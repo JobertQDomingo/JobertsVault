@@ -1,0 +1,170 @@
+# Roadmap: Jobert's Vault
+
+| | |
+|---|---|
+| **Status** | Active |
+| **Last updated** | 2026-10-26 |
+| **Current focus** | **Phase 0: project setup** |
+| **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
+
+This file is the progress tracker.
+- **Tick a box** (`[x]`) when its task meets the definition of done in CLAUDE.md.
+- **IDs in brackets** are PRD requirements, such as `[TXN-1]`. Mention them in the commit message.
+- **Each task is about one pull request.** Within a phase, work top to bottom: later tasks build on earlier ones.
+- **Update "Current focus"** above when you move to the next milestone.
+
+## Overview
+
+| Phase | Goal | Version | Exit criteria | Progress |
+|---|---|---|---|---|
+| **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 2 / 11 |
+| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11 | 0 / 42 |
+| **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 15 |
+| **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
+| **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
+
+---
+
+## Phase 0 · Project setup
+
+- [x] Create the GitHub repository and commit the planning docs (`README.md`, `CLAUDE.md`, `ROADMAP.md`, `docs/`, `assets/brand/`)
+- [ ] Scaffold with `npm create tauri-app@latest`: Tauri 2, React, TypeScript, Vite. Set `productName` to `Jobert's Vault` and `identifier` to `com.jobertsvault.app`.
+- [ ] Set up the window in `tauri.conf.json`: 1440 × 900, `resizable: false`, `maximizable: false`, `center: true`. Also set the content security policy and keep `capabilities/default.json` to the minimum ([ARCHITECTURE §10](docs/ARCHITECTURE.md), [ADR 0008](docs/decisions/0008-fixed-window-size.md))
+- [ ] Frontend libraries: Tailwind CSS 4, shadcn/ui, lucide-react, TanStack Query, React Router, react-hook-form, zod, `@fontsource/sora`
+- [ ] Rust crates: `rusqlite` (with the `bundled` feature), `rusqlite_migration`, `chrono`, `serde`, `thiserror`, `ts-rs`
+- [ ] Tooling: ESLint, Prettier, `rustfmt`, `clippy`, and the npm scripts `lint`, `typecheck`, `test`
+- [ ] Testing: set up Vitest and Testing Library, plus one example test on each side (frontend and Rust)
+- [ ] Type generation: ts-rs writes to `src/bindings/` when `cargo test` runs, and a check confirms the generated files are committed
+- [ ] App icon: `npm run tauri icon assets/brand/app-icon-1024.png`
+- [ ] *(Optional)* CI: a GitHub Actions workflow on `windows-latest` that runs every check from CLAUDE.md
+- [x] Decision records 0001–0009 written ([docs/decisions/](docs/decisions/README.md))
+
+---
+
+## Phase 1 · MVP (`v0.1.0`)
+
+### 1.1 Backend foundations
+- [ ] Database startup: open the database, apply the connection settings (PRAGMAs), refuse a database from a newer app version, show a startup error screen if anything fails ([ARCHITECTURE §6](docs/ARCHITECTURE.md))
+- [ ] Migration `0001_initial.sql`, exactly as in DATA_MODEL §3
+- [ ] Seed data: the Cash account, payment methods, and the preset categories with their colors (DATA_MODEL §7)
+- [ ] `AppError`, `AppState` (one connection behind a `Mutex`), and `api/client.ts` with its typed errors
+- [ ] Domain: the `Money` type, plus parsing and formatting in Rust and in `money.ts`, with tests
+- [ ] Domain: periods (day, Monday-start week, month with `month_start_day`, calendar year), with previous/next and edge-case tests ([DATA_MODEL §5.3](docs/DATA_MODEL.md))
+- [ ] Domain: credit card statement cycle and next due date, with tests (DATA_MODEL §5.5)
+
+### 1.2 Settings
+- [ ] Commands `get_settings` and `update_settings`: currency (₱ default), symbol position, decimals (locked once any transaction exists), week start, month start day, payment method field [SET-1] [SET-2] [SET-6]
+
+### 1.3 Accounts
+- [ ] Create, edit, list and reorder accounts [ACC-1] [ACC-2]
+- [ ] Credit card fields and validation [CC-1] [CC-8]
+- [ ] Balances calculated when requested, the net balance, and the card's amount owed, available credit, utilization, cycle spending and due date [ACC-4] [ACC-5] [CC-2] [CC-6]
+- [ ] Archive and unarchive, with a warning when the balance isn't 0 [ACC-3]
+
+### 1.4 Categories and payment methods
+- [ ] Categories: list, create, edit (name, 12-color palette, icon), reorder, archive [CAT-1] [CAT-2] [CAT-3]
+- [ ] Merge categories, and delete a category that has no transactions [CAT-4]
+- [ ] Payment methods: list, create, edit, archive [TXN-7]
+
+### 1.5 Transactions
+- [ ] Create, edit and delete income, expense and transfer, with every validation rule from DATA_MODEL §6 [TXN-1] [TXN-2]
+- [ ] Duplicate, with today's date [TXN-2]
+- [ ] The list: grouped by day, filters, search, pages of 100 [TXN-3] [TXN-4]
+- [ ] Default to the account used most recently [TXN-1]
+- [ ] Card purchases, bill payments and refunds behave as specified, with service tests, including "a card payment never changes the expense total" [CC-3] [CC-4] [CC-5] [RPT-6]
+
+### 1.6 Dashboard backend
+- [ ] `get_dashboard`: period, totals, balances, net balance, card summary, the 5 most recent transactions and `today`, all in one call [DSH-1] [DSH-2] [DSH-4] [DSH-5] [DSH-8]
+
+### 1.7 Design system in code
+- [ ] Tokens in `globals.css` for light and dark, plus the `glass` and `glass-raised` utilities and the reduced-transparency fallback ([DESIGN_SYSTEM §2–3](docs/DESIGN_SYSTEM.md))
+- [ ] `AuroraBackground` and `GlassPanel`
+- [ ] Restyle the shadcn/ui basics: Button, Input, Select/Combobox, Dialog, Toast, Tabs, Segmented control, Date picker (Monday-first, US dates)
+- [ ] `MoneyText`, `AmountInput`, `CategoryChip`, `AccountRow`, `TransactionRow`, `StatCard`, `ProgressBar`
+- [ ] Empty states, skeletons (shown after 150 ms) and the startup error screen
+
+### 1.8 App shell
+- [ ] Sidebar with the logo, top bar with + Add, routes, `PeriodSwitcher` with the period saved in the URL
+- [ ] TanStack Query hooks, where every money-related key starts with `['ledger', …]`, refreshed after every write
+- [ ] Shortcuts: `Ctrl+N`, `Ctrl+F`, `Ctrl+1`–`3`, `Ctrl+,`, `Alt+←/→`, `Alt+Home`
+
+### 1.9 Screens
+- [ ] Dashboard ([UI_FLOWS §2](docs/UI_FLOWS.md))
+- [ ] Transactions screen with the filter toolbar ([UI_FLOWS §3](docs/UI_FLOWS.md))
+- [ ] Quick-add and edit dialog, including Save & add another and the keyboard path that saves in under 5 seconds [TXN-5]
+- [ ] Accounts list, new/edit account dialog, and account and credit card details
+- [ ] Pay bill: a transfer pre-filled with the full amount owed [CC-9]
+- [ ] Settings: the General, Categories and Payment methods tabs [SET-4]
+- [ ] First-launch setup form: currency and first accounts, skippable [ONB-1]
+- [ ] Fixed-window fallback: open at 1280 × 800 if 1440 × 900 doesn't fit the screen ([ADR 0008](docs/decisions/0008-fixed-window-size.md))
+
+### 1.10 Release `v0.1.0`
+- [ ] Go through PRD §10 by hand on Windows 11, on both monitors
+- [ ] Check performance: cold start under 2 s, and the dashboard and transaction list under 300 ms with 50,000 test transactions. The glass must scroll smoothly.
+- [ ] `npm run tauri build`, install it, and confirm the data is in `%APPDATA%\com.jobertsvault.app\`
+- [ ] Create `CHANGELOG.md`, tag `v0.1.0`
+- [ ] Reminder until Phase 2: copy `jobertsvault.db` somewhere safe by hand
+
+---
+
+## Phase 2 · Reports & backups (`v0.2.0`)
+
+### 2.1 Reports
+- [ ] Income vs expense chart over time, grouped by the period [RPT-1]
+- [ ] Category breakdown (8 largest plus Other) and the ranked list, with clicking through to the transactions [RPT-2] [RPT-3]
+- [ ] Period comparison with the "same days so far" rule and the comparison setting [RPT-4] [RPT-4a] [SET-7]
+- [ ] % change on the dashboard stat cards [DSH-3]
+- [ ] Account filter on reports [RPT-5]
+- [ ] Reports screen ([UI_FLOWS §8.1](docs/UI_FLOWS.md)), its sidebar item and the `Ctrl+4` shortcut
+- [ ] Payee suggestions that fill in the last category used [TXN-6]
+
+### 2.2 Backups and export
+- [ ] Add `tauri-plugin-dialog`, scoped to folder and file pickers only
+- [ ] Back up now (`VACUUM INTO`, then rename the finished file) [BAK-1]
+- [ ] Daily automatic backup, keeping the newest 30 [BAK-2] [BAK-3]
+- [ ] Back up automatically before running migrations [BAK-5]
+- [ ] Restore: check the file, make a safety copy, swap the database, reopen [BAK-4]
+- [ ] Export to CSV (UTF-8 with BOM) [BAK-6]
+- [ ] Backup settings tab, plus a warning when the last backup is more than 7 days old [BAK-7] [SET-3]
+- [ ] Release `v0.2.0`, and test a real restore on a second Windows user account
+
+---
+
+## Phase 3 · Planning (`v0.3.0`)
+
+- [ ] Migration `0003_planning.sql` (DATA_MODEL §4)
+- [ ] Domain: recurrence dates calculated from `start_date`, with the end-of-month and Feb 29 tests (DATA_MODEL §4.1)
+- [ ] Recurring rules: create, edit, pause, delete, with auto or confirm mode [REC-1] [REC-2] [REC-3] [REC-5]
+- [ ] Process recurring rules at startup and when the date changes, never creating a date twice [REC-4]
+- [ ] Review due items: Post, Edit & post, Skip (UI_FLOWS F10)
+- [ ] Recurring screen
+- [ ] Future-dated transactions and the Upcoming section [TXN-8]
+- [ ] Budgets for a category or all spending, weekly, monthly or yearly [BUD-1] [BUD-4]
+- [ ] Budget progress with amber and red thresholds, the Budgets screen, and budgets on the dashboard [BUD-2] [BUD-3] [DSH-6]
+- [ ] Goals linked to an account, with progress and the monthly amount needed [GOL-1] [GOL-2] [GOL-3]
+- [ ] Mark goals achieved and archive them, plus the Goals screen [GOL-4]
+- [ ] Coming up in the next 7 days on the dashboard [DSH-7]
+- [ ] Card due-date banner with Pay bill [CC-7]
+- [ ] The Recurring, Budgets and Goals items appear in the sidebar
+- [ ] Recurring service tests: none missed and none duplicated after the app was closed for 3 months
+- [ ] Release `v0.3.0`
+
+---
+
+## Phase 4 · Polish (`v1.0.0`)
+
+- [ ] Theme switch: system, light or dark [SET-5]
+- [ ] Reduce transparency switch [SET-8]
+- [ ] Polished onboarding: step indicator and a short tour [ONB-2]
+- [ ] `?` opens the keyboard shortcut help dialog, and every shortcut is reviewed
+- [ ] Accessibility pass: focus order, screen reader labels, contrast re-check of any changed tokens
+- [ ] Performance pass on the glass UI with a full year of data
+- [ ] Installer polish: icon, product name, version info. Test on both monitors.
+- [ ] Review all docs against the shipped app, and update any that drifted
+- [ ] Release `v1.0.0`
+
+---
+
+## Not planned
+
+The PRD §3 non-goals stay out of scope unless the PRD is changed first: bank sync, statement import, receipts, multiple users, cloud sync, multiple currencies, investments, tax, other platforms, and split transactions.

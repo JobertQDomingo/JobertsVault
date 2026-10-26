@@ -1,0 +1,661 @@
+<title>Jobert's Vault Design System</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="vault.css">
+<style>
+/* Layout: one reading column on a plain canvas with a sticky section bar; every specimen sits in a preview that paints the app's aurora and draws real glass on top. */
+.sw { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: grid; }
+.sw-head { padding: 10px 12px; display: grid; gap: 2px; border-bottom: 1px solid var(--border); }
+.sw-head code { font-weight: 600; background: none; padding: 0; }
+.sw-panes { display: grid; grid-template-columns: 1fr 1fr; }
+.sw-pane { padding: 12px; display: grid; gap: 8px; align-content: start; min-height: 120px; }
+.sw-pane .sw-meta { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; line-height: 14px; flex-wrap: wrap; }
+.sw-pane .sw-meta > span { background: var(--glass-strong); border-radius: 999px; padding: 1px 7px; color: var(--muted-foreground); }
+.sw-pane .sw-meta code { font-size: 11px; background: var(--glass-strong); border-radius: 999px; padding: 1px 7px; color: var(--foreground); }
+.sw-glass { background: var(--glass); border: 1px solid var(--edge); box-shadow: var(--shadow-panel); -webkit-backdrop-filter: var(--blur-panel); backdrop-filter: var(--blur-panel); border-radius: 12px; height: 52px; display: grid; place-items: center; font-weight: 600; font-size: 18px; font-variant-numeric: tabular-nums; padding: 0 8px; overflow: hidden; white-space: nowrap; }
+.aa { color: var(--success) !important; font-weight: 600; }
+.cat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.cat-card .top { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; gap: 8px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.cat-card .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.cat-card .panes { display: grid; grid-template-columns: 1fr 1fr; }
+.cat-card .pane { padding: 10px; }
+.cat-card .pane .inner { background: var(--glass); border: 1px solid var(--edge); -webkit-backdrop-filter: var(--blur-panel); backdrop-filter: var(--blur-panel); border-radius: 12px; padding: 8px; display: grid; gap: 8px; }
+.cat-card .chip-name { font-size: 12px; line-height: 16px; min-width: 0; }
+.cat-card .chip-name span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clash { outline: 2px solid var(--warning); outline-offset: 2px; border-radius: 8px; }
+.aurora-box { border-radius: 12px; height: 150px; border: 1px solid var(--border); overflow: hidden; }
+.layers { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 340px; padding: 24px; }
+.layers > .lv1, .layers > .lv2 { grid-area: 1 / 1; }
+.layers .lv0 { position: absolute; top: 14px; right: 14px; font-size: 12px; background: var(--glass-strong); border: 1px solid var(--edge); border-radius: 999px; padding: 2px 10px; color: var(--muted-foreground); }
+.layers .lv1 { width: min(100%, 460px); align-self: center; justify-self: start; margin-left: 4%; }
+.layers .lv2 { width: min(100%, 300px); align-self: end; justify-self: start; margin-left: min(calc(4% + 360px), calc(100% - 300px)); padding: 16px 18px; display: grid; gap: 4px; }
+.lv-title { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.type-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 160px; gap: 16px; align-items: baseline; padding: 14px 18px; border-top: 1px solid var(--hairline); }
+.type-row:first-child { border-top: 0; }
+.type-row .spec { font-size: 12px; color: var(--muted-foreground); text-align: right; }
+.space-row { display: grid; grid-template-columns: 60px 1fr; gap: 12px; align-items: center; font-size: 12px; color: var(--muted-foreground); }
+.space-bar { height: 12px; background: color-mix(in srgb, var(--primary) 30%, transparent); border-left: 2px solid var(--primary); border-radius: 2px; }
+.radius-box { height: 72px; border: 1px solid var(--edge); background: var(--glass); -webkit-backdrop-filter: var(--blur-panel); backdrop-filter: var(--blur-panel); box-shadow: var(--shadow-panel); display: grid; place-items: center; font-size: 12px; font-weight: 600; text-align: center; }
+.mini-shell { display: grid; grid-template-columns: 26% minmax(0, 1fr); gap: 10px; height: 230px; font-size: 12px; }
+.mini-shell .v-side { padding: 12px; gap: 6px; }
+.mini-shell .v-side i { display: block; height: 10px; border-radius: 4px; background: var(--wash); }
+.mini-shell .v-main { gap: 10px; }
+.mini-shell .v-top { padding: 8px 12px; }
+.mini-shell .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; flex: 1; }
+.mini-shell .cards .v-card { display: grid; place-items: center; color: var(--muted-foreground); }
+.icon-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: grid; gap: 8px; justify-items: start; }
+.icon-tile .ico { width: 36px; height: 36px; border-radius: 10px; background: var(--muted); display: grid; place-items: center; }
+.cal { width: 268px; border-radius: 16px; padding: 12px; }
+.cal .hd { display: flex; justify-content: space-between; align-items: center; font-weight: 600; margin-bottom: 8px; }
+.cal .g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+.cal .g .dow { color: var(--muted-foreground); font-weight: 600; padding: 4px 0; }
+.cal .g .d { height: 30px; line-height: 30px; border-radius: 9px; }
+.cal .g .d.out { color: var(--muted-foreground); opacity: 0.6; }
+.cal .g .d.sel { background: var(--primary); color: var(--primary-foreground); font-weight: 600; }
+.dd { display: grid; grid-template-columns: minmax(0, 240px) minmax(0, 1fr); gap: 4px 24px; margin: 0; }
+.dd dt { font-weight: 600; padding-top: 12px; border-top: 1px solid var(--border); }
+.dd dd { margin: 0; padding-top: 12px; border-top: 1px solid var(--border); color: var(--muted-foreground); }
+.do-dont { display: grid; grid-template-columns: 1fr 1fr; }
+.do-dont > div { padding: 10px 14px; border-top: 1px solid var(--border); }
+.do-dont .hdr { font-size: 12px; font-weight: 600; color: var(--muted-foreground); background: var(--muted); border-top: 0; }
+.do-dont .hdr.y { color: var(--income); } .do-dont .hdr.n { color: var(--expense); }
+.date-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px; }
+.date-compare .opt { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--surface); display: grid; gap: 6px; }
+pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; overflow-x: auto; font-family: var(--font-mono); font-size: 12px; line-height: 18px; }
+.lift { transition: transform 200ms ease-out; }
+.lift:hover { transform: translateY(-2px); }
+@media (max-width: 640px) {
+  .type-row { grid-template-columns: 1fr; gap: 4px; }
+  .type-row .spec { text-align: left; }
+  .dd { grid-template-columns: 1fr; }
+  .dd dd { border-top: 0; padding-top: 0; }
+  .do-dont { grid-template-columns: 1fr; }
+  .mini-shell { grid-template-columns: 1fr; height: auto; }
+  .mini-shell .v-side { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .lift:hover { transform: none; } }
+</style>
+
+<div class="wrap">
+  <header class="doc-head">
+    <div class="eyebrow"><img src="../../assets/brand/logo.svg" width="16" height="16" alt=""> Jobert's Vault · DESIGN_SYSTEM.md</div>
+    <h1>Design system</h1>
+    <p class="lede">The visual version of DESIGN_SYSTEM.md, now in the Glassmorphism 2.0 style. The app's surfaces are frosted glass floating over a soft colored light we call the aurora. Every color, size and component here uses the app's real tokens. Use the switches to see light or dark mode, or what the app looks like with Windows transparency turned off.</p>
+    <div class="meta">
+      <span class="pill style"><i data-lucide="circle-check" class="s14"></i> Approved v1.0</span>
+      <span class="pill style"><i data-lucide="sparkles" class="s14"></i> Glassmorphism 2.0</span>
+      <span class="pill">Sora · lucide icons</span>
+      <span class="pill">Peso ₱</span>
+      <span class="pill">Updated Oct 26, 2026</span>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <nav class="toc" aria-label="Sections">
+      <a href="#principles">Principles</a><a href="#material">Glass &amp; layers</a><a href="#color">Color</a><a href="#type">Type</a><a href="#spacing">Shape</a>
+      <a href="#icons">Icons</a><a href="#money">Money</a><a href="#dates">Dates</a><a href="#components">Components</a>
+      <a href="#motion">Motion &amp; performance</a><a href="#questions">Open questions</a>
+    </nav>
+    <div class="controls">
+      <label class="switch" for="reduce-transparency"><input type="checkbox" id="reduce-transparency"> Transparency off</label>
+      <div class="seg-ctl" role="group" aria-label="Preview theme">
+        <button type="button" data-theme-mode="auto" aria-pressed="true">Match page</button>
+        <button type="button" data-theme-mode="light" aria-pressed="false">Light</button>
+        <button type="button" data-theme-mode="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. Principles -->
+  <section class="s" id="principles">
+    <h2><span class="sec-no">§1</span> Principles</h2>
+    <dl class="dd">
+      <dt>Numbers come first</dt><dd>Amounts are the largest, clearest thing on screen. The glass frames them and never competes with them.</dd>
+      <dt>Glass is the material, color is the light</dt><dd>Panels stay neutral and frosted. Color lives in the aurora behind them and in the meaning colors (income, expense, warnings), never on whole panels.</dd>
+      <dt>Readability beats effect</dt><dd>Text always sits on a frosted panel, never straight on the aurora. Every text color is checked at the worst spot, where a panel sits over the strongest color.</dd>
+      <dt>One layer of blur</dt><dd>A panel is blurred once. Rows, chips, fields and toolbars inside it are flat tints, never blurred again.</dd>
+      <dt>Never rely on color alone</dt><dd>Income and expense always also have a sign (+ / −) or an icon.</dd>
+      <dt>Built for the keyboard</dt><dd>Every action works without a mouse, with a visible focus ring.</dd>
+    </dl>
+  </section>
+
+  <!-- 2. Material -->
+  <section class="s" id="material">
+    <h2><span class="sec-no">§2</span> Glass and layers</h2>
+    <p class="sec-intro">The app has three levels. The aurora canvas is always at the back. Panels float on it, and raised elements float over the panels. Each level up is more opaque, more blurred and casts a deeper shadow.</p>
+    <div class="preview layers">
+      <span class="lv0">Level 0 · Canvas: aurora + grain</span>
+      <div class="v-card lv1">
+        <div class="v-card-h"><span class="lv-title"><i data-lucide="panel-left" class="s20"></i>Level 1 · Panel</span></div>
+        <p class="cap" style="margin:0;padding:0 18px 10px">Sidebar, top bar, toolbars and cards. Glass 62%, blur 22 px, bright 1 px edge, soft shadow.</p>
+        <div class="v-row compact"><span class="chip" style="--c:var(--cat-2)"><i data-lucide="shopping-cart"></i></span><div class="what"><b>Food &amp; Groceries</b><span>Rows inside are flat, not blurred</span></div><span class="money exp">−₱85.20</span></div>
+        <div class="v-row compact"><span class="chip" style="--c:var(--cat-12)"><i data-lucide="briefcase"></i></span><div class="what"><b>Salary</b><span>Employer · Bank</span></div><span class="money inc">+₱4,200.00</span></div>
+      </div>
+      <div class="v-dialog lv2">
+        <span class="lv-title"><i data-lucide="layers" class="s20"></i>Level 2 · Raised</span>
+        <span class="cap">Dialogs, menus, toasts and the date picker. Glass 86%, blur 32 px, deeper shadow. Behind a dialog the app dims and blurs.</span>
+      </div>
+    </div>
+
+    <h3 class="sub">Rules</h3>
+    <div class="tbl-wrap">
+      <div class="do-dont">
+        <div class="hdr y">Do</div><div class="hdr n">Don't</div>
+        <div>Put all text on a panel, a field or a frosted pill</div><div class="muted">Put text straight on the aurora</div>
+        <div>Blur a panel once. Rows, chips and fields inside it are flat tints (<code>--wash</code>, <code>--field</code>)</div><div class="muted">Put blurred panels inside blurred panels</div>
+        <div>Use <code>--glass-strong</code> for dialogs, menus and toasts</div><div class="muted">Give a dialog the same transparency as the cards behind it</div>
+        <div>Keep color in the aurora and in the meaning colors</div><div class="muted">Tint whole panels with category colors</div>
+        <div>Keep about 12 or fewer blurred elements on screen</div><div class="muted">Blur every list row</div>
+        <div>Tint the net cashflow card with 12% of the accent, the one exception</div><div class="muted">Tint every stat card</div>
+      </div>
+    </div>
+
+    <h3 class="sub">The aurora</h3>
+    <p class="sec-intro" style="margin-bottom:12px">Four soft color lights sit in the corners of the window over a plain canvas, with a faint film grain on top. The aurora is painted by the app, not the Windows wallpaper, so contrast never depends on your desktop. It's fixed to the window: it doesn't scroll or move.</p>
+    <div class="grid g2">
+      <div class="stack" style="gap:6px"><div class="aurora aurora-box theme-light"></div><span class="cap">Light: pink <code>#FF8BD0</code> top-left · blue <code>#7FA8FF</code> top-right · mint <code>#5EEAD4</code> bottom-right · peach <code>#FDBA74</code> bottom-left · canvas <code>#EEF1FA</code> · grain 9%</span></div>
+      <div class="stack" style="gap:6px"><div class="aurora aurora-box theme-dark"></div><span class="cap">Dark: violet <code>#7C3AED</code> · blue <code>#1D4ED8</code> · teal <code>#0E7490</code> · magenta <code>#BE185D</code> · canvas <code>#070815</code> · grain 7%</span></div>
+    </div>
+
+    <h3 class="sub">When transparency is off</h3>
+    <p class="sec-intro" style="margin-bottom:12px">If Windows' "Transparency effects" setting is off, the app follows it: panels become solid (<code>--glass-solid</code>) and the blur turns off, but the aurora, shapes and colors stay. Settings → Appearance also gets a <b>Reduce transparency</b> switch for this app alone (Phase 4). Try the <b>Transparency off</b> switch at the top of this page.</p>
+    <div class="grid g2">
+      <div class="preview"><p class="preview-label"><span>Glass (normal)</span></p><div class="v-card v-stat"><span class="lab">Net cashflow</span><span class="display inc">+₱1,249.60</span></div></div>
+      <div class="preview"><p class="preview-label"><span>Transparency off</span></p><div class="v-card v-stat solid"><span class="lab">Net cashflow</span><span class="display inc">+₱1,249.60</span></div></div>
+    </div>
+  </section>
+
+  <!-- 3. Color -->
+  <section class="s" id="color">
+    <h2><span class="sec-no">§3</span> Color</h2>
+    <p class="sec-intro">Each token is shown in light mode (left) and dark mode (right), on glass over the aurora. The ratios are <b>worst-case contrast</b>: text on a 62% panel sitting over the strongest aurora color. WCAG AA needs 4.5 : 1 for text, and every text color passes. The lowest is 4.95 : 1, for expense red in light mode.</p>
+
+    <h3 class="sub">3.1 Glass surfaces</h3>
+    <div class="grid g4" id="sw-surface"></div>
+
+    <h3 class="sub">3.2 Text and accent</h3>
+    <div class="grid g4" id="sw-text"></div>
+
+    <h3 class="sub">3.3 Meaning: money and status</h3>
+    <div class="grid g4" id="sw-meaning"></div>
+    <p class="cap" style="margin-top:12px"><code>--danger</code> uses the same red as <code>--expense</code>. Each meaning color also has a tint for chips and banners: 16% in light mode, 20% in dark.</p>
+    <div class="preview" style="margin-top:12px">
+      <div class="v-toolbar">
+        <span class="chip" style="--c:var(--income)"><i data-lucide="arrow-down-left"></i></span>
+        <span class="chip" style="--c:var(--expense)"><i data-lucide="arrow-up-right"></i></span>
+        <span class="chip xfer"><i data-lucide="arrow-left-right"></i></span>
+        <span class="chip" style="--c:var(--warning)"><i data-lucide="triangle-alert"></i></span>
+        <span class="chip" style="--c:var(--danger)"><i data-lucide="octagon-alert"></i></span>
+        <span class="chip" style="--c:var(--success)"><i data-lucide="circle-check"></i></span>
+      </div>
+    </div>
+
+    <h3 class="sub">3.4 Category palette <code>cat-1</code> … <code>cat-12</code></h3>
+    <p class="sec-intro" style="margin-bottom:12px">Twelve new values, deeper in light mode and lighter in dark, so category icons stay clear on glass. As icons they need 3 : 1 contrast. The worst case is 3.7 : 1 in light mode and 6.4 : 1 in dark. Income and expense colors are numbered separately, so the 12 most common expense categories each have their own color. Each card lists the preset categories that use it.</p>
+    <div class="grid g4" id="sw-cats"></div>
+    <div class="v-banner info" style="margin-top:16px"><i data-lucide="circle-check" class="s20"></i><div class="msg"><b>Decided:</b> income and expense colors are numbered separately. Only 5 rarely used expense categories share a color, and a category you add gets the least-used color by default.</div></div>
+
+    <h3 class="sub">3.5 Implementation (Tailwind 4)</h3>
+    <pre class="code">/* src/styles/globals.css */
+:root { --glass: rgb(255 255 255 / .62); --edge: rgb(255 255 255 / .8); --income: #03684A; /* … */ }
+.dark { --glass: rgb(20 22 38 / .62);    --edge: rgb(255 255 255 / .14); --income: #6EE7B7; /* … */ }
+
+@utility glass        { background: var(--glass);        border: 1px solid var(--edge); backdrop-filter: blur(22px) saturate(170%); box-shadow: var(--shadow-panel); }
+@utility glass-raised { background: var(--glass-strong); border: 1px solid var(--edge); backdrop-filter: blur(32px) saturate(180%); box-shadow: var(--shadow-raised); }
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .glass-raised { background: var(--glass-solid); backdrop-filter: none; }
+}</pre>
+  </section>
+
+  <!-- 4. Type -->
+  <section class="s" id="type">
+    <h2><span class="sec-no">§4</span> Typography</h2>
+    <p class="sec-intro"><b>Sora</b>, a clean geometric typeface, is bundled inside the app in weights 400, 600 and 700 (the app has no network access). I checked that it has fixed-width digits, so amounts line up in columns, and that it includes the ₱ sign. If it ever fails to load, the app falls back to Segoe UI Variable.</p>
+    <div class="preview on-surface shot" style="padding:10px">
+      <div class="type-row"><code>display</code><div class="display">₱8,240.75</div><div class="spec">30 / 36 · 700 · −2% · amounts</div></div>
+      <div class="type-row"><code>h1</code><div style="font-size:24px;line-height:32px;font-weight:700;letter-spacing:-0.02em">Dashboard</div><div class="spec">24 / 32 · 700 · −2% · page titles</div></div>
+      <div class="type-row"><code>h2</code><div style="font-size:18px;line-height:28px;font-weight:600">Add transaction</div><div class="spec">18 / 28 · 600 · dialogs</div></div>
+      <div class="type-row"><code>h3</code><div style="font-size:16px;line-height:24px;font-weight:600">Recent transactions</div><div class="spec">16 / 24 · 600 · card titles</div></div>
+      <div class="type-row"><code>body</code><div>Lunch with the team at Corner Cafe, paid with the credit card.</div><div class="spec">14 / 20 · 400 · default</div></div>
+      <div class="type-row"><code>body-strong</code><div class="money exp">−₱12.50</div><div class="spec">14 / 20 · 600 · list amounts</div></div>
+      <div class="type-row"><code>small</code><div class="cap">Statement closes Nov 20 · Payment due Nov 5</div><div class="spec">12 / 16 · 400 · helper text</div></div>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="preview on-surface">
+        <p class="preview-label"><span>Fixed-width digits line up</span></p>
+        <div class="stack num" style="font-weight:600;text-align:right;max-width:200px;gap:2px"><span>₱1,111.11</span><span>₱8,410.75</span><span>₱320.00</span></div>
+      </div>
+      <div class="preview on-surface">
+        <p class="preview-label"><span>Sentence case everywhere</span></p>
+        <div class="stack" style="gap:6px"><span><span class="inc">✓</span> Add transaction</span><span class="muted"><span class="exp">✕</span> Add Transaction</span><span class="muted"><span class="exp">✕</span> ADD TRANSACTION</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Shape -->
+  <section class="s" id="spacing">
+    <h2><span class="sec-no">§5</span> Spacing, shape and depth</h2>
+    <div class="grid g2">
+      <div class="preview on-surface">
+        <p class="preview-label"><span>Spacing scale (4 px base)</span></p>
+        <div class="stack" style="gap:8px">
+          <div class="space-row"><span>4</span><div class="space-bar" style="width:4px"></div></div>
+          <div class="space-row"><span>8</span><div class="space-bar" style="width:8px"></div></div>
+          <div class="space-row"><span>12</span><div class="space-bar" style="width:12px"></div></div>
+          <div class="space-row"><span>16</span><div class="space-bar" style="width:16px"></div></div>
+          <div class="space-row"><span>24</span><div class="space-bar" style="width:24px"></div></div>
+          <div class="space-row"><span>32</span><div class="space-bar" style="width:32px"></div></div>
+          <div class="space-row"><span>48</span><div class="space-bar" style="width:48px"></div></div>
+        </div>
+      </div>
+      <div class="preview">
+        <p class="preview-label"><span>Radius: rounder as things get bigger</span></p>
+        <div class="grid" style="grid-template-columns:repeat(5,minmax(0,1fr));gap:8px">
+          <div class="radius-box" style="border-radius:10px">10<br><span class="cap">chips</span></div>
+          <div class="radius-box" style="border-radius:12px">12<br><span class="cap">controls</span></div>
+          <div class="radius-box" style="border-radius:16px">16<br><span class="cap">toolbars</span></div>
+          <div class="radius-box" style="border-radius:20px">20<br><span class="cap">panels</span></div>
+          <div class="radius-box" style="border-radius:24px">24<br><span class="cap">dialogs</span></div>
+        </div>
+        <p class="preview-label" style="margin-top:20px"><span>Depth: panel shadow vs raised shadow</span></p>
+        <div class="grid" style="grid-template-columns:1fr 1fr;gap:16px">
+          <div class="v-card" style="height:64px;display:grid;place-items:center" >Panel</div>
+          <div class="v-dialog" style="height:64px;display:grid;place-items:center;width:auto">Raised</div>
+        </div>
+      </div>
+    </div>
+    <h3 class="sub">Window layout: floating panels</h3>
+    <div class="preview">
+      <div class="mini-shell">
+        <div class="v-side"><b style="font-size:12px">Sidebar · 228 px</b><i></i><i></i><i></i><i></i></div>
+        <div class="v-main">
+          <div class="v-top"><span>Top bar · page title + Add</span></div>
+          <div class="v-period" style="font-size:12px;padding:6px 12px">Period bar</div>
+          <div class="cards"><div class="v-card">card</div><div class="v-card">card</div><div class="v-card">card</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="cap" style="margin-top:8px">The window is a <b>fixed 1440 × 900</b>, not resizable or maximizable, and it falls back to 1280 × 800 if the screen is too small. Every panel floats with a 12 px gap, including from the window edge. The content column is 1176 px wide, and it scrolls under the fixed top bar.</p>
+  </section>
+
+  <!-- 6. Icons -->
+  <section class="s" id="icons">
+    <h2><span class="sec-no">§6</span> Icons</h2>
+    <p class="sec-intro">lucide icons with a 1.75 stroke: 16 px inline and in buttons, 20 px in the sidebar, 24 px in empty states. Category icons sit in a 32 px chip with 10 px corners: a tint of the category color, a bright inner edge, and the icon in full color.</p>
+    <div class="grid g4">
+      <div class="icon-tile"><span class="ico inc"><i data-lucide="arrow-down-left" class="s20"></i></span><b>Income</b><code class="cap">arrow-down-left</code></div>
+      <div class="icon-tile"><span class="ico exp"><i data-lucide="arrow-up-right" class="s20"></i></span><b>Expense</b><code class="cap">arrow-up-right</code></div>
+      <div class="icon-tile"><span class="ico xfer"><i data-lucide="arrow-left-right" class="s20"></i></span><b>Transfer</b><code class="cap">arrow-left-right</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="wallet" class="s20"></i></span><b>Cash account</b><code class="cap">wallet</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="landmark" class="s20"></i></span><b>Bank account</b><code class="cap">landmark</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="smartphone" class="s20"></i></span><b>E-wallet</b><code class="cap">smartphone</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="credit-card" class="s20"></i></span><b>Credit card</b><code class="cap">credit-card</code></div>
+      <div class="icon-tile"><img src="../../assets/brand/logo.svg" width="36" height="36" alt=""><b>App logo</b><span class="cap">C · Line Door</span></div>
+    </div>
+
+    <h3 class="sub">6.1 Logo: Line Door</h3>
+    <p class="sec-intro" style="margin-bottom:12px">A bank-vault door in bold white lines on a rounded indigo tile, with the aurora's light glowing inside. It has a ring, two hinges, a six-spoke wheel and a solid hub. It stays readable down to 16 px.</p>
+    <div class="grid g2">
+      <div class="preview">
+        <p class="preview-label"><span>App icon · <code>logo.svg</code> · 96, 48, 30, 24, 16 px</span></p>
+        <div class="v-toolbar" style="align-items:flex-end;gap:16px;padding:14px 16px">
+          <img src="../../assets/brand/logo.svg" width="96" height="96" alt="Jobert's Vault logo"><img src="../../assets/brand/logo.svg" width="48" height="48" alt=""><img src="../../assets/brand/logo.svg" width="30" height="30" alt=""><img src="../../assets/brand/logo.svg" width="24" height="24" alt=""><img src="../../assets/brand/logo.svg" width="16" height="16" alt="">
+        </div>
+        <div class="v-card" style="margin-top:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;width:fit-content"><img src="../../assets/brand/logo.svg" width="30" height="30" alt=""><b style="font-size:18px;letter-spacing:-0.01em">Jobert's Vault</b></div>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px">
+        <div style="background:#312E81;border-radius:16px;display:grid;place-items:center;padding:24px;gap:8px"><img src="../../assets/brand/logo-mark-white.svg" width="88" height="88" alt="White one-color mark"><span style="color:#E0E7FF;font-size:12px">logo-mark-white.svg</span></div>
+        <div style="background:#FFFFFF;border:1px solid var(--border);border-radius:16px;display:grid;place-items:center;padding:24px;gap:8px"><img src="../../assets/brand/logo-mark-indigo.svg" width="88" height="88" alt="Indigo one-color mark"><span style="color:#3D4560;font-size:12px">logo-mark-indigo.svg</span></div>
+      </div>
+    </div>
+    <p class="cap" style="margin-top:8px">Keep at least one eighth of the icon's width clear around it. Don't recolor the tile, rotate the door, or add text or ₱ inside it. The Windows icons are generated from <code>app-icon-1024.png</code> with <code>tauri icon</code>.</p>
+  </section>
+
+  <!-- 7. Money -->
+  <section class="s" id="money">
+    <h2><span class="sec-no">§7</span> Money and number formatting</h2>
+    <p class="sec-intro">Philippine peso, with the official sign <b>₱</b> (U+20B1) placed before the amount and 2 decimal places. All formatting goes through <code>src/lib/money.ts</code>. Expenses use a true minus sign (−), not a hyphen.</p>
+    <div class="preview on-surface shot">
+      <div class="tbl-wrap" style="border:0;background:none">
+        <table class="t">
+          <thead><tr><th style="background:var(--wash)">Case</th><th style="background:var(--wash)">Shown as</th><th style="background:var(--wash)">Color token</th></tr></thead>
+          <tbody>
+            <tr><td style="border-top-color:var(--hairline)">Income in lists</td><td style="border-top-color:var(--hairline)"><span class="money inc">+₱1,234.50</span></td><td style="border-top-color:var(--hairline)"><code>--income</code></td></tr>
+            <tr><td style="border-top-color:var(--hairline)">Expense in lists</td><td style="border-top-color:var(--hairline)"><span class="money exp">−₱1,234.50</span></td><td style="border-top-color:var(--hairline)"><code>--expense</code></td></tr>
+            <tr><td style="border-top-color:var(--hairline)">Transfer in lists</td><td style="border-top-color:var(--hairline)"><span class="money xfer" style="display:inline-flex;gap:6px;align-items:center"><i data-lucide="arrow-left-right" class="s14"></i>₱1,234.50</span></td><td style="border-top-color:var(--hairline)"><code>--transfer</code></td></tr>
+            <tr><td style="border-top-color:var(--hairline)">Balance, positive</td><td style="border-top-color:var(--hairline)"><span class="money">₱1,234.50</span></td><td style="border-top-color:var(--hairline)"><code>--foreground</code></td></tr>
+            <tr><td style="border-top-color:var(--hairline)">Balance, negative</td><td style="border-top-color:var(--hairline)"><span class="money exp">−₱1,234.50</span></td><td style="border-top-color:var(--hairline)"><code>--expense</code></td></tr>
+            <tr><td style="border-top-color:var(--hairline)">Credit card</td><td style="border-top-color:var(--hairline)"><span class="money">₱1,234.50 owed</span></td><td style="border-top-color:var(--hairline)"><code>--foreground</code></td></tr>
+            <tr><td style="border-top-color:var(--hairline)">Net cashflow</td><td style="border-top-color:var(--hairline)"><span class="money inc">+₱500.00</span> &nbsp; <span class="money exp">−₱500.00</span></td><td style="border-top-color:var(--hairline)"><code>--income</code> / <code>--expense</code></td></tr>
+            <tr><td style="border-top-color:var(--hairline)">Zero</td><td style="border-top-color:var(--hairline)"><span class="money zero">₱0.00</span></td><td style="border-top-color:var(--hairline)"><code>--muted-foreground</code></td></tr>
+            <tr><td style="border-top-color:var(--hairline)">Chart axis</td><td style="border-top-color:var(--hairline)"><span class="num cap">₱12.5k · ₱1.2M</span></td><td style="border-top-color:var(--hairline)"><span class="cap">muted, small</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <h3 class="sub">Percent change <span class="phase">Phase 2</span></h3>
+    <div class="preview on-surface">
+      <div class="grid g3">
+        <div class="stack" style="gap:6px"><span class="cap">Income or net goes up: good</span><span class="pct good">▲ 3.1%</span></div>
+        <div class="stack" style="gap:6px"><span class="cap">Income or net goes down: bad</span><span class="pct bad">▼ 12.0%</span></div>
+        <div class="stack" style="gap:6px"><span class="cap">Expense goes up: bad</span><span class="pct bad">▲ 8.0%</span></div>
+        <div class="stack" style="gap:6px"><span class="cap">Expense goes down: good</span><span class="pct good">▼ 4.0%</span></div>
+        <div class="stack" style="gap:6px"><span class="cap">Nothing to compare against</span><span class="pct none">—</span></div>
+      </div>
+    </div>
+    <h3 class="sub">Amount input</h3>
+    <div class="preview on-surface">
+      <div class="grid g3">
+        <div class="v-field"><span class="v-label">While typing</span><div class="v-input amount is-focus">1234.5<span class="caret"></span></div></div>
+        <div class="v-field"><span class="v-label">After leaving the field</span><div class="v-input amount">1,234.50</div></div>
+        <div class="v-field"><span class="v-label">Stored value</span><div class="v-input" style="font-family:var(--font-mono);font-size:12.5px">123450 <span class="muted">(centavos)</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. Dates -->
+  <section class="s" id="dates">
+    <h2><span class="sec-no">§8</span> Date formatting</h2>
+    <div class="tbl-wrap">
+      <table class="t">
+        <thead><tr><th>Use</th><th>Example</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Day group header</td><td class="nowrap"><b>Today</b> · <b>Yesterday</b> · <b>Mon, Oct 26</b></td><td>Adds the year when it isn't this year</td></tr>
+          <tr><td>Day period</td><td class="nowrap">Mon, Oct 26, 2026</td><td></td></tr>
+          <tr><td>Week period</td><td class="nowrap">Oct 26 – Nov 1, 2026</td><td>Monday to Sunday</td></tr>
+          <tr><td>Month period</td><td class="nowrap">October 2026 · Sep 25 – Oct 24, 2026</td><td>A range when the month start day is after the 1st</td></tr>
+          <tr><td>Year period</td><td class="nowrap">2026</td><td>Always the calendar year</td></tr>
+          <tr><td>Date input</td><td class="nowrap">10/26/2026</td><td>Stored as <code>2026-10-26</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="cap" style="margin-top:12px"><b>Decided:</b> dates always use US order (<span class="num">10/26/2026</span>, Oct 26), whatever the Windows region setting.</p>
+  </section>
+
+  <!-- 9. Components -->
+  <section class="s" id="components">
+    <h2><span class="sec-no">§9</span> Components</h2>
+    <p class="sec-intro">Built on shadcn/ui, restyled with the glass tokens. App-specific components live in <code>src/components/</code>. Hover and focus states are drawn statically so you can see them.</p>
+
+    <h3 class="sub">Buttons</h3>
+    <div class="preview on-surface stack">
+      <div class="row">
+        <button class="v-btn primary" type="button"><i data-lucide="plus"></i> Add</button>
+        <button class="v-btn primary is-hover" type="button">Hover</button>
+        <button class="v-btn primary is-focus" type="button">Focused</button>
+        <button class="v-btn secondary" type="button">Cancel</button>
+        <button class="v-btn ghost" type="button"><i data-lucide="sliders-horizontal"></i> Filters</button>
+        <button class="v-btn destructive" type="button"><i data-lucide="trash-2"></i> Delete transaction</button>
+        <button class="v-btn primary" type="button" disabled>Disabled</button>
+      </div>
+      <div class="row">
+        <button class="v-btn primary sm" type="button">Save</button>
+        <button class="v-btn secondary sm" type="button">Cancel</button>
+        <button class="v-btn ghost icon is-hover" type="button" aria-label="Edit"><i data-lucide="pencil"></i></button>
+        <button class="v-btn ghost icon" type="button" aria-label="Duplicate"><i data-lucide="copy"></i></button>
+        <span class="cap">Primary is solid indigo with a soft glow. Secondary uses the field fill. Buttons are never glass themselves.</span>
+      </div>
+    </div>
+
+    <h3 class="sub">Inputs</h3>
+    <div class="preview on-surface">
+      <div class="grid g3">
+        <div class="v-field"><span class="v-label">Payee</span><div class="v-input"><span class="ph">e.g. Corner Cafe</span></div><span class="v-help">Optional</span></div>
+        <div class="v-field"><span class="v-label">Payee (focused)</span><div class="v-input is-focus">Corner Ca<span class="caret"></span></div></div>
+        <div class="v-field"><span class="v-label">Amount (error)</span><div class="v-input amount is-error">0.00</div><span class="v-err"><i data-lucide="circle-alert" class="s14"></i>Amount must be more than 0</span></div>
+      </div>
+    </div>
+
+    <h3 class="sub">Combobox and date picker <span class="phase">raised glass</span></h3>
+    <div class="preview">
+      <div class="row top" style="gap:24px">
+        <div class="v-field" style="width:280px">
+          <span class="v-label" style="background:var(--glass-strong);border-radius:999px;padding:1px 8px;width:fit-content">Category</span>
+          <div class="v-input is-focus"><span class="grow">din<span class="caret"></span></span><i data-lucide="chevron-down" class="muted"></i></div>
+          <div class="v-menu">
+            <div class="opt on"><span class="chip sm" style="--c:var(--cat-6)"><i data-lucide="utensils"></i></span><span><mark>Din</mark>ing Out</span><i data-lucide="corner-down-left" class="s14 muted" style="margin-left:auto"></i></div>
+          </div>
+        </div>
+        <div class="v-field">
+          <span class="v-label" style="background:var(--glass-strong);border-radius:999px;padding:1px 8px;width:fit-content">Date</span>
+          <div class="v-input" style="width:268px"><span class="grow num">10/26/2026</span><i data-lucide="calendar" class="muted"></i></div>
+          <div class="cal" id="cal"></div>
+        </div>
+      </div>
+      <p class="cap" style="margin-top:12px">Menus and the calendar are raised glass. Weeks start on Monday. ↑ / ↓ in the date field move one day. Typing filters the categories, and Enter picks one.</p>
+    </div>
+
+    <h3 class="sub">Period bar and segmented control</h3>
+    <div class="preview stack">
+      <div class="v-period">
+        <div class="v-seg"><span>Day</span><span>Week</span><span class="on">Month</span><span>Year</span><span>Custom</span></div>
+        <div class="nav"><button class="v-btn ghost icon" type="button" aria-label="Previous period"><i data-lucide="chevron-left"></i></button><span class="label">October 2026</span><button class="v-btn ghost icon" type="button" aria-label="Next period"><i data-lucide="chevron-right"></i></button></div>
+        <button class="v-btn secondary sm" type="button" disabled>Today</button>
+      </div>
+      <p class="cap">The period bar is its own small glass toolbar, so its label never sits on the bare aurora. The selected segment is solid indigo. "Today" is disabled because the current period is already selected.</p>
+    </div>
+
+    <h3 class="sub">Stat cards</h3>
+    <div class="preview">
+      <div class="grid g3">
+        <div class="v-card v-stat lift"><span class="lab"><i data-lucide="arrow-down-left" class="s14 inc"></i>Income</span><span class="display inc">+₱4,200.00</span><span class="chg"><span class="pct good">▲ 3.1%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
+        <div class="v-card v-stat lift"><span class="lab"><i data-lucide="arrow-up-right" class="s14 exp"></i>Expense</span><span class="display exp">−₱2,950.40</span><span class="chg"><span class="pct good">▼ 8.0%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
+        <div class="v-card v-stat net lift"><span class="lab"><i data-lucide="scale" class="s14 muted"></i>Net cashflow</span><span class="display inc">+₱1,249.60</span><span class="chg"><span class="pct good">▲ 44.2%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
+      </div>
+      <p class="cap" style="margin-top:12px">Clickable cards lift 2 px on hover. Net cashflow is the one card tinted with the accent.</p>
+    </div>
+
+    <h3 class="sub">Rows: transactions and accounts</h3>
+    <div class="grid g2">
+      <div class="preview">
+        <div class="v-card">
+          <div class="v-day"><span>Today, Mon Oct 26</span><span class="money exp">−₱85.20</span></div>
+          <div class="v-row compact is-hover"><span class="chip" style="--c:var(--cat-2)"><i data-lucide="shopping-cart"></i></span><div class="what"><b>Food &amp; Groceries</b><span>Market · weekly shop · Cash</span></div><div class="row" style="gap:4px"><span class="money exp">−₱85.20</span><button class="v-btn ghost icon" type="button" aria-label="Edit"><i data-lucide="pencil"></i></button><button class="v-btn ghost icon" type="button" aria-label="Duplicate"><i data-lucide="copy"></i></button></div></div>
+          <div class="v-row compact"><span class="chip xfer"><i data-lucide="arrow-left-right"></i></span><div class="what"><b>Transfer</b><span>October bill · Bank → Credit card</span></div><span class="money xfer">₱1,200.00</span></div>
+          <div class="v-row compact"><span class="chip" style="--c:var(--cat-12)"><i data-lucide="briefcase"></i></span><div class="what"><b>Salary</b><span>Employer · Bank</span></div><span class="money inc">+₱4,200.00</span></div>
+        </div>
+        <p class="cap" style="margin-top:12px">The first row is in its hover state: a lighter wash, with the edit and duplicate buttons.</p>
+      </div>
+      <div class="preview">
+        <div class="v-card">
+          <div class="v-acct" style="border-top:0"><span class="ico"><i data-lucide="wallet"></i></span><b>Cash</b><span class="money">₱320.00</span></div>
+          <div class="v-acct"><span class="ico"><i data-lucide="landmark"></i></span><b>Bank</b><span class="money">₱8,410.75</span></div>
+          <div class="v-acct"><span class="ico"><i data-lucide="credit-card"></i></span><div><b>Credit card</b><div class="sub">Available ₱9,360.00 · Due Nov 5</div></div><span class="money">₱640.00 owed</span></div>
+          <div class="v-acct"><span class="ico"><i data-lucide="smartphone"></i></span><div><b>Old Wallet</b><div class="sub">Archived</div></div><span class="money exp">−₱45.00</span></div>
+          <div class="v-total"><span>Net balance</span><span class="money">₱8,045.75</span></div>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="sub">Progress bars <span class="phase">Phase 3</span></h3>
+    <div class="preview on-surface stack">
+      <div class="v-prog-row"><span style="width:170px" class="chip-name"><span class="chip sm" style="--c:var(--cat-6)"><i data-lucide="utensils"></i></span>Dining Out</span><div class="v-progress"><i style="width:77.5%"></i></div><span class="num cap" style="width:150px;text-align:right">78% · ₱310 of ₱400</span></div>
+      <div class="v-prog-row"><span style="width:170px" class="chip-name"><span class="chip sm" style="--c:var(--cat-2)"><i data-lucide="shopping-cart"></i></span>Food &amp; Groceries</span><div class="v-progress warn"><i style="width:86.7%"></i></div><span class="num cap" style="width:150px;text-align:right">87% · ₱520 of ₱600</span></div>
+      <div class="v-prog-row"><span style="width:170px" class="chip-name"><span class="chip sm" style="--c:var(--cat-4)"><i data-lucide="shopping-bag"></i></span>Shopping</span><div class="v-progress over"><i style="width:100%"></i></div><span class="num cap" style="width:150px;text-align:right">120% · ₱30 over</span></div>
+      <span class="cap">Below 80% uses the accent, from 80% amber, from 100% red. The % is always written next to the bar.</span>
+    </div>
+
+    <h3 class="sub">Banners and toasts</h3>
+    <div class="preview stack">
+      <div class="v-banner warning"><i data-lucide="calendar-clock" class="s20"></i><div class="msg"><b>Card payment due in 3 days.</b> ₱640.00 owed.</div><button class="v-btn primary sm" type="button">Pay bill</button></div>
+      <div class="v-banner danger"><i data-lucide="octagon-alert" class="s20"></i><div class="msg">Shopping is ₱30.00 over its October budget.</div></div>
+      <div class="v-banner info"><i data-lucide="repeat" class="s20"></i><div class="msg">2 recurring transactions are due.</div><button class="v-btn secondary sm" type="button">Review</button></div>
+      <div class="row" style="justify-content:flex-end">
+        <div class="v-toast"><i data-lucide="circle-check"></i><span class="msg">Saved</span></div>
+        <div class="v-toast error"><i data-lucide="circle-alert"></i><span class="msg">Couldn't save. The database is busy, try again.</span><button class="v-btn ghost icon" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
+      </div>
+      <span class="cap">Banners are panel glass tinted with their meaning color. Toasts are raised glass, appear bottom-right and close after 4 s. Error toasts stay until closed.</span>
+    </div>
+
+    <h3 class="sub">Dialog</h3>
+    <div class="preview backdrop">
+      <div class="v-dialog confirm">
+        <div class="v-dialog-h"><h3>Archive Old Wallet?</h3></div>
+        <div class="v-dialog-b"><p style="margin:0">Old Wallet still has <span class="money">₱45.00</span>. Archived accounts still count toward your net balance.</p></div>
+        <div class="v-dialog-f"><button class="v-btn secondary" type="button">Cancel</button><button class="v-btn primary" type="button">Archive anyway</button></div>
+      </div>
+    </div>
+    <p class="cap" style="margin-top:8px">Dialogs are raised glass with 24 px corners. The app behind them dims (<code>--overlay</code>) and gets a light 6 px blur. They fade in while growing from 98% to full size, in 180 ms.</p>
+
+    <h3 class="sub">Empty state and loading skeleton</h3>
+    <div class="grid g2">
+      <div class="preview on-surface">
+        <div class="v-empty"><i data-lucide="receipt" class="s24"></i><b>No transactions yet</b><span class="muted">Press <span class="kbd">Ctrl</span> <span class="kbd">N</span> to add your first one.</span><button class="v-btn primary" type="button"><i data-lucide="plus"></i> Add transaction</button></div>
+      </div>
+      <div class="preview on-surface stack" style="align-content:center">
+        <div class="row"><div class="skel" style="width:32px;height:32px;border-radius:10px"></div><div class="stack" style="gap:6px;flex:1"><div class="skel" style="width:40%"></div><div class="skel" style="width:25%;height:10px"></div></div><div class="skel" style="width:70px"></div></div>
+        <div class="row"><div class="skel" style="width:32px;height:32px;border-radius:10px"></div><div class="stack" style="gap:6px;flex:1"><div class="skel" style="width:55%"></div><div class="skel" style="width:30%;height:10px"></div></div><div class="skel" style="width:60px"></div></div>
+        <span class="muted cap">Skeletons appear only if loading takes over 150 ms, and they don't shimmer.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10. Motion & performance -->
+  <section class="s" id="motion">
+    <h2><span class="sec-no">§10–11</span> Motion, performance and writing</h2>
+    <div class="grid g3">
+      <div>
+        <h3 class="sub" style="margin-top:0">Motion</h3>
+        <ul class="plain">
+          <li>150–200 ms, ease-out.</li>
+          <li>Clickable cards lift 2 px on hover. Buttons shrink to 97% while pressed.</li>
+          <li>Dialogs fade in and grow from 98% to full size. The backdrop fades in with them.</li>
+          <li>The aurora never moves, and numbers never count up.</li>
+          <li>Windows' reduced-motion setting turns all of this off.</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="sub" style="margin-top:0">Performance</h3>
+        <ul class="plain">
+          <li>Blur only on panels (22 px) and raised elements (32 px). Never on rows, chips or fields.</li>
+          <li>About 12 or fewer blurred elements on screen at once.</li>
+          <li>Scrolling lists scroll inside one blurred panel, so rows don't get re-blurred as they move.</li>
+          <li>With transparency off, every panel turns solid and nothing is blurred.</li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="sub" style="margin-top:0">Writing</h3>
+        <div class="tbl-wrap">
+          <div class="do-dont">
+            <div class="hdr y">Write</div><div class="hdr n">Not</div>
+            <div>Amount must be more than 0</div><div class="muted">Invalid input</div>
+            <div>Delete transaction</div><div class="muted">OK</div>
+            <div>Saved</div><div class="muted">Transaction successfully persisted!</div>
+            <div>₱640.00 owed</div><div class="muted">Balance: −₱640.00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12. Open questions -->
+  <section class="s" id="questions">
+    <h2><span class="sec-no">§12</span> Open questions and decisions</h2>
+    <p class="sec-intro">None at the moment. Everything is decided.</p>
+    <h3 class="sub">Decided</h3>
+    <ul class="plain">
+      <li><b>Style:</b> Glassmorphism 2.0.</li>
+      <li><b>Accent:</b> deep indigo <code>#3730A3</code> in light mode, periwinkle <code>#A5B4FC</code> in dark.</li>
+      <li><b>Currency:</b> Philippine peso, shown as ₱, before the amount, with 2 decimal places.</li>
+      <li><b>Font:</b> Sora, bundled with the app.</li>
+      <li><b>Dates:</b> always US order, <span class="num">10/26/2026</span>.</li>
+      <li><b>Category colors:</b> numbered separately for income and expense.</li>
+      <li><b>Reduce transparency:</b> a switch in Settings → Appearance (SET-8, Phase 4).</li>
+      <li><b>Window:</b> fixed 1440 × 900, not resizable.</li>
+      <li><b>Logo:</b> C · Line Door (§6.1).</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(function () {
+  function esc(s) { return s.replace(/&/g, "&amp;"); }
+  function pane(theme, label, value, kind, ratio, name) {
+    var body;
+    if (kind === "surface") body = '<div class="sw-glass" style="background:' + value + '">Aa ₱1,234</div>';
+    else if (kind === "solid") body = '<div class="sw-glass" style="background:' + value + ';backdrop-filter:none;-webkit-backdrop-filter:none">Aa ₱1,234</div>';
+    else if (kind === "edge") body = '<div class="sw-glass" style="border:2px solid ' + value + '">Edge</div>';
+    else if (kind === "hairline") body = '<div class="sw-glass" style="display:grid;place-items:stretch;padding:0;font-size:12px;font-weight:400"><span style="padding:6px 10px">Row</span><span style="padding:6px 10px;border-top:1px solid ' + value + '">Row</span></div>';
+    else if (kind === "wash") body = '<div class="sw-glass" style="padding:0 14px"><span style="display:block;width:100%;height:12px;border-radius:99px;background:' + value + '"></span></div>';
+    else if (kind === "overlay") body = '<div class="sw-glass" style="box-shadow:inset 0 0 0 999px ' + value + '">Dimmed</div>';
+    else if (kind === "fill") body = '<div class="sw-glass"><span class="v-btn sm" style="background:' + value + ';color:var(--primary-foreground)">Hover</span></div>';
+    else if (kind === "onprimary") body = '<div class="sw-glass"><span class="v-btn sm" style="background:var(--primary);color:' + value + '">Save</span></div>';
+    else if (kind === "ondanger") body = '<div class="sw-glass"><span class="v-btn sm" style="background:var(--danger);color:' + value + '">Delete</span></div>';
+    else if (kind === "ring") body = '<div class="sw-glass"><span class="v-btn sm secondary" style="outline:2px solid ' + value + ';outline-offset:2px">Focused</span></div>';
+    else body = '<div class="sw-glass" style="color:' + value + '">' + (name === "--expense" || name === "--danger" ? "−₱85.20" : name === "--income" || name === "--success" ? "+₱4,200" : "Aa ₱1,234") + '</div>';
+    var r = ratio ? '<span class="aa">' + ratio + ' : 1</span>' : "";
+    return '<div class="sw-pane aurora ' + theme + '"><div class="sw-meta"><span>' + label + '</span>' + r + '</div>' + body + '<div class="sw-meta"><code>' + value.replace(/\s+/g, "") + '</code></div></div>';
+  }
+  function swatches(list, id) {
+    document.getElementById(id).innerHTML = list.map(function (t) {
+      return '<div class="sw"><div class="sw-head"><code>' + t[0] + '</code><span class="cap">' + esc(t[1]) + '</span></div><div class="sw-panes">' +
+        pane("theme-light", "Light", t[2], t[4], t[5], t[0]) + pane("theme-dark", "Dark", t[3], t[4], t[6], t[0]) + '</div></div>';
+    }).join("");
+  }
+  swatches([
+    ["--glass", "Panels: sidebar, top bar, toolbars, cards (blur 22 px)", "rgba(255,255,255,0.62)", "rgba(20,22,38,0.62)", "surface"],
+    ["--glass-strong", "Raised: dialogs, menus, toasts (blur 32 px)", "rgba(255,255,255,0.86)", "rgba(20,22,38,0.86)", "surface"],
+    ["--glass-solid", "Panels when transparency is off", "#F7F8FC", "#151729", "solid"],
+    ["--field", "Inputs and secondary buttons", "rgba(255,255,255,0.72)", "rgba(255,255,255,0.06)", "surface"],
+    ["--edge", "Bright 1 px edge on every glass surface", "rgba(255,255,255,0.8)", "rgba(255,255,255,0.14)", "edge"],
+    ["--hairline", "Dividers inside panels", "rgba(11,16,32,0.08)", "rgba(255,255,255,0.08)", "hairline"],
+    ["--wash", "Flat tints inside panels: tracks, hovers, totals", "rgba(11,16,32,0.05)", "rgba(255,255,255,0.07)", "wash"],
+    ["--overlay", "Dims the app behind a dialog", "rgba(11,16,32,0.28)", "rgba(0,0,0,0.5)", "overlay"]
+  ], "sw-surface");
+  swatches([
+    ["--foreground", "Main text", "#0B1020", "#F5F7FF", "text", "14.0", "11.3"],
+    ["--muted-foreground", "Secondary text, labels", "#3D4560", "#C3C9DE", "text", "7.0", "7.3"],
+    ["--primary", "Buttons, active nav, links", "#3730A3", "#A5B4FC", "text", "7.3", "6.0"],
+    ["--primary-hover", "Primary button hover", "#312E81", "#C7D2FE", "fill"],
+    ["--primary-foreground", "Text on primary", "#FFFFFF", "#0B1020", "onprimary", "9.9", "9.5"],
+    ["--ring", "Focus ring", "#3730A3", "#A5B4FC", "ring"]
+  ], "sw-text");
+  swatches([
+    ["--income", "Income, good increases", "#03684A", "#6EE7B7", "text", "5.0", "7.9"],
+    ["--expense", "Expenses, bad increases", "#B4183A", "#FDA4AF", "text", "4.95", "6.4"],
+    ["--transfer", "Transfers (neutral)", "#3D4560", "#C3C9DE", "text", "7.0", "7.3"],
+    ["--warning", "Budget ≥ 80%, due date, stale backup", "#8A4500", "#FCD34D", "text", "5.3", "8.4"],
+    ["--danger", "Budget ≥ 100%, delete, errors", "#B4183A", "#FDA4AF", "text", "4.95", "6.4"],
+    ["--danger-foreground", "Text on a danger button", "#FFFFFF", "#0B1020", "ondanger", "6.7", "10.0"],
+    ["--success", "Goal achieved, \"Saved\" toasts", "#03684A", "#6EE7B7", "text", "5.0", "7.9"]
+  ], "sw-meaning");
+
+  var cats = [["Blue", "#1D4ED8", "#93C5FD"], ["Orange", "#C2410C", "#FDBA74"], ["Teal", "#0F766E", "#5EEAD4"], ["Pink", "#BE185D", "#F9A8D4"],
+    ["Violet", "#6D28D9", "#C4B5FD"], ["Amber", "#B45309", "#FCD34D"], ["Cyan", "#0E7490", "#67E8F9"], ["Rose", "#BE123C", "#FDA4AF"],
+    ["Lime", "#4D7C0F", "#BEF264"], ["Fuchsia", "#A21CAF", "#F0ABFC"], ["Stone", "#57534E", "#D6D3D1"], ["Emerald", "#047857", "#6EE7B7"]];
+  // Seeded categories and their colors (DATA_MODEL §7). Income and expense are numbered separately.
+  var seed = [["Salary", "briefcase", "income", 12], ["Bonus", "award", "income", 9], ["Freelance/Side income", "laptop", "income", 3],
+    ["Interest", "percent", "income", 7], ["Gifts received", "gift", "income", 4], ["Refund", "rotate-ccw", "income", 10], ["Other income", "circle-plus", "income", 11],
+    ["Food & Groceries", "shopping-cart", "", 2], ["Dining Out", "utensils", "", 6], ["Transportation", "car", "", 1], ["Rent/Housing", "house", "", 11],
+    ["Utilities", "zap", "", 7], ["Phone", "smartphone", "", 5], ["Shopping", "shopping-bag", "", 4], ["Health & Medical", "heart-pulse", "", 8],
+    ["Insurance", "shield", "", 3], ["Entertainment", "film", "", 10], ["Subscriptions", "repeat", "", 9], ["Personal Care", "sparkles", "", 12],
+    ["Education", "graduation-cap", "rare", 1], ["Gifts & Donations", "heart-handshake", "rare", 4], ["Travel", "plane", "rare", 3],
+    ["Fees & Charges", "receipt", "rare", 5], ["Other expense", "ellipsis", "rare", 11]];
+  var byKey = cats.map(function () { return []; });
+  seed.forEach(function (c) { byKey[c[3] - 1].push(c); });
+  document.getElementById("sw-cats").innerHTML = cats.map(function (c, k) {
+    var members = byKey[k];
+    function chips(theme, hex) {
+      return '<div class="pane aurora ' + theme + '"><div class="inner">' + members.map(function (m) {
+        return '<span class="chip-name"><span class="chip sm" style="--c:' + hex + '"><i data-lucide="' + m[1] + '"></i></span><span>' + esc(m[0]) + (m[2] ? ' <span class="muted">· ' + m[2] + '</span>' : '') + '</span></span>';
+      }).join("") + '</div></div>';
+    }
+    return '<div class="cat-card"><div class="top"><span class="row" style="gap:8px"><span class="dot" style="background:' + c[1] + '"></span><code style="background:none;padding:0;font-weight:600">cat-' + (k + 1) + '</code><span class="cap">' + c[0] + '</span></span><span class="cap mono">' + c[1] + ' · ' + c[2] + '</span></div><div class="panes">' + chips("theme-light", c[1]) + chips("theme-dark", c[2]) + '</div></div>';
+  }).join("");
+
+  var cal = document.getElementById("cal");
+  var html = '<div class="hd"><button class="v-btn ghost icon" type="button" aria-label="Previous month"><i data-lucide="chevron-left"></i></button><span>October 2026</span><button class="v-btn ghost icon" type="button" aria-label="Next month"><i data-lucide="chevron-right"></i></button></div><div class="g">';
+  ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].forEach(function (d) { html += '<span class="dow">' + d + '</span>'; });
+  var start = new Date(2026, 8, 28);
+  for (var i = 0; i < 35; i++) {
+    var d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    html += '<span class="d' + (d.getMonth() !== 9 ? " out" : "") + (d.getMonth() === 9 && d.getDate() === 26 ? " sel" : "") + '">' + d.getDate() + '</span>';
+  }
+  cal.innerHTML = html + '</div>';
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="vault.js"></script>

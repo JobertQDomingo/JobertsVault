@@ -1,0 +1,9 @@
+# Store text with LF line endings so Windows and other machines produce identical files
+* text=auto eol=lf
+
+# Binary files
+*.png binary
+*.ico binary
+*.icns binary
+*.woff2 binary
+*.db binary
