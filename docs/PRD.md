@@ -323,6 +323,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-01 | From Phase 3, future-dated transactions stay out of every total until their date arrives |
 | 2026-11-01 | ▶ stops at the current period, and the date range picker can't choose future dates |
 | 2026-11-01 | Development builds use a separate database, `jobertsvault-dev.db`, so they can't touch real data |
+| 2026-11-01 | The installer's product name uses a curly apostrophe (`Jobert’s Vault`), because a straight one breaks the installer build |
 
 ---
 

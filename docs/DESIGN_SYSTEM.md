@@ -187,8 +187,8 @@ Categories store a palette key, not a hex code (DATA_MODEL §3.2), so they switc
 
 **Font: Sora**, a clean geometric sans-serif.
 - **Bundled with the app** through the `@fontsource/sora` npm package, in weights 400, 600 and 700. Nothing is downloaded at runtime, because the app has no network access.
-- **Checked on 2026-10-26:** Sora has **tabular (fixed-width) digits** and includes the **₱** sign.
-- **Fallback:** `"Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif`.
+- **Checked on 2026-11-01:** Sora has **tabular (fixed-width) digits**, through `tabular-nums` (its default digits are proportional), and the true minus sign (U+2212). **Sora has no ₱ sign** (U+20B1), and neither do `▲` and `▼`.
+- **Fallback:** `"Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif`. **The ₱, ▲ and ▼ signs come from Segoe UI**, which ships with Windows 10 and 11, so they work offline. This is what the visual previews show. Don't add another font just for these signs.
 
 **Numbers:** every amount uses `font-variant-numeric: tabular-nums`, so digits line up in columns.
 
@@ -405,3 +405,4 @@ Glass costs graphics power, so these rules keep the app smooth:
 | 2026-11-01 | The app follows the Windows light or dark setting from Phase 1 |
 | 2026-11-01 | The 1280 × 800 fallback zooms the same layout to 88.9% |
 | 2026-11-01 | The date picker follows `week_start`, and category icons come from a curated list |
+| 2026-11-01 | Sora has no ₱ sign, so ₱ comes from the Segoe UI fallback |

@@ -49,7 +49,7 @@ Jobert's Vault is a single **Tauri 2** desktop app. The window shows a React UI 
 | UI framework | **React 19 + TypeScript** | Largest library ecosystem (charts, forms, accessible components), and the best supported by AI coding tools |
 | Build tool | **Vite** | Default for Tauri projects; fast reloading while developing |
 | Styling | **Tailwind CSS 4** | Design tokens map directly to CSS variables. The style is Glassmorphism 2.0, built from `glass` / `glass-raised` utilities and `backdrop-filter` (see DESIGN_SYSTEM.md) |
-| Font | **@fontsource/sora** (400, 600, 700) | The UI typeface, bundled into the app so no font is ever downloaded. It has tabular digits and includes ₱. |
+| Font | **@fontsource/sora** (400, 600, 700) | The UI typeface, bundled into the app so no font is ever downloaded. It has tabular digits. It has no ₱ sign, so ₱ comes from the Segoe UI fallback (DESIGN_SYSTEM §4). |
 | Components | **shadcn/ui** (built on Radix UI), with `clsx`, `tailwind-merge` and `class-variance-authority` | Accessible, keyboard-friendly building blocks that are copied into the repo, so they're ours to change |
 | Date picker | **react-day-picker + date-fns** | The shadcn/ui calendar. `Date` objects stay inside the picker: `lib/dates.ts` converts them to `'YYYY-MM-DD'` strings before anything else sees them. |
 | Combobox | **cmdk** | The shadcn/ui combobox, with type-to-filter |
@@ -62,8 +62,8 @@ Jobert's Vault is a single **Tauri 2** desktop app. The window shows a React UI 
 | Frontend tests | **Vitest, Testing Library, jsdom** | Fast unit and component tests (§9) |
 | Linting | **ESLint, Prettier** | Consistent TypeScript and catches common mistakes (§13) |
 | Charts (Phase 2) | **Recharts** | Built for React, and covers the bar, line and donut charts we need |
-| Database driver | **rusqlite** (`bundled` feature) | SQLite is compiled into the app, so its version is always the same. It's synchronous, simple and fast. |
-| Migrations | **rusqlite_migration** | Tracks the schema version in `PRAGMA user_version` |
+| Database driver | **rusqlite** (`bundled` feature) | SQLite is compiled into the app, so its version is always the same. It's synchronous, simple and fast. Pin it to the version `rusqlite_migration` supports, currently `0.40`. Newer releases fail to build alongside it. |
+| Migrations | **rusqlite_migration** (`2.6`) | Tracks the schema version in `PRAGMA user_version` |
 | Dates | **chrono** | Date arithmetic and the local "today" |
 | Errors | **thiserror** | A typed `AppError` enum |
 | Serialization | **serde** | Converts data to and from JSON for IPC. Fields are renamed from `snake_case` to `camelCase` for the frontend. |
@@ -334,7 +334,8 @@ This runs at startup and again whenever the date changes while the app is open (
 - `npm run tauri dev` starts the app for development, with hot reload.
 - **App icon:** `npm run tauri icon assets/brand/app-icon-1024.png` generates `src-tauri/icons/` (the `.ico` and every size) from the logo (DESIGN_SYSTEM §6.1).
 - `npm run tauri build` produces an **NSIS `.exe` installer** (recommended for a single user, as it doesn't need administrator rights) and, optionally, an `.msi`.
-- `productName`: `Jobert's Vault` · `identifier`: `com.jobertsvault.app` · WebView2 is installed by the installer if it's missing.
+- `productName`: `Jobert’s Vault`, with a **curly apostrophe** (U+2019) · `identifier`: `com.jobertsvault.app` · WebView2 is installed by the installer if it's missing.
+- **Apostrophes break the build:** a straight apostrophe (`'`) in `productName` makes the NSIS installer fail, and one in the project's path makes the Rust build fail at the Windows resource step. Keep the repository at a short path with no apostrophe, such as `C:\Projects\JobertsVault`. Paths past 260 characters also fail to link. Text inside the app, including the window title, can use a straight apostrophe.
 - **Window:** a normal opaque window. No `windowEffects` (Mica or Acrylic) and no transparent window. The app paints its own aurora background (DESIGN_SYSTEM §2.2), so the desktop wallpaper never affects readability.
 - **Fixed size:** `tauri.conf.json` sets the window to `"width": 1440, "height": 900, "resizable": false, "maximizable": false, "center": true, "visible": false`. At startup, Rust checks the current monitor's work area (`current_monitor()?.work_area()`). If 1440 × 900 plus the title bar doesn't fit, it switches to 1280 × 800 and sets the webview zoom to 8/9 (about 88.9%) before showing the window. No window-state plugin is needed.
   - **The layout doesn't change:** at that zoom, the page still measures 1440 × 900 CSS pixels, so there's no second layout and no breakpoints.

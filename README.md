@@ -34,6 +34,8 @@ The official checklist is at [Tauri prerequisites](https://v2.tauri.app/start/pr
 
 ### 2. Install and run
 
+Keep the project at a short path with **no apostrophe**, such as `C:\Projects\JobertsVault`. An apostrophe in the path makes the Rust build fail.
+
 ```bash
 git clone <your-repo-url> jobertsvault
 cd jobertsvault

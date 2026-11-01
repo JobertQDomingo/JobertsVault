@@ -68,6 +68,8 @@ Layer rules: `commands → services → (domain, repo)`. Never call `repo` from 
 
 ## Commands
 
+Run these from a path with no apostrophe (ARCHITECTURE §11). The project lives at `C:\Projects\JobertsVault`.
+
 ```bash
 # Development
 npm install
@@ -114,7 +116,7 @@ npm run tauri build
 ## Conventions
 
 - **Naming:** `snake_case` in Rust and SQL, `camelCase` in TypeScript (serde `rename_all = "camelCase"`), `PascalCase` for components.
-- **Commits:** imperative mood, short, with requirement IDs, e.g. `Add transfer validation (TXN-1)`.
+- **Commits:** imperative mood, short, with requirement IDs, e.g. `Add transfer validation (TXN-1)`. Don't add Claude attribution, such as a `Co-Authored-By: Claude ...` line.
 - **Dependencies:** ask before adding any new crate or npm package that isn't listed in ARCHITECTURE.md §2.
 - **Never commit** `*.db`, `*.db-wal`, `*.db-shm`, backups or exported CSV files.
 - When a requirement is unclear, ask, then record the answer in the relevant doc's decision log.
