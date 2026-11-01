@@ -28,10 +28,10 @@ This file is the progress tracker.
 ## Phase 0 · Project setup
 
 - [x] Create the GitHub repository and commit the planning docs (`README.md`, `CLAUDE.md`, `ROADMAP.md`, `docs/`, `assets/brand/`)
-- [ ] Scaffold with `npm create tauri-app@latest`: Tauri 2, React, TypeScript, Vite. Set `productName` to `Jobert's Vault` and `identifier` to `com.jobertsvault.app`. Remove `tauri-plugin-opener` and its permission if the template adds them.
+- [ ] Scaffold with `npm create tauri-app@latest` from a path with no apostrophe ([ARCHITECTURE §11](docs/ARCHITECTURE.md)): Tauri 2, React, TypeScript, Vite. Set `productName` to `Jobert’s Vault` (curly apostrophe) and `identifier` to `com.jobertsvault.app`. Remove `tauri-plugin-opener` and its permission if the template adds them.
 - [ ] Set up the window in `tauri.conf.json`: 1440 × 900, `resizable: false`, `maximizable: false`, `center: true`, `visible: false`. Also set the content security policy and keep `capabilities/default.json` to the minimum ([ARCHITECTURE §10](docs/ARCHITECTURE.md), [ADR 0008](docs/decisions/0008-fixed-window-size.md))
 - [ ] Frontend libraries: Tailwind CSS 4, shadcn/ui and its helpers, lucide-react, TanStack Query, React Router, react-hook-form, zod, `@hookform/resolvers`, `react-day-picker`, `date-fns`, `cmdk`, `sonner`, `@dnd-kit`, `@fontsource/sora` ([ARCHITECTURE §2](docs/ARCHITECTURE.md))
-- [ ] Rust crates: `rusqlite` (with the `bundled` feature), `rusqlite_migration`, `chrono`, `serde`, `thiserror`, `ts-rs`
+- [ ] Rust crates: `rusqlite` `0.40` (with the `bundled` feature), `rusqlite_migration` `2.6`, `chrono`, `serde`, `thiserror`, `ts-rs`
 - [ ] Tooling: ESLint, Prettier, `rustfmt`, `clippy`, and the npm scripts `lint`, `typecheck`, `test`
 - [ ] Testing: set up Vitest, Testing Library and jsdom, plus one example test on each side (frontend and Rust)
 - [ ] Type generation: ts-rs writes to `src/bindings/` when `cargo test` runs, `i64` fields generate `number` ([ARCHITECTURE §4.6](docs/ARCHITECTURE.md)), and a check confirms the generated files are committed
