@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Approved v1.0 |
-| **Last updated** | 2026-10-26 |
+| **Status** | Approved v1.1 |
+| **Last updated** | 2026-11-01 |
 | **Database** | SQLite (bundled with the app through `rusqlite`) |
 | **Related docs** | [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 
@@ -19,13 +19,13 @@ This document describes every table and field, plus the rules for calculating ba
 | **Amount sign** | `transactions.amount` is always **positive**. The transaction's `kind` decides whether money goes in or out. |
 | **Decimal places** | `currency_decimals` (0 or 2) decides how minor units are displayed. It **can only be changed while no transactions exist**, because changing it afterwards would change the meaning of every stored amount. |
 | **Dates** | `TEXT` in `YYYY-MM-DD` format (ISO 8601), using the user's local calendar. This format sorts correctly as plain text. No time of day is stored. |
-| **Timestamps** | `created_at` / `updated_at` are `TEXT` in ISO 8601 UTC (`2026-10-26T09:30:00Z`). They're for record-keeping only and are never used in calculations. |
+| **Timestamps** | `created_at` / `updated_at` are `TEXT` in ISO 8601 UTC (`2026-10-26T09:30:00Z`). They're for record-keeping only and are never used in calculations. Services receive the current time as a `now` value, the same way they receive `today`. |
 | **IDs** | `INTEGER PRIMARY KEY`, assigned by SQLite. |
 | **Booleans** | `INTEGER` 0 or 1, with a `CHECK` constraint. |
 | **Enums** | `TEXT` with a `CHECK (... IN (...))` constraint. The values are lowercase `snake_case`. |
 | **Table mode** | Every table is declared `STRICT`, so SQLite rejects a value of the wrong type. |
 | **Connection settings** | `PRAGMA foreign_keys = ON`, `PRAGMA journal_mode = WAL`, `PRAGMA busy_timeout = 5000` |
-| **Deleting records** | Accounts, categories and payment methods that are in use are **archived instead of deleted**. Foreign keys use `ON DELETE RESTRICT`, so the database itself blocks a delete that would break history. |
+| **Deleting records** | Accounts, categories and payment methods that are in use are **archived instead of deleted**. Unused ones can be deleted. Foreign keys use `ON DELETE RESTRICT`, so the database itself blocks a delete that would break history. |
 | **Names** | Names are trimmed and compared case-insensitively (`COLLATE NOCASE`). |
 
 ## 2. Entity overview
@@ -66,7 +66,7 @@ settings  (a key/value table)
 | `id` | INTEGER | no | Primary key |
 | `name` | TEXT | no | Unique (case-insensitive), 1–50 characters |
 | `kind` | TEXT | no | `cash` \| `bank` \| `ewallet` \| `credit_card` |
-| `opening_balance` | INTEGER | no | Signed, in minor units. **For a credit card, an amount owed is stored as a negative number** (see §5.1). Default 0. |
+| `opening_balance` | INTEGER | no | Signed, in minor units. Forms accept only 0 or more (§6). **For a credit card, the amount owed is stored as a negative number** (see §5.1), and every other account stores 0 or more. Default 0. |
 | `credit_limit` | INTEGER | card only | > 0. Must be NULL for every kind except a credit card. |
 | `statement_day` | INTEGER | card only | 1–31. If the month is shorter, the last day of the month is used. |
 | `due_day` | INTEGER | card only | 1–31. Same rule for shorter months. |
@@ -107,7 +107,7 @@ CREATE TABLE accounts (
 | `name` | TEXT | no | 1–40 characters. Unique within its kind. |
 | `kind` | TEXT | no | `income` \| `expense` |
 | `color` | TEXT | no | A **palette key** such as `cat-3`, not a hex code, so the color adapts to light and dark mode. The palette is defined in DESIGN_SYSTEM.md. |
-| `icon` | TEXT | no | Name of a [Lucide](https://lucide.dev) icon, e.g. `shopping-cart` |
+| `icon` | TEXT | no | Name of a [Lucide](https://lucide.dev) icon from the curated list (DESIGN_SYSTEM §6), e.g. `shopping-cart` |
 | `sort_order` | INTEGER | no | Default 0 |
 | `archived` | INTEGER | no | 0 or 1 |
 | `created_at`, `updated_at` | TEXT | no | |
@@ -127,7 +127,7 @@ CREATE TABLE categories (
 ) STRICT;
 ```
 
-**Merging (CAT-4):** in one database transaction, move every transaction from category A to category B (both must be the same kind), then delete A.
+**Merging (CAT-4):** in one database transaction, move every transaction from category A to active category B (both must be the same kind), then delete A.
 
 ### 3.3 `payment_methods`
 
@@ -153,8 +153,8 @@ CREATE TABLE payment_methods (
 | `account_id` | INTEGER | no | The account money goes into or out of. For a transfer, this is the **source** account. |
 | `to_account_id` | INTEGER | transfer only | The **destination** account. It must differ from `account_id`. |
 | `category_id` | INTEGER | income/expense only | Must be NULL for a transfer. The category's kind must match the transaction's kind. |
-| `payee` | TEXT | yes | Who was paid or who paid. 0–100 characters. |
-| `payment_method_id` | INTEGER | yes | Optional (TXN-7) |
+| `payee` | TEXT | yes | Who was paid or who paid. 0–100 characters. Must be NULL for a transfer. |
+| `payment_method_id` | INTEGER | yes | Optional (TXN-7). Must be NULL for a transfer. |
 | `note` | TEXT | yes | 0–500 characters |
 | `created_at`, `updated_at` | TEXT | no | |
 
@@ -175,7 +175,9 @@ CREATE TABLE transactions (
   CHECK (
     (kind = 'transfer' AND to_account_id IS NOT NULL
                        AND to_account_id <> account_id
-                       AND category_id IS NULL)
+                       AND category_id IS NULL
+                       AND payee IS NULL
+                       AND payment_method_id IS NULL)
     OR
     (kind <> 'transfer' AND to_account_id IS NULL
                         AND category_id IS NOT NULL)
@@ -190,6 +192,8 @@ CREATE INDEX idx_txn_payee         ON transactions(payee COLLATE NOCASE) WHERE p
 ```
 
 **List order (TXN-3):** `ORDER BY date DESC, id DESC`.
+
+**Account filter on the list (TXN-4):** a transaction matches when `account_id = account OR to_account_id = account`, so an account's list includes incoming transfers.
 
 **Payees** don't have their own table. Suggestions (TXN-6, Phase 2) come from the distinct `payee` values, sorted by most recent use. The suggested category is the one on the latest transaction with that payee.
 
@@ -213,6 +217,7 @@ CREATE TABLE settings (
 | `month_start_day` | `1`–`28` | `1` | 1 | SET-2 |
 | `show_payment_method` | `true` \| `false` | `true` | 1 | SET-6 |
 | `last_used_account_id` | account id | (none) | 1 | TXN-1 |
+| `onboarding_completed` | `true` \| `false` | `false` | 1 | ONB-1 |
 | `comparison_mode` | `to_date` \| `full` | `to_date` | 2 | SET-7 |
 | `backup_folder` | absolute path | `<app data>\backups` | 2 | SET-3 |
 | `auto_backup_enabled` | `true` \| `false` | `true` | 2 | SET-3 |
@@ -222,6 +227,8 @@ CREATE TABLE settings (
 | `reduce_transparency` | `true` \| `false` | `false` | 4 | SET-8 |
 
 `month_start_day` is capped at 28 so that every month contains that day.
+
+`onboarding_completed` becomes `true` when the user chooses **Start using the app** or **Set up later**. Closing the app before that shows the form again on the next launch.
 
 ---
 
@@ -255,7 +262,8 @@ CREATE TABLE recurring_rules (
   created_at        TEXT    NOT NULL,
   updated_at        TEXT    NOT NULL,
   CHECK (
-    (kind = 'transfer' AND to_account_id IS NOT NULL AND to_account_id <> account_id AND category_id IS NULL)
+    (kind = 'transfer' AND to_account_id IS NOT NULL AND to_account_id <> account_id AND category_id IS NULL
+                       AND payee IS NULL AND payment_method_id IS NULL)
     OR (kind <> 'transfer' AND to_account_id IS NULL AND category_id IS NOT NULL)
   )
 ) STRICT;
@@ -361,7 +369,8 @@ balance(account, as_of) =
   - `available_credit = credit_limit − amount_owed`
   - `utilization = amount_owed ÷ credit_limit`
   - In the forms, the user enters the opening amount owed as a **positive** number. The app stores it as a negative number.
-- **Net balance (ACC-5)** = the sum of `balance` across **all** accounts, including archived ones. Card debt is already negative, so it's subtracted automatically. Because archived accounts still count, `archive_account` returns a warning that must be confirmed when the account's current balance isn't 0.
+- **Net balance (ACC-5)** = the sum of `balance` across **all** accounts, including archived ones. Card debt is already negative, so it's subtracted automatically. Because archived accounts still count, `archive_account` returns a `Conflict` error when the account's current balance isn't 0, unless it's called again with `acknowledge_balance = true` after the user confirms the warning.
+- **Limits:** spending past a card's limit or below 0 in an account is allowed. `available_credit` can go negative, and it's shown as it is.
 
 ### 5.2 Period totals
 
@@ -372,6 +381,7 @@ net(period)     = income − expense
 ```
 
 - **Transfers are never included** (RPT-6). This is why paying the card bill doesn't count the purchases twice.
+- **Future-dated transactions are never included** (TXN-8, Phase 3). Every total, budget and "recent" list counts only `date ≤ today`, matching balances, so the numbers on a screen always agree. Future-dated rows appear only under Upcoming.
 - If the report is filtered by account (RPT-5), only transactions with `account_id = account` are counted.
 - **Refunds** (CC-5) use an income category, so a refund increases *income*, not lowers *expense*. This is intentional: refunds offset net cashflow, not the expense total or the category breakdown (decided 2026-10-26).
 
@@ -389,7 +399,8 @@ Every period is a closed date range `[start, end]` that includes both ends. Give
 
 - With s = 1, a "month" is the calendar month. With s = 25, Oct 2026 runs from Sep 25 to Oct 24.
 - **The year is always the calendar year**, even when `month_start_day` isn't 1.
-- **Previous and next** are found by moving the anchor date by one period length (one day, 7 days, one month or one year) and recalculating.
+- **Previous and next** are found by moving the anchor date by one period length (one day, 7 days, one month or one year) and recalculating. There is no next period when it would start after today.
+- **Custom** has no anchor. Previous and next move both dates by the length of the range, counting both ends. For example, Oct 1–10 (10 days) has Sep 21–30 before it and Oct 11–20 after it. The comparison in §5.4 uses this same previous range.
 
 ### 5.4 Period comparison (RPT-4a)
 
@@ -432,6 +443,14 @@ progress = max(0, current balance of the linked account)
 monthly_needed = (target_amount − progress) ÷ months left until target_date   (rounded up, if there is a target date)
 ```
 
+### 5.8 Default accounts
+
+| Used for | Rule |
+|---|---|
+| **Quick-add (TXN-1)** | `last_used_account_id`, which is updated whenever a transaction is created. If it's missing or the account is archived or deleted, use the first active account by `sort_order`. |
+| **Pay bill's From account (CC-9)** | The active non-card account on the latest transaction (`date DESC, id DESC`). If there is none, the first active non-card account by `sort_order`. If there's no such account, the field starts empty. |
+| **Pay bill's amount (CC-9)** | The card's `amount_owed`. If that's 0, the field starts empty. |
+
 ---
 
 ## 6. Validation rules (checked in Rust)
@@ -442,6 +461,11 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 |---|---|
 | Amount is > 0 and ≤ 999,999,999,999 minor units | amount |
 | The date is a real calendar date | date |
+| The date isn't in the future: "Date can't be in the future" (Phases 1–2 only; Phase 3 removes this rule for TXN-8) | date |
+| An opening balance is 0 or more and ≤ 999,999,999,999 minor units, and a credit limit is > 0 and ≤ the same maximum | that field |
+| A transfer has no payee or payment method | payee / payment method |
+| The last active account, or the last active category of a kind, can't be archived or deleted (`Conflict`: "Keep at least one active account") | shown as a toast |
+| A category's color is a palette key and its icon is on the curated list (DESIGN_SYSTEM §3.4, §6) | color / icon |
 | A transaction's category kind matches the transaction kind | category |
 | A transfer's destination differs from its source | to_account |
 | A **new** transaction can't use an archived account, category or payment method. Existing transactions keep theirs. | account / category |
@@ -533,3 +557,14 @@ None at the moment. Answered on 2026-10-26:
 
 1. **Refunds** count as income. They offset net cashflow, and the PRD wording (CC-5) was updated to match.
 2. **Archived accounts** still count toward the net balance. Archiving one whose balance isn't 0 shows a warning (§5.1).
+
+Answered on 2026-11-01:
+
+3. **Future dates** are rejected until Phase 3 (§6).
+4. **Custom periods** move by the length of their range (§5.3).
+5. **Opening balances** are entered as 0 or more (§6).
+6. **Transfers** have no payee or payment method (§3.4).
+7. **Limits** aren't enforced: going past a card's limit or below 0 in an account is allowed (§5.1).
+8. **Default accounts** follow §5.8, and first-launch completion is stored in `onboarding_completed` (§3.5).
+9. **Future-dated transactions** stay out of every total until their date arrives (§5.2).
+10. **Moving forward** stops at the current period (§5.3).

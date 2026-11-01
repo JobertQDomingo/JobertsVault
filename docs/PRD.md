@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **App name** | Jobert's Vault |
-| **Status** | Approved v1.0 |
-| **Last updated** | 2026-10-26 |
+| **Status** | Approved v1.1 |
+| **Last updated** | 2026-11-01 |
 | **Platform** | Windows desktop app built with Tauri 2: React + TypeScript frontend, Rust backend, SQLite database |
 
 ---
@@ -58,7 +58,7 @@ One person (the developer/owner) who:
 | **Net cashflow** | Income minus expenses for a period. Transfers are not included. |
 | **Category** | A label for income or expenses, such as Salary, Food or Rent. Income categories and expense categories are kept in separate lists. |
 | **Period** | A time window for reports: Day, Week, Month, Year or Custom. |
-| **Opening balance** | An account's balance when it is first added to the app. It is **not** counted as income. |
+| **Opening balance** | An account's balance when it is first added to the app, entered as 0 or more (for a credit card, the amount owed). It is **not** counted as income. |
 | **Transaction date** | A calendar date only, with no time of day. Transactions on the same date are listed in the order they were entered. |
 
 ## 6. Period rules
@@ -71,7 +71,7 @@ One person (the developer/owner) who:
 | Year | January 1 to December 31 |
 | Custom | Any start and end date the user picks (both days included) |
 
-The user can move to the previous or next period with ◀ ▶ buttons and jump back to the current one with a "Today" button.
+The user can move to the previous or next period with ◀ ▶ buttons and jump back to the current one with a "Today" button. On a Custom period, ◀ ▶ move by the length of the range, so a 10-day range moves 10 days. ▶ stops once the next period would start after today, and the date range picker can't choose future dates.
 
 ---
 
@@ -83,9 +83,9 @@ Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3**
 
 | ID | Requirement | Priority |
 |---|---|---|
-| ACC-1 | The user can create an account with a name, type (Cash, Bank, E-wallet, Credit Card) and opening balance. | P1 |
+| ACC-1 | The user can create an account with a name, type (Cash, Bank, E-wallet, Credit Card) and an opening balance of 0 or more. | P1 |
 | ACC-2 | The user can edit an account's name and opening balance. | P1 |
-| ACC-3 | The user can archive an account. It is hidden from pickers, but its history still appears in reports. Accounts that have transactions cannot be deleted, only archived. Archived accounts still count toward the net balance, so the app warns when an account being archived has a balance other than 0. | P1 |
+| ACC-3 | The user can archive and unarchive an account. An archived account is hidden from pickers, but its history still appears in reports. Accounts that have transactions cannot be deleted, only archived; unused accounts can be deleted. The last active account cannot be archived or deleted. Archived accounts still count toward the net balance, so the app warns when an account being archived has a balance other than 0. | P1 |
 | ACC-4 | Each account shows its current balance: opening balance + income − expenses ± transfers. | P1 |
 | ACC-5 | The dashboard shows a **net balance**: the sum of all asset accounts minus the amount owed on credit cards. | P1 |
 
@@ -101,7 +101,7 @@ Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3**
 | CC-6 | The card's detail view shows: amount owed, available credit (limit − owed), % of the limit used, spending in the current statement cycle, and the next due date. | P1 |
 | CC-7 | When the payment due date is 5 days away or closer, the dashboard shows a reminder banner with the amount owed. | P3 |
 | CC-8 | The data model supports any number of cards (v1 is used with one). | P1 |
-| CC-9 | A **Pay bill** button on the card's details opens a transfer to the card, pre-filled with the **full amount owed**. The user can edit the amount for a partial payment. | P1 |
+| CC-9 | A **Pay bill** button on the card's details opens a transfer to the card, pre-filled with the **full amount owed**. The user can edit the amount for a partial payment. If nothing is owed, the amount starts empty. | P1 |
 
 **Due-day rule:** if the statement or due day is greater than the number of days in a month (e.g. 31 in February), the last day of that month is used.
 
@@ -110,22 +110,22 @@ Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3**
 | ID | Requirement | Priority |
 |---|---|---|
 | CAT-1 | The app comes with preset categories (see Appendix A). | P1 |
-| CAT-2 | The user can add, rename, recolor, change the icon of, and archive categories. | P1 |
+| CAT-2 | The user can add, rename, recolor, change the icon of, archive and unarchive categories. Icons come from a curated list of about 40. The last active category of each kind cannot be archived or deleted. | P1 |
 | CAT-3 | Categories are either Income or Expense. A transaction can only use a category of the matching kind. | P1 |
-| CAT-4 | Categories that have transactions cannot be deleted, only archived. The app may offer to move those transactions to another category and then delete the original. | P1 |
+| CAT-4 | Categories that have transactions cannot be deleted, only archived; unused categories can be deleted. The app may offer to move those transactions to another category and then delete the original. | P1 |
 
 ### 7.4 Transactions
 
 | ID | Requirement | Priority |
 |---|---|---|
-| TXN-1 | The user can add a transaction with these fields: **type**, **amount** (must be > 0), **date** (date only, defaults to today), **account** (defaults to the account used most recently), **category** (Income/Expense only), **to-account** (Transfer only), and optionally **payee/source**, **payment method** and **note**. | P1 |
+| TXN-1 | The user can add a transaction with these fields: **type**, **amount** (must be > 0), **date** (date only, defaults to today, can't be in the future until TXN-8 arrives), **account** (defaults to the account used most recently), **category** (Income/Expense only), **to-account** (Transfer only), and optionally **payee/source** and **payment method** (Income/Expense only) and **note**. Spending past a card's limit or below 0 in an account is allowed, because the app records what really happened. | P1 |
 | TXN-2 | The user can edit, delete (after confirming) and duplicate a transaction. A duplicate opens the form pre-filled with **today's date**. | P1 |
 | TXN-3 | The transaction list is grouped by date, newest first, with a total for each day. | P1 |
 | TXN-4 | The list can be filtered by period, account, category, type and payment method, and searched by text (payee or note). | P1 |
 | TXN-5 | A quick-add form opens with **Ctrl+N** from anywhere in the app. The form can be completed using only the keyboard. | P1 |
 | TXN-6 | The payee field suggests previously used payees as the user types. Choosing one fills in the category last used with that payee. | P2 |
-| TXN-7 | Payment method is optional. Its values come from an editable list (preset: Cash, Debit Card, Credit Card, Bank Transfer, E-wallet, Other), and the field can be hidden in Settings (SET-6). | P1 |
-| TXN-8 | Future-dated transactions are allowed, appear as "upcoming", and do not count toward the current balance until their date arrives. | P3 |
+| TXN-7 | Payment method is optional. Its values come from an editable list (preset: Cash, Debit Card, Credit Card, Bank Transfer, E-wallet, Other), and the field can be hidden in Settings (SET-6). Methods can be reordered, archived and unarchived, and unused ones can be deleted. | P1 |
+| TXN-8 | Future-dated transactions are allowed, appear as "upcoming", and do not count toward the current balance or any total until their date arrives. Before Phase 3, a future date is rejected. | P3 |
 
 ### 7.5 Dashboard
 
@@ -148,7 +148,7 @@ Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3**
 | RPT-2 | **Category breakdown**: a donut chart and a list ranked by amount and %. The user can switch between expenses and income. | P2 |
 | RPT-3 | Clicking a category in the breakdown opens the transaction list filtered to that category and period. | P2 |
 | RPT-4 | **Period comparison**: the current period next to the previous one (e.g. this month vs last month, this year vs last year), with the difference in amount and % for income, expense, net and each category. | P2 |
-| RPT-4a | **Comparison rule:** while the current period is still in progress, it is compared with the **same number of days** at the start of the previous period (e.g. Oct 1–26 vs Sep 1–26, or Mon–Wed vs last Mon–Wed). If the previous period is shorter, the comparison stops at its last day. A toggle switches to comparing against the **full** previous period. Periods that are already over are always compared in full. | P2 |
+| RPT-4a | **Comparison rule:** while the current period is still in progress, it is compared with the **same number of days** at the start of the previous period (e.g. Oct 1–26 vs Sep 1–26, or Mon–Wed vs last Mon–Wed). If the previous period is shorter, the comparison stops at its last day. A toggle switches to comparing against the **full** previous period. Periods that are already over are always compared in full. A Custom period's previous period is the range of the same length just before it. | P2 |
 | RPT-5 | Reports can be filtered by account. | P2 |
 | RPT-6 | Transfers are never included in income or expense figures. | P1 |
 
@@ -202,7 +202,7 @@ This section is no longer part of the MVP. It is now in Phase 2 (see §11).
 | SET-2 | First day of week (default **Monday**) and month start day (default **1**). | P1 |
 | SET-3 | Backup folder location and whether automatic backups are on. | P2 |
 | SET-4 | Category and payment method management. | P1 |
-| SET-5 | Light, dark or system theme. | P4 |
+| SET-5 | A switch for light, dark or system theme. Until it arrives, the app follows the Windows setting. | P4 |
 | SET-6 | Show or hide the payment method field (shown by default). | P1 |
 | SET-7 | Default comparison mode for RPT-4a: same number of days so far (default) or full previous period. | P2 |
 | SET-8 | A **Reduce transparency** switch in Settings → Appearance makes every glass panel solid and turns off blur for this app, even when Windows transparency effects are on. | P4 |
@@ -211,7 +211,7 @@ This section is no longer part of the MVP. It is now in Phase 2 (see §11).
 
 | ID | Requirement | Priority |
 |---|---|---|
-| ONB-1 | On first launch, a plain setup form asks for the currency (₱ preselected, symbol before the amount, 2 decimals) and lets the user add their first accounts: bank, e-wallet and credit card with its limit, statement day and due day. Cash already exists. The form can be skipped with "Set up later". | P1 |
+| ONB-1 | On first launch, a plain setup form asks for the currency (₱ preselected, symbol before the amount, 2 decimals) and lets the user add their first accounts: bank, e-wallet and credit card with its limit, statement day and due day. Cash already exists. The form can be skipped with "Set up later". Closing the app without finishing shows the form again on the next launch. | P1 |
 | ONB-2 | The setup is polished into a step-by-step onboarding with a progress indicator and a short tour of quick-add and the period bar. | P4 |
 
 ---
@@ -220,13 +220,13 @@ This section is no longer part of the MVP. It is now in Phase 2 (see §11).
 
 | Area | Requirement |
 |---|---|
-| **Privacy** | No network requests, analytics or telemetry. The app works fully offline. |
+| **Privacy** | No network requests, analytics or telemetry. The app works fully offline. The local error log never records amounts, payees or notes. |
 | **Data integrity** | Money is stored as **integers in minor units** (e.g. cents), never as floating-point numbers. Every write is wrapped in a database transaction, so a crash can't leave data half-saved. |
 | **Performance** | Cold start in < 2 s. With 50,000 transactions, each dashboard or report view loads in < 300 ms. |
 | **Architecture** | All business logic (balances, period totals, comparisons, recurring rules) and all database access live in the **Rust backend**. The React frontend only displays data and calls backend commands. It never runs SQL itself. |
 | **Storage location** | The database is stored in the user's app data folder, at a path based on the app's identifier (e.g. `%APPDATA%\com.jobertsvault.app\`). |
 | **Platform** | Windows 10 and 11, 64-bit. Distributed as an `.msi` or `.exe` installer. |
-| **Window** | A **fixed 1440 × 900** window that can't be resized or maximized (minimize and close only). It opens centered on the main monitor. It's sized for the owner's 1920 × 1080 and 2560 × 1080 monitors at 100% display scaling. If the monitor's usable area is too small (for example, if display scaling is raised), it opens at 1280 × 800 instead. |
+| **Window** | A **fixed 1440 × 900** window that can't be resized or maximized (minimize and close only). It opens centered on the main monitor. It's sized for the owner's 1920 × 1080 and 2560 × 1080 monitors at 100% display scaling. If the monitor's usable area is too small (for example, if display scaling is raised), it opens at 1280 × 800 instead, showing the same layout zoomed to 88.9%. |
 | **Usability** | Every main action works from the keyboard. Amounts use thousands separators, and negative or expense values are clearly distinguished by more than color alone. |
 | **Reliability** | Recurring transactions and backups resume correctly after the app is closed for any length of time. |
 
@@ -243,9 +243,21 @@ This section is no longer part of the MVP. It is now in Phase 2 (see §11).
 - [ ] I can create cash, bank, e-wallet and credit card accounts, each with an opening balance.
 - [ ] I can add, edit, delete and duplicate income, expense and transfer transactions.
 - [ ] Account balances and the amount owed on the card are always correct after any add, edit or delete.
-- [ ] The dashboard shows correct income, expense and net totals for Day, Week (Mon–Sun), Month and Year, and moving between periods works.
+- [ ] The dashboard shows correct income, expense and net totals for Day, Week (Mon–Sun), Month, Year and Custom, and moving between periods works.
 - [ ] Transfers, including paying the card bill, never appear in income or expense totals.
 - [ ] I can filter and search the transaction list.
+- [ ] A future date is rejected with a clear message.
+- [ ] Ctrl+N opens quick-add from any screen, and I can log a typical transaction with only the keyboard in 5 seconds or less.
+- [ ] **Pay bill** opens a transfer pre-filled with the full amount owed, and a partial payment works.
+- [ ] A card's details show the amount owed, available credit, % of the limit used, cycle spending and next due date.
+- [ ] A refund on the card lowers the amount owed and counts as income.
+- [ ] I can manage categories and payment methods: add, edit, reorder, archive, unarchive and delete unused ones, plus merge categories.
+- [ ] Archiving an account with a balance other than 0 shows a warning, and my last active account can't be archived or deleted.
+- [ ] Settings for currency, week start, month start day and the payment method field work, and decimals lock once a transaction exists.
+- [ ] The first-launch form works, can be skipped, and comes back only if the app was closed before finishing it.
+- [ ] The app follows the Windows light or dark setting, and stays readable with Windows transparency effects off.
+- [ ] Cold start takes under 2 s, and the dashboard and transaction list load in under 300 ms with 50,000 test transactions.
+- [ ] The dashboard and transaction list scroll smoothly on both monitors.
 - [ ] The app runs fully offline on Windows 11.
 
 ## 11. Release plan
@@ -254,10 +266,10 @@ This section is no longer part of the MVP. It is now in Phase 2 (see §11).
 
 | Phase | Scope |
 |---|---|
-| **1: MVP** | Accounts (including the credit card), categories, transactions, dashboard totals by period, settings, basic first-launch setup |
+| **1: MVP** | Accounts (including the credit card), categories, transactions, dashboard totals by period, settings, basic first-launch setup, light and dark themes that follow Windows |
 | **2: Reports & backups** | Charts over time, category breakdown, period comparison, % change, payee suggestions, backup, restore, CSV export |
 | **3: Planning** | Recurring transactions, budgets, savings goals, card due-date reminder, future-dated transactions |
-| **4: Polish** | Dark mode, the Reduce transparency switch, more keyboard shortcuts, polished first-launch onboarding, Windows installer and app icon |
+| **4: Polish** | The theme switch, the Reduce transparency switch, more keyboard shortcuts, polished first-launch onboarding, Windows installer polish |
 
 ## 12. How we'll measure success
 
@@ -298,7 +310,19 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-10-26 | A duplicated transaction uses today's date |
 | 2026-10-26 | Added CC-9: Pay bill suggests the full amount owed, editable |
 | 2026-10-26 | The window is a fixed 1440 × 900 and can't be resized or maximized |
-| 2026-10-26 | Visual style: **Glassmorphism 2.0**, with frosted glass panels over a soft colored "aurora" background, the Sora font and a deep indigo accent (DESIGN_SYSTEM.md v0.2) |
+| 2026-10-26 | Visual style: **Glassmorphism 2.0**, with frosted glass panels over a soft colored "aurora" background, the Sora font and a deep indigo accent (DESIGN_SYSTEM.md) |
+| 2026-11-01 | Phase 1 rejects future dates. Phase 3 lifts the rule when it adds TXN-8. |
+| 2026-11-01 | On a Custom period, ◀ ▶ move by the length of the range, and comparisons use the same-length range just before it |
+| 2026-11-01 | The app follows the Windows light or dark setting from Phase 1. Phase 4 adds only the switch. |
+| 2026-11-01 | The 1280 × 800 fallback shows the same layout zoomed to 88.9%, with no second layout |
+| 2026-11-01 | Opening balances are entered as 0 or more |
+| 2026-11-01 | Unused accounts, categories and payment methods can be deleted. The last active account, and the last active category of each kind, can't be archived or deleted. |
+| 2026-11-01 | Transfers have no payee or payment method |
+| 2026-11-01 | Going past a card's limit or below 0 in an account is allowed, with no warning |
+| 2026-11-01 | PRD §10 is expanded into the complete Phase 1 release checklist |
+| 2026-11-01 | From Phase 3, future-dated transactions stay out of every total until their date arrives |
+| 2026-11-01 | ▶ stops at the current period, and the date range picker can't choose future dates |
+| 2026-11-01 | Development builds use a separate database, `jobertsvault-dev.db`, so they can't touch real data |
 
 ---
 

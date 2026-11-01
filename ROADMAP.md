@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Active |
-| **Last updated** | 2026-10-26 |
+| **Last updated** | 2026-11-01 |
 | **Current focus** | **Phase 0: project setup** |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
@@ -28,15 +28,15 @@ This file is the progress tracker.
 ## Phase 0 · Project setup
 
 - [x] Create the GitHub repository and commit the planning docs (`README.md`, `CLAUDE.md`, `ROADMAP.md`, `docs/`, `assets/brand/`)
-- [ ] Scaffold with `npm create tauri-app@latest`: Tauri 2, React, TypeScript, Vite. Set `productName` to `Jobert's Vault` and `identifier` to `com.jobertsvault.app`.
-- [ ] Set up the window in `tauri.conf.json`: 1440 × 900, `resizable: false`, `maximizable: false`, `center: true`. Also set the content security policy and keep `capabilities/default.json` to the minimum ([ARCHITECTURE §10](docs/ARCHITECTURE.md), [ADR 0008](docs/decisions/0008-fixed-window-size.md))
-- [ ] Frontend libraries: Tailwind CSS 4, shadcn/ui, lucide-react, TanStack Query, React Router, react-hook-form, zod, `@fontsource/sora`
+- [ ] Scaffold with `npm create tauri-app@latest`: Tauri 2, React, TypeScript, Vite. Set `productName` to `Jobert's Vault` and `identifier` to `com.jobertsvault.app`. Remove `tauri-plugin-opener` and its permission if the template adds them.
+- [ ] Set up the window in `tauri.conf.json`: 1440 × 900, `resizable: false`, `maximizable: false`, `center: true`, `visible: false`. Also set the content security policy and keep `capabilities/default.json` to the minimum ([ARCHITECTURE §10](docs/ARCHITECTURE.md), [ADR 0008](docs/decisions/0008-fixed-window-size.md))
+- [ ] Frontend libraries: Tailwind CSS 4, shadcn/ui and its helpers, lucide-react, TanStack Query, React Router, react-hook-form, zod, `@hookform/resolvers`, `react-day-picker`, `date-fns`, `cmdk`, `sonner`, `@dnd-kit`, `@fontsource/sora` ([ARCHITECTURE §2](docs/ARCHITECTURE.md))
 - [ ] Rust crates: `rusqlite` (with the `bundled` feature), `rusqlite_migration`, `chrono`, `serde`, `thiserror`, `ts-rs`
 - [ ] Tooling: ESLint, Prettier, `rustfmt`, `clippy`, and the npm scripts `lint`, `typecheck`, `test`
-- [ ] Testing: set up Vitest and Testing Library, plus one example test on each side (frontend and Rust)
-- [ ] Type generation: ts-rs writes to `src/bindings/` when `cargo test` runs, and a check confirms the generated files are committed
+- [ ] Testing: set up Vitest, Testing Library and jsdom, plus one example test on each side (frontend and Rust)
+- [ ] Type generation: ts-rs writes to `src/bindings/` when `cargo test` runs, `i64` fields generate `number` ([ARCHITECTURE §4.6](docs/ARCHITECTURE.md)), and a check confirms the generated files are committed
 - [ ] App icon: `npm run tauri icon assets/brand/app-icon-1024.png`
-- [ ] *(Optional)* CI: a GitHub Actions workflow on `windows-latest` that runs every check from CLAUDE.md
+- [ ] CI: a GitHub Actions workflow on `windows-latest` that runs every check from CLAUDE.md and the bindings check on each push and pull request, without building the installer
 - [x] Decision records 0001–0009 written ([docs/decisions/](docs/decisions/README.md))
 
 ---
@@ -44,42 +44,42 @@ This file is the progress tracker.
 ## Phase 1 · MVP (`v0.1.0`)
 
 ### 1.1 Backend foundations
-- [ ] Database startup: open the database, apply the connection settings (PRAGMAs), refuse a database from a newer app version, show a startup error screen if anything fails ([ARCHITECTURE §6](docs/ARCHITECTURE.md))
+- [ ] Database startup: open the database (debug builds use `jobertsvault-dev.db`), apply the connection settings (PRAGMAs), refuse a database from a newer app version, and report any failure through `get_startup_status`, with `open_data_folder` ([ARCHITECTURE §6](docs/ARCHITECTURE.md))
 - [ ] Migration `0001_initial.sql`, exactly as in DATA_MODEL §3
 - [ ] Seed data: the Cash account, payment methods, and the preset categories with their colors (DATA_MODEL §7)
-- [ ] `AppError`, `AppState` (one connection behind a `Mutex`), and `api/client.ts` with its typed errors
+- [ ] `AppError`, `AppState` (one connection behind a `Mutex`), the error log ([ARCHITECTURE §4.4](docs/ARCHITECTURE.md)), and `api/client.ts` with its typed errors
 - [ ] Domain: the `Money` type, plus parsing and formatting in Rust and in `money.ts`, with tests
-- [ ] Domain: periods (day, Monday-start week, month with `month_start_day`, calendar year), with previous/next and edge-case tests ([DATA_MODEL §5.3](docs/DATA_MODEL.md))
+- [ ] Domain: periods (day, Monday-start week, month with `month_start_day`, calendar year, custom range), with previous/next and edge-case tests ([DATA_MODEL §5.3](docs/DATA_MODEL.md))
 - [ ] Domain: credit card statement cycle and next due date, with tests (DATA_MODEL §5.5)
 
 ### 1.2 Settings
-- [ ] Commands `get_settings` and `update_settings`: currency (₱ default), symbol position, decimals (locked once any transaction exists), week start, month start day, payment method field [SET-1] [SET-2] [SET-6]
+- [ ] Commands `get_settings` and `update_settings`: currency (₱ default), symbol position, decimals (locked once any transaction exists), week start, month start day, payment method field, `onboarding_completed` [SET-1] [SET-2] [SET-6] [ONB-1]
 
 ### 1.3 Accounts
-- [ ] Create, edit, list and reorder accounts [ACC-1] [ACC-2]
+- [ ] Create, edit, list and reorder accounts, with opening balances of 0 or more [ACC-1] [ACC-2]
 - [ ] Credit card fields and validation [CC-1] [CC-8]
 - [ ] Balances calculated when requested, the net balance, and the card's amount owed, available credit, utilization, cycle spending and due date [ACC-4] [ACC-5] [CC-2] [CC-6]
-- [ ] Archive and unarchive, with a warning when the balance isn't 0 [ACC-3]
+- [ ] Archive and unarchive, with a warning when the balance isn't 0. Delete unused accounts, and block archiving or deleting the last active one [ACC-3]
 
 ### 1.4 Categories and payment methods
-- [ ] Categories: list, create, edit (name, 12-color palette, icon), reorder, archive [CAT-1] [CAT-2] [CAT-3]
+- [ ] Categories: list, create, edit (name, 12-color palette, curated icons), reorder, archive, unarchive, and block archiving the last active one of a kind [CAT-1] [CAT-2] [CAT-3]
 - [ ] Merge categories, and delete a category that has no transactions [CAT-4]
-- [ ] Payment methods: list, create, edit, archive [TXN-7]
+- [ ] Payment methods: list, create, edit, reorder, archive, unarchive, delete unused [TXN-7]
 
 ### 1.5 Transactions
-- [ ] Create, edit and delete income, expense and transfer, with every validation rule from DATA_MODEL §6 [TXN-1] [TXN-2]
-- [ ] Duplicate, with today's date [TXN-2]
-- [ ] The list: grouped by day, filters, search, pages of 100 [TXN-3] [TXN-4]
-- [ ] Default to the account used most recently [TXN-1]
+- [ ] Create, edit and delete income, expense and transfer, with every validation rule from DATA_MODEL §6, including rejecting future dates [TXN-1] [TXN-2]
+- [ ] Duplicate: the form opens pre-filled with today's date, and saving creates the copy [TXN-2]
+- [ ] The list: grouped by day, filters, search, pages of 100, with the summary and day totals from the backend. An account's list includes incoming transfers [TXN-3] [TXN-4]
+- [ ] `get_transaction_defaults` and `get_pay_bill_defaults` ([DATA_MODEL §5.8](docs/DATA_MODEL.md)) [TXN-1] [CC-9]
 - [ ] Card purchases, bill payments and refunds behave as specified, with service tests, including "a card payment never changes the expense total" [CC-3] [CC-4] [CC-5] [RPT-6]
 
 ### 1.6 Dashboard backend
-- [ ] `get_dashboard`: period, totals, balances, net balance, card summary, the 5 most recent transactions and `today`, all in one call [DSH-1] [DSH-2] [DSH-4] [DSH-5] [DSH-8]
+- [ ] `get_period`, and `get_dashboard`: period, totals, balances, net balance, card summary, the 5 most recent transactions and `today`, all in one call [DSH-1] [DSH-2] [DSH-4] [DSH-5] [DSH-8]
 
 ### 1.7 Design system in code
-- [ ] Tokens in `globals.css` for light and dark, plus the `glass` and `glass-raised` utilities and the reduced-transparency fallback ([DESIGN_SYSTEM §2–3](docs/DESIGN_SYSTEM.md))
+- [ ] Tokens in `globals.css` for light and dark, following the Windows setting, plus the `glass` and `glass-raised` utilities and the reduced-transparency fallback ([DESIGN_SYSTEM §2–3](docs/DESIGN_SYSTEM.md))
 - [ ] `AuroraBackground` and `GlassPanel`
-- [ ] Restyle the shadcn/ui basics: Button, Input, Select/Combobox, Dialog, Toast, Tabs, Segmented control, Date picker (Monday-first, US dates)
+- [ ] Restyle the shadcn/ui basics: Button, Input, Select/Combobox, Dialog, Toast, Tabs, Segmented control, Date picker (follows `week_start`, US dates)
 - [ ] `MoneyText`, `AmountInput`, `CategoryChip`, `AccountRow`, `TransactionRow`, `StatCard`, `ProgressBar`
 - [ ] Empty states, skeletons (shown after 150 ms) and the startup error screen
 
@@ -94,9 +94,9 @@ This file is the progress tracker.
 - [ ] Quick-add and edit dialog, including Save & add another and the keyboard path that saves in under 5 seconds [TXN-5]
 - [ ] Accounts list, new/edit account dialog, and account and credit card details
 - [ ] Pay bill: a transfer pre-filled with the full amount owed [CC-9]
-- [ ] Settings: the General, Categories and Payment methods tabs [SET-4]
-- [ ] First-launch setup form: currency and first accounts, skippable [ONB-1]
-- [ ] Fixed-window fallback: open at 1280 × 800 if 1440 × 900 doesn't fit the screen ([ADR 0008](docs/decisions/0008-fixed-window-size.md))
+- [ ] Settings: the General, Categories and Payment methods tabs, with drag and keyboard reordering [SET-4]
+- [ ] First-launch setup form at `/welcome`: currency and first accounts, skippable [ONB-1]
+- [ ] Fixed-window fallback: open at 1280 × 800, zoomed to 88.9%, if 1440 × 900 doesn't fit the screen ([ADR 0008](docs/decisions/0008-fixed-window-size.md), [ARCHITECTURE §11](docs/ARCHITECTURE.md))
 
 ### 1.10 Release `v0.1.0`
 - [ ] Go through PRD §10 by hand on Windows 11, on both monitors
@@ -138,7 +138,7 @@ This file is the progress tracker.
 - [ ] Process recurring rules at startup and when the date changes, never creating a date twice [REC-4]
 - [ ] Review due items: Post, Edit & post, Skip (UI_FLOWS F10)
 - [ ] Recurring screen
-- [ ] Future-dated transactions and the Upcoming section [TXN-8]
+- [ ] Future-dated transactions and the Upcoming section: lift the Phase 1 date rule, and keep them out of every total until their date arrives ([DATA_MODEL §5.2](docs/DATA_MODEL.md)) [TXN-8]
 - [ ] Budgets for a category or all spending, weekly, monthly or yearly [BUD-1] [BUD-4]
 - [ ] Budget progress with amber and red thresholds, the Budgets screen, and budgets on the dashboard [BUD-2] [BUD-3] [DSH-6]
 - [ ] Goals linked to an account, with progress and the monthly amount needed [GOL-1] [GOL-2] [GOL-3]

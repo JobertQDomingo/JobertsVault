@@ -2,16 +2,16 @@
 
 A private, offline desktop app for Windows that tracks personal cashflow (income and expenses) by **day, week, month or year**. You enter every transaction yourself, and all data stays in a local SQLite file on your computer. Nothing is sent over the internet.
 
-> **Status:** planning complete, development not started yet. The documents below are approved. Code begins with Phase 1 (MVP).
+> **Status:** planning complete, development not started yet. The documents below are approved. Code begins with Phase 0 (project setup).
 
 ## Features
 
 | Phase | Features |
 |---|---|
-| **1: MVP** | Accounts (cash, bank, e-wallet, credit card), income, expense and transfer transactions, editable categories, a dashboard with income, expense and net cashflow for each day, week (starting Monday), month or year, account balances and net balance, credit card amount owed, available credit and due date, quick-add with **Ctrl+N** |
+| **1: MVP** | Accounts (cash, bank, e-wallet, credit card), income, expense and transfer transactions, editable categories, a dashboard with income, expense and net cashflow for each day, week (starting Monday), month or year, account balances and net balance, credit card amount owed, available credit and due date, quick-add with **Ctrl+N**, light and dark themes that follow Windows |
 | **2: Reports & backups** | Income-vs-expense charts, category breakdown, period comparison, payee suggestions, automatic daily backups, restore, CSV export |
 | **3: Planning** | Recurring transactions, budgets, savings goals, credit card due-date reminders |
-| **4: Polish** | Dark mode, more keyboard shortcuts, onboarding on first launch, installer |
+| **4: Polish** | Theme and Reduce transparency switches, more keyboard shortcuts, polished onboarding on first launch, installer polish |
 
 See [PRD.md](docs/PRD.md) for the full requirements.
 
@@ -59,9 +59,12 @@ The first `tauri dev` compiles every Rust dependency, which takes several minute
 | What | Location |
 |---|---|
 | Database | `%APPDATA%\com.jobertsvault.app\jobertsvault.db` |
+| Error log | `%APPDATA%\com.jobertsvault.app\jobertsvault.log` (no amounts, payees or notes) |
 | Backups (Phase 2) | `%APPDATA%\com.jobertsvault.app\backups\` by default (you can change this in Settings) |
 
 > ⚠️ **Phase 1 has no backup feature.** Until Phase 2, close the app now and then and copy `jobertsvault.db` somewhere safe yourself. A OneDrive or Google Drive folder works well.
+
+`npm run tauri dev` uses `jobertsvault-dev.db` and `jobertsvault-dev.log` in the same folder, so development never touches your real data.
 
 Uninstalling the app **does not** delete your data. To start fresh, delete the folder above.
 
