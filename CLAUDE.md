@@ -25,23 +25,27 @@ Build **only the current phase**. Don't build features from a later phase, or ou
 2. **The frontend never runs SQL and never calculates totals or balances.** All business logic lives in Rust (`services/` + `domain/`). React only displays what commands return.
 3. **No network access.** Don't add HTTP clients, analytics, an updater, or remote fonts or scripts. Don't loosen the content security policy.
 4. **No Tauri `fs`, `shell` or `http` plugins.** Rust does all file work and validates the paths it's given.
-5. **Dates are `'YYYY-MM-DD'` strings** across the Rust ↔ TypeScript boundary. Never pass a JavaScript `Date`. `domain/` and `services/` never read the clock: `today` is passed in.
+5. **Dates are `'YYYY-MM-DD'` strings** across the Rust ↔ TypeScript boundary. Never pass a JavaScript `Date`. `domain/` and `services/` never read the clock: `today` and `now` are passed in.
 6. **Every database write runs inside a database transaction**, and SQL always uses bound parameters.
 7. **Schema changes:** update DATA_MODEL.md first, then add a **new** migration file (`src-tauri/migrations/NNNN_name.sql`). **Never edit a migration that has already been released.**
 8. **Never edit generated files** in `src/bindings/`. Change the Rust struct and run `cargo test` to regenerate them.
+9. **The error log never records amounts, payees, notes, or account and category names.**
 
 ## Domain rules that are easy to get wrong
 
-- **Transfers are never counted as income or expense**, and that includes paying the credit card bill.
-- **Balances are signed.** Credit card debt is a negative balance, and `amount_owed = max(0, −balance)`. In forms, the user types the amount owed as a positive number.
-- **Opening balances are not income.** Future-dated transactions don't count toward the current balance.
+- **Transfers are never counted as income or expense**, and that includes paying the credit card bill. They have no category, payee or payment method.
+- **Balances are signed.** Credit card debt is a negative balance, and `amount_owed = max(0, −balance)`. In forms, the user types the amount owed as a positive number. Limits aren't enforced: a card can go past its limit, and an account can go below 0.
+- **Opening balances are not income**, and forms accept only 0 or more.
+- **Future dates are rejected until Phase 3** (TXN-8). From then on, future-dated transactions don't count toward the current balance or any total until their date arrives.
 - **Refunds are income** (in the "Refund" category). They offset net cashflow but don't reduce expense totals or budgets.
 - **Archived accounts still count toward the net balance.** Archiving an account whose balance isn't 0 requires confirming a warning.
 - **Weeks start on Monday** by default. A month can start on any day from 1 to 28 (`month_start_day`). **Years are always calendar years.**
 - **Comparisons:** a period still in progress is compared with the same number of days at the start of the previous period, unless `comparison_mode = full`. If the comparison total is 0, show "—".
 - **Recurring dates** are always calculated from `start_date + n × interval`, never from the previous occurrence. Days past the end of a short month fall on its last day.
 - **`currency_decimals` can't change** once any transaction exists.
-- **In-use records are archived, not deleted.** Accounts, categories and payment methods use `ON DELETE RESTRICT`.
+- **In-use records are archived, not deleted.** Accounts, categories and payment methods use `ON DELETE RESTRICT`. Unused ones can be deleted. The last active account, and the last active category of each kind, can't be archived or deleted.
+- **Custom periods** move by the length of their range, and ▶ stops at the current period. The frontend never works out period dates: it uses what `get_period` returns.
+- **Debug builds use `jobertsvault-dev.db`**, so development never touches real data. Never remove this split.
 
 ## Code layout (details in ARCHITECTURE.md §3)
 
@@ -86,7 +90,7 @@ npm run tauri build
 2. Add the service function in `services/`, including validation that returns `AppError::Validation { field, message }`.
 3. Add the SQL in `repo/` if it's needed.
 4. Add a thin wrapper in `commands/` and register it in `lib.rs`.
-5. Derive `TS` on the input and output structs, then run `cargo test` to regenerate the bindings.
+5. Derive `TS` on the input and output structs, mark `i64` fields `#[ts(type = "number")]`, then run `cargo test` to regenerate the bindings.
 6. Add a typed wrapper in `src/api/<area>.ts` and a hook in `src/hooks/`. After any change that writes data, refresh the `['ledger']` queries.
 7. Add the command to the catalog in ARCHITECTURE.md §4.5.
 

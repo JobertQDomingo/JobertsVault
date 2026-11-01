@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Approved v1.0 |
-| **Style** | Glassmorphism 2.0 ([DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) v0.2) |
-| **Last updated** | 2026-10-26 |
+| **Status** | Approved v1.1 |
+| **Style** | Glassmorphism 2.0 ([DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)) |
+| **Last updated** | 2026-11-01 |
 | **Related docs** | [PRD.md](PRD.md), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), [ARCHITECTURE.md](ARCHITECTURE.md) §5.4 (routes) |
 
 The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors, glass levels and components come from DESIGN_SYSTEM.md. [design/ui-flows.html](design/ui-flows.html) shows every screen drawn in the real style, with consistent ₱ sample data. Open it in a browser.
@@ -35,7 +35,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
 - **Sidebar:** a glass panel with the app mark and name at the top, the screens in the middle and Settings at the bottom. The current screen gets a soft indigo tint. Items from later phases are **hidden** until their phase is built.
 - **Top bar:** a glass panel with the page title on the left. The **"+ Add" button** (Ctrl+N) is always on the right and opens quick-add on every screen.
 - **Period bar:** on screens with a period, the period switcher is its own small glass toolbar under the top bar.
-- **Window:** a fixed **1440 × 900**. It can't be resized or maximized, so the title bar has minimize and close only. It opens centered on the main monitor. The sidebar and top bar stay in place, and the content below the top bar scrolls.
+- **Window:** a fixed **1440 × 900**. It can't be resized or maximized, so the title bar has minimize and close only. It opens centered on the main monitor. If 1440 × 900 doesn't fit, it opens at 1280 × 800 with the same layout zoomed to 88.9%. The sidebar and top bar stay in place, and the content below the top bar scrolls.
 - The window title is "Jobert's Vault", with the app logo.
 
 ---
@@ -67,7 +67,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
 
 | Area | Behavior | PRD |
 |---|---|---|
-| Period switcher | Changes every number on the page. The choice is saved in the URL (`?period=month&anchor=2026-10-26`). It's a glass toolbar of its own. | DSH-1 |
+| Period switcher | Changes every number on the page. The choice is saved in the URL (`?period=month&anchor=2026-10-26`, or `?period=custom&start=…&end=…`). It's a glass toolbar of its own. | DSH-1 |
 | Stat cards | Income, expense and net cashflow for the period. Transfers aren't included. The % change line appears in Phase 2. The net cashflow card is the only one tinted with the accent. | DSH-2, DSH-3 |
 | Recent transactions | The 5 newest transactions **regardless of the selected period**. Clicking a row opens it for editing. "View all" goes to `/transactions`. | DSH-8 |
 | Accounts | Current balances (as of today), with the credit card summary and the net balance. Clicking an account opens its details. | DSH-4, DSH-5 |
@@ -137,7 +137,7 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 | Amount | empty, **focused when the dialog opens** | Must be > 0. |
 | Category | empty | Type to filter. Only categories of the selected type are listed. |
 | Account | **the account used most recently** (TXN-1) | Archived accounts are hidden. |
-| Date | **today** | ↑/↓ change it by one day. |
+| Date | **today** | ↑/↓ change it by one day. Until Phase 3, a future date shows "Date can't be in the future". |
 | Payee, Method, Note | empty | All optional. Payee suggestions start in Phase 2 (TXN-6). |
 
 **For a transfer** the fields become: Amount → **From** account → **To** account → Date → Note. There's no category, payee or method. "To" can't be the same as "From".
@@ -177,7 +177,7 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-- Drag the ⋮⋮ handle to reorder accounts (`reorder_accounts`).
+- Drag the ⋮⋮ handle to reorder accounts (`reorder_accounts`), or focus it and use the arrow keys. Categories and payment methods reorder the same way.
 - Archived accounts are collapsed at the bottom. Their balances still count toward the net balance.
 
 ### 5.2 New / edit account dialog
@@ -186,12 +186,12 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 |---|---|
 | Name | Required, must be unique |
 | Type | Cash / Bank / E-wallet / Credit card. **Can't be changed after the account is created**, because that would change how its balance works. |
-| Opening balance | For a credit card the label changes to **"Amount owed now"**, entered as a positive number (DATA_MODEL §5.1). |
+| Opening balance | 0 or more. For a credit card the label changes to **"Amount owed now"** (DATA_MODEL §5.1). |
 | *(Credit card only)* Credit limit, Statement closing day, Payment due day | Days are 1–31, with the help text "If a month is shorter, the last day is used." |
 
 ### 5.3 Account details (`/accounts/:id`)
 
-**Cash, bank or e-wallet:** the name, the current balance in `display` size, and that account's transactions (the same list and period switcher as `/transactions`, already filtered to the account). Edit and archive actions are in a ⋯ menu.
+**Cash, bank or e-wallet:** the name, the current balance in `display` size, and that account's transactions, including incoming transfers (the same list and period switcher as `/transactions`, already filtered to the account). Edit and archive actions are in a ⋯ menu, which also has **Delete** if the account has never been used.
 
 **Credit card** (CC-6):
 
@@ -214,8 +214,8 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 | Tab | Contents | PRD |
 |---|---|---|
 | **General** | Currency symbol, its position (before or after the amount), decimal places (**locked** once any transaction exists, with an explanation), first day of week, month start day (1–28), show payment method field | SET-1, SET-2, SET-6 |
-| **Categories** | Two lists (Income and Expense). Add, rename, change color (12 swatches) and icon, reorder, archive, **merge** | CAT-2, CAT-4 |
-| **Payment methods** | Add, rename, reorder, archive | TXN-7 |
+| **Categories** | Two lists (Income and Expense). Add, rename, change color (12 swatches) and icon (curated list), reorder, archive, unarchive, **merge**, delete if unused | CAT-2, CAT-4 |
+| **Payment methods** | Add, rename, reorder, archive, unarchive, delete if unused | TXN-7 |
 | **Backup** (Phase 2) | See §8.1 | BAK-* |
 | **Appearance** (Phase 4) | Theme: system / light / dark, and a **Reduce transparency** switch | SET-5, SET-8 |
 
@@ -235,8 +235,8 @@ Changes to settings save **immediately**, with a "Saved" toast. There's no Save 
 1. On the card's detail page, click **Pay bill**. (In Phase 3 this button is also on the due-date banner.)
 2. The transfer form opens already filled in:
    - **To** = the card
-   - **From** = the last-used account that isn't a credit card
-   - **Amount** = the current amount owed
+   - **From** = the latest non-card account used, or else the first active non-card account (DATA_MODEL §5.8)
+   - **Amount** = the current amount owed (empty if nothing is owed)
    - **Note** = "Credit card payment"
 3. Change the amount if you're paying part of the bill, then save.
 4. The amount owed goes down. The month's expense total **doesn't change**.
@@ -262,20 +262,24 @@ Welcome to Jobert's Vault
 
 - The **Phase 1** version is a plain form, because the currency must be set before the first transaction. **Phase 4** adds polish: a step indicator and a short tour.
 - It can be skipped ("Set up later"). Every setting can be changed later in Settings.
+- It lives at `/welcome`. **Start using the app** or **Set up later** ends it for good (`onboarding_completed`). Closing the app before choosing either one shows it again on the next launch.
 
 ### F6: Archive an account (Phase 1)
 1. Account ⋯ menu → **Archive**.
 2. **If the balance is 0:** a confirm dialog says "Archive Old Wallet? It will be hidden from lists but its history stays."
 3. **If the balance isn't 0:** a warning dialog says "Old Wallet still has ₱45.00. Archived accounts still count toward your net balance. Archive anyway?" with the buttons **Cancel** and **Archive anyway** (ACC-3).
 4. Archived accounts can be restored with **Unarchive** in the "Show archived" section.
+5. **Last active account:** it can't be archived or deleted. The app shows "Keep at least one active account".
+6. **Unused account:** the ⋯ menu also offers **Delete**, after a confirm dialog.
 
 ### F7: Archive or merge a category (Phase 1)
 1. Settings → Categories → ⋯ on the category → **Archive** or **Merge into…**.
 2. **Merge:** pick a category of the same kind → confirm: "Move 23 transactions from 'Snacks' to 'Dining Out' and delete 'Snacks'?" (CAT-4)
 3. A category with no transactions can simply be **deleted**.
+4. Archived categories can be restored with **Unarchive**. The last active category of each kind can't be archived or deleted.
 
 ### F8: Look at a different period (Phase 1)
-- Use the segmented control to switch between Day, Week, Month and Year. ◀ ▶ move one period back or forward, and **Today** jumps back to the current period. Custom opens a date range picker.
+- Use the segmented control to switch between Day, Week, Month and Year. ◀ ▶ move one period back or forward, and **Today** jumps back to the current period. Custom opens a date range picker that can't choose future dates, and ◀ ▶ then move by the length of the range. ▶ is disabled once the next period would start after today.
 - **Phase 2** adds a "Compare to: Same days so far ▾ / Full previous period" option on Reports (RPT-4a, SET-7).
 
 ### F9: Back up and restore (Phase 2)
@@ -316,7 +320,7 @@ Goal cards showing the name, the linked account, a progress bar, "₱2,400 of �
 | **No transactions yet** (dashboard) | Empty state: "No transactions yet. Press Ctrl+N to add your first one." with a **[+ Add transaction]** button. The stat cards show `₱0.00`. |
 | **No transactions in this period** | "Nothing recorded for October 2026." plus **[Go to today]** |
 | **No filter matches** | "No transactions match these filters." plus **[Clear filters]** |
-| **Error loading data** | An inline message with a **Retry** button. Details are in the log. |
+| **Error loading data** | An inline message with a **Retry** button. Details are in the error log (ARCHITECTURE §4.4). |
 | **App can't start** | A full-window error screen showing the database path and the error, plus **Open data folder** (ARCHITECTURE §6) |
 | **Transparency off** (Windows setting) | The same screens with solid panels and no blur. The aurora and layout stay (DESIGN_SYSTEM §2.4). |
 
@@ -350,3 +354,11 @@ None at the moment. Answered on 2026-10-26:
 3. **Pay bill:** suggests the **full amount owed**, and you can edit it (CC-9).
 4. **Window:** a fixed **1440 × 900** that can't be resized or maximized, instead of remembering its size. It fits both of the owner's monitors (1920 × 1080 and 2560 × 1080) at 100% scaling, and falls back to 1280 × 800 if the screen is too small.
 5. **Logo:** C · Line Door, shown in the sidebar and the title bar (DESIGN_SYSTEM §6.1).
+
+Answered on 2026-11-01:
+
+6. **Custom period:** ◀ ▶ move by the length of the range (F8).
+7. **Fallback window:** the same layout zoomed to 88.9% (§1).
+8. **Reordering:** drag or arrow keys, using `@dnd-kit` (§5.1).
+9. **Last active records and unused records:** see F6 and F7.
+10. **First launch:** closing the form early shows it again (F5).

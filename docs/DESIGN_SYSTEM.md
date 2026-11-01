@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Approved v1.0 |
+| **Status** | Approved v1.1 |
 | **Style** | **Glassmorphism 2.0**: frosted glass panels floating over a soft colored light (the "aurora") |
-| **Last updated** | 2026-10-26 |
+| **Last updated** | 2026-11-01 |
 | **Related docs** | [PRD.md](PRD.md), [UI_FLOWS.md](UI_FLOWS.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 | **Built with** | Tailwind CSS 4 + shadcn/ui (Radix), lucide-react icons, Sora font (bundled) |
 
@@ -179,7 +179,7 @@ Categories store a palette key, not a hex code (DATA_MODEL §3.2), so they switc
 ```
 
 - The aurora is one component, `<AuroraBackground>`, rendered once behind the app shell.
-- **Dark mode** is the `.dark` class on `<html>`. It follows the Windows setting until the theme switch (SET-5) arrives in Phase 4.
+- **Dark mode** is the `.dark` class on `<html>`. **From Phase 1**, it follows the Windows setting through the `prefers-color-scheme` media query, and it changes while the app is open. Phase 4 adds the theme switch (SET-5).
 
 ---
 
@@ -225,7 +225,7 @@ Categories store a palette key, not a hex code (DATA_MODEL §3.2), so they switc
 
 | Element | Size |
 |---|---|
-| Window | **Fixed 1440 × 900**: not resizable or maximizable (minimize and close only), centered on the main monitor. If the monitor's usable area is too small (for example, display scaling above 100%), it opens at 1280 × 800 instead. |
+| Window | **Fixed 1440 × 900**: not resizable or maximizable (minimize and close only), centered on the main monitor. If the monitor's usable area is too small (for example, display scaling above 100%), it opens at 1280 × 800 instead, showing the same layout zoomed to 88.9%. Every size below is for 1440 × 900. |
 | Gaps | Every panel floats with a **12 px gap**, including from the window edge |
 | Sidebar | A glass panel, 228 px wide, full height |
 | Top bar | A glass panel holding the page title and the **+ Add** button |
@@ -240,6 +240,7 @@ Categories store a palette key, not a hex code (DATA_MODEL §3.2), so they switc
 - **lucide-react**, stroke width **1.75**.
 - Sizes: **16 px** inline and in buttons, **20 px** in the sidebar, **24 px** in empty states.
 - **Category chip:** a 32 px square with 10 px corners. It has the category color's tint as background, a 1 px inner `--edge`, and the icon in full category color. The small chip is 24 px with 8 px corners.
+- **Category icon picker:** a curated list of about 40 icons in `src/lib/categoryIcons.ts`, which must include every seed icon from DATA_MODEL §7. Importing only these keeps the rest of Lucide out of the bundle.
 - **Logo:** see §6.1.
 - Fixed icons:
 
@@ -327,7 +328,7 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **Button** | Flat (never glass) | Four variants:<br>• `primary`: solid `--primary`, 1 px inner top highlight, soft accent glow `0 6px 18px` at 32%<br>• `secondary`: `--field` with `--field-edge`<br>• `ghost`: transparent, `--wash` on hover<br>• `destructive`: `--danger` with `--danger-foreground`<br>Sizes `md` (36 px, 12 px radius) and `sm` (32 px, 10 px radius). The button shrinks to 97% while pressed. The tooltip shows the shortcut. |
 | **Input / Textarea** | Flat | `--field`, `--field-edge` border, 12 px radius. Focus: `--ring` border plus a 3 px ring at 25%. Error: `--danger` border plus an 18% ring, and the message below in `small` text. |
 | **Select / Combobox** | Its menu is Level 2 | You can type to filter. Category options show their chip. Archived options are hidden. |
-| **Date picker** | Its popover is Level 2 | Weeks start on Monday. In the input, ↑ and ↓ move one day. The selected day is solid `--primary`. |
+| **Date picker** | Its popover is Level 2 | Weeks start on the `week_start` setting (Monday by default). In the input, ↑ and ↓ move one day. Until Phase 3, future days are disabled. The selected day is solid `--primary`. |
 | **Segmented control** | Flat | A `--wash` track with 12 px radius. The selected segment is solid `--primary` with `--primary-foreground` text. |
 | **Toolbar** | Level 1 | A small glass bar (16 px radius, 6 px padding) for controls that sit on the canvas: the period bar, the filter bar, report controls. Inside a card it becomes a flat `--wash`. |
 | **Dialog** | Level 2 | 24 px radius, max width 480 px (forms) or 400 px (confirmations). The backdrop is `--overlay` plus a 6 px blur of the app behind. Esc closes it, and focus stays inside. |
@@ -346,7 +347,7 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **`GlassPanel`** | The Level 1 wrapper that cards, the sidebar and toolbars are built on. Its `raised` prop switches it to Level 2. |
 | **`MoneyText`** | Displays an amount using the §7 rules. Props: `amount`, `kind` (`income` / `expense` / `transfer` / `balance` / `owed` / `net`), `size`. |
 | **`AmountInput`** | Converts what you type into centavos through `money.ts`. Right-aligned, tabular digits, never negative. |
-| **`PeriodSwitcher`** | A glass toolbar: `[Day│Week│Month│Year│Custom]  ◀  October 2026  ▶  [Today]`. "Today" is disabled when the current period is already selected. |
+| **`PeriodSwitcher`** | A glass toolbar: `[Day│Week│Month│Year│Custom]  ◀  October 2026  ▶  [Today]`. "Today" is disabled when the current period is already selected. ▶ is disabled when the next period would start after today. |
 | **`StatCard`** | A label, a `display`-sized amount, and (from Phase 2) the % change with a caption such as "vs Sep 1–26". The **net cashflow** card is tinted with 12% of `--primary`. Clickable cards lift 2 px on hover. |
 | **`CategoryChip`** | The icon chip from §6, with the name next to it if needed. |
 | **`AccountRow`** | Account icon in a `--wash` square, the name, and the balance on the right. A credit card also shows "Available ₱X · Due Nov 5". |
@@ -401,3 +402,6 @@ Glass costs graphics power, so these rules keep the app smooth:
 | 2026-10-26 | Logo: **C · Line Door**, a white line vault door on an indigo aurora tile (§6.1) |
 | 2026-10-26 | A Reduce transparency switch in Settings → Appearance (SET-8, Phase 4) |
 | 2026-10-26 | Fixed 1440 × 900 window, not resizable, with no responsive window layouts |
+| 2026-11-01 | The app follows the Windows light or dark setting from Phase 1 |
+| 2026-11-01 | The 1280 × 800 fallback zooms the same layout to 88.9% |
+| 2026-11-01 | The date picker follows `week_start`, and category icons come from a curated list |
