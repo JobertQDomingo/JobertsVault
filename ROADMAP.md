@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **Status** | Active |
-| **Last updated** | 2026-11-01 |
-| **Current focus** | **Phase 0: project setup** |
+| **Last updated** | 2026-11-03 |
+| **Current focus** | **Phase 0: project setup**, waiting on the first CI run. Next: Phase 1, 1.1 Backend foundations. |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -17,7 +17,7 @@ This file is the progress tracker.
 
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
-| **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 2 / 11 |
+| **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 10 / 11 |
 | **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11 | 0 / 42 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 15 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
@@ -28,14 +28,14 @@ This file is the progress tracker.
 ## Phase 0 · Project setup
 
 - [x] Create the GitHub repository and commit the planning docs (`README.md`, `CLAUDE.md`, `ROADMAP.md`, `docs/`, `assets/brand/`)
-- [ ] Scaffold with `npm create tauri-app@latest` from a path with no apostrophe ([ARCHITECTURE §11](docs/ARCHITECTURE.md)): Tauri 2, React, TypeScript, Vite. Set `productName` to `Jobert’s Vault` (curly apostrophe) and `identifier` to `com.jobertsvault.app`. Remove `tauri-plugin-opener` and its permission if the template adds them.
-- [ ] Set up the window in `tauri.conf.json`: 1440 × 900, `resizable: false`, `maximizable: false`, `center: true`, `visible: false`. Also set the content security policy and keep `capabilities/default.json` to the minimum ([ARCHITECTURE §10](docs/ARCHITECTURE.md), [ADR 0008](docs/decisions/0008-fixed-window-size.md))
-- [ ] Frontend libraries: Tailwind CSS 4, shadcn/ui and its helpers, lucide-react, TanStack Query, React Router, react-hook-form, zod, `@hookform/resolvers`, `react-day-picker`, `date-fns`, `cmdk`, `sonner`, `@dnd-kit`, `@fontsource/sora` ([ARCHITECTURE §2](docs/ARCHITECTURE.md))
-- [ ] Rust crates: `rusqlite` `0.40` (with the `bundled` feature), `rusqlite_migration` `2.6`, `chrono`, `serde`, `thiserror`, `ts-rs`
-- [ ] Tooling: ESLint, Prettier, `rustfmt`, `clippy`, and the npm scripts `lint`, `typecheck`, `test`
-- [ ] Testing: set up Vitest, Testing Library and jsdom, plus one example test on each side (frontend and Rust)
-- [ ] Type generation: ts-rs writes to `src/bindings/` when `cargo test` runs, `i64` fields generate `number` ([ARCHITECTURE §4.6](docs/ARCHITECTURE.md)), and a check confirms the generated files are committed
-- [ ] App icon: `npm run tauri icon assets/brand/app-icon-1024.png`
+- [x] Scaffold with `npm create tauri-app@latest` from a path with no apostrophe ([ARCHITECTURE §11](docs/ARCHITECTURE.md)): Tauri 2, React, TypeScript, Vite. Set `productName` to `Jobert’s Vault` (curly apostrophe) and `identifier` to `com.jobertsvault.app`. Remove `tauri-plugin-opener` and its permission if the template adds them.
+- [x] Set up the window in `tauri.conf.json`: 1440 × 900, `resizable: false`, `maximizable: false`, `center: true`, `visible: false`. Also set the content security policy and keep `capabilities/default.json` to the minimum ([ARCHITECTURE §10](docs/ARCHITECTURE.md), [ADR 0008](docs/decisions/0008-fixed-window-size.md))
+- [x] Frontend libraries: Tailwind CSS 4, shadcn/ui and its helpers, lucide-react, TanStack Query, React Router, react-hook-form, zod, `@hookform/resolvers`, `react-day-picker`, `date-fns`, `cmdk`, `sonner`, `@dnd-kit`, `@fontsource/sora` ([ARCHITECTURE §2](docs/ARCHITECTURE.md))
+- [x] Rust crates: `rusqlite` `0.40` (with the `bundled` feature), `rusqlite_migration` `2.6`, `chrono`, `serde`, `thiserror`, `ts-rs`
+- [x] Tooling: ESLint, Prettier, `rustfmt`, `clippy`, and the npm scripts `lint`, `typecheck`, `test`
+- [x] Testing: set up Vitest, Testing Library and jsdom, plus one example test on each side (frontend and Rust)
+- [x] Type generation: ts-rs writes to `src/bindings/` when `cargo test` runs, `i64` fields generate `number` ([ARCHITECTURE §4.6](docs/ARCHITECTURE.md)), and a check confirms the generated files are committed
+- [x] App icon: `npm run tauri icon assets/brand/app-icon-1024.png`
 - [ ] CI: a GitHub Actions workflow on `windows-latest` that runs every check from CLAUDE.md and the bindings check on each push and pull request, without building the installer
 - [x] Decision records 0001–0009 written ([docs/decisions/](docs/decisions/README.md))
 

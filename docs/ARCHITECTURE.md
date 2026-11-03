@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.1 |
-| **Last updated** | 2026-11-01 |
+| **Last updated** | 2026-11-03 |
 | **Related docs** | [PRD.md](PRD.md), [DATA_MODEL.md](DATA_MODEL.md) |
 
 ---
@@ -47,10 +47,10 @@ Jobert's Vault is a single **Tauri 2** desktop app. The window shows a React UI 
 |---|---|---|
 | App shell | **Tauri 2** | Small installer (about 10 MB), low memory use, Rust backend, uses the WebView2 engine that ships with Windows 10 and 11 |
 | UI framework | **React 19 + TypeScript** | Largest library ecosystem (charts, forms, accessible components), and the best supported by AI coding tools |
-| Build tool | **Vite** | Default for Tauri projects; fast reloading while developing |
-| Styling | **Tailwind CSS 4** | Design tokens map directly to CSS variables. The style is Glassmorphism 2.0, built from `glass` / `glass-raised` utilities and `backdrop-filter` (see DESIGN_SYSTEM.md) |
+| Build tool | **Vite**, with `@vitejs/plugin-react` | Default for Tauri projects; fast reloading while developing |
+| Styling | **Tailwind CSS 4**, with `@tailwindcss/vite` | Design tokens map directly to CSS variables. The style is Glassmorphism 2.0, built from `glass` / `glass-raised` utilities and `backdrop-filter` (see DESIGN_SYSTEM.md) |
 | Font | **@fontsource/sora** (400, 600, 700) | The UI typeface, bundled into the app so no font is ever downloaded. It has tabular digits. It has no ₱ sign, so ₱ comes from the Segoe UI fallback (DESIGN_SYSTEM §4). |
-| Components | **shadcn/ui** (built on Radix UI), with `clsx`, `tailwind-merge` and `class-variance-authority` | Accessible, keyboard-friendly building blocks that are copied into the repo, so they're ours to change |
+| Components | **shadcn/ui** (built on the `radix-ui` package), with `clsx`, `tailwind-merge` and `class-variance-authority` | Accessible, keyboard-friendly building blocks that are copied into the repo, so they're ours to change. shadcn's toast asks for `next-themes`: don't add it, because the app sets the `.dark` class itself (DESIGN_SYSTEM §3.5). |
 | Date picker | **react-day-picker + date-fns** | The shadcn/ui calendar. `Date` objects stay inside the picker: `lib/dates.ts` converts them to `'YYYY-MM-DD'` strings before anything else sees them. |
 | Combobox | **cmdk** | The shadcn/ui combobox, with type-to-filter |
 | Toasts | **sonner** | The shadcn/ui toast |
@@ -59,8 +59,8 @@ Jobert's Vault is a single **Tauri 2** desktop app. The window shows a React UI 
 | Server state | **TanStack Query** | Caching, loading and error states, and refreshing data after changes |
 | Routing | **React Router** | Simple routes, with the selected period kept in the URL |
 | Forms | **react-hook-form + zod**, joined by `@hookform/resolvers` | Fast, keyboard-friendly forms with type-safe validation |
-| Frontend tests | **Vitest, Testing Library, jsdom** | Fast unit and component tests (§9) |
-| Linting | **ESLint, Prettier** | Consistent TypeScript and catches common mistakes (§13) |
+| Frontend tests | **Vitest, Testing Library** (`@testing-library/react`, `@testing-library/dom`), **jsdom** | Fast unit and component tests (§9) |
+| Linting | **ESLint** (`@eslint/js`, `typescript-eslint`, `eslint-plugin-react-hooks`), **Prettier** | Consistent TypeScript and catches common mistakes (§13) |
 | Charts (Phase 2) | **Recharts** | Built for React, and covers the bar, line and donut charts we need |
 | Database driver | **rusqlite** (`bundled` feature) | SQLite is compiled into the app, so its version is always the same. It's synchronous, simple and fast. Pin it to the version `rusqlite_migration` supports, currently `0.40`. Newer releases fail to build alongside it. |
 | Migrations | **rusqlite_migration** (`2.6`) | Tracks the schema version in `PRAGMA user_version` |
@@ -81,7 +81,10 @@ jobertsvault/
 │  ├─ decisions/                   # decision records 0001–0009 (see docs/decisions/README.md)
 │  └─ design/                      # visual previews of the design system and UI flows
 ├─ assets/brand/                   # logo.svg, one-color marks, app-icon-1024.png
-├─ package.json  vite.config.ts  tsconfig.json
+├─ .cargo/config.toml              # tells ts-rs to write to src/bindings/ (§4.6)
+├─ .github/workflows/ci.yml        # the checks in §9
+├─ package.json  package-lock.json  components.json  eslint.config.js  .prettierignore
+├─ vite.config.ts  tsconfig.json  tsconfig.node.json
 ├─ src/                            # ── Frontend ──
 │  ├─ main.tsx  App.tsx  routes.tsx
 │  ├─ api/                         # one typed wrapper per Tauri command (the only place that calls invoke)
@@ -100,8 +103,10 @@ jobertsvault/
 │  │  ├─ money.ts                  # parse and format minor units (the only place that does this)
 │  │  ├─ dates.ts                  # formatting 'YYYY-MM-DD' for display, and date picker conversion
 │  │  ├─ categoryIcons.ts          # the curated icon list (DESIGN_SYSTEM §6)
-│  │  └─ queryKeys.ts
-│  └─ styles/globals.css           # design tokens (CSS variables)
+│  │  ├─ queryKeys.ts
+│  │  └─ utils.ts                  # cn(), the class name helper shadcn/ui expects
+│  ├─ styles/globals.css           # design tokens (CSS variables)
+│  └─ test/setup.ts                # Vitest setup
 └─ src-tauri/                      # ── Backend ──
    ├─ Cargo.toml  tauri.conf.json
    ├─ capabilities/default.json    # the minimum permissions the frontend needs
@@ -212,7 +217,7 @@ All commands use `camelCase` parameter names in TypeScript and `snake_case` in R
 ### 4.6 Rust ↔ TypeScript types
 
 - Every struct that crosses IPC derives `Serialize/Deserialize` and `ts_rs::TS` with `#[serde(rename_all = "camelCase")]`.
-- Running `cargo test` regenerates the files in `src/bindings/`. These files are committed to git, and CI fails if they're out of date.
+- Running `cargo test` regenerates the files in `src/bindings/` (the folder is set by `TS_RS_EXPORT_DIR` in `.cargo/config.toml`). These files are committed to git, and CI fails if they're out of date. ts-rs doesn't delete old files, so delete the file by hand when you remove a type.
 - **Money crosses IPC as a plain integer of minor units.** JavaScript numbers are exact up to 2⁵³ (about 9 × 10¹⁵), far above the app's maximum amount (DATA_MODEL §6).
 - **Mark `i64` as `number`.** ts-rs generates `bigint` for `i64` by default, but the JSON holds a plain number. Add `#[ts(type = "number")]` to `Money` and to every `i64` field, including IDs.
 - **Dates cross IPC as `'YYYY-MM-DD'` strings**, never as JavaScript `Date` objects, which can shift a date across midnight because of time zones.
