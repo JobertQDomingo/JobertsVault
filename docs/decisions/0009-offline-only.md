@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Superseded by [0010](0010-automatic-updates.md) |
 | **Date** | 2026-10-26 |
 | **Related** | PRD §3 and §8 (Privacy), ARCHITECTURE §10, CLAUDE.md rules 3 and 4 |
 

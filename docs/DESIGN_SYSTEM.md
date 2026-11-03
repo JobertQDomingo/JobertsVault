@@ -186,7 +186,7 @@ Categories store a palette key, not a hex code (DATA_MODEL §3.2), so they switc
 ## 4. Typography
 
 **Font: Sora**, a clean geometric sans-serif.
-- **Bundled with the app** through the `@fontsource/sora` npm package, in weights 400, 600 and 700. Nothing is downloaded at runtime, because the app has no network access.
+- **Bundled with the app** through the `@fontsource/sora` npm package, in weights 400, 600 and 700. No font is ever downloaded at runtime.
 - **Checked on 2026-11-01:** Sora has **tabular (fixed-width) digits**, through `tabular-nums` (its default digits are proportional), and the true minus sign (U+2212). **Sora has no ₱ sign** (U+20B1), and neither do `▲` and `▼`.
 - **Fallback:** `"Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif`. **The ₱, ▲ and ▼ signs come from Segoe UI**, which ships with Windows 10 and 11, so they work offline. This is what the visual previews show. Don't add another font just for these signs.
 

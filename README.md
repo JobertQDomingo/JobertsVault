@@ -1,6 +1,6 @@
 # Jobert's Vault
 
-A private, offline desktop app for Windows that tracks personal cashflow (income and expenses) by **day, week, month or year**. You enter every transaction yourself, and all data stays in a local SQLite file on your computer. Nothing is sent over the internet.
+A private desktop app for Windows that tracks personal cashflow (income and expenses) by **day, week, month or year**. You enter every transaction yourself, and all data stays in a local SQLite file on your computer. Your financial data is never sent over the internet. The only network use is checking GitHub for app updates, which you can turn off, and the app works fully offline.
 
 > **Status:** in development. The app shell from Phase 0 (project setup) runs, but it has no features yet. See [ROADMAP.md](ROADMAP.md) for progress.
 
@@ -8,7 +8,7 @@ A private, offline desktop app for Windows that tracks personal cashflow (income
 
 | Phase | Features |
 |---|---|
-| **1: MVP** | Accounts (cash, bank, e-wallet, credit card), income, expense and transfer transactions, editable categories, a dashboard with income, expense and net cashflow for each day, week (starting Monday), month or year, account balances and net balance, credit card amount owed, available credit and due date, quick-add with **Ctrl+N**, light and dark themes that follow Windows |
+| **1: MVP** | Accounts (cash, bank, e-wallet, credit card), income, expense and transfer transactions, editable categories, a dashboard with income, expense and net cashflow for each day, week (starting Monday), month or year, account balances and net balance, credit card amount owed, available credit and due date, quick-add with **Ctrl+N**, light and dark themes that follow Windows, automatic updates, a database backup before migrations |
 | **2: Reports & backups** | Income-vs-expense charts, category breakdown, period comparison, payee suggestions, automatic daily backups, restore, CSV export |
 | **3: Planning** | Recurring transactions, budgets, savings goals, credit card due-date reminders |
 | **4: Polish** | Theme and Reduce transparency switches, more keyboard shortcuts, polished onboarding on first launch, installer polish |
@@ -63,13 +63,14 @@ The first `tauri dev` compiles every Rust dependency, which takes several minute
 |---|---|
 | Database | `%APPDATA%\com.jobertsvault.app\jobertsvault.db` |
 | Error log | `%APPDATA%\com.jobertsvault.app\jobertsvault.log` (no amounts, payees or notes) |
+| Pre-migration backups | `%APPDATA%\com.jobertsvault.app\backups\pre-migration\`, made automatically before an update changes the database |
 | Backups (Phase 2) | `%APPDATA%\com.jobertsvault.app\backups\` by default (you can change this in Settings) |
 
-> ⚠️ **Phase 1 has no backup feature.** Until Phase 2, close the app now and then and copy `jobertsvault.db` somewhere safe yourself. A OneDrive or Google Drive folder works well.
+> ⚠️ **Phase 1 has no regular backups and no Restore.** Until Phase 2, close the app now and then and copy `jobertsvault.db` somewhere safe yourself. A OneDrive or Google Drive folder works well.
 
 `npm run tauri dev` uses `jobertsvault-dev.db` and `jobertsvault-dev.log` in the same folder, so development never touches your real data.
 
-Uninstalling the app **does not** delete your data. To start fresh, delete the folder above.
+Updates keep your data, because it isn't in the install folder. Uninstalling keeps it too, unless you tick **Delete the application data** in the uninstaller, which removes the folder above, including the database and any backups in it. To start fresh, delete that folder.
 
 ## Project documents
 
@@ -84,7 +85,8 @@ Start with [docs/README.md](docs/README.md) for the reading order.
 | [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) | The Glassmorphism 2.0 style: glass layers, colors, fonts, components |
 | [UI_FLOWS.md](docs/UI_FLOWS.md) | Screens and user flows |
 | [ROADMAP.md](ROADMAP.md) | Phase checklists and progress |
-| [docs/decisions/](docs/decisions/README.md) | Decision records 0001–0009: why the big choices were made |
+| [RELEASING.md](RELEASING.md) | How a change gets from a branch to every installed copy (written during Phase 1) |
+| [docs/decisions/](docs/decisions/README.md) | Decision records 0001–0010: why the big choices were made |
 | [docs/design/](docs/design/) | Visual previews of the design system and every screen. Open the `.html` files in a browser. |
 | `assets/brand/` | The logo (`logo.svg`), one-color versions and the 1024 px app icon source |
 

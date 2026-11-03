@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.1 |
-| **Last updated** | 2026-11-01 |
+| **Last updated** | 2026-11-03 |
 | **Database** | SQLite (bundled with the app through `rusqlite`) |
 | **Related docs** | [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 
@@ -218,6 +218,7 @@ CREATE TABLE settings (
 | `show_payment_method` | `true` \| `false` | `true` | 1 | SET-6 |
 | `last_used_account_id` | account id | (none) | 1 | TXN-1 |
 | `onboarding_completed` | `true` \| `false` | `false` | 1 | ONB-1 |
+| `auto_update_enabled` | `true` \| `false` | `true` | 1 | UPD-3 |
 | `comparison_mode` | `to_date` \| `full` | `to_date` | 2 | SET-7 |
 | `backup_folder` | absolute path | `<app data>\backups` | 2 | SET-3 |
 | `auto_backup_enabled` | `true` \| `false` | `true` | 2 | SET-3 |
@@ -528,7 +529,7 @@ Income and expense colors are **numbered separately**, because the breakdown cha
 - The migration files live in `src-tauri/migrations/`, named `NNNN_description.sql`, and are run by `rusqlite_migration`. The current schema version is stored in SQLite's `PRAGMA user_version`.
 - **A migration is never edited once it has been released.** Every schema change is a new file.
 - Each migration runs inside a single database transaction, so it either completes fully or changes nothing.
-- From Phase 2, the database is backed up automatically before any migration runs (BAK-5).
+- **The database is backed up automatically before any migration runs (BAK-5).** This applies when an existing database has pending migrations, not when a new one is created. The copy goes to `<app data>\backups\pre-migration\jobertsvault-pre-migration-v<schema version>-YYYY-MM-DD_HHMM.db`, whatever `backup_folder` says, and is never deleted automatically. If the backup fails, the migration doesn't run and the app shows the startup error screen.
 - The app refuses to open a database whose `user_version` is **newer** than it knows about (e.g. a backup made by a later version). It shows a message instead of risking damage to the data.
 
 | File | Phase | Contents |

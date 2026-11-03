@@ -11,7 +11,7 @@ Everything that defines what Jobert's Vault is and how it's built. All the docs 
 | 3 | [ARCHITECTURE.md](ARCHITECTURE.md) | How it's built: Tauri, React and Rust layers, commands, startup, testing, security |
 | 4 | [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) | The Glassmorphism 2.0 style: glass layers, colors, type, components, the logo |
 | 5 | [UI_FLOWS.md](UI_FLOWS.md) | Every screen and the key flows, such as quick-add and paying the card bill |
-| 6 | [decisions/](decisions/README.md) | Why the big choices were made (decision records 0001–0009) |
+| 6 | [decisions/](decisions/README.md) | Why the big choices were made (decision records 0001–0010) |
 
 The progress tracker, [ROADMAP.md](../ROADMAP.md), and the rules for AI coding sessions, [CLAUDE.md](../CLAUDE.md), live at the repository root.
 
@@ -25,7 +25,7 @@ The design system and UI flows also exist as visual pages, drawn with the real t
 | [design/ui-flows.html](design/ui-flows.html) | Every screen at the real 1440 × 900 window size, the key flows and the Phase 2–4 screens |
 
 - **To view them:** open the `.html` file from your local clone in a browser. GitHub shows `.html` files as code, not as pages.
-- **They need internet** to load the Sora font and the icons. Offline, they fall back to the system font and show no icons. (The app itself bundles everything and never goes online.)
+- **They need internet** to load the Sora font and the icons. Offline, they fall back to the system font and show no icons. (The app itself bundles everything, and only goes online to check for updates.)
 - **Keep them in sync:** when a doc changes something visual, update its page too. `vault.css` and `vault.js` are shared by both pages.
 
 ## Brand assets
