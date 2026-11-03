@@ -1,7 +1,12 @@
 use tauri::Manager;
 
+use state::AppState;
+
+pub mod commands;
+pub mod db;
 pub mod error;
 pub mod log;
+pub mod services;
 pub mod state;
 #[cfg(test)]
 mod test_support;
@@ -9,12 +14,19 @@ mod test_support;
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
-            // The window starts hidden and is shown once startup is done (ARCHITECTURE §6).
+            let data_dir = app.path().app_data_dir()?;
+            app.manage(AppState::open(data_dir, &db::migrations()));
+            // The window starts hidden and is shown once startup is done, even if it failed
+            // (ARCHITECTURE §6).
             if let Some(window) = app.get_webview_window("main") {
                 window.show()?;
             }
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            commands::system::get_startup_status,
+            commands::system::open_data_folder,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running the app");
 }

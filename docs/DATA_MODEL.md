@@ -24,7 +24,7 @@ This document describes every table and field, plus the rules for calculating ba
 | **Booleans** | `INTEGER` 0 or 1, with a `CHECK` constraint. |
 | **Enums** | `TEXT` with a `CHECK (... IN (...))` constraint. The values are lowercase `snake_case`. |
 | **Table mode** | Every table is declared `STRICT`, so SQLite rejects a value of the wrong type. |
-| **Connection settings** | `PRAGMA foreign_keys = ON`, `PRAGMA journal_mode = WAL`, `PRAGMA busy_timeout = 5000` |
+| **Connection settings** | `PRAGMA foreign_keys = ON`, `PRAGMA journal_mode = WAL`, `PRAGMA busy_timeout = 5000`, `PRAGMA synchronous = NORMAL` (as in ARCHITECTURE §4.3) |
 | **Deleting records** | Accounts, categories and payment methods that are in use are **archived instead of deleted**. Unused ones can be deleted. Foreign keys use `ON DELETE RESTRICT`, so the database itself blocks a delete that would break history. |
 | **Names** | Names are trimmed and compared case-insensitively (`COLLATE NOCASE`). |
 
