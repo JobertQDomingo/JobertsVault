@@ -28,7 +28,7 @@ pub fn open(path: &Path) -> Result<Connection, AppError> {
     Ok(conn)
 }
 
-/// Gets an open database ready to use. Refuses one made by a newer version of the app.
+/// Refuses a database made by a newer version of the app.
 pub fn prepare(conn: &mut Connection, ms: &Migrations) -> Result<(), AppError> {
     if ms.pending_migrations(conn)? < 0 {
         return Err(AppError::Database {
@@ -66,5 +66,25 @@ mod tests {
         assert_eq!(pragma("journal_mode"), "wal");
         assert_eq!(pragma("busy_timeout"), "5000");
         assert_eq!(pragma("synchronous"), "1");
+    }
+
+    #[test]
+    fn open_waits_for_a_lock_instead_of_failing() {
+        let dir = TempDir::new("db-busy");
+        let path = dir.path().join("test.db");
+        let holder = Connection::open(&path).unwrap();
+        // Hold a write lock on a non-empty database while open() runs.
+        holder
+            .execute_batch("CREATE TABLE t (x); BEGIN EXCLUSIVE")
+            .unwrap();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(300));
+            holder.execute_batch("COMMIT").unwrap();
+        });
+        assert!(
+            open(&path).is_ok(),
+            "the WAL switch must wait out another writer's lock"
+        );
+        release.join().unwrap();
     }
 }

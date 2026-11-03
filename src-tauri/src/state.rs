@@ -36,8 +36,8 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// Runs startup steps 1–6 in `data_dir`. A failure is logged and kept in place of the
-    /// connection, so the app still opens and shows it.
+    /// Runs the startup sequence (ARCHITECTURE §6) in `data_dir`. A failure is logged and kept
+    /// in place of the connection, so the app still opens and shows it.
     pub fn open(data_dir: PathBuf, ms: &Migrations) -> Self {
         let db_path = data_dir.join(format!("{}.db", db::NAME));
         let log_path = data_dir.join(format!("{}.log", db::NAME));
@@ -88,6 +88,7 @@ mod tests {
     const NEWER: &str = "This database was made by a newer version of Jobert's Vault. Install the latest version to open it.";
 
     #[test]
+    #[cfg(debug_assertions)]
     fn debug_builds_use_their_own_files() {
         let dir = TempDir::new("state-names");
         let state = AppState::open(dir.path().to_path_buf(), &Migrations::new(vec![]));
