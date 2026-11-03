@@ -111,10 +111,10 @@ mod tests {
         let db_path = dir.path().join("jobertsvault-dev.db");
         Connection::open(&db_path)
             .unwrap()
-            .pragma_update(None, "user_version", 1)
+            .pragma_update(None, "user_version", 99) // far past any real migration
             .unwrap();
 
-        let state = AppState::open(dir.path().to_path_buf(), &Migrations::new(vec![]));
+        let state = AppState::open(dir.path().to_path_buf(), &db::migrations());
         assert_eq!(
             state.startup_status(),
             StartupStatus::Failed {
@@ -166,5 +166,20 @@ mod tests {
             .query_row("SELECT 1", [], |row| row.get(0))
             .unwrap();
         assert_eq!(one, 1);
+    }
+
+    #[test]
+    fn the_real_migrations_apply_and_the_app_reopens() {
+        let dir = TempDir::new("state-real");
+        for _launch in 0..2 {
+            let state = AppState::open(dir.path().to_path_buf(), &db::migrations());
+            assert_eq!(state.startup_status(), StartupStatus::Ok);
+            let version: i64 = state
+                .conn()
+                .unwrap()
+                .query_row("PRAGMA user_version", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(version, 1);
+        }
     }
 }

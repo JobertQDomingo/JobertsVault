@@ -22,6 +22,17 @@ mod tests {
         conn
     }
 
+    /// Accounts 1 (Cash) and 2 (Bank), category 1 (Salary, income), payment method 1 (Cash).
+    fn add_basics(conn: &Connection) {
+        for sql in [
+            "INSERT INTO accounts (name, kind, created_at, updated_at) VALUES ('Cash', 'cash', ?1, ?1), ('Bank', 'bank', ?1, ?1)",
+            "INSERT INTO categories (name, kind, color, icon, created_at, updated_at) VALUES ('Salary', 'income', 'cat-12', 'briefcase', ?1, ?1)",
+            "INSERT INTO payment_methods (name, created_at, updated_at) VALUES ('Cash', ?1, ?1)",
+        ] {
+            conn.execute(sql, [NOW]).unwrap();
+        }
+    }
+
     #[test]
     fn the_migrations_are_valid() {
         assert!(migrations().validate().is_ok());
@@ -105,11 +116,7 @@ mod tests {
     #[test]
     fn a_transfer_has_no_category() {
         let conn = migrated();
-        conn.execute_batch(&format!(
-            "INSERT INTO accounts (name, kind, created_at, updated_at) VALUES ('Cash', 'cash', '{NOW}', '{NOW}'), ('Bank', 'bank', '{NOW}', '{NOW}');
-             INSERT INTO categories (name, kind, color, icon, created_at, updated_at) VALUES ('Salary', 'income', 'cat-12', 'briefcase', '{NOW}', '{NOW}');"
-        ))
-        .unwrap();
+        add_basics(&conn);
         let with_category = conn.execute(
             "INSERT INTO transactions (kind, amount, date, account_id, to_account_id, category_id, created_at, updated_at) VALUES ('transfer', 100, '2026-10-26', 1, 2, 1, ?1, ?1)",
             [NOW],
@@ -120,5 +127,104 @@ mod tests {
             [NOW],
         );
         assert!(plain.is_ok(), "{plain:?}");
+    }
+
+    #[test]
+    fn the_checks_reject_rows_that_break_the_rules() {
+        let conn = migrated();
+        add_basics(&conn);
+        let txn = "INSERT INTO transactions (kind, amount, date, account_id, to_account_id, category_id, payee, payment_method_id, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9)";
+        // kind, amount, date, account, to_account, category, payee, payment method
+        type Row = (
+            &'static str,
+            i64,
+            &'static str,
+            i64,
+            Option<i64>,
+            Option<i64>,
+            Option<&'static str>,
+            Option<i64>,
+        );
+        let rejected: [Row; 7] = [
+            ("income", 0, "2026-10-26", 1, None, Some(1), None, None),
+            ("income", 100, "26-10-2026", 1, None, Some(1), None, None),
+            ("income", 100, "2026-10-26", 1, None, None, None, None),
+            ("income", 100, "2026-10-26", 1, Some(2), Some(1), None, None),
+            ("transfer", 100, "2026-10-26", 1, Some(1), None, None, None),
+            (
+                "transfer",
+                100,
+                "2026-10-26",
+                1,
+                Some(2),
+                None,
+                Some("Corner Cafe"),
+                None,
+            ),
+            (
+                "transfer",
+                100,
+                "2026-10-26",
+                1,
+                Some(2),
+                None,
+                None,
+                Some(1),
+            ),
+        ];
+        let valid = conn.execute(
+            txn,
+            rusqlite::params![
+                "income",
+                100,
+                "2026-10-26",
+                1,
+                None::<i64>,
+                Some(1),
+                Some("Corner Cafe"),
+                Some(1),
+                NOW
+            ],
+        );
+        assert!(valid.is_ok(), "the statement itself must work: {valid:?}");
+        for row @ (kind, amount, date, account, to_account, category, payee, method) in rejected {
+            let result = conn.execute(
+                txn,
+                rusqlite::params![
+                    kind, amount, date, account, to_account, category, payee, method, NOW
+                ],
+            );
+            assert!(result.is_err(), "accepted {row:?}");
+        }
+        let non_card_limit = conn.execute(
+            "INSERT INTO accounts (name, kind, credit_limit, created_at, updated_at) VALUES ('GCash', 'ewallet', 100, ?1, ?1)",
+            [NOW],
+        );
+        assert!(non_card_limit.is_err());
+    }
+
+    #[test]
+    fn an_account_in_use_cannot_be_deleted() {
+        let conn = migrated();
+        add_basics(&conn);
+        conn.execute(
+            "INSERT INTO transactions (kind, amount, date, account_id, category_id, created_at, updated_at) VALUES ('income', 100, '2026-10-26', 1, 1, ?1, ?1)",
+            [NOW],
+        )
+        .unwrap();
+        assert!(
+            conn.execute("DELETE FROM accounts WHERE id = 1", [])
+                .is_err()
+        );
+        assert!(
+            conn.execute("DELETE FROM categories WHERE id = 1", [])
+                .is_err()
+        );
+        assert_eq!(
+            conn.execute("DELETE FROM accounts WHERE id = 2", [])
+                .unwrap(),
+            1,
+            "unused ones can go"
+        );
     }
 }
