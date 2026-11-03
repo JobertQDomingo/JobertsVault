@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
+use chrono::{DateTime, Local};
 use rusqlite::Connection;
 use rusqlite_migration::Migrations;
 use serde::Serialize;
@@ -38,10 +39,10 @@ pub struct AppState {
 impl AppState {
     /// Runs the startup sequence (ARCHITECTURE §6) in `data_dir`. A failure is logged and kept
     /// in place of the connection, so the app still opens and shows it.
-    pub fn open(data_dir: PathBuf, ms: &Migrations) -> Self {
+    pub fn open(data_dir: PathBuf, ms: &Migrations, now: DateTime<Local>) -> Self {
         let db_path = data_dir.join(format!("{}.db", db::NAME));
         let log_path = data_dir.join(format!("{}.log", db::NAME));
-        let db = start(&data_dir, &db_path, ms);
+        let db = start(&data_dir, &db_path, ms, now);
         if let Err(err) = &db {
             log::record_startup(&log_path, err);
         }
@@ -73,17 +74,23 @@ impl AppState {
     }
 }
 
-fn start(data_dir: &Path, db_path: &Path, ms: &Migrations) -> Result<Connection, AppError> {
+fn start(
+    data_dir: &Path,
+    db_path: &Path,
+    ms: &Migrations,
+    now: DateTime<Local>,
+) -> Result<Connection, AppError> {
     fs::create_dir_all(data_dir)?;
     let mut conn = db::open(db_path)?;
-    db::prepare(&mut conn, ms)?;
+    let backup_dir = data_dir.join(db::BACKUPS_DIR).join("pre-migration");
+    db::prepare(&mut conn, ms, &backup_dir, now)?;
     Ok(conn)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::TempDir;
+    use crate::test_support::{TempDir, now};
 
     const NEWER: &str = "This database was made by a newer version of Jobert's Vault. Install the latest version to open it.";
 
@@ -91,7 +98,7 @@ mod tests {
     #[cfg(debug_assertions)]
     fn debug_builds_use_their_own_files() {
         let dir = TempDir::new("state-names");
-        let state = AppState::open(dir.path().to_path_buf(), &Migrations::new(vec![]));
+        let state = AppState::open(dir.path().to_path_buf(), &Migrations::new(vec![]), now());
         assert!(state.db_path.ends_with("jobertsvault-dev.db"));
         assert!(state.log_path.ends_with("jobertsvault-dev.log"));
     }
@@ -100,7 +107,7 @@ mod tests {
     fn a_fresh_folder_starts_ok() {
         let dir = TempDir::new("state-fresh");
         let data_dir = dir.path().join("com.jobertsvault.app");
-        let state = AppState::open(data_dir, &Migrations::new(vec![]));
+        let state = AppState::open(data_dir, &Migrations::new(vec![]), now());
         assert_eq!(state.startup_status(), StartupStatus::Ok);
         assert!(state.db_path.exists());
     }
@@ -108,7 +115,7 @@ mod tests {
     #[test]
     fn a_newer_database_is_refused() {
         let dir = TempDir::new("state-newer");
-        let db_path = dir.path().join("jobertsvault-dev.db");
+        let db_path = dir.path().join(format!("{}.db", db::NAME));
         Connection::open(&db_path)
             .unwrap()
             .pragma_update(None, "user_version", 99) // far past any real migration
@@ -116,7 +123,8 @@ mod tests {
 
         let state = AppState::open(
             dir.path().to_path_buf(),
-            &db::migrations(chrono::Utc::now()),
+            &db::migrations(now().to_utc()),
+            now(),
         );
         assert_eq!(
             state.startup_status(),
@@ -135,8 +143,12 @@ mod tests {
     #[test]
     fn a_corrupt_file_is_reported() {
         let dir = TempDir::new("state-corrupt");
-        fs::write(dir.path().join("jobertsvault-dev.db"), vec![0x5a; 4096]).unwrap();
-        let state = AppState::open(dir.path().to_path_buf(), &Migrations::new(vec![]));
+        fs::write(
+            dir.path().join(format!("{}.db", db::NAME)),
+            vec![0x5a; 4096],
+        )
+        .unwrap();
+        let state = AppState::open(dir.path().to_path_buf(), &Migrations::new(vec![]), now());
         assert!(matches!(
             state.startup_status(),
             StartupStatus::Failed { .. }
@@ -177,7 +189,8 @@ mod tests {
         for _launch in 0..2 {
             let state = AppState::open(
                 dir.path().to_path_buf(),
-                &db::migrations(chrono::Utc::now()),
+                &db::migrations(now().to_utc()),
+                now(),
             );
             assert_eq!(state.startup_status(), StartupStatus::Ok);
             let version: i64 = state
@@ -187,5 +200,41 @@ mod tests {
                 .unwrap();
             assert_eq!(version, 1);
         }
+    }
+
+    #[test]
+    fn startup_status_reports_a_failed_backup() {
+        use rusqlite_migration::M;
+        let dir = TempDir::new("state-backup");
+        let first = M::up("CREATE TABLE a (x);");
+        let db_path = dir.path().join(format!("{}.db", db::NAME));
+        let mut conn = db::open(&db_path).unwrap();
+        Migrations::new(vec![first.clone()])
+            .to_latest(&mut conn)
+            .unwrap();
+        drop(conn);
+        fs::write(
+            dir.path().join(db::BACKUPS_DIR),
+            b"a file where the folder should be",
+        )
+        .unwrap();
+
+        let both = Migrations::new(vec![first, M::up("CREATE TABLE b (y);")]);
+        let state = AppState::open(dir.path().to_path_buf(), &both, now());
+
+        let StartupStatus::Failed { message, .. } = state.startup_status() else {
+            panic!("startup should have failed");
+        };
+        assert!(message.starts_with("Couldn't back up"), "{message}");
+        assert!(
+            fs::read_to_string(&state.log_path)
+                .unwrap()
+                .contains("startup io: Couldn't back up")
+        );
+        let version: i64 = Connection::open(&db_path)
+            .unwrap()
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 1, "the migration must not run");
     }
 }

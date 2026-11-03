@@ -283,7 +283,7 @@ Quick-add (**Ctrl+N**) is a dialog that can be opened from any route. It isn't a
 9. Store AppState, apply the window size (§11) and show the main window
 ```
 
-**Development builds use their own files.** Debug builds (`cfg!(debug_assertions)`, which includes `npm run tauri dev`) open `jobertsvault-dev.db`, write to `jobertsvault-dev.log` and, from Phase 2, default to a `backups-dev` folder. An unreleased migration can therefore never reach real data. Release builds use the real names.
+**Development builds use their own files.** Debug builds (`cfg!(debug_assertions)`, which includes `npm run tauri dev`) open `jobertsvault-dev.db`, write to `jobertsvault-dev.log`, put their pre-migration backups in `backups-dev\pre-migration` (DATA_MODEL §8) and, from Phase 2, default to a `backups-dev` folder. An unreleased migration can therefore never reach real data. Release builds use the real names.
 
 The window starts hidden and is shown in step 9, even if an earlier step failed. A failure is logged (§4.4) and stored in `AppState` in place of the connection, and every data command then returns an error.
 

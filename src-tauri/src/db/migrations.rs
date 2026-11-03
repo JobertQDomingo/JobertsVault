@@ -27,7 +27,13 @@ mod tests {
     fn migrated() -> Connection {
         let mut conn = open(Path::new(":memory:")).unwrap();
         let now = Utc.with_ymd_and_hms(2026, 10, 26, 9, 30, 0).unwrap();
-        prepare(&mut conn, &migrations(now)).unwrap();
+        prepare(
+            &mut conn,
+            &migrations(now),
+            Path::new("unused"),
+            crate::test_support::now(),
+        )
+        .unwrap();
         conn
     }
 
@@ -43,7 +49,11 @@ mod tests {
 
     #[test]
     fn the_migrations_are_valid() {
-        assert!(migrations(Utc::now()).validate().is_ok());
+        assert!(
+            migrations(crate::test_support::now().to_utc())
+                .validate()
+                .is_ok()
+        );
     }
 
     #[test]

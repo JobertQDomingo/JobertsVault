@@ -529,7 +529,7 @@ Income and expense colors are **numbered separately**, because the breakdown cha
 - The migration files live in `src-tauri/migrations/`, named `NNNN_description.sql`, and are run by `rusqlite_migration`. The current schema version is stored in SQLite's `PRAGMA user_version`.
 - **A migration is never edited once it has been released.** Every schema change is a new file.
 - Each migration runs inside a single database transaction, so it either completes fully or changes nothing.
-- **The database is backed up automatically before any migration runs (BAK-5).** This applies when an existing database has pending migrations, not when a new one is created. The copy goes to `<app data>\backups\pre-migration\jobertsvault-pre-migration-v<schema version>-YYYY-MM-DD_HHMM.db`, whatever `backup_folder` says, and is never deleted automatically. If the backup fails, the migration doesn't run and the app shows the startup error screen.
+- **The database is backed up automatically before any migration runs (BAK-5).** This applies when an existing database has pending migrations, not when a new one is created (`user_version` 0, which has nothing to lose). The copy goes to `<app data>\backups\pre-migration\jobertsvault-pre-migration-v<schema version>-YYYY-MM-DD_HHMM.db`, whatever `backup_folder` says, and is never deleted automatically. `<schema version>` is the version the copy holds, from before the migration, and the time is local. Debug builds write `<app data>\backups-dev\pre-migration\jobertsvault-dev-pre-migration-…` instead. If the backup fails, the migration doesn't run and the app shows the startup error screen.
 - The app refuses to open a database whose `user_version` is **newer** than it knows about (e.g. a backup made by a later version). It shows a message instead of risking damage to the data.
 
 | File | Phase | Contents |
@@ -569,3 +569,7 @@ Answered on 2026-11-01:
 8. **Default accounts** follow §5.8, and first-launch completion is stored in `onboarding_completed` (§3.5).
 9. **Future-dated transactions** stay out of every total until their date arrives (§5.2).
 10. **Moving forward** stops at the current period (§5.3).
+
+Answered on 2026-11-03:
+
+11. **Debug builds' pre-migration backups** go in `backups-dev\pre-migration`, named `jobertsvault-dev-pre-migration-…`, so a dev copy never sits next to a real one or replaces it (§8).

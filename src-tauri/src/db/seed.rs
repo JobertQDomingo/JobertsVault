@@ -79,7 +79,13 @@ mod tests {
     fn seeded() -> Connection {
         let now = Utc.with_ymd_and_hms(2026, 10, 26, 9, 30, 0).unwrap();
         let mut conn = open(Path::new(":memory:")).unwrap();
-        prepare(&mut conn, &migrations(now)).unwrap();
+        prepare(
+            &mut conn,
+            &migrations(now),
+            Path::new("unused"),
+            crate::test_support::now(),
+        )
+        .unwrap();
         conn
     }
 
@@ -187,7 +193,11 @@ mod tests {
     fn the_seed_runs_only_on_first_launch() {
         let dir = TempDir::new("seed-once");
         for _launch in 0..2 {
-            let state = AppState::open(dir.path().to_path_buf(), &migrations(Utc::now()));
+            let state = AppState::open(
+                dir.path().to_path_buf(),
+                &migrations(crate::test_support::now().to_utc()),
+                crate::test_support::now(),
+            );
             let conn = state.conn().unwrap();
             assert_eq!(count(&conn, "SELECT count(*) FROM accounts"), 1);
             assert_eq!(count(&conn, "SELECT count(*) FROM categories"), 24);
