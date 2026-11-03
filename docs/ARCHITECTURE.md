@@ -39,7 +39,7 @@ Jobert's Vault is a single **Tauri 2** desktop app. The window shows a React UI 
 **Core rules**
 1. **The frontend never runs SQL** and never calculates money totals. It displays what the backend returns.
 2. **All business logic lives in Rust**: the `services` layer, plus the pure `domain` layer, which has no database access.
-3. **No network.** No HTTP plugin and no updater are installed, and the content security policy (CSP) blocks all outgoing connections (§10).
+3. **No network, with one exception.** The only connection is the updater, running in Rust, to this project's GitHub releases ([ADR 0010](decisions/0010-automatic-updates.md)). No HTTP plugin is installed, and the content security policy (CSP) blocks all outgoing connections from the UI (§10).
 
 ## 2. Technology choices
 
@@ -68,6 +68,8 @@ Jobert's Vault is a single **Tauri 2** desktop app. The window shows a React UI 
 | Errors | **thiserror** | A typed `AppError` enum |
 | Serialization | **serde** | Converts data to and from JSON for IPC. Fields are renamed from `snake_case` to `camelCase` for the frontend. |
 | Rust → TS types | **ts-rs** | Generates TypeScript types from Rust structs, so the two sides can't drift apart |
+| Updates | **tauri-plugin-updater** (`2`, with default features off and `native-tls`, `system-proxy` and `zip` on) | Downloads and verifies signed updates (§11.1). Stay on version `2`, because crates.io's newest is a `3.0.0` alpha. |
+| Release builds | **tauri-apps/tauri-action** (`v0`, GitHub Actions only) | Builds and signs the installer, and writes `latest.json` (§11.1) |
 | File dialogs (Phase 2) | **tauri-plugin-dialog** | Folder and file pickers for backup and restore |
 
 Exact versions are pinned in `Cargo.lock` and `package-lock.json`, and upgraded on purpose rather than automatically.
@@ -76,13 +78,14 @@ Exact versions are pinned in `Cargo.lock` and `package-lock.json`, and upgraded 
 
 ```
 jobertsvault/
-├─ README.md  CLAUDE.md  ROADMAP.md  CHANGELOG.md
+├─ README.md  CLAUDE.md  ROADMAP.md  RELEASING.md
 ├─ docs/                           # PRD, DATA_MODEL, ARCHITECTURE, DESIGN_SYSTEM, UI_FLOWS
-│  ├─ decisions/                   # decision records 0001–0009 (see docs/decisions/README.md)
+│  ├─ decisions/                   # decision records 0001–0010 (see docs/decisions/README.md)
 │  └─ design/                      # visual previews of the design system and UI flows
 ├─ assets/brand/                   # logo.svg, one-color marks, app-icon-1024.png
 ├─ .cargo/config.toml              # tells ts-rs to write to src/bindings/ (§4.6)
-├─ .github/workflows/ci.yml        # the checks in §9
+├─ .claude/skills/release/SKILL.md # the /release command (§11.1)
+├─ .github/workflows/              # ci.yml (the checks in §9), release.yml (§11.1)
 ├─ package.json  package-lock.json  components.json  eslint.config.js  .prettierignore
 ├─ vite.config.ts  tsconfig.json  tsconfig.node.json
 ├─ src/                            # ── Frontend ──
@@ -176,6 +179,7 @@ pub enum AppError {
     Conflict   { message: String },                 // e.g. "category is in use"
     Database   { message: String },                 // logged in full; the user sees a generic message
     Io         { message: String },
+    Update     { message: String },                 // a failed update check or install; says why, and that nothing changed
 }
 ```
 
@@ -183,7 +187,7 @@ The frontend's `api/client.ts` converts these into a typed `ApiError`:
 - `validation` errors are shown on the matching form field (via react-hook-form's `setError`).
 - Other errors are shown as a toast notification.
 
-**Error log:** Rust appends `Database` and `Io` errors and startup failures to `<app data>\jobertsvault.log`, using only the standard library. When the file passes 1 MB, it's renamed to `jobertsvault.log.1`, replacing the older copy, so the log never takes more than about 2 MB. **It never records amounts, payees, notes, or account and category names.** A failure to write the log is ignored, so it can't stop the app.
+**Error log:** Rust appends `Database`, `Io` and `Update` errors and startup failures to `<app data>\jobertsvault.log`, using only the standard library. When the file passes 1 MB, it's renamed to `jobertsvault.log.1`, replacing the older copy, so the log never takes more than about 2 MB. **It never records amounts, payees, notes, or account and category names.** A failure to write the log is ignored, so it can't stop the app.
 
 ### 4.5 Command catalog
 
@@ -191,7 +195,8 @@ All commands use `camelCase` parameter names in TypeScript and `snake_case` in R
 
 | Phase | Area | Commands |
 |---|---|---|
-| 1 | System | `get_startup_status` → `ok`, or the error message and database path; `open_data_folder` |
+| 1 | System | `get_startup_status` → `ok`, or the error message and database path; `open_data_folder`; `get_app_version` |
+| 1 | Updates | `check_update` → the newer version, or none (always none in debug builds); `install_update` (doesn't return on success, because the app restarts) |
 | 1 | Period | `get_period(query)` → start, end, previous query, next query (none when it would start after today), whether it's the current period, `today` |
 | 1 | Accounts | `list_accounts`, `get_account`, `create_account`, `update_account`, `archive_account(id, acknowledge_balance)`, `unarchive_account`, `delete_account`, `reorder_accounts` |
 | 1 | Categories | `list_categories`, `create_category`, `update_category`, `archive_category`, `unarchive_category`, `delete_category`, `reorder_categories`, `merge_categories` |
@@ -270,7 +275,7 @@ Quick-add (**Ctrl+N**) is a dialog that can be opened from any route. It isn't a
 1. Resolve the app data folder           (%APPDATA%\com.jobertsvault.app\)
 2. Open jobertsvault.db, apply the connection settings
 3. Check user_version  ── newer than the app knows? ─▶ error screen, stop
-4. [P2] If migrations are pending: back up the database first (BAK-5)
+4. If an existing database has pending migrations: back it up first (BAK-5) ── fails? ─▶ error screen, stop
 5. Run migrations
 6. If the database is new: add the seed data (DATA_MODEL §7)
 7. [P2] Daily auto-backup, if not done yet today (BAK-2), then delete old ones (BAK-3)
@@ -283,12 +288,14 @@ Quick-add (**Ctrl+N**) is a dialog that can be opened from any route. It isn't a
 The window starts hidden and is shown in step 9, even if an earlier step failed. A failure is logged (§4.4) and stored in `AppState` in place of the connection, and every data command then returns an error.
 
 The frontend calls `get_startup_status` first:
-- **On failure:** it shows an error screen with the database path and the error message, plus an "Open data folder" button. It never shows a blank window.
-- **On success:** it reads the settings and goes to `/welcome` if `onboarding_completed` is false.
+- **On failure:** it shows an error screen with the database path and the error message, plus "Open data folder" and "Check for updates" buttons (UPD-6). It never shows a blank window.
+- **On success:** it reads the settings. If `auto_update_enabled` is true, it runs the update check (§11.1) before anything else. Then it goes to `/welcome` if `onboarding_completed` is false.
 
 `open_data_folder` opens Explorer at the app data folder with `std::process::Command`. It takes no path from the frontend, and needs no plugin.
 
 ## 7. Backup and restore (Phase 2)
+
+**The pre-migration backup (BAK-5) is in Phase 1**, because automatic updates can carry a migration. It uses the same `VACUUM INTO` and rename steps, runs in startup step 4, and is kept as DATA_MODEL §8 describes. Everything else in this section is Phase 2.
 
 - **Backup:** run `VACUUM INTO '<folder>/jobertsvault-YYYY-MM-DD_HHMM.db.tmp'`, then rename the file to `.db`. Renaming at the end means a half-written file never looks like a real backup. `VACUUM INTO` produces a consistent, compacted copy even while the app has the database open.
   - **Automatic** backups go in `<backup_folder>/auto/`, and the newest 30 are kept.
@@ -325,13 +332,16 @@ This runs at startup and again whenever the date changes while the app is open (
 
 **Example tests that must exist:** "Paying the card bill doesn't change the month's expense total", "Week of 2026-10-26 (a Monday) is Oct 26 to Nov 1", "Month start day 25: Oct 2026 is Sep 25 to Oct 24", "Comparing Oct 1–26 uses Sep 1–26".
 
-**CI (required from Phase 0, GitHub Actions on `windows-latest`):** on every push and pull request, `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, a check that the bindings are up to date, `npm run lint`, `npm run typecheck` and `npm test`. CI doesn't build the installer. That's done by hand at each release.
+**CI (required from Phase 0, GitHub Actions on `windows-latest`):** on every pull request and every push to `main`, `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`, a check that the bindings are up to date, `npm run lint`, `npm run typecheck` and `npm test`. A newer run on the same branch cancels the older one. CI doesn't build the installer. The Release workflow does that (§11.1), after running the same checks.
 
 ## 10. Security and privacy
 
 - **Tauri capabilities:** the frontend is granted only the core window permissions and, from Phase 2, the dialog plugin. There's **no** `fs`, `shell`, `http` or `opener` plugin. If the Tauri project template adds `tauri-plugin-opener`, remove it and its permission during Phase 0. All file work happens in Rust, which validates the paths it's given.
+- **Updates run in Rust.** The frontend gets no updater permissions, and calls only our own `check_update` and `install_update` commands.
 - **Content security policy:** `default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' data:; style-src 'self' 'unsafe-inline'`. With this, the UI can't load anything from the internet.
-- **No telemetry, crash reporting or auto-updater.** The error log (§4.4) stays on the computer and holds no financial details.
+- **The updater is the only network use.** It requests `latest.json` and the installer from GitHub, and sends nothing from the database ([ADR 0010](decisions/0010-automatic-updates.md)).
+- **No telemetry or crash reporting.** The error log (§4.4) stays on the computer and holds no financial details.
+- **Update signing:** the app holds only the public key. The private key is kept by the owner and in GitHub's secrets, and it's never committed (§11.1).
 - **The data is not encrypted.** It's protected by your Windows account and disk encryption, such as BitLocker. Encrypting the database could be added later (e.g. with SQLCipher) if needed. This is recorded as a known limitation.
 
 ## 11. Build and distribution
@@ -345,8 +355,74 @@ This runs at startup and again whenever the date changes while the app is open (
 - **Fixed size:** `tauri.conf.json` sets the window to `"width": 1440, "height": 900, "resizable": false, "maximizable": false, "center": true, "visible": false`. At startup, Rust checks the current monitor's work area (`current_monitor()?.work_area()`). If 1440 × 900 plus the title bar doesn't fit, it switches to 1280 × 800 and sets the webview zoom to 8/9 (about 88.9%) before showing the window. No window-state plugin is needed.
   - **The layout doesn't change:** at that zoom, the page still measures 1440 × 900 CSS pixels, so there's no second layout and no breakpoints.
   - **Known limit:** on a 1080p monitor at 125% scaling, only about 816 px of height is usable, and the fallback needs about 832 px. This is accepted because both of the owner's monitors run at 100% ([ADR 0008](decisions/0008-fixed-window-size.md)).
-- **Updates are manual:** download and run the new installer. Your data is kept because it's in `%APPDATA%`, not the install folder.
-- **Code signing:** the installer isn't signed, so Windows SmartScreen shows a "More info → Run anyway" warning. That's acceptable for a personal app.
+- **Updates are automatic** (§11.1). Your data is kept because it's in `%APPDATA%`, not the install folder.
+- **Code signing:** the installer isn't signed for Windows, so Windows SmartScreen shows a "More info → Run anyway" warning on a first install. That's acceptable for a personal app. The separate update signature (§11.1) is what protects updates.
+
+### 11.1 Releases and updates
+
+The process is the same as NBSBuddy's. [RELEASING.md](../RELEASING.md) has the step-by-step guide.
+
+```
+a change:   branch → PR → CI ✓ → squash-merge → main                   (nothing released)
+a release:  release/vX.Y.Z → PR → CI ✓ → merge → Release workflow → installed copies update
+```
+
+**The rules**
+- `main` is always ready to ship. A **Protect Main** ruleset allows changes only through a PR with green CI, and blocks force pushes and deleting the branch.
+- `package.json` holds the app's **only version number**, and `tauri.conf.json` reads it (`"version": "../package.json"`).
+- **Merging a change releases nothing. Merging a version bump releases that version.**
+- **Never push a tag by hand.** Publishing a release creates its tag.
+- **Forward only:** a published release or tag is never deleted or moved. A bad release is fixed by a newer one.
+- The `/release` command runs a release, and always asks before the merge that publishes it.
+
+**The Release workflow** (`.github/workflows/release.yml`) runs when `package.json` changes on `main`, or by hand after a failed run:
+1. **`version`** reads `package.json`. If that version's tag already exists, it stops, which is why ordinary merges release nothing.
+2. **`release`**, on Windows:
+   - Runs every check from §9.
+   - Removes any draft left by a failed run.
+   - Uses `tauri-action` to build and sign the installer into a **hidden draft**.
+   - Uploads `JobertsVault-setup.exe`, a stable name for a direct download.
+   - Checks that all 4 files are there: `latest.json`, `JobertsVault_X.Y.Z_x64-setup.exe`, its `.sig` and `JobertsVault-setup.exe`.
+   - Writes the notes from the PR titles, then publishes.
+
+A failed release stays a hidden draft, so no installed copy ever sees it.
+
+**Asset names must be plain ASCII.** The curly apostrophe and space in the product name don't survive as GitHub asset names, and `latest.json` would then point at a file that doesn't exist. So `tauri-action` gets `assetNamePattern: JobertsVault_[version]_[arch][setup][ext]`. This is the one real difference from NBSBuddy's workflow. `tauri-action` only runs on GitHub, so the rehearsal can't test it. The workflow's check for all 4 files is what catches a wrong name, and the release then stays a draft.
+
+**Configuration**
+
+```json
+"bundle": {
+  "targets": ["nsis"],
+  "createUpdaterArtifacts": true,
+  "publisher": "Jobert Domingo",
+  "windows": { "nsis": { "installMode": "currentUser" } }
+},
+"plugins": {
+  "updater": {
+    "pubkey": "<the public key>",
+    "endpoints": ["https://github.com/JobertQDomingo/JobertsVault/releases/latest/download/latest.json"],
+    "requireSignedVersion": true,
+    "windows": { "installMode": "passive" }
+  }
+}
+```
+
+**In the app**
+- **At startup:** if `auto_update_enabled` is true, the frontend calls `check_update`, then `install_update` if there's a newer version. "Checking for updates…" appears only if the check takes more than 150 ms. Any failure is logged, and the app carries on (UPD-2).
+- **Timeouts:** the check gives up after 3 seconds. The plugin's builder timeout also limits the download, so `install_update` must clear it (`update.timeout = None`) or a slow connection would fail every install.
+- **Debug builds:** `check_update` returns nothing and `install_update` refuses, checked in Rust with `cfg!(debug_assertions)` (UPD-7).
+- **Only at safe moments:** the app updates at startup or when the user clicks **Update now**, never in the background, so it can't restart while a transaction is being typed. Every write is a database transaction, so closing for the installer can't leave data half-saved.
+- **The installer doesn't touch `%APPDATA%`.** The uninstaller's "delete the application data" checkbox doesn't apply during an update.
+
+**The signing key**
+- **Private key:** `~/.tauri/jobertsvault.key`, protected by a password and backed up off the PC. GitHub holds copies in the secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. It's never committed, and `*.key` is in `.gitignore`.
+- **Public key:** `plugins.updater.pubkey` in `tauri.conf.json`. It's safe to share.
+- **Local builds:** once `createUpdaterArtifacts` is on, a local `npm run tauri build` needs both variables set. `npm run tauri dev` doesn't.
+- **If the key or its password is lost:** no installed copy can accept a new update. Make a new key, replace the public key and both secrets, release, and reinstall by hand once.
+- **Never** run `tauri signer generate -f` on that path, because it replaces the key.
+
+**Rehearsal:** any change to the updater is first tested with two signed builds of a separate "Rehearsal" app, served from `localhost`. It has its own `identifier`, so it has its own data folder and can't touch real data. RELEASING.md lists the tests: starting offline, automatic update, **Update now**, a swapped installer, a relabelled old release, and an update that brings a migration.
 
 ## 12. Performance targets (from the PRD)
 
@@ -377,4 +453,5 @@ The reasoning behind the big decisions lives in [docs/decisions/](decisions/READ
 | [0006](decisions/0006-credit-card-accounting.md) | Credit card purchases counted as expenses when made, and bill payments as transfers |
 | [0007](decisions/0007-glassmorphism-2.md) | Visual style: Glassmorphism 2.0, with the aurora painted by the app |
 | [0008](decisions/0008-fixed-window-size.md) | A fixed 1440 × 900 window |
-| [0009](decisions/0009-offline-only.md) | Offline only: no network access |
+| [0009](decisions/0009-offline-only.md) | Offline only: no network access. Superseded by 0010. |
+| [0010](decisions/0010-automatic-updates.md) | Automatic updates: the one exception to offline |

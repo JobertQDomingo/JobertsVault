@@ -14,7 +14,8 @@ Short records of the big decisions behind Jobert's Vault: what was decided, why,
 | [0006](0006-credit-card-accounting.md) | Card purchases are expenses when made; bill payments are transfers | Accepted | 2026-10-26 |
 | [0007](0007-glassmorphism-2.md) | Visual style: Glassmorphism 2.0, with the aurora painted by the app | Accepted | 2026-10-26 |
 | [0008](0008-fixed-window-size.md) | A fixed 1440 × 900 window that can't be resized | Accepted | 2026-10-26 |
-| [0009](0009-offline-only.md) | Offline only: no network access at all | Accepted | 2026-10-26 |
+| [0009](0009-offline-only.md) | Offline only: no network access at all | Superseded by 0010 | 2026-10-26 |
+| [0010](0010-automatic-updates.md) | Automatic updates: the one exception to offline | Accepted | 2026-11-03 |
 
 ## When to write one
 

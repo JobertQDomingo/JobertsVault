@@ -15,6 +15,10 @@ backups/
 # Environment and secrets
 .env
 .env.*
+*.key
+
+# AI working plans and ledgers: not a source of truth
+.superpowers/
 
 # Editors and OS files
 .vscode/*

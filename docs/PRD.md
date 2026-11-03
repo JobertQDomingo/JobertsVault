@@ -4,14 +4,14 @@
 |---|---|
 | **App name** | Jobert's Vault |
 | **Status** | Approved v1.1 |
-| **Last updated** | 2026-11-01 |
+| **Last updated** | 2026-11-03 |
 | **Platform** | Windows desktop app built with Tauri 2: React + TypeScript frontend, Rust backend, SQLite database |
 
 ---
 
 ## 1. Overview
 
-A private Windows desktop app for tracking personal cashflow (income and expenses) and viewing it by **day, week, month, year or a custom range**. All data is entered by hand and stored locally on the user's computer. Nothing is sent over the internet.
+A private Windows desktop app for tracking personal cashflow (income and expenses) and viewing it by **day, week, month, year or a custom range**. All data is entered by hand and stored locally on the user's computer. Financial data is never sent over the internet. The only network use is checking for and downloading app updates (§7.13).
 
 Besides cashflow, the app tracks balances across several accounts (including one credit card), budgets, recurring transactions and savings goals. Local backups, restore and CSV export follow in Phase 2.
 
@@ -182,7 +182,7 @@ Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3**
 
 ### 7.10 Backup, restore and export
 
-This section is no longer part of the MVP. It is now in Phase 2 (see §11).
+This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because automatic updates (§7.13) can carry a database migration.
 
 | ID | Requirement | Priority |
 |---|---|---|
@@ -190,7 +190,7 @@ This section is no longer part of the MVP. It is now in Phase 2 (see §11).
 | BAK-2 | **Automatic daily backup**, made the first time the app is opened each day. | P2 |
 | BAK-3 | Keeps the newest **30** automatic backups and deletes older ones. Manual backups are never deleted automatically. | P2 |
 | BAK-4 | **Restore**: the user picks a backup file. The app checks that it is a valid database, makes a safety backup of the current data, then replaces it. | P2 |
-| BAK-5 | A backup is always made automatically before a database migration (an app update that changes the schema). | P2 |
+| BAK-5 | A backup is always made automatically before a database migration (an app update that changes the schema). If the backup fails, the migration doesn't run and the app shows the startup error screen. | P1 |
 | BAK-6 | **Export to CSV**: transactions for any period, with columns for date, type, amount, account, to-account, category, payee, payment method and note. | P2 |
 | BAK-7 | Settings shows the date of the last backup. If the last successful backup is more than 7 days old, the app shows a warning. | P2 |
 
@@ -214,18 +214,30 @@ This section is no longer part of the MVP. It is now in Phase 2 (see §11).
 | ONB-1 | On first launch, a plain setup form asks for the currency (₱ preselected, symbol before the amount, 2 decimals) and lets the user add their first accounts: bank, e-wallet and credit card with its limit, statement day and due day. Cash already exists. The form can be skipped with "Set up later". Closing the app without finishing shows the form again on the next launch. | P1 |
 | ONB-2 | The setup is polished into a step-by-step onboarding with a progress indicator and a short tour of quick-add and the period bar. | P4 |
 
+### 7.13 Updates
+
+| ID | Requirement | Priority |
+|---|---|---|
+| UPD-1 | When automatic updates are on (the default), the app checks for a newer version at each start. If there is one, it shows "Updating Jobert's Vault to X…", installs it and reopens on the new version, with nothing for the user to do. | P1 |
+| UPD-2 | If the check fails or there's no internet, the app starts normally and shows no error. The check gives up after **3 seconds**. | P1 |
+| UPD-3 | Settings shows the current version, a **Check for updates** button that says "You're up to date" or names the newer version with an **Update now** button, and a switch for automatic updates. When the switch is off, the app never connects by itself. | P1 |
+| UPD-4 | Every update is signed. The app refuses an update whose signature doesn't match, or one signed for a different version than announced. If an update is refused or fails, the app says why and nothing changes. | P1 |
+| UPD-5 | An update never changes or removes the user's data. Any migration it brings is protected by BAK-5. | P1 |
+| UPD-6 | The startup error screen also has a **Check for updates** button, so a newer version can fix an app that can't open its database. | P1 |
+| UPD-7 | Development builds never check for or install updates. | P1 |
+
 ---
 
 ## 8. Non-functional requirements
 
 | Area | Requirement |
 |---|---|
-| **Privacy** | No network requests, analytics or telemetry. The app works fully offline. The local error log never records amounts, payees or notes. |
+| **Privacy** | Financial data never leaves the computer. No analytics or telemetry. The only network requests are for app updates from this project's GitHub releases (§7.13), and turning automatic updates off stops them. The app works fully offline. The local error log never records amounts, payees or notes. |
 | **Data integrity** | Money is stored as **integers in minor units** (e.g. cents), never as floating-point numbers. Every write is wrapped in a database transaction, so a crash can't leave data half-saved. |
-| **Performance** | Cold start in < 2 s. With 50,000 transactions, each dashboard or report view loads in < 300 ms. |
+| **Performance** | Cold start in < 2 s, not counting the time the update check waits on a slow connection (up to 3 s, UPD-2). With 50,000 transactions, each dashboard or report view loads in < 300 ms. |
 | **Architecture** | All business logic (balances, period totals, comparisons, recurring rules) and all database access live in the **Rust backend**. The React frontend only displays data and calls backend commands. It never runs SQL itself. |
 | **Storage location** | The database is stored in the user's app data folder, at a path based on the app's identifier (e.g. `%APPDATA%\com.jobertsvault.app\`). |
-| **Platform** | Windows 10 and 11, 64-bit. Distributed as an `.msi` or `.exe` installer. |
+| **Platform** | Windows 10 and 11, 64-bit. Distributed as an `.exe` installer on GitHub Releases. Installed copies then update themselves (§7.13). |
 | **Window** | A **fixed 1440 × 900** window that can't be resized or maximized (minimize and close only). It opens centered on the main monitor. It's sized for the owner's 1920 × 1080 and 2560 × 1080 monitors at 100% display scaling. If the monitor's usable area is too small (for example, if display scaling is raised), it opens at 1280 × 800 instead, showing the same layout zoomed to 88.9%. |
 | **Usability** | Every main action works from the keyboard. Amounts use thousands separators, and negative or expense values are clearly distinguished by more than color alone. |
 | **Reliability** | Recurring transactions and backups resume correctly after the app is closed for any length of time. |
@@ -258,16 +270,20 @@ This section is no longer part of the MVP. It is now in Phase 2 (see §11).
 - [ ] The app follows the Windows light or dark setting, and stays readable with Windows transparency effects off.
 - [ ] Cold start takes under 2 s, and the dashboard and transaction list load in under 300 ms with 50,000 test transactions.
 - [ ] The dashboard and transaction list scroll smoothly on both monitors.
-- [ ] The app runs fully offline on Windows 11.
+- [ ] The app runs fully offline on Windows 11, and starts normally with no internet.
+- [ ] An installed copy updates itself to a newer published version at its next start, and all my data is still there afterward.
+- [ ] With automatic updates off, the app doesn't connect by itself, and **Check for updates** in Settings still works.
+- [ ] A tampered update is refused, and nothing changes.
+- [ ] An update with a migration makes a backup of the database first, and a failed backup stops the migration.
 
 ## 11. Release plan
 
-> **Data safety before Phase 2:** the MVP has no backup feature. Until Phase 2 ships, copy the database file from the app data folder by hand now and then.
+> **Data safety before Phase 2:** the MVP only backs up the database before a migration (BAK-5). It has no regular backups and no Restore. Until Phase 2 ships, copy the database file from the app data folder by hand now and then.
 
 | Phase | Scope |
 |---|---|
-| **1: MVP** | Accounts (including the credit card), categories, transactions, dashboard totals by period, settings, basic first-launch setup, light and dark themes that follow Windows |
-| **2: Reports & backups** | Charts over time, category breakdown, period comparison, % change, payee suggestions, backup, restore, CSV export |
+| **1: MVP** | Accounts (including the credit card), categories, transactions, dashboard totals by period, settings, basic first-launch setup, light and dark themes that follow Windows, automatic updates, a database backup before migrations |
+| **2: Reports & backups** | Charts over time, category breakdown, period comparison, % change, payee suggestions, regular backups, restore, CSV export |
 | **3: Planning** | Recurring transactions, budgets, savings goals, card due-date reminder, future-dated transactions |
 | **4: Polish** | The theme switch, the Reduce transparency switch, more keyboard shortcuts, polished first-launch onboarding, Windows installer polish |
 
@@ -324,6 +340,11 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-01 | ▶ stops at the current period, and the date range picker can't choose future dates |
 | 2026-11-01 | Development builds use a separate database, `jobertsvault-dev.db`, so they can't touch real data |
 | 2026-11-01 | The installer's product name uses a curly apostrophe (`Jobert’s Vault`), because a straight one breaks the installer build |
+| 2026-11-03 | Added automatic updates (UPD-1 to UPD-7) to the MVP, with the same release process as NBSBuddy. This reverses "no network" for updates only ([ADR 0010](decisions/0010-automatic-updates.md)). |
+| 2026-11-03 | The pre-migration backup (BAK-5) moved from Phase 2 into the MVP, because updates can carry migrations |
+| 2026-11-03 | When automatic updates are off, the app never connects by itself. This differs from NBSBuddy, which still checks. |
+| 2026-11-03 | The update check at startup gives up after 3 seconds, rather than NBSBuddy's 8, to keep startup fast |
+| 2026-11-03 | NBSBuddy's "What's new" tour and download page are not part of the MVP |
 
 ---
 

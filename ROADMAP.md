@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-03 |
-| **Current focus** | **Phase 1, 1.1: Backend foundations** |
+| **Current focus** | **Phase 1, 1.0: How changes ship** |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -18,8 +18,8 @@ This file is the progress tracker.
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
-| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11 | 0 / 42 |
-| **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 15 |
+| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 0 / 53 |
+| **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
 
@@ -43,17 +43,24 @@ This file is the progress tracker.
 
 ## Phase 1 · MVP (`v0.1.0`)
 
+### 1.0 How changes ship
+The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 0010](docs/decisions/0010-automatic-updates.md)). This comes first because every later task ships through it.
+- [ ] Align `ci.yml`: run on pull requests and pushes to `main`, cancel older runs on the same branch, and name the job `check`, keeping all our checks
+- [ ] Set up GitHub: a **Protect Main** ruleset (PR required, `check` must pass, no force pushes or deleting), squash merging only, and delete branches on merge
+- [ ] Write the "every change" loop in `RELEASING.md`, make `package.json` the only version number (`"version": "../package.json"`), and set it to `0.0.0` so the first release is a real version bump
+
 ### 1.1 Backend foundations
 - [ ] Database startup: open the database (debug builds use `jobertsvault-dev.db`), apply the connection settings (PRAGMAs), refuse a database from a newer app version, and report any failure through `get_startup_status`, with `open_data_folder` ([ARCHITECTURE §6](docs/ARCHITECTURE.md))
 - [ ] Migration `0001_initial.sql`, exactly as in DATA_MODEL §3
 - [ ] Seed data: the Cash account, payment methods, and the preset categories with their colors (DATA_MODEL §7)
+- [ ] Back up an existing database before running pending migrations, and stop if the backup fails, with tests for both cases and for a new database, which skips it (DATA_MODEL §8) [BAK-5]
 - [ ] `AppError`, `AppState` (one connection behind a `Mutex`), the error log ([ARCHITECTURE §4.4](docs/ARCHITECTURE.md)), and `api/client.ts` with its typed errors
 - [ ] Domain: the `Money` type, plus parsing and formatting in Rust and in `money.ts`, with tests
 - [ ] Domain: periods (day, Monday-start week, month with `month_start_day`, calendar year, custom range), with previous/next and edge-case tests ([DATA_MODEL §5.3](docs/DATA_MODEL.md))
 - [ ] Domain: credit card statement cycle and next due date, with tests (DATA_MODEL §5.5)
 
 ### 1.2 Settings
-- [ ] Commands `get_settings` and `update_settings`: currency (₱ default), symbol position, decimals (locked once any transaction exists), week start, month start day, payment method field, `onboarding_completed` [SET-1] [SET-2] [SET-6] [ONB-1]
+- [ ] Commands `get_settings` and `update_settings`: currency (₱ default), symbol position, decimals (locked once any transaction exists), week start, month start day, payment method field, `onboarding_completed`, `auto_update_enabled` [SET-1] [SET-2] [SET-6] [ONB-1] [UPD-3]
 
 ### 1.3 Accounts
 - [ ] Create, edit, list and reorder accounts, with opening balances of 0 or more [ACC-1] [ACC-2]
@@ -98,11 +105,20 @@ This file is the progress tracker.
 - [ ] First-launch setup form at `/welcome`: currency and first accounts, skippable [ONB-1]
 - [ ] Fixed-window fallback: open at 1280 × 800, zoomed to 88.9%, if 1440 × 900 doesn't fit the screen ([ADR 0008](docs/decisions/0008-fixed-window-size.md), [ARCHITECTURE §11](docs/ARCHITECTURE.md))
 
-### 1.10 Release `v0.1.0`
+### 1.10 Automatic updates and releases
+- [ ] The owner generates the signing key, backs it up off this PC, and adds the two GitHub secrets. The public key goes in `tauri.conf.json` ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md)) [UPD-4]
+- [ ] Updater backend: `tauri-plugin-updater` and its config, `check_update` and `install_update` with the 3-second check and no limit on the download, `get_app_version`, `AppError::Update`, and nothing happens in debug builds [UPD-1] [UPD-2] [UPD-4] [UPD-7]
+- [ ] Startup flow: "Checking for updates…" and "Updating Jobert's Vault to X…", and a failed check starts the app normally [UPD-1] [UPD-2]
+- [ ] Settings: the version, **Check for updates**, **Update now**, the automatic updates switch, and **Check for updates** on the startup error screen ([UI_FLOWS §6](docs/UI_FLOWS.md)) [UPD-3] [UPD-6]
+- [ ] `.github/workflows/release.yml`, adapted from NBSBuddy: every check from CI, plain ASCII asset names, and `JobertsVault-setup.exe`
+- [ ] The `/release` command (`.claude/skills/release/SKILL.md`) and the rest of `RELEASING.md`: a release, what to do when something goes wrong, the signing key, and the rehearsal. Leave out NBSBuddy's "What's new" check.
+- [ ] Rehearse on this PC with a separate app: starting offline, automatic update, **Update now**, a swapped installer (refused), a relabelled old release (refused), and an update that brings a migration (backup made, data intact) [UPD-1] [UPD-2] [UPD-3] [UPD-4] [UPD-5]
+
+### 1.11 Release `v0.1.0`
 - [ ] Go through PRD §10 by hand on Windows 11, on both monitors
 - [ ] Check performance: cold start under 2 s, and the dashboard and transaction list under 300 ms with 50,000 test transactions. The glass must scroll smoothly.
-- [ ] `npm run tauri build`, install it, and confirm the data is in `%APPDATA%\com.jobertsvault.app\`
-- [ ] Create `CHANGELOG.md`, tag `v0.1.0`
+- [ ] `/release 0.1.0`, install it from the GitHub release, and confirm the data is in `%APPDATA%\com.jobertsvault.app\`
+- [ ] Prove the real path: `/release 0.1.1` with a small fix, and confirm the installed `v0.1.0` updates itself with all its data
 - [ ] Reminder until Phase 2: copy `jobertsvault.db` somewhere safe by hand
 
 ---
@@ -122,11 +138,10 @@ This file is the progress tracker.
 - [ ] Add `tauri-plugin-dialog`, scoped to folder and file pickers only
 - [ ] Back up now (`VACUUM INTO`, then rename the finished file) [BAK-1]
 - [ ] Daily automatic backup, keeping the newest 30 [BAK-2] [BAK-3]
-- [ ] Back up automatically before running migrations [BAK-5]
 - [ ] Restore: check the file, make a safety copy, swap the database, reopen [BAK-4]
 - [ ] Export to CSV (UTF-8 with BOM) [BAK-6]
 - [ ] Backup settings tab, plus a warning when the last backup is more than 7 days old [BAK-7] [SET-3]
-- [ ] Release `v0.2.0`, and test a real restore on a second Windows user account
+- [ ] Release `v0.2.0` with `/release`, and test a real restore on a second Windows user account
 
 ---
 
@@ -147,7 +162,7 @@ This file is the progress tracker.
 - [ ] Card due-date banner with Pay bill [CC-7]
 - [ ] The Recurring, Budgets and Goals items appear in the sidebar
 - [ ] Recurring service tests: none missed and none duplicated after the app was closed for 3 months
-- [ ] Release `v0.3.0`
+- [ ] Release `v0.3.0` with `/release`
 
 ---
 
@@ -161,7 +176,7 @@ This file is the progress tracker.
 - [ ] Performance pass on the glass UI with a full year of data
 - [ ] Installer polish: icon, product name, version info. Test on both monitors.
 - [ ] Review all docs against the shipped app, and update any that drifted
-- [ ] Release `v1.0.0`
+- [ ] Release `v1.0.0` with `/release`
 
 ---
 

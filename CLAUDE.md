@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for AI coding assistants working on **Jobert's Vault**: a single-user, offline Windows desktop app for tracking personal cashflow. It's built with Tauri 2, a React + TypeScript frontend, a Rust backend and SQLite.
+Guidance for AI coding assistants working on **Jobert's Vault**: a single-user Windows desktop app that keeps its data on the user's PC and tracks personal cashflow. It's built with Tauri 2, a React + TypeScript frontend, a Rust backend and SQLite.
 
 > **Project status:** in development. See "Current focus" in [ROADMAP.md](ROADMAP.md) for where to continue.
 
@@ -23,13 +23,14 @@ Build **only the current phase**. Don't build features from a later phase, or ou
 
 1. **Money is an integer in minor units** (`i64` / `Money` in Rust, `number` holding minor units in TypeScript). Never use `f64`, `parseFloat` or floating-point maths on money. In the UI, only `src/lib/money.ts` converts between text and amounts.
 2. **The frontend never runs SQL and never calculates totals or balances.** All business logic lives in Rust (`services/` + `domain/`). React only displays what commands return.
-3. **No network access.** Don't add HTTP clients, analytics, an updater, or remote fonts or scripts. Don't loosen the content security policy.
+3. **No network access, except the updater** ([ADR 0010](docs/decisions/0010-automatic-updates.md)). `tauri-plugin-updater`, running in Rust, may fetch this project's GitHub releases, and nothing else. Don't add other HTTP clients, analytics or remote fonts or scripts, never send anything from the database, and don't loosen the content security policy.
 4. **No Tauri `fs`, `shell` or `http` plugins.** Rust does all file work and validates the paths it's given.
 5. **Dates are `'YYYY-MM-DD'` strings** across the Rust ↔ TypeScript boundary. Never pass a JavaScript `Date`. `domain/` and `services/` never read the clock: `today` and `now` are passed in.
 6. **Every database write runs inside a database transaction**, and SQL always uses bound parameters.
 7. **Schema changes:** update DATA_MODEL.md first, then add a **new** migration file (`src-tauri/migrations/NNNN_name.sql`). **Never edit a migration that has already been released.**
 8. **Never edit generated files** in `src/bindings/`. Change the Rust struct and run `cargo test` to regenerate them.
 9. **The error log never records amounts, payees, notes, or account and category names.**
+10. **Releases only happen through `/release`, and always ask first.** Never push a tag, never delete or move a published release, and never commit or print the private signing key. Merging a version bump to `main` publishes to every installed copy.
 
 ## Domain rules that are easy to get wrong
 
@@ -45,7 +46,8 @@ Build **only the current phase**. Don't build features from a later phase, or ou
 - **`currency_decimals` can't change** once any transaction exists.
 - **In-use records are archived, not deleted.** Accounts, categories and payment methods use `ON DELETE RESTRICT`. Unused ones can be deleted. The last active account, and the last active category of each kind, can't be archived or deleted.
 - **Custom periods** move by the length of their range, and ▶ stops at the current period. The frontend never works out period dates: it uses what `get_period` returns.
-- **Debug builds use `jobertsvault-dev.db`**, so development never touches real data. Never remove this split.
+- **Debug builds use `jobertsvault-dev.db`**, so development never touches real data. Never remove this split. Debug builds also never check for or install updates.
+- **Migrations are backed up first.** An existing database is copied before any pending migration runs, and a failed backup stops the migration (BAK-5).
 
 ## Code layout (details in ARCHITECTURE.md §3)
 
@@ -81,7 +83,7 @@ cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml     # also regenerates src/bindings/
 
-# Release build (Windows installer)
+# Local test build of the Windows installer. Real releases come from the Release workflow (ARCHITECTURE §11.1).
 npm run tauri build
 ```
 
@@ -116,6 +118,7 @@ npm run tauri build
 ## Conventions
 
 - **Naming:** `snake_case` in Rust and SQL, `camelCase` in TypeScript (serde `rename_all = "camelCase"`), `PascalCase` for components.
+- **Branches and pull requests:** every change goes through a PR on a `feat/`, `fix/`, `docs/`, `chore/` or `ci/` branch, and is squash-merged once CI is green. The PR title becomes a line in the release notes, so write it for the reader, with a type prefix and requirement IDs, e.g. `feat: add transfer validation (TXN-1)`. This applies once ROADMAP 1.0 is done.
 - **Commits:** imperative mood, short, with requirement IDs, e.g. `Add transfer validation (TXN-1)`. Don't add Claude attribution, such as a `Co-Authored-By: Claude ...` line.
 - **Dependencies:** ask before adding any new crate or npm package that isn't listed in ARCHITECTURE.md §2.
 - **Never commit** `*.db`, `*.db-wal`, `*.db-shm`, backups or exported CSV files.

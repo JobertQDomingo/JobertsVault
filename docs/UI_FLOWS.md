@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Approved v1.1 |
 | **Style** | Glassmorphism 2.0 ([DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)) |
-| **Last updated** | 2026-11-01 |
+| **Last updated** | 2026-11-03 |
 | **Related docs** | [PRD.md](PRD.md), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), [ARCHITECTURE.md](ARCHITECTURE.md) §5.4 (routes) |
 
 The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors, glass levels and components come from DESIGN_SYSTEM.md. [design/ui-flows.html](design/ui-flows.html) shows every screen drawn in the real style, with consistent ₱ sample data. Open it in a browser.
@@ -213,7 +213,7 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 
 | Tab | Contents | PRD |
 |---|---|---|
-| **General** | Currency symbol, its position (before or after the amount), decimal places (**locked** once any transaction exists, with an explanation), first day of week, month start day (1–28), show payment method field | SET-1, SET-2, SET-6 |
+| **General** | Currency symbol, its position (before or after the amount), decimal places (**locked** once any transaction exists, with an explanation), first day of week, month start day (1–28), show payment method field. **Updates:** the current version, **Check for updates** and a switch, "Install updates automatically when the app starts" | SET-1, SET-2, SET-6, UPD-3 |
 | **Categories** | Two lists (Income and Expense). Add, rename, change color (12 swatches) and icon (curated list), reorder, archive, unarchive, **merge**, delete if unused | CAT-2, CAT-4 |
 | **Payment methods** | Add, rename, reorder, archive, unarchive, delete if unused | TXN-7 |
 | **Backup** (Phase 2) | See §8.1 | BAK-* |
@@ -291,6 +291,13 @@ Welcome to Jobert's Vault
 1. A banner on the dashboard says "2 recurring transactions are due" → **Review**.
 2. Each one shows **Post**, **Edit & post** or **Skip** (REC-3).
 
+### F11: Update the app (Phase 1)
+- **Automatic (the default):** at startup, the app checks for a newer version. "Checking for updates…" appears only if the check takes more than 150 ms. If there's a newer version, "Updating Jobert's Vault to 0.2.0…" appears, and the app closes and reopens on it. There's nothing to click (UPD-1).
+- **No internet, or the check fails:** the app starts normally and shows no error (UPD-2).
+- **By hand:** Settings → General → **Check for updates** says "You're up to date." or "0.2.0 is out." with an **Update now** button. It restarts the app, so anything unsaved in an open form is lost: the button is in Settings, where no form is open (UPD-3).
+- **Automatic updates off:** the app doesn't connect by itself. **Check for updates** still works (UPD-3).
+- **If an update is refused or fails:** the message says why and adds "Nothing was changed." (UPD-4).
+
 ---
 
 ## 8. Phase 2–4 screens (outline)
@@ -321,7 +328,8 @@ Goal cards showing the name, the linked account, a progress bar, "₱2,400 of �
 | **No transactions in this period** | "Nothing recorded for October 2026." plus **[Go to today]** |
 | **No filter matches** | "No transactions match these filters." plus **[Clear filters]** |
 | **Error loading data** | An inline message with a **Retry** button. Details are in the error log (ARCHITECTURE §4.4). |
-| **App can't start** | A full-window error screen showing the database path and the error, plus **Open data folder** (ARCHITECTURE §6) |
+| **App can't start** | A full-window error screen showing the database path and the error, plus **Open data folder** and **Check for updates** (ARCHITECTURE §6, UPD-6) |
+| **Updating** | A centered glass panel with the logo and "Updating Jobert's Vault to 0.2.0…". The rest of the app isn't shown yet. |
 | **Transparency off** (Windows setting) | The same screens with solid panels and no blur. The aurora and layout stay (DESIGN_SYSTEM §2.4). |
 
 ---
