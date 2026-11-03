@@ -15,7 +15,10 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
-            app.manage(AppState::open(data_dir, &db::migrations()));
+            app.manage(AppState::open(
+                data_dir,
+                &db::migrations(chrono::Utc::now()),
+            ));
             // The window starts hidden and is shown once startup is done, even if it failed
             // (ARCHITECTURE §6).
             if let Some(window) = app.get_webview_window("main") {

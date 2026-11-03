@@ -1,16 +1,24 @@
-use rusqlite_migration::{M, Migrations};
+use chrono::{DateTime, Utc};
+use rusqlite::Transaction;
+use rusqlite_migration::{HookResult, M, Migrations};
+
+use super::seed;
 
 /// Every schema change, oldest first. A released migration is never edited (DATA_MODEL §8).
-pub fn migrations() -> Migrations<'static> {
-    Migrations::new(vec![M::up(include_str!(
-        "../../migrations/0001_initial.sql"
-    ))])
+/// `now` stamps the seed data that 0001 adds to a new database.
+pub fn migrations(now: DateTime<Utc>) -> Migrations<'static> {
+    let stamp = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    Migrations::new(vec![M::up_with_hook(
+        include_str!("../../migrations/0001_initial.sql"),
+        move |tx: &Transaction| -> HookResult { Ok(seed::seed(tx, &stamp)?) },
+    )])
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::{open, prepare};
+    use chrono::TimeZone;
     use rusqlite::Connection;
     use std::path::Path;
 
@@ -18,24 +26,24 @@ mod tests {
 
     fn migrated() -> Connection {
         let mut conn = open(Path::new(":memory:")).unwrap();
-        prepare(&mut conn, &migrations()).unwrap();
+        let now = Utc.with_ymd_and_hms(2026, 10, 26, 9, 30, 0).unwrap();
+        prepare(&mut conn, &migrations(now)).unwrap();
         conn
     }
 
-    /// Accounts 1 (Cash) and 2 (Bank), category 1 (Salary, income), payment method 1 (Cash).
+    /// Adds account 2 (Bank). The seed already holds account 1 (Cash), category 1 (Salary,
+    /// income) and payment method 1 (Cash).
     fn add_basics(conn: &Connection) {
-        for sql in [
-            "INSERT INTO accounts (name, kind, created_at, updated_at) VALUES ('Cash', 'cash', ?1, ?1), ('Bank', 'bank', ?1, ?1)",
-            "INSERT INTO categories (name, kind, color, icon, created_at, updated_at) VALUES ('Salary', 'income', 'cat-12', 'briefcase', ?1, ?1)",
-            "INSERT INTO payment_methods (name, created_at, updated_at) VALUES ('Cash', ?1, ?1)",
-        ] {
-            conn.execute(sql, [NOW]).unwrap();
-        }
+        conn.execute(
+            "INSERT INTO accounts (name, kind, created_at, updated_at) VALUES ('Bank', 'bank', ?1, ?1)",
+            [NOW],
+        )
+        .unwrap();
     }
 
     #[test]
     fn the_migrations_are_valid() {
-        assert!(migrations().validate().is_ok());
+        assert!(migrations(Utc::now()).validate().is_ok());
     }
 
     #[test]
@@ -101,11 +109,6 @@ mod tests {
     #[test]
     fn a_transaction_needs_a_real_account() {
         let conn = migrated();
-        conn.execute(
-            "INSERT INTO categories (name, kind, color, icon, created_at, updated_at) VALUES ('Salary', 'income', 'cat-12', 'briefcase', ?1, ?1)",
-            [NOW],
-        )
-        .unwrap();
         let orphan = conn.execute(
             "INSERT INTO transactions (kind, amount, date, account_id, category_id, created_at, updated_at) VALUES ('income', 100, '2026-10-26', 99, 1, ?1, ?1)",
             [NOW],
