@@ -42,6 +42,9 @@ const EXPENSE: [(&str, &str, &str); 17] = [
 
 /// The first-launch data (DATA_MODEL §7). It runs inside migration 0001's transaction, so a new
 /// database gets it together with its schema, and an existing one never gets it again.
+///
+/// Frozen with 0001: it runs before every later migration, so it may only use 0001's columns.
+/// Changing the seed for new installs means a new migration, never an edit here.
 pub fn seed(tx: &Transaction, now: &str) -> rusqlite::Result<()> {
     tx.execute(
         "INSERT INTO accounts (name, kind, opening_balance, created_at, updated_at) VALUES ('Cash', 'cash', 0, ?1, ?1)",
@@ -190,5 +193,28 @@ mod tests {
             assert_eq!(count(&conn, "SELECT count(*) FROM categories"), 24);
             assert_eq!(count(&conn, "SELECT count(*) FROM payment_methods"), 6);
         }
+    }
+
+    #[test]
+    fn every_seed_color_is_a_palette_key() {
+        let palette: Vec<String> = (1..=12).map(|n| format!("cat-{n}")).collect();
+        for (name, _, color) in super::INCOME.iter().chain(&super::EXPENSE) {
+            assert!(palette.iter().any(|key| key == color), "{name} has {color}");
+        }
+    }
+
+    #[test]
+    fn the_12_common_expense_categories_each_have_their_own_color() {
+        let mut colors: Vec<&str> = super::EXPENSE[..12]
+            .iter()
+            .map(|(_, _, color)| *color)
+            .collect();
+        colors.sort_unstable();
+        colors.dedup();
+        assert_eq!(
+            colors.len(),
+            12,
+            "DATA_MODEL §7: only the 5 rarely used ones share"
+        );
     }
 }
