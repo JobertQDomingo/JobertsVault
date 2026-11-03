@@ -1,6 +1,6 @@
 [package]
 name = "jobertsvault"
-version = "0.1.0"
+version = "0.1.0" # not the app version: that lives only in package.json
 description = "A private, offline Windows app for tracking personal cashflow"
 authors = ["Jobert Domingo"]
 edition = "2024"

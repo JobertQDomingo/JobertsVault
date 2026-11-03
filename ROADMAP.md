@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-03 |
-| **Current focus** | **Phase 1, 1.0: How changes ship** |
+| **Current focus** | **Phase 1, 1.1: Backend foundations** |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -18,7 +18,7 @@ This file is the progress tracker.
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
-| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 1 / 53 |
+| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 3 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
@@ -46,8 +46,8 @@ This file is the progress tracker.
 ### 1.0 How changes ship
 The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 0010](docs/decisions/0010-automatic-updates.md)). This comes first because every later task ships through it.
 - [x] Align `ci.yml`: run on pull requests and pushes to `main`, cancel older runs on the same branch, and name the job `check`, keeping all our checks
-- [ ] Set up GitHub: a **Protect Main** ruleset (PR required, `check` must pass, no force pushes or deleting), squash merging only, and delete branches on merge
-- [ ] Write the "every change" loop in `RELEASING.md`, make `package.json` the only version number (`"version": "../package.json"`), and set it to `0.0.0` so the first release is a real version bump
+- [x] Set up GitHub: a **Protect Main** ruleset (PR required, `check` must pass, no force pushes or deleting), squash merging only, and delete branches on merge
+- [x] Write the "every change" loop in `RELEASING.md`, make `package.json` the only version number (`"version": "../package.json"`), and set it to `0.0.0` so the first release is a real version bump
 
 ### 1.1 Backend foundations
 - [ ] Database startup: open the database (debug builds use `jobertsvault-dev.db`), apply the connection settings (PRAGMAs), refuse a database from a newer app version, and report any failure through `get_startup_status`, with `open_data_folder` ([ARCHITECTURE §6](docs/ARCHITECTURE.md))
