@@ -1,14 +1,20 @@
+# Run every check on each pull request and each push to main.
 name: CI
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  checks:
+  check:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
