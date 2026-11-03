@@ -90,7 +90,7 @@ fn start(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::TempDir;
+    use crate::test_support::{TempDir, now};
 
     const NEWER: &str = "This database was made by a newer version of Jobert's Vault. Install the latest version to open it.";
 
@@ -98,11 +98,7 @@ mod tests {
     #[cfg(debug_assertions)]
     fn debug_builds_use_their_own_files() {
         let dir = TempDir::new("state-names");
-        let state = AppState::open(
-            dir.path().to_path_buf(),
-            &Migrations::new(vec![]),
-            Local::now(),
-        );
+        let state = AppState::open(dir.path().to_path_buf(), &Migrations::new(vec![]), now());
         assert!(state.db_path.ends_with("jobertsvault-dev.db"));
         assert!(state.log_path.ends_with("jobertsvault-dev.log"));
     }
@@ -111,7 +107,7 @@ mod tests {
     fn a_fresh_folder_starts_ok() {
         let dir = TempDir::new("state-fresh");
         let data_dir = dir.path().join("com.jobertsvault.app");
-        let state = AppState::open(data_dir, &Migrations::new(vec![]), Local::now());
+        let state = AppState::open(data_dir, &Migrations::new(vec![]), now());
         assert_eq!(state.startup_status(), StartupStatus::Ok);
         assert!(state.db_path.exists());
     }
@@ -119,7 +115,7 @@ mod tests {
     #[test]
     fn a_newer_database_is_refused() {
         let dir = TempDir::new("state-newer");
-        let db_path = dir.path().join("jobertsvault-dev.db");
+        let db_path = dir.path().join(format!("{}.db", db::NAME));
         Connection::open(&db_path)
             .unwrap()
             .pragma_update(None, "user_version", 99) // far past any real migration
@@ -127,8 +123,8 @@ mod tests {
 
         let state = AppState::open(
             dir.path().to_path_buf(),
-            &db::migrations(chrono::Utc::now()),
-            Local::now(),
+            &db::migrations(now().to_utc()),
+            now(),
         );
         assert_eq!(
             state.startup_status(),
@@ -147,12 +143,12 @@ mod tests {
     #[test]
     fn a_corrupt_file_is_reported() {
         let dir = TempDir::new("state-corrupt");
-        fs::write(dir.path().join("jobertsvault-dev.db"), vec![0x5a; 4096]).unwrap();
-        let state = AppState::open(
-            dir.path().to_path_buf(),
-            &Migrations::new(vec![]),
-            Local::now(),
-        );
+        fs::write(
+            dir.path().join(format!("{}.db", db::NAME)),
+            vec![0x5a; 4096],
+        )
+        .unwrap();
+        let state = AppState::open(dir.path().to_path_buf(), &Migrations::new(vec![]), now());
         assert!(matches!(
             state.startup_status(),
             StartupStatus::Failed { .. }
@@ -193,8 +189,8 @@ mod tests {
         for _launch in 0..2 {
             let state = AppState::open(
                 dir.path().to_path_buf(),
-                &db::migrations(chrono::Utc::now()),
-                Local::now(),
+                &db::migrations(now().to_utc()),
+                now(),
             );
             assert_eq!(state.startup_status(), StartupStatus::Ok);
             let version: i64 = state
@@ -211,20 +207,20 @@ mod tests {
         use rusqlite_migration::M;
         let dir = TempDir::new("state-backup");
         let first = M::up("CREATE TABLE a (x);");
-        let db_path = dir.path().join("jobertsvault-dev.db");
+        let db_path = dir.path().join(format!("{}.db", db::NAME));
         let mut conn = db::open(&db_path).unwrap();
         Migrations::new(vec![first.clone()])
             .to_latest(&mut conn)
             .unwrap();
         drop(conn);
         fs::write(
-            dir.path().join("backups-dev"),
+            dir.path().join(db::BACKUPS_DIR),
             b"a file where the folder should be",
         )
         .unwrap();
 
         let both = Migrations::new(vec![first, M::up("CREATE TABLE b (y);")]);
-        let state = AppState::open(dir.path().to_path_buf(), &both, Local::now());
+        let state = AppState::open(dir.path().to_path_buf(), &both, now());
 
         let StartupStatus::Failed { message, .. } = state.startup_status() else {
             panic!("startup should have failed");

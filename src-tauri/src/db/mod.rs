@@ -66,40 +66,50 @@ pub fn prepare(
 }
 
 /// Copies the database into `dir` as `<name>-pre-migration-v<version>-<local time>.db`
-/// (DATA_MODEL §8). It's written to a `.tmp` file and renamed when complete, so a half-written
-/// copy never looks like a backup. These copies are never deleted automatically.
+/// (DATA_MODEL §8). These copies are never deleted automatically.
 fn back_up(
     conn: &Connection,
     dir: &Path,
     version: i64,
     now: DateTime<Local>,
 ) -> Result<(), AppError> {
-    let copy = || -> Result<(), AppError> {
-        fs::create_dir_all(dir)?;
-        let stamp = now.format("%Y-%m-%d_%H%M");
-        let path = dir.join(format!("{NAME}-pre-migration-v{version}-{stamp}.db"));
-        let tmp = path.with_extension("db.tmp");
-        // Left by a backup that was cut short. VACUUM INTO refuses to overwrite a file.
-        if let Err(err) = fs::remove_file(&tmp)
-            && err.kind() != ErrorKind::NotFound
-        {
-            return Err(err.into());
-        }
-        conn.execute("VACUUM INTO ?1", [tmp.to_string_lossy()])?;
-        fs::rename(&tmp, &path)?;
-        Ok(())
-    };
-    copy().map_err(|err| AppError::Io {
+    let stamp = now.format("%Y-%m-%d_%H%M");
+    let path = dir.join(format!("{NAME}-pre-migration-v{version}-{stamp}.db"));
+    vacuum_into(conn, &path).map_err(|err| AppError::Io {
         message: format!(
             "Couldn't back up the database before updating it, so nothing was changed. {err}"
         ),
     })
 }
 
+/// Writes a consistent copy of the database to `path`. It goes to `<path>.tmp` first and is
+/// renamed when complete, so a half-written copy never looks like a backup (ARCHITECTURE §7).
+fn vacuum_into(conn: &Connection, path: &Path) -> Result<(), AppError> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    let tmp = path.with_extension("db.tmp");
+    // Left by a copy that was cut short. VACUUM INTO refuses to overwrite a file.
+    if let Err(err) = fs::remove_file(&tmp)
+        && err.kind() != ErrorKind::NotFound
+    {
+        return Err(err.into());
+    }
+    let written = conn
+        .execute("VACUUM INTO ?1", [tmp.to_string_lossy()])
+        .map_err(AppError::from)
+        .and_then(|_| fs::rename(&tmp, path).map_err(AppError::from));
+    if written.is_err() {
+        // A partial copy can be large, and a retry in a later minute wouldn't find it.
+        let _ = fs::remove_file(&tmp);
+    }
+    written
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::TempDir;
+    use crate::test_support::{TempDir, now};
 
     #[test]
     fn open_applies_the_connection_settings() {
@@ -142,7 +152,6 @@ mod tests {
         release.join().unwrap();
     }
 
-    use chrono::TimeZone;
     use rusqlite_migration::M;
 
     fn first() -> M<'static> {
@@ -151,10 +160,6 @@ mod tests {
 
     fn both() -> Migrations<'static> {
         Migrations::new(vec![first(), M::up("CREATE TABLE b (y);")])
-    }
-
-    fn at_2_05_pm() -> DateTime<Local> {
-        Local.with_ymd_and_hms(2026, 11, 3, 14, 5, 0).unwrap()
     }
 
     fn version(conn: &Connection) -> i64 {
@@ -176,7 +181,7 @@ mod tests {
     fn existing(dir: &TempDir) -> Connection {
         let mut conn = open(&dir.path().join("test.db")).unwrap();
         let older = Migrations::new(vec![first()]);
-        prepare(&mut conn, &older, &dir.path().join("unused"), at_2_05_pm()).unwrap();
+        prepare(&mut conn, &older, &dir.path().join("unused"), now()).unwrap();
         assert_eq!(version(&conn), 1);
         conn
     }
@@ -184,13 +189,13 @@ mod tests {
     #[test]
     fn an_existing_database_is_backed_up_before_migrating() {
         let dir = TempDir::new("bak-existing");
-        let backups = dir.path().join("backups-dev").join("pre-migration");
+        let backups = dir.path().join(BACKUPS_DIR).join("pre-migration");
         let mut conn = existing(&dir);
 
-        prepare(&mut conn, &both(), &backups, at_2_05_pm()).unwrap();
+        prepare(&mut conn, &both(), &backups, now()).unwrap();
 
         assert_eq!(version(&conn), 2);
-        let copy_path = backups.join("jobertsvault-dev-pre-migration-v1-2026-11-03_1405.db");
+        let copy_path = backups.join(format!("{NAME}-pre-migration-v1-2026-11-03_1405.db"));
         let copy = Connection::open(&copy_path).unwrap();
         assert_eq!(version(&copy), 1);
         assert_eq!(
@@ -212,16 +217,11 @@ mod tests {
     #[test]
     fn a_failed_backup_stops_the_migration() {
         let dir = TempDir::new("bak-failed");
-        let blocked = dir.path().join("backups-dev");
+        let blocked = dir.path().join(BACKUPS_DIR);
         std::fs::write(&blocked, b"a file where the folder should be").unwrap();
         let mut conn = existing(&dir);
 
-        let result = prepare(
-            &mut conn,
-            &both(),
-            &blocked.join("pre-migration"),
-            at_2_05_pm(),
-        );
+        let result = prepare(&mut conn, &both(), &blocked.join("pre-migration"), now());
 
         assert!(
             matches!(&result, Err(AppError::Io { message }) if message.starts_with("Couldn't back up")),
@@ -236,7 +236,7 @@ mod tests {
         let dir = TempDir::new("bak-new");
         let backups = dir.path().join("pre-migration");
         let mut conn = open(&dir.path().join("test.db")).unwrap();
-        prepare(&mut conn, &both(), &backups, at_2_05_pm()).unwrap();
+        prepare(&mut conn, &both(), &backups, now()).unwrap();
         assert_eq!(version(&conn), 2);
         assert!(!backups.exists());
     }
@@ -246,9 +246,24 @@ mod tests {
         let dir = TempDir::new("bak-current");
         let backups = dir.path().join("pre-migration");
         let mut conn = open(&dir.path().join("test.db")).unwrap();
-        prepare(&mut conn, &both(), &dir.path().join("unused"), at_2_05_pm()).unwrap();
-        prepare(&mut conn, &both(), &backups, at_2_05_pm()).unwrap();
+        prepare(&mut conn, &both(), &dir.path().join("unused"), now()).unwrap();
+        prepare(&mut conn, &both(), &backups, now()).unwrap();
         assert!(!backups.exists());
+    }
+
+    #[test]
+    fn a_failed_copy_leaves_no_tmp_file() {
+        let dir = TempDir::new("bak-cleanup");
+        let backups = dir.path().join("pre-migration");
+        let name = format!("{NAME}-pre-migration-v1-2026-11-03_1405.db");
+        std::fs::create_dir_all(backups.join(&name)).unwrap(); // the rename can't replace a folder
+        let mut conn = existing(&dir);
+
+        assert!(prepare(&mut conn, &both(), &backups, now()).is_err());
+        assert!(
+            !backups.join(format!("{name}.tmp")).exists(),
+            "a partial copy was left behind"
+        );
     }
 
     #[test]
@@ -256,13 +271,13 @@ mod tests {
         let dir = TempDir::new("bak-tmp");
         let backups = dir.path().join("pre-migration");
         std::fs::create_dir_all(&backups).unwrap();
-        let name = "jobertsvault-dev-pre-migration-v1-2026-11-03_1405.db";
+        let name = format!("{NAME}-pre-migration-v1-2026-11-03_1405.db");
         std::fs::write(backups.join(format!("{name}.tmp")), b"half a backup").unwrap();
         let mut conn = existing(&dir);
 
-        prepare(&mut conn, &both(), &backups, at_2_05_pm()).unwrap();
+        prepare(&mut conn, &both(), &backups, now()).unwrap();
 
-        let copy = Connection::open(backups.join(name)).unwrap();
+        let copy = Connection::open(backups.join(&name)).unwrap();
         assert_eq!(version(&copy), 1);
         assert!(!backups.join(format!("{name}.tmp")).exists());
     }

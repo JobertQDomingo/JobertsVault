@@ -72,7 +72,7 @@ mod tests {
     use crate::db::{migrations, open, prepare};
     use crate::state::AppState;
     use crate::test_support::TempDir;
-    use chrono::{Local, TimeZone, Utc};
+    use chrono::{TimeZone, Utc};
     use rusqlite::Connection;
     use std::path::Path;
 
@@ -83,7 +83,7 @@ mod tests {
             &mut conn,
             &migrations(now),
             Path::new("unused"),
-            Local::now(),
+            crate::test_support::now(),
         )
         .unwrap();
         conn
@@ -195,8 +195,8 @@ mod tests {
         for _launch in 0..2 {
             let state = AppState::open(
                 dir.path().to_path_buf(),
-                &migrations(Utc::now()),
-                Local::now(),
+                &migrations(crate::test_support::now().to_utc()),
+                crate::test_support::now(),
             );
             let conn = state.conn().unwrap();
             assert_eq!(count(&conn, "SELECT count(*) FROM accounts"), 1);

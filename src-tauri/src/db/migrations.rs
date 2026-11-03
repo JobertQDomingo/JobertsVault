@@ -18,7 +18,7 @@ pub fn migrations(now: DateTime<Utc>) -> Migrations<'static> {
 mod tests {
     use super::*;
     use crate::db::{open, prepare};
-    use chrono::{Local, TimeZone};
+    use chrono::TimeZone;
     use rusqlite::Connection;
     use std::path::Path;
 
@@ -31,7 +31,7 @@ mod tests {
             &mut conn,
             &migrations(now),
             Path::new("unused"),
-            Local::now(),
+            crate::test_support::now(),
         )
         .unwrap();
         conn
@@ -49,7 +49,11 @@ mod tests {
 
     #[test]
     fn the_migrations_are_valid() {
-        assert!(migrations(Utc::now()).validate().is_ok());
+        assert!(
+            migrations(crate::test_support::now().to_utc())
+                .validate()
+                .is_ok()
+        );
     }
 
     #[test]
