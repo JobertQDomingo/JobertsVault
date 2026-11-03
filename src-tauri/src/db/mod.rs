@@ -28,9 +28,10 @@ pub fn open(path: &Path) -> Result<Connection, AppError> {
     Ok(conn)
 }
 
-/// Refuses a database made by a newer version of the app.
+/// Refuses a database made by a newer version of the app, and runs any pending migrations.
 pub fn prepare(conn: &mut Connection, ms: &Migrations) -> Result<(), AppError> {
-    if ms.pending_migrations(conn)? < 0 {
+    let pending = ms.pending_migrations(conn)?;
+    if pending < 0 {
         return Err(AppError::Database {
             message: concat!(
                 "This database was made by a newer version of Jobert's Vault. ",
@@ -38,6 +39,9 @@ pub fn prepare(conn: &mut Connection, ms: &Migrations) -> Result<(), AppError> {
             )
             .into(),
         });
+    }
+    if pending > 0 {
+        ms.to_latest(conn)?;
     }
     Ok(())
 }
