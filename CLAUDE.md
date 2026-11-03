@@ -2,7 +2,7 @@
 
 Guidance for AI coding assistants working on **Jobert's Vault**: a single-user, offline Windows desktop app for tracking personal cashflow. It's built with Tauri 2, a React + TypeScript frontend, a Rust backend and SQLite.
 
-> **Project status:** all planning docs approved, code not started yet. Start with **Phase 0** in [ROADMAP.md](ROADMAP.md).
+> **Project status:** in development. See "Current focus" in [ROADMAP.md](ROADMAP.md) for where to continue.
 
 ## Sources of truth
 

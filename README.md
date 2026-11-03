@@ -2,7 +2,7 @@
 
 A private, offline desktop app for Windows that tracks personal cashflow (income and expenses) by **day, week, month or year**. You enter every transaction yourself, and all data stays in a local SQLite file on your computer. Nothing is sent over the internet.
 
-> **Status:** planning complete, development not started yet. The documents below are approved. Code begins with Phase 0 (project setup).
+> **Status:** in development. The app shell from Phase 0 (project setup) runs, but it has no features yet. See [ROADMAP.md](ROADMAP.md) for progress.
 
 ## Features
 
@@ -52,7 +52,8 @@ The first `tauri dev` compiles every Rust dependency, which takes several minute
 | `npm run tauri dev` | Runs the app with hot reload |
 | `npm run tauri build` | Builds the Windows installer (`src-tauri/target/release/bundle/nsis/*.exe`) |
 | `npm test` | Runs the frontend tests (Vitest) |
-| `npm run lint` / `npm run typecheck` | Runs ESLint and the TypeScript checks |
+| `npm run lint` / `npm run typecheck` | Runs ESLint and Prettier, and the TypeScript checks |
+| `npm run format` | Fixes formatting with Prettier |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | Runs the backend tests and regenerates the TypeScript types in `src/bindings/` |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` | Runs the Rust linter |
 
