@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-03 |
-| **Current focus** | **Phase 0: project setup**, waiting on the first CI run. Next: Phase 1, 1.1 Backend foundations. |
+| **Current focus** | **Phase 1, 1.1: Backend foundations** |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -17,7 +17,7 @@ This file is the progress tracker.
 
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
-| **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 10 / 11 |
+| **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
 | **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11 | 0 / 42 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 15 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
@@ -36,7 +36,7 @@ This file is the progress tracker.
 - [x] Testing: set up Vitest, Testing Library and jsdom, plus one example test on each side (frontend and Rust)
 - [x] Type generation: ts-rs writes to `src/bindings/` when `cargo test` runs, `i64` fields generate `number` ([ARCHITECTURE §4.6](docs/ARCHITECTURE.md)), and a check confirms the generated files are committed
 - [x] App icon: `npm run tauri icon assets/brand/app-icon-1024.png`
-- [ ] CI: a GitHub Actions workflow on `windows-latest` that runs every check from CLAUDE.md and the bindings check on each push and pull request, without building the installer
+- [x] CI: a GitHub Actions workflow on `windows-latest` that runs every check from CLAUDE.md and the bindings check on each push and pull request, without building the installer
 - [x] Decision records 0001–0009 written ([docs/decisions/](docs/decisions/README.md))
 
 ---
