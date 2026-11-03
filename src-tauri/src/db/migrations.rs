@@ -18,7 +18,7 @@ pub fn migrations(now: DateTime<Utc>) -> Migrations<'static> {
 mod tests {
     use super::*;
     use crate::db::{open, prepare};
-    use chrono::TimeZone;
+    use chrono::{Local, TimeZone};
     use rusqlite::Connection;
     use std::path::Path;
 
@@ -27,7 +27,13 @@ mod tests {
     fn migrated() -> Connection {
         let mut conn = open(Path::new(":memory:")).unwrap();
         let now = Utc.with_ymd_and_hms(2026, 10, 26, 9, 30, 0).unwrap();
-        prepare(&mut conn, &migrations(now)).unwrap();
+        prepare(
+            &mut conn,
+            &migrations(now),
+            Path::new("unused"),
+            Local::now(),
+        )
+        .unwrap();
         conn
     }
 
