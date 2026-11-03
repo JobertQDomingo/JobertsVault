@@ -39,6 +39,18 @@ impl From<rusqlite::Error> for AppError {
     }
 }
 
+impl From<rusqlite_migration::Error> for AppError {
+    fn from(err: rusqlite_migration::Error) -> Self {
+        match err {
+            // Goes through the rusqlite conversion, which drops values and the SQL text.
+            rusqlite_migration::Error::RusqliteError { err, .. } => err.into(),
+            err => Self::Database {
+                message: err.to_string(),
+            },
+        }
+    }
+}
+
 impl From<std::io::Error> for AppError {
     fn from(err: std::io::Error) -> Self {
         Self::Io {

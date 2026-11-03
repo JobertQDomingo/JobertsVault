@@ -18,7 +18,7 @@ This file is the progress tracker.
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
-| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 4 / 53 |
+| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 5 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
@@ -51,7 +51,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 
 ### 1.1 Backend foundations
 - [x] `AppError`, `AppState` (one connection behind a `Mutex`), the error log ([ARCHITECTURE §4.4](docs/ARCHITECTURE.md)), and `api/client.ts` with its typed errors
-- [ ] Database startup: open the database (debug builds use `jobertsvault-dev.db`), apply the connection settings (PRAGMAs), refuse a database from a newer app version, and report any failure through `get_startup_status`, with `open_data_folder` ([ARCHITECTURE §6](docs/ARCHITECTURE.md))
+- [x] Database startup: open the database (debug builds use `jobertsvault-dev.db`), apply the connection settings (PRAGMAs), refuse a database from a newer app version, and report any failure through `get_startup_status`, with `open_data_folder` ([ARCHITECTURE §6](docs/ARCHITECTURE.md))
 - [ ] Migration `0001_initial.sql`, exactly as in DATA_MODEL §3
 - [ ] Seed data: the Cash account, payment methods, and the preset categories with their colors (DATA_MODEL §7)
 - [ ] Back up an existing database before running pending migrations, and stop if the backup fails, with tests for both cases and for a new database, which skips it (DATA_MODEL §8) [BAK-5]
