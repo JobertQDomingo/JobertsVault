@@ -13,15 +13,23 @@ const CODES: Record<AppError["code"], true> = {
   io: true,
 };
 
+function messageFor(detail: ApiErrorDetail): string {
+  switch (detail.code) {
+    case "not_found":
+      return `${detail.entity} ${detail.id} not found`;
+    // The raw text is SQLite's, which means nothing to the user (ARCHITECTURE §4.4).
+    case "database":
+      return "Something went wrong with the database. The details are in the error log.";
+    default:
+      return detail.message;
+  }
+}
+
 export class ApiError extends Error {
   readonly detail: ApiErrorDetail;
 
   constructor(detail: ApiErrorDetail) {
-    super(
-      detail.code === "not_found"
-        ? `${detail.entity} ${detail.id} not found`
-        : detail.message,
-    );
+    super(messageFor(detail));
     this.name = "ApiError";
     this.detail = detail;
   }

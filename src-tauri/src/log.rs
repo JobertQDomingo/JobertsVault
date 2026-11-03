@@ -1,40 +1,56 @@
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
+use std::sync::Mutex;
 
 use crate::error::AppError;
 
 const MAX_BYTES: u64 = 1_048_576;
 
-/// Appends a `Database` or `Io` error to the error log. Other errors are the user's to fix, and
-/// their messages can hold what they typed, so they're never written.
+// Commands run on several threads, and two of them rotating at once would lose the older copy.
+static WRITING: Mutex<()> = Mutex::new(());
+
+/// Appends a `Database` or `Io` error to the error log. Other kinds are the user's to fix and
+/// aren't logged.
 pub fn record(path: &Path, err: &AppError) {
-    if matches!(err, AppError::Database { .. } | AppError::Io { .. }) {
-        append(path, &format!("{}: {err}", code(err)));
+    if let (code, Some(message)) = describe(err) {
+        append(path, &format!("{code}: {message}"));
     }
 }
 
 /// Appends a failure that stopped startup, whatever its kind.
 pub fn record_startup(path: &Path, err: &AppError) {
-    append(path, &format!("startup {}: {err}", code(err)));
+    match describe(err) {
+        (code, Some(message)) => append(path, &format!("startup {code}: {message}")),
+        (code, None) => append(path, &format!("startup {code}")),
+    }
 }
 
-fn code(err: &AppError) -> &'static str {
+/// The error's code, and its message only when it's safe to log. Messages of the other kinds
+/// can hold what the user typed: amounts, payees, notes, account or category names.
+fn describe(err: &AppError) -> (&'static str, Option<String>) {
     match err {
-        AppError::Validation { .. } => "validation",
-        AppError::NotFound { .. } => "not_found",
-        AppError::Conflict { .. } => "conflict",
-        AppError::Database { .. } => "database",
-        AppError::Io { .. } => "io",
+        AppError::Validation { .. } => ("validation", None),
+        AppError::NotFound { .. } => ("not_found", None),
+        AppError::Conflict { .. } => ("conflict", None),
+        AppError::Database { .. } => ("database", Some(err.to_string())),
+        AppError::Io { .. } => ("io", Some(err.to_string())),
     }
 }
 
 /// Never fails: a log that can't be written mustn't stop the app (ARCHITECTURE §4.4).
 fn append(path: &Path, line: &str) {
-    if fs::metadata(path).is_ok_and(|m| m.len() >= MAX_BYTES) {
-        let _ = fs::rename(path, path.with_extension("log.1"));
+    let _writing = WRITING
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    // If the old copy can't be replaced, skip the entry rather than grow past the cap.
+    if fs::metadata(path).is_ok_and(|m| m.len() >= MAX_BYTES)
+        && fs::rename(path, path.with_extension("log.1")).is_err()
+    {
+        return;
     }
     let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ");
+    let line = line.replace(['\r', '\n'], " ");
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
         let _ = writeln!(file, "{now} {line}");
     }
@@ -72,6 +88,15 @@ mod tests {
             ),
             conn.query_row("SELECT 4242424242", [], |row| row.get::<_, u8>(0))
                 .map(|_| 0),
+            // What a FromSql/ToSql impl (e.g. a Money newtype) could return.
+            Err(rusqlite::Error::FromSqlConversionFailure(
+                0,
+                rusqlite::types::Type::Integer,
+                "amount 123456 is out of range".into(),
+            )),
+            Err(rusqlite::Error::ToSqlConversionFailure(
+                "payee Corner Cafe".into(),
+            )),
         ];
         for failure in failures {
             record(&log, &AppError::from(failure.unwrap_err()));
@@ -91,7 +116,7 @@ mod tests {
         );
 
         let written = fs::read_to_string(&log).unwrap();
-        assert_eq!(written.lines().count(), 4, "{written}");
+        assert_eq!(written.lines().count(), 6, "{written}");
         for secret in [
             "BPI Savings",
             "123456",
@@ -109,20 +134,65 @@ mod tests {
     }
 
     #[test]
-    fn startup_failures_are_logged_with_their_code() {
+    fn startup_failures_never_record_user_text() {
         let dir = TempDir::new("log-startup");
         let log = dir.path().join("test.log");
         record_startup(
             &log,
             &AppError::Conflict {
+                message: "BPI Savings is in use".into(),
+            },
+        );
+        record_startup(
+            &log,
+            &AppError::Database {
+                message: "disk I/O error".into(),
+            },
+        );
+        let written = fs::read_to_string(&log).unwrap();
+        assert!(
+            written.contains(
+                "startup conflict
+"
+            ),
+            "{written}"
+        );
+        assert!(
+            written.contains("startup database: disk I/O error"),
+            "{written}"
+        );
+        assert!(!written.contains("BPI Savings"), "{written}");
+    }
+
+    #[test]
+    fn a_multi_line_message_stays_on_one_line() {
+        let dir = TempDir::new("log-lines");
+        let log = dir.path().join("test.log");
+        record(
+            &log,
+            &AppError::Database {
+                message: "near \"FORM\"
+  FROM t
+ WHERE x"
+                    .into(),
+            },
+        );
+        assert_eq!(fs::read_to_string(&log).unwrap().lines().count(), 1);
+    }
+
+    #[test]
+    fn a_failed_rotation_stops_the_log_growing() {
+        let dir = TempDir::new("log-stuck");
+        let log = dir.path().join("test.log");
+        fs::create_dir(dir.path().join("test.log.1")).unwrap(); // the rename can't replace a folder
+        fs::write(&log, vec![b'x'; 1_048_576]).unwrap();
+        record(
+            &log,
+            &AppError::Io {
                 message: "x".into(),
             },
         );
-        assert!(
-            fs::read_to_string(&log)
-                .unwrap()
-                .contains("startup conflict: x")
-        );
+        assert_eq!(fs::metadata(&log).unwrap().len(), 1_048_576);
     }
 
     #[test]

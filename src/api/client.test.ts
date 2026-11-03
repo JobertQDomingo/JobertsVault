@@ -47,3 +47,15 @@ test("wraps anything else as unknown", async () => {
     message: "command foo not found",
   });
 });
+
+test("shows a generic message for database errors but keeps the detail", async () => {
+  const detail = {
+    code: "database",
+    message: "UNIQUE constraint failed: accounts.name",
+  };
+  const error = await rejection(detail);
+  expect(error.message).toBe(
+    "Something went wrong with the database. The details are in the error log.",
+  );
+  expect(error.detail).toEqual(detail);
+});

@@ -25,10 +25,14 @@ pub enum AppError {
 impl From<rusqlite::Error> for AppError {
     fn from(err: rusqlite::Error) -> Self {
         let message = match err {
-            // The only rusqlite message that holds a stored value, which could be an amount.
+            // These messages can hold the value itself, which could be an amount or a name.
             rusqlite::Error::IntegralValueOutOfRange(column, _) => {
                 format!("Integer out of range at index {column}")
             }
+            rusqlite::Error::FromSqlConversionFailure(column, kind, _) => {
+                format!("Conversion error from type {kind} at index {column}")
+            }
+            rusqlite::Error::ToSqlConversionFailure(_) => "Conversion error to SQL".into(),
             err => err.to_string(),
         };
         Self::Database { message }
