@@ -2,7 +2,7 @@
 
 A private desktop app for Windows that tracks personal cashflow (income and expenses) by **day, week, month or year**. You enter every transaction yourself, and all data stays in a local SQLite file on your computer. Your financial data is never sent over the internet. The only network use is checking GitHub for app updates, which you can turn off, and the app works fully offline.
 
-> **Status:** in development. The app shell from Phase 0 (project setup) runs, but it has no features yet. See [ROADMAP.md](ROADMAP.md) for progress.
+> **Status:** in development. The app opens, migrates and seeds its database at startup, and backs up an existing database before migrating it, but it has no screens yet. See [ROADMAP.md](ROADMAP.md) for progress.
 
 ## Features
 
@@ -68,7 +68,7 @@ The first `tauri dev` compiles every Rust dependency, which takes several minute
 
 > ⚠️ **Phase 1 has no regular backups and no Restore.** Until Phase 2, close the app now and then and copy `jobertsvault.db` somewhere safe yourself. A OneDrive or Google Drive folder works well.
 
-`npm run tauri dev` uses `jobertsvault-dev.db` and `jobertsvault-dev.log` in the same folder, so development never touches your real data.
+`npm run tauri dev` uses `jobertsvault-dev.db`, `jobertsvault-dev.log` and `backups-dev\pre-migration\` in the same folder, so development never touches your real data.
 
 Updates keep your data, because it isn't in the install folder. Uninstalling keeps it too, unless you tick **Delete the application data** in the uninstaller, which removes the folder above, including the database and any backups in it. To start fresh, delete that folder.
 

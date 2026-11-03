@@ -185,9 +185,13 @@ pub enum AppError {
 
 The frontend's `api/client.ts` converts these into a typed `ApiError`:
 - `validation` errors are shown on the matching form field (via react-hook-form's `setError`).
-- Other errors are shown as a toast notification.
+- Other errors are shown as a toast notification. For `database` errors, the toast text is generic ("Something went wrong with the database…"), and SQLite's own text stays in `ApiError.detail`.
+- Anything Tauri itself rejects with (an unknown command, bad arguments) becomes code `unknown`.
 
-**Error log:** Rust appends `Database`, `Io` and `Update` errors and startup failures to `<app data>\jobertsvault.log`, using only the standard library. When the file passes 1 MB, it's renamed to `jobertsvault.log.1`, replacing the older copy, so the log never takes more than about 2 MB. **It never records amounts, payees, notes, or account and category names.** A failure to write the log is ignored, so it can't stop the app.
+**Error log:** Rust appends `Database` and `Io` errors (and `Update` errors, once ROADMAP 1.10 adds them) and startup failures to `<app data>\jobertsvault.log`, using only the standard library. When the file passes 1 MB, it's renamed to `jobertsvault.log.1`, replacing the older copy, so the log never takes more than about 2 MB. If that rename fails, the entry is skipped rather than let the log grow. **It never records amounts, payees, notes, or account and category names.**
+- A startup failure of any other kind (`validation`, `conflict`, `not_found`) is logged by its code only, because those messages can hold what the user typed. `startup_failures_never_record_user_text` guards this.
+- Converting a rusqlite error drops the stored values that some of its messages carry. SQL text can still appear, but it never holds user data, because every query binds its values. `the_log_never_records_user_data` guards this.
+- Each entry is one line, and a failure to write the log is ignored, so it can't stop the app.
 
 ### 4.5 Command catalog
 
@@ -329,6 +333,8 @@ This runs at startup and again whenever the date changes while the app is open (
 | **Service tests** | `cargo test` with an in-memory SQLite database and migrations applied | Balances after creating, editing and deleting transactions; transfers left out of totals; validation errors; archive and merge rules; recurring transactions not duplicated |
 | **Frontend unit tests** | Vitest + Testing Library | `money.ts` parsing and formatting, `AmountInput`, `PeriodSwitcher`, form validation |
 | **Manual acceptance tests** | A checklist | The PRD §10 acceptance criteria, run on Windows 11 before each release |
+
+**Files, clock and build in tests.** Tests that need real files (startup, backups, the log) use `test_support::TempDir`, a folder under the system temp directory that's wiped afterwards, never the app data folder. Wherever code takes the time as a value, tests pass the fixed `test_support::now()` (2026-11-03 14:05 local). The log is the one exception: it stamps its own entries. A test that needs a file name the app itself uses builds it from `db::NAME` and `db::BACKUPS_DIR`, so it passes in both debug and release builds. No `.db` file or backup is ever committed.
 
 **Example tests that must exist:** "Paying the card bill doesn't change the month's expense total", "Week of 2026-10-26 (a Monday) is Oct 26 to Nov 1", "Month start day 25: Oct 2026 is Sep 25 to Oct 24", "Comparing Oct 1–26 uses Sep 1–26".
 
