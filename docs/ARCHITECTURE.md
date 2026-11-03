@@ -162,7 +162,7 @@ fn card_cycle(statement_day: u8, due_day: u8, today: NaiveDate) -> CardCycle;   
 ### 4.3 Database access
 
 - **One SQLite connection** stored in `AppState` behind a `Mutex`. With a single user and queries that take milliseconds, this is simpler than a connection pool and avoids write conflicts.
-- Tauri runs commands on background threads, so database work never blocks the window.
+- **Every command is declared `#[tauri::command(async)]`.** Tauri runs a plain command on the main thread, which also draws the window, so a query waiting on a lock (up to `busy_timeout`) would freeze it. With `async`, a normal `fn` runs on Tauri's thread pool, so database work never blocks the window, and it can still borrow `State`.
 - Settings applied when the connection opens: `foreign_keys = ON`, `journal_mode = WAL`, `busy_timeout = 5000`, `synchronous = NORMAL`.
 - **Every write runs inside a database transaction.** One change, such as merging categories or posting a recurring occurrence, is always one transaction.
 - Queries always use **bound parameters**. Values are never pasted into SQL text.

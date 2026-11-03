@@ -93,7 +93,7 @@ npm run tauri build
 1. Write the domain logic and its tests (if any) in `domain/`.
 2. Add the service function in `services/`, including validation that returns `AppError::Validation { field, message }`.
 3. Add the SQL in `repo/` if it's needed.
-4. Add a thin wrapper in `commands/` and register it in `lib.rs`.
+4. Add a thin wrapper in `commands/`, declared `#[tauri::command(async)]` so it runs off the main thread (ARCHITECTURE §4.3), and register it in `lib.rs`.
 5. Derive `TS` on the input and output structs, mark `i64` fields `#[ts(type = "number")]`, then run `cargo test` to regenerate the bindings.
 6. Add a typed wrapper in `src/api/<area>.ts` and a hook in `src/hooks/`. After any change that writes data, refresh the `['ledger']` queries.
 7. Add the command to the catalog in ARCHITECTURE.md §4.5.
