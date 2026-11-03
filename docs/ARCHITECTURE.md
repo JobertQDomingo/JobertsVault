@@ -277,7 +277,7 @@ Quick-add (**Ctrl+N**) is a dialog that can be opened from any route. It isn't a
 3. Check user_version  ── newer than the app knows? ─▶ error screen, stop
 4. If an existing database has pending migrations: back it up first (BAK-5) ── fails? ─▶ error screen, stop
 5. Run migrations
-6. If the database is new: add the seed data (DATA_MODEL §7)
+6. If the database is new: add the seed data (DATA_MODEL §7), inside migration 0001's transaction, so it lands with the schema or not at all
 7. [P2] Daily auto-backup, if not done yet today (BAK-2), then delete old ones (BAK-3)
 8. [P3] Process recurring rules due up to today (REC-4)
 9. Store AppState, apply the window size (§11) and show the main window

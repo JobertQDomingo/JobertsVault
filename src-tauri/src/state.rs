@@ -114,7 +114,10 @@ mod tests {
             .pragma_update(None, "user_version", 99) // far past any real migration
             .unwrap();
 
-        let state = AppState::open(dir.path().to_path_buf(), &db::migrations());
+        let state = AppState::open(
+            dir.path().to_path_buf(),
+            &db::migrations(chrono::Utc::now()),
+        );
         assert_eq!(
             state.startup_status(),
             StartupStatus::Failed {
@@ -172,7 +175,10 @@ mod tests {
     fn the_real_migrations_apply_and_the_app_reopens() {
         let dir = TempDir::new("state-real");
         for _launch in 0..2 {
-            let state = AppState::open(dir.path().to_path_buf(), &db::migrations());
+            let state = AppState::open(
+                dir.path().to_path_buf(),
+                &db::migrations(chrono::Utc::now()),
+            );
             assert_eq!(state.startup_status(), StartupStatus::Ok);
             let version: i64 = state
                 .conn()

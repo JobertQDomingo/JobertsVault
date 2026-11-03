@@ -1,4 +1,5 @@
 mod migrations;
+mod seed;
 
 use std::path::Path;
 

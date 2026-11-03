@@ -345,6 +345,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-03 | When automatic updates are off, the app never connects by itself. This differs from NBSBuddy, which still checks. |
 | 2026-11-03 | The update check at startup gives up after 3 seconds, rather than NBSBuddy's 8, to keep startup fast |
 | 2026-11-03 | NBSBuddy's "What's new" tour and download page are not part of the MVP |
+| 2026-11-03 | The preset expense categories follow DATA_MODEL §7's order: the 12 common ones first, then the 5 rarely used ones (so Personal Care comes before Education) |
 
 ---
 
@@ -352,4 +353,4 @@ None at the moment. All earlier questions have been answered and are recorded in
 
 **Income:** Salary, Bonus, Freelance/Side income, Interest, Gifts received, Refund, Other income
 
-**Expense:** Food & Groceries, Dining Out, Transportation, Rent/Housing, Utilities (electricity, water, internet), Phone, Shopping, Health & Medical, Insurance, Entertainment, Subscriptions, Education, Personal Care, Gifts & Donations, Travel, Fees & Charges, Other expense
+**Expense:** Food & Groceries, Dining Out, Transportation, Rent/Housing, Utilities (electricity, water, internet), Phone, Shopping, Health & Medical, Insurance, Entertainment, Subscriptions, Personal Care, Education, Gifts & Donations, Travel, Fees & Charges, Other expense
