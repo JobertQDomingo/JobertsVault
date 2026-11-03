@@ -128,7 +128,7 @@ jobertsvault/
       ├─ services/                 # rules + database transactions
       │  ├─ accounts.rs  categories.rs  payment_methods.rs  transactions.rs  dashboard.rs  settings.rs
       │  ├─ reports.rs (P2)  backup.rs (P2)  export.rs (P2)  recurring.rs (P3)  budgets.rs (P3)  goals.rs (P3)
-      └─ commands/                 # #[tauri::command] wrappers, one module per area
+      └─ commands/                 # #[tauri::command(async)] wrappers, one module per area
 ```
 
 ## 4. Backend design
@@ -162,7 +162,7 @@ fn card_cycle(statement_day: u8, due_day: u8, today: NaiveDate) -> CardCycle;   
 ### 4.3 Database access
 
 - **One SQLite connection** stored in `AppState` behind a `Mutex`. With a single user and queries that take milliseconds, this is simpler than a connection pool and avoids write conflicts.
-- **Every command is declared `#[tauri::command(async)]`.** Tauri runs a plain command on the main thread, which also draws the window, so a query waiting on a lock (up to `busy_timeout`) would freeze it. With `async`, a normal `fn` runs on Tauri's thread pool, so database work never blocks the window, and it can still borrow `State`.
+- **Every command is declared `#[tauri::command(async)]`**, and a test in `commands/` fails if one isn't. Tauri runs a plain command on the main thread, which also draws the window, so a slow query, or a wait for the connection's `Mutex`, would freeze it. With `async`, a normal `fn` runs on a worker thread of Tauri's async runtime and can still borrow `State`. (An `async fn` that borrows `State` must return a `Result`.) Database calls take milliseconds, so briefly holding a worker is fine. Work that can take seconds, such as backup and restore (Phase 2), runs inside `tauri::async_runtime::spawn_blocking` so it doesn't hold up the runtime's few workers.
 - Settings applied when the connection opens: `foreign_keys = ON`, `journal_mode = WAL`, `busy_timeout = 5000`, `synchronous = NORMAL`.
 - **Every write runs inside a database transaction.** One change, such as merging categories or posting a recurring occurrence, is always one transaction.
 - Queries always use **bound parameters**. Values are never pasted into SQL text.
