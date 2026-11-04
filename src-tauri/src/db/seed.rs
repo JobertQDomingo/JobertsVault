@@ -214,6 +214,16 @@ mod tests {
     }
 
     #[test]
+    fn every_seed_icon_is_curated() {
+        for (name, icon, _) in super::INCOME.iter().chain(&super::EXPENSE) {
+            assert!(
+                crate::domain::category::ICONS.contains(icon),
+                "{name} has {icon}"
+            );
+        }
+    }
+
+    #[test]
     fn the_12_common_expense_categories_each_have_their_own_color() {
         let mut colors: Vec<&str> = super::EXPENSE[..12]
             .iter()
