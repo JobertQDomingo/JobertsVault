@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.1 |
-| **Last updated** | 2026-11-03 |
+| **Last updated** | 2026-11-04 |
 | **Related docs** | [PRD.md](PRD.md), [DATA_MODEL.md](DATA_MODEL.md) |
 
 ---
@@ -147,7 +147,7 @@ jobertsvault/
 ### 4.2 Key domain types
 
 ```rust
-pub struct Money(i64);                 // minor units; checked arithmetic, never f64
+pub struct Money(pub i64);             // minor units; checked arithmetic, never f64
 pub enum Decimals { Zero, Two }        // currency_decimals, for Money::parse and Money::to_plain
 pub enum PeriodKind { Day, Week, Month, Year, Custom }
 pub struct Period { kind: PeriodKind, start: NaiveDate, end: NaiveDate }   // inclusive; private fields, read by kind()/start()/end()
@@ -161,6 +161,7 @@ impl Period {
 fn comparison_window(current: &Period, today: NaiveDate, mode: ComparisonMode) -> Period; // §5.4
 pub struct CardCycle { start: NaiveDate, end: NaiveDate, due: NaiveDate }  // end = statement closing date
 fn card_cycle(statement_day: u8, due_day: u8, today: NaiveDate) -> Option<CardCycle>;     // §5.5; None past chrono's range
+fn card_figures(balance: Money, credit_limit: Money) -> CardFigures;  // amount owed, available credit, utilization % (§5.1)
 ```
 
 ### 4.3 Database access
@@ -206,7 +207,7 @@ All commands use `camelCase` parameter names in TypeScript and `snake_case` in R
 | 1 | System | `get_startup_status` → `ok`, or the error message and database path; `open_data_folder`; `get_app_version` |
 | 1 | Updates | `check_update` → the newer version, or none (always none in debug builds); `install_update` (doesn't return on success, because the app restarts) |
 | 1 | Period | `get_period(query)` → start, end, previous query, next query (none when it would start after today), whether it's the current period, `today` |
-| 1 | Accounts | `list_accounts`, `get_account`, `create_account`, `update_account`, `archive_account(id, acknowledge_balance)`, `unarchive_account`, `delete_account`, `reorder_accounts` |
+| 1 | Accounts | `list_accounts` → every account (archived included) and the net balance; `get_account(id)`; `create_account(account)`; `update_account(id, account)` (the kind can't change); `archive_account(id, acknowledge_balance)`; `unarchive_account(id)`; `delete_account(id)` (unused accounts only); `reorder_accounts(ids)`. Each account carries its signed `balance` as of today, `inUse`, and for a credit card a `card` summary: amount owed, available credit, utilization as a whole percent, the current cycle, its spending so far and the next due date |
 | 1 | Categories | `list_categories`, `create_category`, `update_category`, `archive_category`, `unarchive_category`, `delete_category`, `reorder_categories`, `merge_categories` |
 | 1 | Payment methods | `list_payment_methods`, `create_payment_method`, `update_payment_method`, `archive_payment_method`, `unarchive_payment_method`, `delete_payment_method`, `reorder_payment_methods` |
 | 1 | Transactions | `list_transactions(filter, page)`, `get_transaction`, `create_transaction`, `update_transaction`, `delete_transaction`, `get_transaction_defaults` → account and today (DATA_MODEL §5.8), `get_pay_bill_defaults(card_id)` → From account, amount and today |

@@ -23,3 +23,22 @@ export const updateAccount = ({
 /** Each id's position becomes its sort order. */
 export const reorderAccounts = (ids: number[]) =>
   call<null>("reorder_accounts", { ids });
+
+/**
+ * Archives the account. A balance other than 0 is a `conflict` unless the user has
+ * confirmed the warning (UI_FLOWS F6). The last active account is always a `conflict`.
+ */
+export const archiveAccount = ({
+  id,
+  acknowledgeBalance,
+}: {
+  id: number;
+  acknowledgeBalance: boolean;
+}) => call<null>("archive_account", { id, acknowledgeBalance });
+
+export const unarchiveAccount = (id: number) =>
+  call<null>("unarchive_account", { id });
+
+/** Only an account with no transactions (`inUse` false) can be deleted. */
+export const deleteAccount = (id: number) =>
+  call<null>("delete_account", { id });

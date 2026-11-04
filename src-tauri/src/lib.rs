@@ -36,6 +36,9 @@ pub fn run() {
             commands::accounts::create_account,
             commands::accounts::update_account,
             commands::accounts::reorder_accounts,
+            commands::accounts::archive_account,
+            commands::accounts::unarchive_account,
+            commands::accounts::delete_account,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the app");

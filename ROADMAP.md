@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-04 |
-| **Current focus** | **Phase 1, 1.3: Accounts** |
+| **Current focus** | **Phase 1, 1.4: Categories and payment methods** |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -18,7 +18,7 @@ This file is the progress tracker.
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
-| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 12 / 53 |
+| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 16 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
@@ -63,10 +63,10 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] Commands `get_settings` and `update_settings`: currency (₱ default), symbol position, decimals (locked once any amount is stored), week start, month start day, payment method field, `onboarding_completed`, `auto_update_enabled` [SET-1] [SET-2] [SET-6] [ONB-1] [UPD-3]
 
 ### 1.3 Accounts
-- [ ] Create, edit, list and reorder accounts, with opening balances of 0 or more [ACC-1] [ACC-2]
-- [ ] Credit card fields and validation [CC-1] [CC-8]
-- [ ] Balances calculated when requested, the net balance, and the card's amount owed, available credit, utilization, cycle spending and due date [ACC-4] [ACC-5] [CC-2] [CC-6]
-- [ ] Archive and unarchive, with a warning when the balance isn't 0. Delete unused accounts, and block archiving or deleting the last active one [ACC-3]
+- [x] Create, edit, list and reorder accounts, with opening balances of 0 or more [ACC-1] [ACC-2]
+- [x] Credit card fields and validation [CC-1] [CC-8]
+- [x] Balances calculated when requested, the net balance, and the card's amount owed, available credit, utilization, cycle spending and due date [ACC-4] [ACC-5] [CC-2] [CC-6]
+- [x] Archive and unarchive, with a warning when the balance isn't 0. Delete unused accounts, and block archiving or deleting the last active one [ACC-3]
 
 ### 1.4 Categories and payment methods
 - [ ] Categories: list, create, edit (name, 12-color palette, curated icons), reorder, archive, unarchive, and block archiving the last active one of a kind [CAT-1] [CAT-2] [CAT-3]

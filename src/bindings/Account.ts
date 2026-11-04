@@ -18,4 +18,8 @@ balance: Money,
 /**
  * Only for a credit card.
  */
-card: CardSummary | null, };
+card: CardSummary | null, 
+/**
+ * Whether any transaction uses it, in either direction. Only an unused account can be deleted.
+ */
+inUse: boolean, };

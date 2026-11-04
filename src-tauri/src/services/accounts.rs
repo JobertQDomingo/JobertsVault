@@ -67,6 +67,8 @@ pub struct Account {
     pub balance: Money,
     /// Only for a credit card.
     pub card: Option<CardSummary>,
+    /// Whether any transaction uses it, in either direction. Only an unused account can be deleted.
+    pub in_use: bool,
 }
 
 /// A credit card's details view (CC-6).
@@ -169,6 +171,66 @@ pub fn reorder(conn: &mut Connection, ids: Vec<i64>, now: DateTime<Local>) -> Re
         }
     }
     tx.commit()?;
+    Ok(())
+}
+
+/// Hides the account from pickers. It still counts toward the net balance, so a balance other
+/// than 0 needs `acknowledge_balance` after the user confirms the warning (ACC-3, UI_FLOWS F6).
+pub fn archive(
+    conn: &mut Connection,
+    id: i64,
+    acknowledge_balance: bool,
+    now: DateTime<Local>,
+) -> Result<(), AppError> {
+    let tx = conn.transaction()?;
+    let account = get(&tx, id, now.date_naive())?;
+    if account.archived {
+        return Ok(());
+    }
+    check_not_last_active(&tx)?;
+    if account.balance != Money::ZERO && !acknowledge_balance {
+        return Err(AppError::Conflict {
+            message: "This account's balance isn't 0. Archived accounts still count toward your net balance.".into(),
+        });
+    }
+    repo::accounts::set_archived(&tx, id, true, &stamp(now))?;
+    tx.commit()?;
+    Ok(())
+}
+
+pub fn unarchive(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result<(), AppError> {
+    let tx = conn.transaction()?;
+    if repo::accounts::set_archived(&tx, id, false, &stamp(now))? == 0 {
+        return Err(not_found(id));
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+/// Only an account no transaction uses can go; any other is archived instead (ACC-3).
+pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
+    let tx = conn.transaction()?;
+    let archived = repo::accounts::archived(&tx, id)?.ok_or_else(|| not_found(id))?;
+    if repo::accounts::in_use(&tx, id)? {
+        return Err(AppError::Conflict {
+            message: "This account has transactions, so it can only be archived".into(),
+        });
+    }
+    if !archived {
+        check_not_last_active(&tx)?;
+    }
+    repo::accounts::delete(&tx, id)?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Called before an active account is archived or deleted.
+fn check_not_last_active(conn: &Connection) -> Result<(), AppError> {
+    if repo::accounts::active_count(conn)? <= 1 {
+        return Err(AppError::Conflict {
+            message: "Keep at least one active account".into(),
+        });
+    }
     Ok(())
 }
 
@@ -302,6 +364,7 @@ fn view(
         archived: row.archived,
         balance,
         card,
+        in_use: repo::accounts::in_use(conn, row.id)?,
     })
 }
 
@@ -454,6 +517,7 @@ mod tests {
                 archived: false,
                 balance: Money(100_000),
                 card: None,
+                in_use: false,
             }
         );
         let listed = list(&conn, today()).unwrap().accounts;
@@ -834,5 +898,126 @@ mod tests {
             .unwrap();
         create(&mut conn, card("Visa", 64_000), now()).unwrap();
         assert_eq!(list(&conn, today()).unwrap().net_balance, Money(36_000));
+    }
+
+    fn conflict(result: Result<(), AppError>) -> String {
+        match result {
+            Err(AppError::Conflict { message }) => message,
+            other => panic!("expected a conflict, got {other:?}"),
+        }
+    }
+
+    fn is_archived(conn: &Connection, id: i64) -> bool {
+        get(conn, id, today()).unwrap().archived
+    }
+
+    #[test]
+    fn a_zero_balance_account_archives_without_a_warning() {
+        let mut conn = db();
+        let bank = add(&mut conn, "Bank");
+        archive(&mut conn, bank.id, false, now()).unwrap();
+        assert!(is_archived(&conn, bank.id));
+        // Archiving it again changes nothing.
+        archive(&mut conn, bank.id, false, now()).unwrap();
+        assert!(is_archived(&conn, bank.id));
+    }
+
+    #[test]
+    fn a_balance_other_than_0_needs_the_warning_acknowledged() {
+        let mut conn = db();
+        let wallet = create(
+            &mut conn,
+            new("Old Wallet", AccountKind::Cash, 4_500),
+            now(),
+        )
+        .unwrap();
+        let message = conflict(archive(&mut conn, wallet.id, false, now()));
+        assert!(message.contains("net balance"), "{message}");
+        assert!(!message.contains("45"), "never the amount: {message}");
+        assert!(!is_archived(&conn, wallet.id));
+        archive(&mut conn, wallet.id, true, now()).unwrap();
+        assert!(is_archived(&conn, wallet.id));
+
+        // Card debt counts too, and a future-dated row doesn't.
+        let visa = create(&mut conn, card("Visa", 0), now()).unwrap();
+        txn(
+            &conn,
+            "expense",
+            100,
+            today() + chrono::Duration::days(1),
+            visa.id,
+            None,
+        );
+        archive(&mut conn, visa.id, false, now()).unwrap();
+        let amex = create(&mut conn, card("Amex", 100), now()).unwrap();
+        conflict(archive(&mut conn, amex.id, false, now()));
+    }
+
+    #[test]
+    fn the_last_active_account_cannot_be_archived_or_deleted() {
+        let mut conn = db();
+        let old = add(&mut conn, "Old");
+        archive(&mut conn, old.id, false, now()).unwrap();
+        let keep = "Keep at least one active account";
+        assert_eq!(conflict(archive(&mut conn, 1, true, now())), keep);
+        assert_eq!(conflict(delete(&mut conn, 1)), keep);
+        assert!(!is_archived(&conn, 1));
+        // An archived one can still go, since Cash stays active.
+        delete(&mut conn, old.id).unwrap();
+    }
+
+    #[test]
+    fn unarchive_restores_an_account() {
+        let mut conn = db();
+        let bank = add(&mut conn, "Bank");
+        archive(&mut conn, bank.id, false, now()).unwrap();
+        unarchive(&mut conn, bank.id, now()).unwrap();
+        assert!(!is_archived(&conn, bank.id));
+    }
+
+    #[test]
+    fn an_unused_account_can_be_deleted() {
+        let mut conn = db();
+        let bank = add(&mut conn, "Bank");
+        delete(&mut conn, bank.id).unwrap();
+        assert!(matches!(
+            get(&conn, bank.id, today()),
+            Err(AppError::NotFound { .. })
+        ));
+        assert_eq!(list(&conn, today()).unwrap().accounts.len(), 1);
+    }
+
+    #[test]
+    fn an_account_with_transactions_can_only_be_archived() {
+        let mut conn = db();
+        let bank = add(&mut conn, "Bank");
+        let savings = add(&mut conn, "Savings");
+        txn(&conn, "transfer", 100, today(), 1, Some(bank.id));
+        txn(&conn, "transfer", 100, today(), bank.id, Some(1));
+        assert!(get(&conn, bank.id, today()).unwrap().in_use);
+        assert!(get(&conn, 1, today()).unwrap().in_use);
+        assert!(!get(&conn, savings.id, today()).unwrap().in_use);
+        let message = conflict(delete(&mut conn, bank.id));
+        assert!(message.contains("archived"), "{message}");
+        assert!(get(&conn, bank.id, today()).is_ok());
+
+        // Only ever on the receiving side of a transfer still counts as used.
+        let to_only = add(&mut conn, "To only");
+        txn(&conn, "transfer", 100, today(), 1, Some(to_only.id));
+        conflict(delete(&mut conn, to_only.id));
+    }
+
+    #[test]
+    fn archive_unarchive_and_delete_of_a_missing_account_are_not_found() {
+        let mut conn = db();
+        let not_found = |result: Result<(), AppError>| {
+            assert!(
+                matches!(result, Err(AppError::NotFound { id: 99, .. })),
+                "{result:?}"
+            );
+        };
+        not_found(archive(&mut conn, 99, true, now()));
+        not_found(unarchive(&mut conn, 99, now()));
+        not_found(delete(&mut conn, 99));
     }
 }

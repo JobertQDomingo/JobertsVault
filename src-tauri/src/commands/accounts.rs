@@ -41,3 +41,30 @@ pub fn reorder_accounts(state: State<'_, AppState>, ids: Vec<i64>) -> Result<(),
     services::accounts::reorder(&mut *state.conn()?, ids, chrono::Local::now())
         .inspect_err(|err| log::record(&state.log_path, err))
 }
+
+#[tauri::command(async)]
+pub fn archive_account(
+    state: State<'_, AppState>,
+    id: i64,
+    acknowledge_balance: bool,
+) -> Result<(), AppError> {
+    services::accounts::archive(
+        &mut *state.conn()?,
+        id,
+        acknowledge_balance,
+        chrono::Local::now(),
+    )
+    .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+#[tauri::command(async)]
+pub fn unarchive_account(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
+    services::accounts::unarchive(&mut *state.conn()?, id, chrono::Local::now())
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+#[tauri::command(async)]
+pub fn delete_account(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
+    services::accounts::delete(&mut *state.conn()?, id)
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
