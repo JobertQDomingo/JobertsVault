@@ -6,6 +6,7 @@ use ts_rs::TS;
 use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
+use crate::services::period::{self, PeriodQuery};
 use crate::services::{accounts, invalid, not_found, stamp};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -87,6 +88,139 @@ pub struct PayBillDefaults {
     /// The amount owed, or `None` when nothing is owed, so the field starts empty.
     pub amount: Option<Money>,
     pub today: NaiveDate,
+}
+
+/// The Transactions screen's filters (TXN-4, UI_FLOWS §3). `None` means any.
+#[derive(Clone, Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct TransactionFilter {
+    pub period: PeriodQuery,
+    pub kind: Option<TransactionKind>,
+    /// Includes transfers into the account.
+    #[ts(type = "number | null")]
+    pub account_id: Option<i64>,
+    #[ts(type = "number | null")]
+    pub category_id: Option<i64>,
+    #[ts(type = "number | null")]
+    pub payment_method_id: Option<i64>,
+    /// Looks in the payee and the note.
+    pub search: Option<String>,
+}
+
+/// One page of the list, with figures that cover every matching row (ARCHITECTURE §4.5).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct TransactionList {
+    pub items: Vec<Transaction>,
+    pub has_more: bool,
+    pub summary: TransactionSummary,
+    /// For every date on this page, including that date's rows on other pages.
+    pub day_nets: Vec<DayNet>,
+}
+
+/// Transfers are counted, but never as income or expense (RPT-6).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct TransactionSummary {
+    #[ts(type = "number")]
+    pub count: i64,
+    pub income: Money,
+    pub expense: Money,
+}
+
+/// A day header's figure: income − expense (UI_FLOWS §3).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DayNet {
+    pub date: NaiveDate,
+    pub net: Money,
+}
+
+pub const PAGE_SIZE: u32 = 100;
+
+/// Page `page` (from 0) of the matching transactions, newest first (TXN-3, TXN-4).
+pub fn list(
+    conn: &Connection,
+    filter: TransactionFilter,
+    page: u32,
+    today: NaiveDate,
+) -> Result<TransactionList, AppError> {
+    let period = period::resolve(conn, &filter.period, today)?;
+    let (start, end) = (period.start().to_string(), period.end().to_string());
+    // shortcut: SQLite's LIKE ignores case for ASCII letters only, so "Ñ" doesn't match "ñ".
+    let search = filter
+        .search
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            let escaped = s
+                .replace('\\', r"\\")
+                .replace('%', r"\%")
+                .replace('_', r"\_");
+            format!("%{escaped}%")
+        });
+    let f = repo::transactions::Filter {
+        start: &start,
+        end: &end,
+        kind: filter.kind.map(kind_text),
+        account_id: filter.account_id,
+        category_id: filter.category_id,
+        payment_method_id: filter.payment_method_id,
+        search: search.as_deref(),
+    };
+    let mut rows = repo::transactions::page(
+        conn,
+        &f,
+        PAGE_SIZE + 1,
+        i64::from(page) * i64::from(PAGE_SIZE),
+    )?;
+    let has_more = rows.len() > PAGE_SIZE as usize;
+    rows.truncate(PAGE_SIZE as usize);
+    let items = rows.into_iter().map(view).collect::<Result<Vec<_>, _>>()?;
+    let (count, income, expense) = repo::transactions::totals(conn, &f)?;
+    let day_nets = match (items.last(), items.first()) {
+        (Some(oldest), Some(newest)) => {
+            // Every matching row between the page's oldest and newest dates is on a page date.
+            let (start, end) = (oldest.date.to_string(), newest.date.to_string());
+            let page_dates = repo::transactions::Filter {
+                start: &start,
+                end: &end,
+                ..f
+            };
+            repo::transactions::day_nets(conn, &page_dates)?
+                .into_iter()
+                .map(|(date, net)| {
+                    Ok(DayNet {
+                        date: parse_date(&date).ok_or_else(|| AppError::Database {
+                            message: "A transaction has an invalid date".into(),
+                        })?,
+                        net: Money(net),
+                    })
+                })
+                .collect::<Result<Vec<_>, AppError>>()?
+        }
+        _ => Vec::new(),
+    };
+    Ok(TransactionList {
+        items,
+        has_more,
+        summary: TransactionSummary {
+            count,
+            income: Money(income),
+            expense: Money(expense),
+        },
+        day_nets,
+    })
+}
+
+/// A stored `YYYY-MM-DD` date.
+fn parse_date(text: &str) -> Option<NaiveDate> {
+    NaiveDate::parse_from_str(text, "%Y-%m-%d").ok()
 }
 
 /// The last account used, if it's still active, else the first active one (DATA_MODEL §5.8).
@@ -183,9 +317,8 @@ fn validate(
     if f.amount > Money::MAX {
         return Err(invalid("amount", "That amount is too large"));
     }
-    let date = NaiveDate::parse_from_str(&f.date, "%Y-%m-%d")
-        .ok()
-        // parse_from_str also takes "2026-1-5"; only the stored form is accepted.
+    let date = parse_date(&f.date)
+        // Parsing also takes "2026-1-5"; only the stored form is accepted.
         .filter(|d| d.to_string() == f.date)
         .ok_or_else(|| invalid("date", "Enter a real date"))?;
     // Phases 1–2 only: Phase 3 allows future dates (TXN-8).
@@ -302,7 +435,7 @@ fn view(row: repo::transactions::Row) -> Result<Transaction, AppError> {
     .into_iter()
     .find(|k| kind_text(*k) == row.kind)
     .ok_or_else(|| bad("kind"))?;
-    let date = NaiveDate::parse_from_str(&row.date, "%Y-%m-%d").map_err(|_| bad("date"))?;
+    let date = parse_date(&row.date).ok_or_else(|| bad("date"))?;
     Ok(Transaction {
         id: row.id,
         kind,
@@ -1012,5 +1145,207 @@ mod tests {
             pay_bill_defaults(&conn, 999, today()),
             Err(AppError::NotFound { .. })
         ));
+    }
+
+    /// Every row this month, with no other filter.
+    fn this_month() -> TransactionFilter {
+        TransactionFilter {
+            period: PeriodQuery::Month { anchor: None },
+            kind: None,
+            account_id: None,
+            category_id: None,
+            payment_method_id: None,
+            search: None,
+        }
+    }
+
+    fn ids(list: &TransactionList) -> Vec<i64> {
+        list.items.iter().map(|t| t.id).collect()
+    }
+
+    fn page(conn: &Connection, filter: TransactionFilter, n: u32) -> TransactionList {
+        list(conn, filter, n, today()).unwrap()
+    }
+
+    #[test]
+    fn the_list_is_newest_first_and_paged_by_100() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        for i in 0..205 {
+            spend(&mut conn, 100, cash, d(2026, 11, 1 + i % 3));
+        }
+        let pages: Vec<_> = (0..3).map(|n| page(&conn, this_month(), n)).collect();
+        assert_eq!(
+            pages
+                .iter()
+                .map(|p| (p.items.len(), p.has_more))
+                .collect::<Vec<_>>(),
+            [(100, true), (100, true), (5, false)]
+        );
+        let all: Vec<_> = pages.iter().flat_map(|p| &p.items).collect();
+        assert!(
+            all.windows(2)
+                .all(|w| (w[0].date, w[0].id) > (w[1].date, w[1].id))
+        );
+        assert!(page(&conn, this_month(), 3).items.is_empty());
+    }
+
+    #[test]
+    fn day_nets_cover_dates_split_across_pages() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        let pay = TransactionFields {
+            date: d(2026, 11, 2).to_string(),
+            ..income(&conn, 100_000, cash)
+        };
+        create(&mut conn, pay, now()).unwrap();
+        for _ in 0..150 {
+            spend(&mut conn, 100, cash, d(2026, 11, 2));
+        }
+        spend(&mut conn, 7, cash, d(2026, 11, 3));
+        let net = |date, net| DayNet {
+            date,
+            net: Money(net),
+        };
+        // Page 0 holds Nov 3 and 99 of Nov 2's rows; the rest of Nov 2 is on page 1.
+        assert_eq!(
+            page(&conn, this_month(), 0).day_nets,
+            [
+                net(d(2026, 11, 3), -7),
+                net(d(2026, 11, 2), 100_000 - 15_000)
+            ]
+        );
+        assert_eq!(
+            page(&conn, this_month(), 1).day_nets,
+            [net(d(2026, 11, 2), 100_000 - 15_000)]
+        );
+    }
+
+    #[test]
+    fn summary_counts_every_page_and_leaves_out_transfers() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        let bank = bank(&mut conn, "Bank", 0);
+        for _ in 0..101 {
+            spend(&mut conn, 10, cash, today());
+        }
+        {
+            let f = income(&conn, 5_000, bank);
+            create(&mut conn, f, now()).unwrap();
+        }
+        create(&mut conn, transfer(2_000, bank, cash), now()).unwrap();
+        let first = page(&conn, this_month(), 0);
+        assert_eq!(
+            first.summary,
+            TransactionSummary {
+                count: 103,
+                income: Money(5_000),
+                expense: Money(1_010)
+            }
+        );
+        assert_eq!(page(&conn, this_month(), 1).summary, first.summary);
+        assert_eq!(first.day_nets[0].net, Money(5_000 - 1_010));
+    }
+
+    #[test]
+    fn an_accounts_list_includes_incoming_transfers() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        let bank = bank(&mut conn, "Bank", 10_000);
+        let incoming = create(&mut conn, transfer(2_000, bank, cash), now()).unwrap();
+        let spent = spend(&mut conn, 100, bank, today());
+        spend(&mut conn, 100, cash, today());
+        let of = |account| TransactionFilter {
+            account_id: Some(account),
+            ..this_month()
+        };
+        let banks = page(&conn, of(bank), 0);
+        assert_eq!(ids(&banks), [spent.id, incoming.id]);
+        assert_eq!(banks.summary.count, 2);
+        assert_eq!(banks.summary.expense, Money(100));
+        assert_eq!(page(&conn, of(cash), 0).items.len(), 2);
+    }
+
+    #[test]
+    fn filters_by_kind_category_and_method() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        let method = id_of(&conn, "payment_methods", "E-wallet");
+        let paid = {
+            let f = TransactionFields {
+                payment_method_id: Some(method),
+                ..expense(&conn, 100, cash)
+            };
+            create(&mut conn, f, now()).unwrap()
+        };
+        let plain = spend(&mut conn, 200, cash, today());
+        let earned = {
+            let f = income(&conn, 300, cash);
+            create(&mut conn, f, now()).unwrap()
+        };
+        let by_kind = TransactionFilter {
+            kind: Some(TransactionKind::Income),
+            ..this_month()
+        };
+        assert_eq!(ids(&page(&conn, by_kind, 0)), [earned.id]);
+        let by_category = TransactionFilter {
+            category_id: Some(food(&conn)),
+            ..this_month()
+        };
+        assert_eq!(ids(&page(&conn, by_category, 0)), [plain.id, paid.id]);
+        let by_method = TransactionFilter {
+            payment_method_id: Some(method),
+            ..this_month()
+        };
+        let by_method = page(&conn, by_method, 0);
+        assert_eq!(ids(&by_method), [paid.id]);
+        assert_eq!(by_method.summary.expense, Money(100));
+    }
+
+    #[test]
+    fn search_matches_payee_or_note_ignoring_case_and_wildcards() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        let mut save = |payee: Option<&str>, note: Option<&str>| {
+            let f = TransactionFields {
+                payee: payee.map(Into::into),
+                note: note.map(Into::into),
+                ..expense(&conn, 100, cash)
+            };
+            create(&mut conn, f, now()).unwrap().id
+        };
+        let sale = save(Some("Store"), Some("50% off"));
+        let other = save(Some("Store"), Some("500 off"));
+        let market = save(Some("Corner Market"), None);
+        let underscore = save(None, Some("a_b"));
+        let found = |text: &str| {
+            let filter = TransactionFilter {
+                search: Some(text.into()),
+                ..this_month()
+            };
+            ids(&page(&conn, filter, 0))
+        };
+        assert_eq!(found("50%"), [sale]);
+        assert_eq!(found("  MARKET "), [market]);
+        assert_eq!(found("_"), [underscore]);
+        assert_eq!(found("store"), [other, sale]);
+        assert_eq!(found("   ").len(), 4);
+    }
+
+    #[test]
+    fn the_period_limits_the_list() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        spend(&mut conn, 100, cash, d(2026, 10, 31));
+        let november = spend(&mut conn, 100, cash, d(2026, 11, 1));
+        assert_eq!(ids(&page(&conn, this_month(), 0)), [november.id]);
+        let custom = TransactionFilter {
+            period: PeriodQuery::Custom {
+                start: d(2026, 10, 1),
+                end: d(2026, 10, 31),
+            },
+            ..this_month()
+        };
+        assert_eq!(page(&conn, custom, 0).summary.count, 1);
     }
 }

@@ -1,4 +1,4 @@
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, ToSql, params};
 
 /// Whether any transaction exists at all.
 pub fn any(conn: &Connection) -> rusqlite::Result<bool> {
@@ -100,6 +100,75 @@ pub fn update(conn: &Connection, id: i64, v: &Values, now: &str) -> rusqlite::Re
         ],
     )?;
     Ok(())
+}
+
+/// The list's filters (TXN-4). `None` means any. `search` is a LIKE pattern escaped with `\`.
+#[derive(Clone, Copy)]
+pub struct Filter<'a> {
+    pub start: &'a str,
+    pub end: &'a str,
+    pub kind: Option<&'a str>,
+    /// Matches either side, so an account's list includes incoming transfers.
+    pub account_id: Option<i64>,
+    pub category_id: Option<i64>,
+    pub payment_method_id: Option<i64>,
+    pub search: Option<&'a str>,
+}
+
+impl Filter<'_> {
+    fn values(&self) -> [&dyn ToSql; 7] {
+        [
+            &self.start,
+            &self.end,
+            &self.kind,
+            &self.account_id,
+            &self.category_id,
+            &self.payment_method_id,
+            &self.search,
+        ]
+    }
+}
+
+const WHERE: &str = r"WHERE date BETWEEN ?1 AND ?2
+       AND (?3 IS NULL OR kind = ?3)
+       AND (?4 IS NULL OR account_id = ?4 OR to_account_id = ?4)
+       AND (?5 IS NULL OR category_id = ?5)
+       AND (?6 IS NULL OR payment_method_id = ?6)
+       AND (?7 IS NULL OR payee LIKE ?7 ESCAPE '\' OR note LIKE ?7 ESCAPE '\')";
+
+/// The matching rows, newest first (TXN-3).
+pub fn page(conn: &Connection, f: &Filter, limit: u32, offset: i64) -> rusqlite::Result<Vec<Row>> {
+    let mut values = f.values().to_vec();
+    values.extend([&limit as &dyn ToSql, &offset]);
+    conn.prepare(&format!(
+        "{SELECT} {WHERE} ORDER BY date DESC, id DESC LIMIT ?8 OFFSET ?9"
+    ))?
+    .query_map(&*values, row)?
+    .collect()
+}
+
+/// The number of matching rows and their income and expense totals. Transfers count in neither.
+pub fn totals(conn: &Connection, f: &Filter) -> rusqlite::Result<(i64, i64, i64)> {
+    conn.query_row(
+        &format!(
+            "SELECT count(*),
+                    COALESCE(SUM(CASE kind WHEN 'income' THEN amount END), 0),
+                    COALESCE(SUM(CASE kind WHEN 'expense' THEN amount END), 0)
+             FROM transactions {WHERE}"
+        ),
+        &f.values()[..],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+    )
+}
+
+/// Income minus expense for each date with matching rows, newest first.
+pub fn day_nets(conn: &Connection, f: &Filter) -> rusqlite::Result<Vec<(String, i64)>> {
+    conn.prepare(&format!(
+        "SELECT date, SUM(CASE kind WHEN 'income' THEN amount WHEN 'expense' THEN -amount ELSE 0 END)
+         FROM transactions {WHERE} GROUP BY date ORDER BY date DESC"
+    ))?
+    .query_map(&f.values()[..], |r| Ok((r.get(0)?, r.get(1)?)))?
+    .collect()
 }
 
 /// The source account of the latest transaction whose source is an active non-card account.
