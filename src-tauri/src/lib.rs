@@ -7,6 +7,7 @@ pub mod db;
 pub mod domain;
 pub mod error;
 pub mod log;
+pub mod repo;
 pub mod services;
 pub mod state;
 #[cfg(test)]
@@ -28,6 +29,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::system::get_startup_status,
             commands::system::open_data_folder,
+            commands::settings::get_settings,
+            commands::settings::update_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the app");
