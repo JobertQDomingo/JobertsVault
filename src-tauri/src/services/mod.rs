@@ -6,6 +6,7 @@ use crate::error::AppError;
 
 pub mod accounts;
 pub mod categories;
+pub mod payment_methods;
 pub mod settings;
 pub mod system;
 
