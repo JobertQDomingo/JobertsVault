@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-04 |
-| **Current focus** | **Phase 1, 1.5: Transactions** |
+| **Current focus** | **Phase 1, 1.6: Dashboard backend** |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -18,7 +18,7 @@ This file is the progress tracker.
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
-| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 19 / 53 |
+| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 24 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
@@ -74,11 +74,11 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] Payment methods: list, create, edit, reorder, archive, unarchive, delete unused [TXN-7]
 
 ### 1.5 Transactions
-- [ ] Create, edit and delete income, expense and transfer, with every validation rule from DATA_MODEL §6, including rejecting future dates [TXN-1] [TXN-2]
-- [ ] Duplicate: the form opens pre-filled with today's date, and saving creates the copy [TXN-2]
-- [ ] The list: grouped by day, filters, search, pages of 100, with the summary and day totals from the backend. An account's list includes incoming transfers [TXN-3] [TXN-4]
-- [ ] `get_transaction_defaults` and `get_pay_bill_defaults` ([DATA_MODEL §5.8](docs/DATA_MODEL.md)) [TXN-1] [CC-9]
-- [ ] Card purchases, bill payments and refunds behave as specified, with service tests, including "a card payment never changes the expense total" [CC-3] [CC-4] [CC-5] [RPT-6]
+- [x] Create, edit and delete income, expense and transfer, with every validation rule from DATA_MODEL §6, including rejecting future dates [TXN-1] [TXN-2]
+- [x] Duplicate: the form opens pre-filled with today's date, and saving creates the copy [TXN-2]
+- [x] The list: grouped by day, filters, search, pages of 100, with the summary and day totals from the backend. An account's list includes incoming transfers [TXN-3] [TXN-4]
+- [x] `get_transaction_defaults` and `get_pay_bill_defaults` ([DATA_MODEL §5.8](docs/DATA_MODEL.md)) [TXN-1] [CC-9]
+- [x] Card purchases, bill payments and refunds behave as specified, with service tests, including "a card payment never changes the expense total" [CC-3] [CC-4] [CC-5] [RPT-6]
 
 ### 1.6 Dashboard backend
 - [ ] `get_period`, and `get_dashboard`: period, totals, balances, net balance, card summary, the 5 most recent transactions and `today`, all in one call [DSH-1] [DSH-2] [DSH-4] [DSH-5] [DSH-8]

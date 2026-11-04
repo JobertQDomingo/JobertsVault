@@ -54,6 +54,13 @@ pub fn run() {
             commands::payment_methods::archive_payment_method,
             commands::payment_methods::unarchive_payment_method,
             commands::payment_methods::delete_payment_method,
+            commands::transactions::list_transactions,
+            commands::transactions::get_transaction,
+            commands::transactions::create_transaction,
+            commands::transactions::update_transaction,
+            commands::transactions::delete_transaction,
+            commands::transactions::get_transaction_defaults,
+            commands::transactions::get_pay_bill_defaults,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the app");

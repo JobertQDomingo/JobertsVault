@@ -141,6 +141,17 @@ pub fn set_archived(
     )
 }
 
+/// The first active account by `sort_order`, leaving out credit cards unless `cards` is true.
+pub fn first_active(conn: &Connection, cards: bool) -> rusqlite::Result<Option<i64>> {
+    conn.query_row(
+        "SELECT id FROM accounts WHERE archived = 0 AND (?1 OR kind <> 'credit_card')
+         ORDER BY sort_order, id LIMIT 1",
+        [cards],
+        |r| r.get(0),
+    )
+    .optional()
+}
+
 pub fn active_count(conn: &Connection) -> rusqlite::Result<i64> {
     conn.query_row(
         "SELECT count(*) FROM accounts WHERE archived = 0",
