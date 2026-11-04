@@ -59,15 +59,20 @@ impl Default for Settings {
 pub struct SettingsView {
     #[serde(flatten)]
     pub settings: Settings,
-    /// `currency_decimals` can't change once any transaction exists (DATA_MODEL §1).
+    /// `currency_decimals` can't change once any amount is stored (DATA_MODEL §1).
     pub decimals_locked: bool,
 }
 
 pub fn get(conn: &Connection) -> Result<SettingsView, AppError> {
     Ok(SettingsView {
         settings: load(conn, |_| true)?,
-        decimals_locked: repo::transactions::any(conn)?,
+        decimals_locked: decimals_locked(conn)?,
     })
+}
+
+/// Changing the decimals would change the meaning of every stored amount (DATA_MODEL §1).
+fn decimals_locked(conn: &Connection) -> Result<bool, AppError> {
+    Ok(repo::transactions::any(conn)? || repo::accounts::any_with_amount(conn)?)
 }
 
 /// The stored rows whose key `wanted` picks, over the defaults.
@@ -100,7 +105,7 @@ pub fn update(conn: &mut Connection, mut settings: Settings) -> Result<SettingsV
         return Err(invalid("monthStartDay", "Choose a day from 1 to 28"));
     }
     let tx = conn.transaction()?;
-    let decimals_locked = repo::transactions::any(&tx)?;
+    let decimals_locked = decimals_locked(&tx)?;
     // Reads only the row the lock needs, so saving replaces any other bad row.
     if decimals_locked
         && settings.currency_decimals
@@ -108,7 +113,7 @@ pub fn update(conn: &mut Connection, mut settings: Settings) -> Result<SettingsV
     {
         return Err(invalid(
             "currencyDecimals",
-            "Decimal places can't change once there are transactions",
+            "Decimal places can't change once you've saved an amount",
         ));
     }
     for (key, value) in [
@@ -345,6 +350,38 @@ mod tests {
         let saved = update(&mut conn, same_decimals).unwrap();
         assert_eq!(saved.settings.week_start, WeekStart::Sunday);
         assert!(saved.decimals_locked);
+    }
+
+    #[test]
+    fn decimals_lock_once_an_account_holds_an_amount() {
+        let add = |conn: &Connection, values: &str| {
+            conn.execute(
+                &format!("INSERT INTO accounts (name, kind, opening_balance, credit_limit, statement_day, due_day, created_at, updated_at) VALUES {values}"),
+                [],
+            )
+            .unwrap();
+        };
+        let conn = db();
+        assert!(
+            !get(&conn).unwrap().decimals_locked,
+            "the seeded Cash holds 0"
+        );
+        add(
+            &conn,
+            "('Bank', 'bank', 100000, NULL, NULL, NULL, 'x', 'x')",
+        );
+        assert!(get(&conn).unwrap().decimals_locked);
+
+        let mut conn = db();
+        add(
+            &conn,
+            "('Visa', 'credit_card', 0, 5000000, 15, 5, 'x', 'x')",
+        );
+        let zero = Settings {
+            currency_decimals: 0,
+            ..Settings::default()
+        };
+        assert_eq!(field_of(update(&mut conn, zero)), "currencyDecimals");
     }
 
     #[test]

@@ -7,6 +7,6 @@ import type { WeekStart } from "./WeekStart";
  */
 export type SettingsView = { 
 /**
- * `currency_decimals` can't change once any transaction exists (DATA_MODEL §1).
+ * `currency_decimals` can't change once any amount is stored (DATA_MODEL §1).
  */
 decimalsLocked: boolean, currencySymbol: string, currencyPosition: CurrencyPosition, currencyDecimals: 0 | 2, weekStart: WeekStart, monthStartDay: number, showPaymentMethod: boolean, onboardingCompleted: boolean, autoUpdateEnabled: boolean, };

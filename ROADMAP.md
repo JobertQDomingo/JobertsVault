@@ -60,7 +60,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] Domain: credit card statement cycle and next due date, with tests (DATA_MODEL §5.5)
 
 ### 1.2 Settings
-- [x] Commands `get_settings` and `update_settings`: currency (₱ default), symbol position, decimals (locked once any transaction exists), week start, month start day, payment method field, `onboarding_completed`, `auto_update_enabled` [SET-1] [SET-2] [SET-6] [ONB-1] [UPD-3]
+- [x] Commands `get_settings` and `update_settings`: currency (₱ default), symbol position, decimals (locked once any amount is stored), week start, month start day, payment method field, `onboarding_completed`, `auto_update_enabled` [SET-1] [SET-2] [SET-6] [ONB-1] [UPD-3]
 
 ### 1.3 Accounts
 - [ ] Create, edit, list and reorder accounts, with opening balances of 0 or more [ACC-1] [ACC-2]
