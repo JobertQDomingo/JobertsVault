@@ -9,6 +9,8 @@ export function useUpdateSettings() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: updateSettings,
+    // One at a time: each save sends the whole set, so an older one must never land last.
+    scope: { id: "settings" },
     onSuccess: (saved) => {
       client.setQueryData(queryKeys.settings, saved);
       // The week start and month start day change the totals (ARCHITECTURE §5.2).
