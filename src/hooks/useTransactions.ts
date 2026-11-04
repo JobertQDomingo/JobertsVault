@@ -1,4 +1,8 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import type { TransactionFilter } from "@/bindings/TransactionFilter";
 import {
   createTransaction,
@@ -42,4 +46,11 @@ export const usePayBillDefaults = (cardId: number) =>
 
 export const useCreateTransaction = () => useLedgerMutation(createTransaction);
 export const useUpdateTransaction = () => useLedgerMutation(updateTransaction);
-export const useDeleteTransaction = () => useLedgerMutation(deleteTransaction);
+/** Drops the deleted row's query before the ledger refresh, so it isn't fetched again. */
+export const useDeleteTransaction = () => {
+  const client = useQueryClient();
+  return useLedgerMutation(async (id: number) => {
+    await deleteTransaction(id);
+    client.removeQueries({ queryKey: queryKeys.transaction(id) });
+  });
+};

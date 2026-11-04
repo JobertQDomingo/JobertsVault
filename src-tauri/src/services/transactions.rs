@@ -318,8 +318,9 @@ fn validate(
         return Err(invalid("amount", "That amount is too large"));
     }
     let date = parse_date(&f.date)
-        // Parsing also takes "2026-1-5"; only the stored form is accepted.
-        .filter(|d| d.to_string() == f.date)
+        // Parsing also takes "2026-1-5" and "-0001-01-01"; only the stored YYYY-MM-DD form is
+        // accepted, which the column's CHECK requires.
+        .filter(|d| f.date.len() == 10 && d.to_string() == f.date)
         .ok_or_else(|| invalid("date", "Enter a real date"))?;
     // Phases 1–2 only: Phase 3 allows future dates (TXN-8).
     if date > today {
@@ -334,13 +335,9 @@ fn validate(
         return Err(invalid("note", "Enter up to 500 characters"));
     }
     let kept = |pick: fn(&Transaction) -> Option<i64>| stored.and_then(pick);
-    check_account(
-        conn,
-        "accountId",
-        f.account_id,
-        kept(|s| Some(s.account_id)),
-        today,
-    )?;
+    // An account the edited row uses on either side stays usable, so a transfer can be reversed.
+    let uses = |id: i64| stored.is_some_and(|s| s.account_id == id || s.to_account_id == Some(id));
+    check_account(conn, "accountId", f.account_id, uses(f.account_id), today)?;
     if f.kind == TransactionKind::Transfer {
         for (field, present) in [
             ("categoryId", f.category_id.is_some()),
@@ -357,7 +354,7 @@ fn validate(
         if to == f.account_id {
             return Err(invalid("toAccountId", "Choose a different account"));
         }
-        return check_account(conn, "toAccountId", to, kept(|s| s.to_account_id), today);
+        return check_account(conn, "toAccountId", to, uses(to), today);
     }
     if f.to_account_id.is_some() {
         return Err(invalid("toAccountId", "Only a transfer has this field"));
@@ -366,7 +363,7 @@ fn validate(
         .category_id
         .ok_or_else(|| invalid("categoryId", "Choose a category"))?;
     let category = repo::categories::find(conn, category_id)?
-        .ok_or_else(|| not_found("category", category_id))?;
+        .ok_or_else(|| invalid("categoryId", "This category no longer exists"))?;
     if category.kind != kind_text(f.kind) {
         return Err(invalid(
             "categoryId",
@@ -378,7 +375,7 @@ fn validate(
     }
     if let Some(method_id) = f.payment_method_id {
         let method = repo::payment_methods::find(conn, method_id)?
-            .ok_or_else(|| not_found("payment method", method_id))?;
+            .ok_or_else(|| invalid("paymentMethodId", "This payment method no longer exists"))?;
         if method.archived && kept(|s| s.payment_method_id) != Some(method_id) {
             return Err(invalid(
                 "paymentMethodId",
@@ -389,16 +386,17 @@ fn validate(
     Ok(())
 }
 
-/// The account must exist, and be active unless the edited row already uses it there.
+/// The account must exist, and be active unless the edited row already uses it.
 fn check_account(
     conn: &Connection,
     field: &str,
     id: i64,
-    kept: Option<i64>,
+    kept: bool,
     today: NaiveDate,
 ) -> Result<(), AppError> {
-    let account = repo::accounts::find(conn, id, today)?.ok_or_else(|| not_found("account", id))?;
-    if account.archived && kept != Some(id) {
+    let account = repo::accounts::find(conn, id, today)?
+        .ok_or_else(|| invalid(field, "This account no longer exists"))?;
+    if account.archived && !kept {
         return Err(invalid(field, "This account is archived"));
     }
     Ok(())
@@ -672,7 +670,7 @@ mod tests {
     fn the_date_must_be_real_and_not_in_the_future() {
         let mut conn = db();
         let cash = cash(&conn);
-        for bad in ["2026-02-30", "2026-1-5", "x", ""] {
+        for bad in ["2026-02-30", "2026-1-5", "x", "", "-0001-01-01"] {
             let fields = TransactionFields {
                 date: bad.into(),
                 ..expense(&conn, 100, cash)
@@ -903,21 +901,52 @@ mod tests {
             delete(&mut conn, 99),
             Err(AppError::NotFound { .. })
         ));
-        assert!(matches!(
-            {
-                let f = expense(&conn, 100, 99);
-                create(&mut conn, f, now())
-            },
-            Err(AppError::NotFound { .. })
-        ));
-        let missing_category = TransactionFields {
+    }
+
+    #[test]
+    fn a_record_that_no_longer_exists_is_an_error_on_its_field() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        let gone_account = {
+            let f = expense(&conn, 100, 99);
+            create(&mut conn, f, now())
+        };
+        assert_eq!(field_of(gone_account), "accountId");
+        assert_eq!(
+            field_of(create(&mut conn, transfer(100, cash, 99), now())),
+            "toAccountId"
+        );
+        let gone_category = TransactionFields {
             category_id: Some(999),
             ..expense(&conn, 100, cash)
         };
-        assert!(matches!(
-            create(&mut conn, missing_category, now()),
-            Err(AppError::NotFound { .. })
-        ));
+        assert_eq!(
+            field_of(create(&mut conn, gone_category, now())),
+            "categoryId"
+        );
+        let gone_method = TransactionFields {
+            payment_method_id: Some(999),
+            ..expense(&conn, 100, cash)
+        };
+        assert_eq!(
+            field_of(create(&mut conn, gone_method, now())),
+            "paymentMethodId"
+        );
+    }
+
+    #[test]
+    fn an_edit_keeps_an_archived_account_it_uses_on_either_side() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        let old = bank(&mut conn, "Old bank", 10_000);
+        let out = create(&mut conn, transfer(1_000, old, cash), now()).unwrap();
+        let into = create(&mut conn, transfer(1_000, cash, old), now()).unwrap();
+        accounts::archive(&mut conn, old, true, now()).unwrap();
+        // Fixing the direction keeps the same two accounts.
+        assert!(update(&mut conn, out.id, transfer(1_000, cash, old), now()).is_ok());
+        // So does turning it into an expense on the account it used to receive.
+        let f = expense(&conn, 1_000, old);
+        assert!(update(&mut conn, into.id, f, now()).is_ok());
     }
 
     #[test]
