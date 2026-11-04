@@ -449,7 +449,7 @@ monthly_needed = (target_amount − progress) ÷ months left until target_date  
 | Used for | Rule |
 |---|---|
 | **Quick-add (TXN-1)** | `last_used_account_id`, which is updated whenever a transaction is created. If it's missing or the account is archived or deleted, use the first active account by `sort_order`. |
-| **Pay bill's From account (CC-9)** | The active non-card account on the latest transaction (`date DESC, id DESC`). If there is none, the first active non-card account by `sort_order`. If there's no such account, the field starts empty. |
+| **Pay bill's From account (CC-9)** | The active non-card account on the latest transaction (`date DESC, id DESC`), going by each transaction's source `account_id`. If there is none, the first active non-card account by `sort_order`. If there's no such account, the field starts empty. |
 | **Pay bill's amount (CC-9)** | The card's `amount_owed`. If that's 0, the field starts empty. |
 
 ---
@@ -582,3 +582,4 @@ Answered on 2026-11-03:
 Answered on 2026-11-04:
 
 12. **The decimals lock** covers every stored amount, not only transactions: an account's opening balance other than 0, or a credit limit, locks `currency_decimals` too, because changing it would reinterpret those amounts (§1). The seeded Cash account holds 0, so a new database starts unlocked. ADR 0002's rule still holds, since a transaction still locks it.
+13. **Pay bill's From account** goes by each transaction's source `account_id`: the latest transaction whose source is an active non-card account. A transfer's destination doesn't count as using that account (§5.8).
