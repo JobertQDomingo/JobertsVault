@@ -1,6 +1,7 @@
 pub mod accounts;
 pub mod categories;
 pub mod payment_methods;
+pub mod period;
 pub mod settings;
 pub mod system;
 pub mod transactions;
