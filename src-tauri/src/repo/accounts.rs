@@ -21,8 +21,8 @@ pub struct Values<'a> {
     pub name: &'a str,
     pub opening_balance: i64,
     pub credit_limit: Option<i64>,
-    pub statement_day: Option<u8>,
-    pub due_day: Option<u8>,
+    pub statement_day: Option<i64>,
+    pub due_day: Option<i64>,
 }
 
 /// `?1` is the as-of date: later transactions don't count.

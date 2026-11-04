@@ -32,9 +32,12 @@ pub struct AccountFields {
     pub opening_balance: Money,
     /// Credit card only, like the two days (CC-1).
     pub credit_limit: Option<Money>,
-    /// 1–31; a shorter month uses its last day.
-    pub statement_day: Option<u8>,
-    pub due_day: Option<u8>,
+    /// 1–31; a shorter month uses its last day. Any integer arrives, so validation can name the
+    /// field instead of the argument decoding failing.
+    #[ts(type = "number | null")]
+    pub statement_day: Option<i64>,
+    #[ts(type = "number | null")]
+    pub due_day: Option<i64>,
 }
 
 #[derive(Clone, Debug, Deserialize, TS)]
@@ -160,12 +163,19 @@ pub fn update(
 /// Gives each account in `ids` its position as `sort_order` (UI_FLOWS §5.1).
 pub fn reorder(conn: &mut Connection, ids: Vec<i64>, now: DateTime<Local>) -> Result<(), AppError> {
     let mut seen = HashSet::new();
-    if !ids.iter().all(|id| seen.insert(id)) {
+    if !ids.iter().all(|id| seen.insert(*id)) {
         return Err(invalid("ids", "Each account can appear only once"));
     }
     let tx = conn.transaction()?;
+    // Accounts left out (e.g. archived ones the list doesn't drag) follow in their old order,
+    // so no two accounts share a position.
+    let rest: Vec<i64> = repo::accounts::all(&tx, now.date_naive())?
+        .into_iter()
+        .map(|row| row.id)
+        .filter(|id| !seen.contains(id))
+        .collect();
     let now = stamp(now);
-    for (order, id) in (0_i64..).zip(ids) {
+    for (order, id) in (0_i64..).zip(ids.into_iter().chain(rest)) {
         if repo::accounts::set_sort_order(&tx, id, order, &now)? == 0 {
             return Err(not_found(id));
         }
@@ -762,7 +772,7 @@ mod tests {
     #[test]
     fn a_limit_is_1_to_the_largest_amount_and_days_are_1_to_31() {
         let mut conn = db();
-        let with = |limit: i64, statement: u8, due: u8| {
+        let with = |limit: i64, statement: i64, due: i64| {
             let mut input = card("Visa", 0);
             input.fields.credit_limit = Some(Money(limit));
             input.fields.statement_day = Some(statement);
@@ -1019,5 +1029,48 @@ mod tests {
         not_found(archive(&mut conn, 99, true, now()));
         not_found(unarchive(&mut conn, 99, now()));
         not_found(delete(&mut conn, 99));
+    }
+
+    #[test]
+    fn reordering_some_accounts_puts_the_rest_after_them_in_their_old_order() {
+        let mut conn = db();
+        let bank = add(&mut conn, "Bank");
+        let old = add(&mut conn, "Old");
+        let wallet = add(&mut conn, "Wallet");
+        archive(&mut conn, old.id, false, now()).unwrap();
+        // The list screen only drags the active accounts.
+        reorder(&mut conn, vec![wallet.id, 1, bank.id], now()).unwrap();
+        let order: Vec<(String, i64)> = list(&conn, today())
+            .unwrap()
+            .accounts
+            .into_iter()
+            .map(|a| (a.name, a.sort_order))
+            .collect();
+        assert_eq!(
+            order,
+            [
+                ("Wallet".into(), 0),
+                ("Cash".into(), 1),
+                ("Bank".into(), 2),
+                ("Old".into(), 3)
+            ]
+        );
+    }
+
+    #[test]
+    fn days_outside_1_to_31_get_a_field_error_whatever_the_number() {
+        let mut conn = db();
+        for bad in [-1, 300, i64::MAX] {
+            let mut input = card("Visa", 0);
+            input.fields.statement_day = Some(bad);
+            assert_eq!(
+                field_of(create(&mut conn, input, now())),
+                "statementDay",
+                "{bad}"
+            );
+            let mut input = card("Visa", 0);
+            input.fields.due_day = Some(bad);
+            assert_eq!(field_of(create(&mut conn, input, now())), "dueDay", "{bad}");
+        }
     }
 }

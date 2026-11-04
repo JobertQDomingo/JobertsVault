@@ -14,6 +14,7 @@ openingBalance: Money,
  */
 creditLimit: Money | null, 
 /**
- * 1–31; a shorter month uses its last day.
+ * 1–31; a shorter month uses its last day. Any integer arrives, so validation can name the
+ * field instead of the argument decoding failing.
  */
 statementDay: number | null, dueDay: number | null, };
