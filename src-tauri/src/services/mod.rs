@@ -10,6 +10,7 @@ pub mod payment_methods;
 pub mod period;
 pub mod settings;
 pub mod system;
+pub mod transactions;
 
 /// A Validation error on `field`, the camelCase name the form uses for `setError`.
 fn invalid(field: &str, message: &str) -> AppError {
