@@ -1,4 +1,4 @@
-use chrono::{Datelike, Days, NaiveDate, Weekday};
+use chrono::{Datelike, Days, NaiveDate, TimeDelta, Weekday};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PeriodKind {
@@ -76,6 +76,23 @@ impl Period {
     /// `None` when the next period would start after `today` (DATA_MODEL §5.3).
     pub fn next(&self, settings: &PeriodSettings, today: NaiveDate) -> Option<Period> {
         self.step(true, settings).filter(|next| next.start <= today)
+    }
+
+    /// The period in the same sequence as this one that contains `date`, for the Today button.
+    /// A custom range moves by whole range lengths, so it lands where `next` stops.
+    pub fn in_sequence(&self, date: NaiveDate, settings: &PeriodSettings) -> Option<Period> {
+        if self.kind != PeriodKind::Custom {
+            return Period::containing(self.kind, date, settings);
+        }
+        let length = (self.end - self.start).num_days() + 1;
+        let steps = (date - self.start).num_days().div_euclid(length);
+        let start = self
+            .start
+            .checked_add_signed(TimeDelta::try_days(steps.checked_mul(length)?)?)?;
+        Period::custom(
+            start,
+            start.checked_add_days(Days::new(length.unsigned_abs() - 1))?,
+        )
     }
 
     fn step(&self, forward: bool, settings: &PeriodSettings) -> Option<Period> {
@@ -371,6 +388,60 @@ mod tests {
         assert_eq!(october.next(&MONDAY_1, today), None);
         let september = october.previous(&MONDAY_1).unwrap();
         assert_eq!(september.next(&MONDAY_1, today), Some(october));
+    }
+
+    #[test]
+    fn today_finds_the_custom_range_that_contains_it() {
+        let p = Period::custom(d(2026, 10, 1), d(2026, 10, 10)).unwrap();
+        let at = |date| span(p.in_sequence(date, &MONDAY_1).unwrap());
+        assert_eq!(at(d(2026, 10, 26)), (d(2026, 10, 21), d(2026, 10, 30)));
+        assert_eq!(at(d(2026, 10, 10)), (d(2026, 10, 1), d(2026, 10, 10)));
+        assert_eq!(at(d(2026, 10, 11)), (d(2026, 10, 11), d(2026, 10, 20)));
+        assert_eq!(
+            p.in_sequence(d(2026, 10, 26), &MONDAY_1).unwrap().kind,
+            PeriodKind::Custom
+        );
+    }
+
+    #[test]
+    fn today_moves_a_future_custom_range_back() {
+        let p = Period::custom(d(2026, 11, 1), d(2026, 11, 10)).unwrap();
+        assert_eq!(
+            span(p.in_sequence(d(2026, 10, 26), &MONDAY_1).unwrap()),
+            (d(2026, 10, 22), d(2026, 10, 31))
+        );
+    }
+
+    #[test]
+    fn today_is_where_next_stops() {
+        let today = d(2026, 10, 26);
+        let mut p = Period::custom(d(2026, 10, 1), d(2026, 10, 10)).unwrap();
+        while let Some(next) = p.next(&MONDAY_1, today) {
+            p = next;
+        }
+        assert_eq!(p.in_sequence(today, &MONDAY_1), Some(p));
+    }
+
+    #[test]
+    fn today_for_anchored_kinds_is_the_containing_period() {
+        let s25 = settings(Weekday::Mon, 25);
+        let old = Period::containing(PeriodKind::Month, d(2025, 3, 1), &s25).unwrap();
+        assert_eq!(
+            span(old.in_sequence(d(2026, 10, 10), &s25).unwrap()),
+            (d(2026, 9, 25), d(2026, 10, 24))
+        );
+    }
+
+    #[test]
+    fn in_sequence_at_the_calendar_limit_is_none() {
+        // Oct 1–10's range around MAX ends on MAX exactly; a day later, it would end past it.
+        let fits = Period::custom(d(2026, 10, 1), d(2026, 10, 10)).unwrap();
+        assert_eq!(
+            fits.in_sequence(NaiveDate::MAX, &MONDAY_1).unwrap().end,
+            NaiveDate::MAX
+        );
+        let past = Period::custom(d(2026, 10, 2), d(2026, 10, 11)).unwrap();
+        assert_eq!(past.in_sequence(NaiveDate::MAX, &MONDAY_1), None);
     }
 
     #[test]

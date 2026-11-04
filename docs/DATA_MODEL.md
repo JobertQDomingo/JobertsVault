@@ -402,6 +402,7 @@ Every period is a closed date range `[start, end]` that includes both ends. Give
 - **The year is always the calendar year**, even when `month_start_day` isn't 1.
 - **Previous and next** are found by moving the anchor date by one period length (one day, 7 days, one month or one year) and recalculating. There is no next period when it would start after today.
 - **Custom** has no anchor. Previous and next move both dates by the length of the range, counting both ends. For example, Oct 1–10 (10 days) has Sep 21–30 before it and Oct 11–20 after it. The comparison in §5.4 uses this same previous range.
+- **Today** goes to the period of the same kind that contains today. For Custom, that's the range in the same sequence (moved by whole range lengths, backward too) that contains today, which is where ▶ stops. For example, from Oct 1–10 with today Nov 3, Today goes to Oct 31–Nov 9.
 
 ### 5.4 Period comparison (RPT-4a)
 
@@ -583,3 +584,4 @@ Answered on 2026-11-04:
 
 12. **The decimals lock** covers every stored amount, not only transactions: an account's opening balance other than 0, or a credit limit, locks `currency_decimals` too, because changing it would reinterpret those amounts (§1). The seeded Cash account holds 0, so a new database starts unlocked. ADR 0002's rule still holds, since a transaction still locks it.
 13. **Pay bill's From account** goes by each transaction's source `account_id`: the latest transaction whose source is an active non-card account. A transfer's destination doesn't count as using that account (§5.8).
+14. **Today on a Custom period** jumps to the range in the same sequence that contains today, which is where ▶ stops (§5.3).

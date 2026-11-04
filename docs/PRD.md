@@ -4,7 +4,7 @@
 |---|---|
 | **App name** | Jobert's Vault |
 | **Status** | Approved v1.1 |
-| **Last updated** | 2026-11-03 |
+| **Last updated** | 2026-11-04 |
 | **Platform** | Windows desktop app built with Tauri 2: React + TypeScript frontend, Rust backend, SQLite database |
 
 ---
@@ -346,6 +346,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-03 | The update check at startup gives up after 3 seconds, rather than NBSBuddy's 8, to keep startup fast |
 | 2026-11-03 | NBSBuddy's "What's new" tour and download page are not part of the MVP |
 | 2026-11-03 | The preset expense categories follow DATA_MODEL §7's order: the 12 common ones first, then the 5 rarely used ones (so Personal Care comes before Education) |
+| 2026-11-04 | Today on a Custom period jumps to the range, in the same sequence, that contains today, which is where ▶ stops (DATA_MODEL §5.3) |
 
 ---
 

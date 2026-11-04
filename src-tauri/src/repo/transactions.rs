@@ -171,6 +171,15 @@ pub fn day_nets(conn: &Connection, f: &Filter) -> rusqlite::Result<Vec<(String, 
     .collect()
 }
 
+/// The `limit` newest transactions dated `as_of` or earlier, newest first.
+pub fn recent(conn: &Connection, as_of: &str, limit: u32) -> rusqlite::Result<Vec<Row>> {
+    conn.prepare(&format!(
+        "{SELECT} WHERE date <= ?1 ORDER BY date DESC, id DESC LIMIT ?2"
+    ))?
+    .query_map(params![as_of, limit], row)?
+    .collect()
+}
+
 /// The source account of the latest transaction whose source is an active non-card account.
 pub fn latest_non_card_source(conn: &Connection) -> rusqlite::Result<Option<i64>> {
     conn.query_row(
