@@ -4,6 +4,7 @@ use ts_rs::TS;
 
 use crate::error::AppError;
 use crate::repo;
+use crate::services::invalid;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
@@ -208,13 +209,6 @@ fn decimals_ok(decimals: u8) -> bool {
 /// Capped at 28 so every month has that day (DATA_MODEL §3.5).
 fn month_start_day_ok(day: u8) -> bool {
     (1..=28).contains(&day)
-}
-
-fn invalid(field: &str, message: &str) -> AppError {
-    AppError::Validation {
-        field: field.into(),
-        message: message.into(),
-    }
 }
 
 #[cfg(test)]

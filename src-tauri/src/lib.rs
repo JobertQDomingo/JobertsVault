@@ -31,6 +31,11 @@ pub fn run() {
             commands::system::open_data_folder,
             commands::settings::get_settings,
             commands::settings::update_settings,
+            commands::accounts::list_accounts,
+            commands::accounts::get_account,
+            commands::accounts::create_account,
+            commands::accounts::update_account,
+            commands::accounts::reorder_accounts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running the app");
