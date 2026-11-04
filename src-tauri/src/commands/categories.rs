@@ -46,3 +46,19 @@ pub fn unarchive_category(state: State<'_, AppState>, id: i64) -> Result<(), App
     services::categories::unarchive(&mut *state.conn()?, id, chrono::Local::now())
         .inspect_err(|err| log::record(&state.log_path, err))
 }
+
+#[tauri::command(async)]
+pub fn delete_category(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
+    services::categories::delete(&mut *state.conn()?, id)
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+#[tauri::command(async)]
+pub fn merge_categories(
+    state: State<'_, AppState>,
+    from_id: i64,
+    into_id: i64,
+) -> Result<(), AppError> {
+    services::categories::merge(&mut *state.conn()?, from_id, into_id, chrono::Local::now())
+        .inspect_err(|err| log::record(&state.log_path, err))
+}

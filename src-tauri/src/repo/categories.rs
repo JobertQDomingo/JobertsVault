@@ -108,3 +108,22 @@ pub fn active_count(conn: &Connection, kind: &str) -> rusqlite::Result<i64> {
         |r| r.get(0),
     )
 }
+
+pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<()> {
+    conn.execute("DELETE FROM categories WHERE id = ?1", [id])?;
+    Ok(())
+}
+
+/// Gives every transaction of `from` the category `into`.
+pub fn move_transactions(
+    conn: &Connection,
+    from: i64,
+    into: i64,
+    now: &str,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE transactions SET category_id = ?2, updated_at = ?3 WHERE category_id = ?1",
+        params![from, into, now],
+    )?;
+    Ok(())
+}

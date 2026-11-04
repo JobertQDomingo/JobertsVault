@@ -168,6 +168,52 @@ pub fn unarchive(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result
     Ok(())
 }
 
+/// Only a category no transaction uses can go; any other is archived or merged (CAT-4).
+pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
+    let tx = conn.transaction()?;
+    let row = stored(&tx, id)?;
+    if row.transaction_count > 0 {
+        return Err(AppError::Conflict {
+            message: "This category has transactions, so it can only be archived or merged".into(),
+        });
+    }
+    if !row.archived {
+        check_not_last_active(&tx, &row.kind)?;
+    }
+    repo::categories::delete(&tx, id)?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Moves every transaction of `from_id` to the active category `into_id` of the same kind, then
+/// deletes `from_id`, as one change (DATA_MODEL §3.2, UI_FLOWS F7).
+pub fn merge(
+    conn: &mut Connection,
+    from_id: i64,
+    into_id: i64,
+    now: DateTime<Local>,
+) -> Result<(), AppError> {
+    let tx = conn.transaction()?;
+    let from = stored(&tx, from_id)?;
+    let into = stored(&tx, into_id)?;
+    if from_id == into_id {
+        return Err(invalid("intoId", "Choose a different category"));
+    }
+    if into.kind != from.kind {
+        return Err(invalid(
+            "intoId",
+            &format!("Choose an {} category", from.kind),
+        ));
+    }
+    if into.archived {
+        return Err(invalid("intoId", "Choose an active category"));
+    }
+    repo::categories::move_transactions(&tx, from_id, into_id, &stamp(now))?;
+    repo::categories::delete(&tx, from_id)?;
+    tx.commit()?;
+    Ok(())
+}
+
 fn get(conn: &Connection, id: i64) -> Result<Category, AppError> {
     view(stored(conn, id)?)
 }
@@ -585,5 +631,108 @@ mod tests {
         assert_eq!(find(&conn, FOOD).transaction_count, 2);
         assert_eq!(find(&conn, SALARY).transaction_count, 1);
         assert_eq!(find(&conn, DINING).transaction_count, 0);
+    }
+
+    fn gone(conn: &Connection, id: i64) -> bool {
+        list(conn).unwrap().categories.iter().all(|c| c.id != id)
+    }
+
+    #[test]
+    fn an_unused_category_can_be_deleted() {
+        let mut conn = db();
+        delete(&mut conn, FOOD).unwrap();
+        assert!(gone(&conn, FOOD));
+    }
+
+    #[test]
+    fn a_category_with_transactions_can_only_be_archived_or_merged() {
+        let mut conn = db();
+        txn(&conn, FOOD);
+        let message = conflict(delete(&mut conn, FOOD));
+        assert!(message.contains("merged"), "{message}");
+        assert!(!gone(&conn, FOOD));
+    }
+
+    #[test]
+    fn the_last_active_category_of_a_kind_cannot_be_deleted() {
+        let mut conn = db();
+        for id in 3..=7 {
+            delete(&mut conn, id).unwrap();
+        }
+        archive(&mut conn, BONUS, now()).unwrap();
+        assert_eq!(
+            conflict(delete(&mut conn, SALARY)),
+            "Keep at least one active income category"
+        );
+        // An archived one can still go, since Salary stays active.
+        delete(&mut conn, BONUS).unwrap();
+        assert!(!gone(&conn, SALARY));
+    }
+
+    fn stamps_of(conn: &Connection, category: i64) -> Vec<String> {
+        conn.prepare("SELECT updated_at FROM transactions WHERE category_id = ?1 ORDER BY id")
+            .unwrap()
+            .query_map([category], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap()
+    }
+
+    #[test]
+    fn merge_moves_every_transaction_and_deletes_the_source() {
+        let mut conn = db();
+        txn(&conn, DINING);
+        for _ in 0..3 {
+            txn(&conn, FOOD);
+        }
+        let later = now() + chrono::Duration::days(1);
+        merge(&mut conn, FOOD, DINING, later).unwrap();
+        assert!(gone(&conn, FOOD));
+        assert_eq!(find(&conn, DINING).transaction_count, 4);
+        let moved = stamp(later);
+        assert_eq!(
+            stamps_of(&conn, DINING),
+            ["x", moved.as_str(), moved.as_str(), moved.as_str()],
+            "only the moved rows change"
+        );
+    }
+
+    #[test]
+    fn merge_rejects_itself_other_kinds_and_archived_targets() {
+        let mut conn = db();
+        txn(&conn, FOOD);
+        archive(&mut conn, DINING, now()).unwrap();
+        for into in [FOOD, SALARY, DINING] {
+            assert_eq!(
+                field_of(merge(&mut conn, FOOD, into, now())),
+                "intoId",
+                "{into}"
+            );
+        }
+        assert_eq!(find(&conn, FOOD).transaction_count, 1, "nothing moved");
+    }
+
+    #[test]
+    fn an_archived_category_can_be_merged() {
+        let mut conn = db();
+        txn(&conn, FOOD);
+        archive(&mut conn, FOOD, now()).unwrap();
+        merge(&mut conn, FOOD, DINING, now()).unwrap();
+        assert!(gone(&conn, FOOD));
+        assert_eq!(find(&conn, DINING).transaction_count, 1);
+    }
+
+    #[test]
+    fn delete_and_merge_of_a_missing_category_are_not_found() {
+        let mut conn = db();
+        let not_found = |result: Result<(), AppError>| {
+            assert!(
+                matches!(result, Err(AppError::NotFound { id: 99, .. })),
+                "{result:?}"
+            );
+        };
+        not_found(delete(&mut conn, 99));
+        not_found(merge(&mut conn, 99, DINING, now()));
+        not_found(merge(&mut conn, FOOD, 99, now()));
     }
 }
