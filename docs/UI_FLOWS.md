@@ -213,7 +213,7 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 
 | Tab | Contents | PRD |
 |---|---|---|
-| **General** | Currency symbol, its position (before or after the amount), decimal places (**locked** once any transaction exists, with an explanation), first day of week, month start day (1–28), show payment method field. **Updates:** the current version, **Check for updates** and a switch, "Install updates automatically when the app starts" | SET-1, SET-2, SET-6, UPD-3 |
+| **General** | Currency symbol, its position (before or after the amount), decimal places (**locked** once any amount is saved, with an explanation), first day of week, month start day (1–28), show payment method field. **Updates:** the current version, **Check for updates** and a switch, "Install updates automatically when the app starts" | SET-1, SET-2, SET-6, UPD-3 |
 | **Categories** | Two lists (Income and Expense). Add, rename, change color (12 swatches) and icon (curated list), reorder, archive, unarchive, **merge**, delete if unused | CAT-2, CAT-4 |
 | **Payment methods** | Add, rename, reorder, archive, unarchive, delete if unused | TXN-7 |
 | **Backup** (Phase 2) | See §8.1 | BAK-* |

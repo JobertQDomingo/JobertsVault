@@ -265,7 +265,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 - [ ] A refund on the card lowers the amount owed and counts as income.
 - [ ] I can manage categories and payment methods: add, edit, reorder, archive, unarchive and delete unused ones, plus merge categories.
 - [ ] Archiving an account with a balance other than 0 shows a warning, and my last active account can't be archived or deleted.
-- [ ] Settings for currency, week start, month start day and the payment method field work, and decimals lock once a transaction exists.
+- [ ] Settings for currency, week start, month start day and the payment method field work, and decimals lock once an amount is saved.
 - [ ] The first-launch form works, can be skipped, and comes back only if the app was closed before finishing it.
 - [ ] The app follows the Windows light or dark setting, and stays readable with Windows transparency effects off.
 - [ ] Cold start takes under 2 s, and the dashboard and transaction list load in under 300 ms with 50,000 test transactions.

@@ -59,24 +59,34 @@ impl Default for Settings {
 pub struct SettingsView {
     #[serde(flatten)]
     pub settings: Settings,
-    /// `currency_decimals` can't change once any transaction exists (DATA_MODEL §1).
+    /// `currency_decimals` can't change once any amount is stored (DATA_MODEL §1).
     pub decimals_locked: bool,
 }
 
 pub fn get(conn: &Connection) -> Result<SettingsView, AppError> {
+    Ok(SettingsView {
+        settings: load(conn, |_| true)?,
+        decimals_locked: decimals_locked(conn)?,
+    })
+}
+
+/// Changing the decimals would change the meaning of every stored amount (DATA_MODEL §1).
+fn decimals_locked(conn: &Connection) -> Result<bool, AppError> {
+    Ok(repo::transactions::any(conn)? || repo::accounts::any_with_amount(conn)?)
+}
+
+/// The stored rows whose key `wanted` picks, over the defaults.
+fn load(conn: &Connection, wanted: impl Fn(&str) -> bool) -> Result<Settings, AppError> {
     let mut settings = Settings::default();
     for (key, value) in repo::settings::all(conn)? {
-        if read(&mut settings, &key, &value).is_none() {
+        if wanted(&key) && read(&mut settings, &key, &value).is_none() {
             // Never the value itself: Database errors go to the log (ARCHITECTURE §4.4).
             return Err(AppError::Database {
                 message: format!("The setting {key} has an invalid value"),
             });
         }
     }
-    Ok(SettingsView {
-        settings,
-        decimals_locked: repo::transactions::any(conn)?,
-    })
+    Ok(settings)
 }
 
 /// Saves every key at once: the form sends the whole set each time a field changes.
@@ -95,11 +105,15 @@ pub fn update(conn: &mut Connection, mut settings: Settings) -> Result<SettingsV
         return Err(invalid("monthStartDay", "Choose a day from 1 to 28"));
     }
     let tx = conn.transaction()?;
-    let current = get(&tx)?;
-    if current.decimals_locked && settings.currency_decimals != current.settings.currency_decimals {
+    let decimals_locked = decimals_locked(&tx)?;
+    // Reads only the row the lock needs, so saving replaces any other bad row.
+    if decimals_locked
+        && settings.currency_decimals
+            != load(&tx, |key| key == "currency_decimals")?.currency_decimals
+    {
         return Err(invalid(
             "currencyDecimals",
-            "Decimal places can't change once there are transactions",
+            "Decimal places can't change once you've saved an amount",
         ));
     }
     for (key, value) in [
@@ -129,7 +143,7 @@ pub fn update(conn: &mut Connection, mut settings: Settings) -> Result<SettingsV
     tx.commit()?;
     Ok(SettingsView {
         settings,
-        decimals_locked: current.decimals_locked,
+        decimals_locked,
     })
 }
 
@@ -339,6 +353,38 @@ mod tests {
     }
 
     #[test]
+    fn decimals_lock_once_an_account_holds_an_amount() {
+        let add = |conn: &Connection, values: &str| {
+            conn.execute(
+                &format!("INSERT INTO accounts (name, kind, opening_balance, credit_limit, statement_day, due_day, created_at, updated_at) VALUES {values}"),
+                [],
+            )
+            .unwrap();
+        };
+        let conn = db();
+        assert!(
+            !get(&conn).unwrap().decimals_locked,
+            "the seeded Cash holds 0"
+        );
+        add(
+            &conn,
+            "('Bank', 'bank', 100000, NULL, NULL, NULL, 'x', 'x')",
+        );
+        assert!(get(&conn).unwrap().decimals_locked);
+
+        let mut conn = db();
+        add(
+            &conn,
+            "('Visa', 'credit_card', 0, 5000000, 15, 5, 'x', 'x')",
+        );
+        let zero = Settings {
+            currency_decimals: 0,
+            ..Settings::default()
+        };
+        assert_eq!(field_of(update(&mut conn, zero)), "currencyDecimals");
+    }
+
+    #[test]
     fn a_rejected_update_changes_nothing() {
         let mut conn = db();
         let bad = Settings {
@@ -364,6 +410,14 @@ mod tests {
             }
             other => panic!("expected a database error, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn saving_repairs_an_invalid_stored_value() {
+        let mut conn = db();
+        store(&conn, "month_start_day", "40");
+        update(&mut conn, Settings::default()).unwrap();
+        assert_eq!(get(&conn).unwrap().settings, Settings::default());
     }
 
     #[test]
