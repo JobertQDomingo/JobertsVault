@@ -18,7 +18,7 @@ This file is the progress tracker.
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
-| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 8 / 53 |
+| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 9 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
@@ -55,7 +55,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] Migration `0001_initial.sql`, exactly as in DATA_MODEL §3
 - [x] Seed data: the Cash account, payment methods, and the preset categories with their colors (DATA_MODEL §7)
 - [x] Back up an existing database before running pending migrations, and stop if the backup fails, with tests for both cases and for a new database, which skips it (DATA_MODEL §8) [BAK-5]
-- [ ] Domain: the `Money` type, plus parsing and formatting in Rust and in `money.ts`, with tests
+- [x] Domain: the `Money` type, plus parsing and formatting in Rust and in `money.ts`, with tests
 - [ ] Domain: periods (day, Monday-start week, month with `month_start_day`, calendar year, custom range), with previous/next and edge-case tests ([DATA_MODEL §5.3](docs/DATA_MODEL.md))
 - [ ] Domain: credit card statement cycle and next due date, with tests (DATA_MODEL §5.5)
 
