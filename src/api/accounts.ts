@@ -1,10 +1,11 @@
 import type { Account } from "@/bindings/Account";
+import type { AccountList } from "@/bindings/AccountList";
 import type { AccountFields } from "@/bindings/AccountFields";
 import type { NewAccount } from "@/bindings/NewAccount";
 import { call } from "./client";
 
-/** Every account, archived included, in display order. */
-export const listAccounts = () => call<Account[]>("list_accounts");
+/** Every account, archived included, in display order, and the net balance. */
+export const listAccounts = () => call<AccountList>("list_accounts");
 
 export const getAccount = (id: number) => call<Account>("get_account", { id });
 

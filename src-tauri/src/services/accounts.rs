@@ -1,10 +1,12 @@
 use std::collections::HashSet;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, NaiveDate};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::domain::account::card_figures;
+use crate::domain::card_cycle::card_cycle;
 use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
@@ -61,21 +63,67 @@ pub struct Account {
     #[ts(type = "number")]
     pub sort_order: i64,
     pub archived: bool,
+    /// Signed and calculated as of today: card debt is negative (DATA_MODEL §5.1).
+    pub balance: Money,
+    /// Only for a credit card.
+    pub card: Option<CardSummary>,
 }
 
-/// Every account, archived included, in display order.
-pub fn list(conn: &Connection) -> Result<Vec<Account>, AppError> {
-    repo::accounts::all(conn)?.into_iter().map(view).collect()
+/// A credit card's details view (CC-6).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CardSummary {
+    pub amount_owed: Money,
+    /// Negative once spending passes the limit.
+    pub available_credit: Money,
+    /// A whole percent, over 100 past the limit.
+    #[ts(type = "number")]
+    pub utilization_percent: i64,
+    /// The current statement cycle, which ends on the closing date (DATA_MODEL §5.5).
+    pub cycle_start: NaiveDate,
+    pub cycle_end: NaiveDate,
+    /// Expenses on the card from the cycle start through today.
+    pub cycle_spending: Money,
+    pub due_date: NaiveDate,
 }
 
-pub fn get(conn: &Connection, id: i64) -> Result<Account, AppError> {
-    view(repo::accounts::find(conn, id)?.ok_or_else(|| not_found(id))?)
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct AccountList {
+    pub accounts: Vec<Account>,
+    /// Every balance added up, archived accounts included (ACC-5).
+    pub net_balance: Money,
+}
+
+/// Every account, archived included, in display order, with balances as of `today`.
+pub fn list(conn: &Connection, today: NaiveDate) -> Result<AccountList, AppError> {
+    let accounts = repo::accounts::all(conn, today)?
+        .into_iter()
+        .map(|row| view(conn, row, today))
+        .collect::<Result<Vec<_>, _>>()?;
+    let net_balance = accounts
+        .iter()
+        .try_fold(Money::ZERO, |sum, a| sum.checked_add(a.balance))
+        .ok_or_else(|| AppError::Database {
+            message: "The net balance is too large".into(),
+        })?;
+    Ok(AccountList {
+        accounts,
+        net_balance,
+    })
+}
+
+pub fn get(conn: &Connection, id: i64, today: NaiveDate) -> Result<Account, AppError> {
+    let row = repo::accounts::find(conn, id, today)?.ok_or_else(|| not_found(id))?;
+    view(conn, row, today)
 }
 
 pub fn create(
     conn: &mut Connection,
     mut input: NewAccount,
-    now: DateTime<Utc>,
+    now: DateTime<Local>,
 ) -> Result<Account, AppError> {
     validate(input.kind, &mut input.fields)?;
     let tx = conn.transaction()?;
@@ -86,7 +134,7 @@ pub fn create(
         &values(input.kind, &input.fields),
         &stamp(now),
     )?;
-    let account = get(&tx, id)?;
+    let account = get(&tx, id, now.date_naive())?;
     tx.commit()?;
     Ok(account)
 }
@@ -95,20 +143,20 @@ pub fn update(
     conn: &mut Connection,
     id: i64,
     mut input: AccountFields,
-    now: DateTime<Utc>,
+    now: DateTime<Local>,
 ) -> Result<Account, AppError> {
     let tx = conn.transaction()?;
-    let kind = get(&tx, id)?.kind;
+    let kind = get(&tx, id, now.date_naive())?.kind;
     validate(kind, &mut input)?;
     check_name_free(&tx, &input.name, Some(id))?;
     repo::accounts::update(&tx, id, &values(kind, &input), &stamp(now))?;
-    let account = get(&tx, id)?;
+    let account = get(&tx, id, now.date_naive())?;
     tx.commit()?;
     Ok(account)
 }
 
 /// Gives each account in `ids` its position as `sort_order` (UI_FLOWS §5.1).
-pub fn reorder(conn: &mut Connection, ids: Vec<i64>, now: DateTime<Utc>) -> Result<(), AppError> {
+pub fn reorder(conn: &mut Connection, ids: Vec<i64>, now: DateTime<Local>) -> Result<(), AppError> {
     let mut seen = HashSet::new();
     if !ids.iter().all(|id| seen.insert(id)) {
         return Err(invalid("ids", "Each account can appear only once"));
@@ -204,7 +252,11 @@ fn check_name_free(conn: &Connection, name: &str, except: Option<i64>) -> Result
     Ok(())
 }
 
-fn view(row: repo::accounts::Row) -> Result<Account, AppError> {
+fn view(
+    conn: &Connection,
+    row: repo::accounts::Row,
+    today: NaiveDate,
+) -> Result<Account, AppError> {
     let kind = [
         AccountKind::Cash,
         AccountKind::Bank,
@@ -226,6 +278,18 @@ fn view(row: repo::accounts::Row) -> Result<Account, AppError> {
     } else {
         row.opening_balance
     };
+    let balance = Money(row.balance);
+    let card = match (row.credit_limit, row.statement_day, row.due_day) {
+        (Some(limit), Some(statement_day), Some(due_day)) if kind == AccountKind::CreditCard => {
+            let terms = CardTerms {
+                credit_limit: Money(limit),
+                statement_day,
+                due_day,
+            };
+            Some(card_summary(conn, row.id, balance, terms, today)?)
+        }
+        _ => None,
+    };
     Ok(Account {
         id: row.id,
         name: row.name,
@@ -236,6 +300,40 @@ fn view(row: repo::accounts::Row) -> Result<Account, AppError> {
         due_day: row.due_day,
         sort_order: row.sort_order,
         archived: row.archived,
+        balance,
+        card,
+    })
+}
+
+struct CardTerms {
+    credit_limit: Money,
+    statement_day: u8,
+    due_day: u8,
+}
+
+fn card_summary(
+    conn: &Connection,
+    id: i64,
+    balance: Money,
+    terms: CardTerms,
+    today: NaiveDate,
+) -> Result<CardSummary, AppError> {
+    let cycle = card_cycle(terms.statement_day, terms.due_day, today).ok_or_else(|| {
+        AppError::Conflict {
+            message: "Today's date is outside the supported range".into(),
+        }
+    })?;
+    let figures = card_figures(balance, terms.credit_limit);
+    // Through today, so a future-dated purchase waits for its date (TXN-8).
+    let spent = repo::accounts::expenses_between(conn, id, cycle.start, cycle.end.min(today))?;
+    Ok(CardSummary {
+        amount_owed: figures.amount_owed,
+        available_credit: figures.available_credit,
+        utilization_percent: figures.utilization_percent,
+        cycle_start: cycle.start,
+        cycle_end: cycle.end,
+        cycle_spending: Money(spent),
+        due_date: cycle.due,
     })
 }
 
@@ -256,14 +354,44 @@ fn not_found(id: i64) -> AppError {
 }
 
 /// `created_at` / `updated_at` text (DATA_MODEL §1).
-fn stamp(now: DateTime<Utc>) -> String {
-    now.format("%Y-%m-%dT%H:%M:%SZ").to_string()
+fn stamp(now: DateTime<Local>) -> String {
+    now.to_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_support::{db, now};
+    use chrono::NaiveDate;
+
+    fn today() -> NaiveDate {
+        now().date_naive()
+    }
+
+    fn d(y: i32, m: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, day).expect("a real test date")
+    }
+
+    /// Inserts a transaction directly: the transaction commands come in ROADMAP 1.5.
+    fn txn(
+        conn: &Connection,
+        kind: &str,
+        amount: i64,
+        date: NaiveDate,
+        from: i64,
+        to: Option<i64>,
+    ) {
+        conn.execute(
+            "INSERT INTO transactions (kind, amount, date, account_id, to_account_id, category_id, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, (SELECT id FROM categories WHERE kind = ?1 LIMIT 1), 'x', 'x')",
+            rusqlite::params![kind, amount, date.to_string(), from, to],
+        )
+        .unwrap();
+    }
+
+    fn balance_of(conn: &Connection, id: i64, on: NaiveDate) -> i64 {
+        get(conn, id, on).unwrap().balance.0
+    }
 
     type FieldEdit = fn(&mut AccountFields);
 
@@ -305,18 +433,13 @@ mod tests {
     }
 
     fn add(conn: &mut Connection, name: &str) -> Account {
-        create(conn, new(name, AccountKind::Bank, 0), now().to_utc()).unwrap()
+        create(conn, new(name, AccountKind::Bank, 0), now()).unwrap()
     }
 
     #[test]
     fn create_saves_and_lists_after_the_seeded_cash() {
         let mut conn = db();
-        let bank = create(
-            &mut conn,
-            new("Bank", AccountKind::Bank, 100_000),
-            now().to_utc(),
-        )
-        .unwrap();
+        let bank = create(&mut conn, new("Bank", AccountKind::Bank, 100_000), now()).unwrap();
         assert_eq!(
             bank,
             Account {
@@ -329,9 +452,11 @@ mod tests {
                 due_day: None,
                 sort_order: 1,
                 archived: false,
+                balance: Money(100_000),
+                card: None,
             }
         );
-        let listed = list(&conn).unwrap();
+        let listed = list(&conn, today()).unwrap().accounts;
         assert_eq!(
             listed
                 .iter()
@@ -339,7 +464,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             [("Cash", 0), ("Bank", 1)]
         );
-        assert_eq!(get(&conn, bank.id).unwrap(), bank);
+        assert_eq!(get(&conn, bank.id, today()).unwrap(), bank);
     }
 
     #[test]
@@ -351,9 +476,7 @@ mod tests {
             ("GCash", AccountKind::Ewallet),
         ] {
             assert_eq!(
-                create(&mut conn, new(name, kind, 0), now().to_utc())
-                    .unwrap()
-                    .kind,
+                create(&mut conn, new(name, kind, 0), now()).unwrap().kind,
                 kind
             );
         }
@@ -362,23 +485,14 @@ mod tests {
     #[test]
     fn names_are_trimmed_and_1_to_50_characters() {
         let mut conn = db();
-        let saved = create(
-            &mut conn,
-            new("  Bank ", AccountKind::Bank, 0),
-            now().to_utc(),
-        )
-        .unwrap();
+        let saved = create(&mut conn, new("  Bank ", AccountKind::Bank, 0), now()).unwrap();
         assert_eq!(saved.name, "Bank");
         // 50 characters, but 100 bytes.
         let long = "ñ".repeat(50);
-        assert!(create(&mut conn, new(&long, AccountKind::Bank, 0), now().to_utc()).is_ok());
+        assert!(create(&mut conn, new(&long, AccountKind::Bank, 0), now()).is_ok());
         for bad in ["".to_string(), "   ".into(), "a".repeat(51)] {
             assert_eq!(
-                field_of(create(
-                    &mut conn,
-                    new(&bad, AccountKind::Bank, 0),
-                    now().to_utc()
-                )),
+                field_of(create(&mut conn, new(&bad, AccountKind::Bank, 0), now())),
                 "name",
                 "{bad:?}"
             );
@@ -392,7 +506,7 @@ mod tests {
             field_of(create(
                 &mut conn,
                 new(" cash ", AccountKind::Cash, 0),
-                now().to_utc()
+                now()
             )),
             "name"
         );
@@ -403,21 +517,16 @@ mod tests {
             field_of(create(
                 &mut conn,
                 new("OLD WALLET", AccountKind::Cash, 0),
-                now().to_utc()
+                now()
             )),
             "name"
         );
         assert_eq!(
-            field_of(update(
-                &mut conn,
-                1,
-                fields("old wallet", 0),
-                now().to_utc()
-            )),
+            field_of(update(&mut conn, 1, fields("old wallet", 0), now())),
             "name"
         );
         // Its own name in a different case is fine.
-        let renamed = update(&mut conn, 1, fields("CASH", 0), now().to_utc()).unwrap();
+        let renamed = update(&mut conn, 1, fields("CASH", 0), now()).unwrap();
         assert_eq!(renamed.name, "CASH");
     }
 
@@ -429,22 +538,22 @@ mod tests {
                 field_of(create(
                     &mut conn,
                     new("Bank", AccountKind::Bank, bad),
-                    now().to_utc()
+                    now()
                 )),
                 "openingBalance",
                 "{bad}"
             );
             assert_eq!(
-                field_of(update(&mut conn, 1, fields("Cash", bad), now().to_utc())),
+                field_of(update(&mut conn, 1, fields("Cash", bad), now())),
                 "openingBalance"
             );
         }
-        assert!(create(&mut conn, new("Zero", AccountKind::Bank, 0), now().to_utc()).is_ok());
+        assert!(create(&mut conn, new("Zero", AccountKind::Bank, 0), now()).is_ok());
         assert!(
             create(
                 &mut conn,
                 new("Max", AccountKind::Bank, Money::MAX.0),
-                now().to_utc()
+                now()
             )
             .is_ok()
         );
@@ -453,13 +562,13 @@ mod tests {
     #[test]
     fn update_changes_the_name_and_opening_balance() {
         let mut conn = db();
-        let later = now().to_utc() + chrono::Duration::days(1);
+        let later = now() + chrono::Duration::days(1);
         let saved = update(&mut conn, 1, fields(" Wallet ", 32_000), later).unwrap();
         assert_eq!(
             (saved.name.as_str(), saved.opening_balance),
             ("Wallet", Money(32_000))
         );
-        assert_eq!(get(&conn, 1).unwrap(), saved);
+        assert_eq!(get(&conn, 1, today()).unwrap(), saved);
         let (created, updated): (String, String) = conn
             .query_row(
                 "SELECT created_at, updated_at FROM accounts WHERE id = 1",
@@ -467,7 +576,10 @@ mod tests {
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .unwrap();
-        assert_eq!(updated, later.format("%Y-%m-%dT%H:%M:%SZ").to_string());
+        assert_eq!(
+            updated,
+            later.to_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+        );
         assert_ne!(created, updated);
     }
 
@@ -480,8 +592,8 @@ mod tests {
                 "{result:?}"
             );
         };
-        not_found(get(&conn, 99));
-        not_found(update(&mut conn, 99, fields("Gone", 0), now().to_utc()));
+        not_found(get(&conn, 99, today()));
+        not_found(update(&mut conn, 99, fields("Gone", 0), now()));
     }
 
     #[test]
@@ -489,19 +601,29 @@ mod tests {
         let mut conn = db();
         let bank = add(&mut conn, "Bank");
         let wallet = add(&mut conn, "Wallet");
-        reorder(&mut conn, vec![wallet.id, 1, bank.id], now().to_utc()).unwrap();
-        let names: Vec<String> = list(&conn).unwrap().into_iter().map(|a| a.name).collect();
+        reorder(&mut conn, vec![wallet.id, 1, bank.id], now()).unwrap();
+        let names: Vec<String> = list(&conn, today())
+            .unwrap()
+            .accounts
+            .into_iter()
+            .map(|a| a.name)
+            .collect();
         assert_eq!(names, ["Wallet", "Cash", "Bank"]);
 
         assert!(matches!(
-            reorder(&mut conn, vec![bank.id, 99], now().to_utc()),
+            reorder(&mut conn, vec![bank.id, 99], now()),
             Err(AppError::NotFound { id: 99, .. })
         ));
         assert_eq!(
-            field_of(reorder(&mut conn, vec![bank.id, bank.id], now().to_utc())),
+            field_of(reorder(&mut conn, vec![bank.id, bank.id], now())),
             "ids"
         );
-        let unchanged: Vec<String> = list(&conn).unwrap().into_iter().map(|a| a.name).collect();
+        let unchanged: Vec<String> = list(&conn, today())
+            .unwrap()
+            .accounts
+            .into_iter()
+            .map(|a| a.name)
+            .collect();
         assert_eq!(
             unchanged,
             ["Wallet", "Cash", "Bank"],
@@ -512,7 +634,7 @@ mod tests {
     #[test]
     fn a_card_stores_its_amount_owed_as_negative() {
         let mut conn = db();
-        let visa = create(&mut conn, card("Visa", 64_000), now().to_utc()).unwrap();
+        let visa = create(&mut conn, card("Visa", 64_000), now()).unwrap();
         let stored: i64 = conn
             .query_row(
                 "SELECT opening_balance FROM accounts WHERE id = ?1",
@@ -531,13 +653,7 @@ mod tests {
             (Some(Money(1_000_000)), Some(20), Some(5))
         );
 
-        let edited = update(
-            &mut conn,
-            visa.id,
-            card("Visa", 1_000).fields,
-            now().to_utc(),
-        )
-        .unwrap();
+        let edited = update(&mut conn, visa.id, card("Visa", 1_000).fields, now()).unwrap();
         assert_eq!(edited.opening_balance, Money(1_000));
     }
 
@@ -555,10 +671,7 @@ mod tests {
             (|f| f.due_day = None, "dueDay"),
         ];
         for (strip, field) in cases {
-            assert_eq!(
-                field_of(create(&mut conn, without(strip), now().to_utc())),
-                field
-            );
+            assert_eq!(field_of(create(&mut conn, without(strip), now())), field);
         }
     }
 
@@ -573,12 +686,9 @@ mod tests {
         for (add_field, field) in cases {
             let mut input = new("Bank", AccountKind::Bank, 0);
             add_field(&mut input.fields);
+            assert_eq!(field_of(create(&mut conn, input.clone(), now())), field);
             assert_eq!(
-                field_of(create(&mut conn, input.clone(), now().to_utc())),
-                field
-            );
-            assert_eq!(
-                field_of(update(&mut conn, 1, input.fields, now().to_utc())),
+                field_of(update(&mut conn, 1, input.fields, now())),
                 field,
                 "editing Cash"
             );
@@ -596,7 +706,7 @@ mod tests {
             input
         };
         let mut create_with =
-            |limit, statement, due| create(&mut conn, with(limit, statement, due), now().to_utc());
+            |limit, statement, due| create(&mut conn, with(limit, statement, due), now());
         assert_eq!(field_of(create_with(0, 20, 5)), "creditLimit");
         assert_eq!(
             field_of(create_with(Money::MAX.0 + 1, 20, 5)),
@@ -613,10 +723,11 @@ mod tests {
     fn any_number_of_cards_can_be_added() {
         let mut conn = db();
         for name in ["Visa", "Mastercard", "Amex"] {
-            create(&mut conn, card(name, 0), now().to_utc()).unwrap();
+            create(&mut conn, card(name, 0), now()).unwrap();
         }
-        let cards = list(&conn)
+        let cards = list(&conn, today())
             .unwrap()
+            .accounts
             .into_iter()
             .filter(|a| a.kind == AccountKind::CreditCard)
             .count();
@@ -626,12 +737,12 @@ mod tests {
     #[test]
     fn update_can_change_the_card_fields() {
         let mut conn = db();
-        let visa = create(&mut conn, card("Visa", 0), now().to_utc()).unwrap();
+        let visa = create(&mut conn, card("Visa", 0), now()).unwrap();
         let mut changed = card("Visa", 0).fields;
         changed.credit_limit = Some(Money(2_000_000));
         changed.statement_day = Some(31);
         changed.due_day = Some(15);
-        let saved = update(&mut conn, visa.id, changed, now().to_utc()).unwrap();
+        let saved = update(&mut conn, visa.id, changed, now()).unwrap();
         assert_eq!(
             (saved.credit_limit, saved.statement_day, saved.due_day),
             (Some(Money(2_000_000)), Some(31), Some(15))
@@ -640,8 +751,88 @@ mod tests {
         let mut stripped = card("Visa", 0).fields;
         stripped.due_day = None;
         assert_eq!(
-            field_of(update(&mut conn, visa.id, stripped, now().to_utc())),
+            field_of(update(&mut conn, visa.id, stripped, now())),
             "dueDay"
         );
+    }
+
+    #[test]
+    fn a_balance_adds_income_and_received_transfers_and_subtracts_the_rest() {
+        let mut conn = db();
+        let bank = create(&mut conn, new("Bank", AccountKind::Bank, 100_000), now()).unwrap();
+        let on = today();
+        txn(&conn, "income", 5_000, on, 1, None);
+        txn(&conn, "expense", 1_200, on, 1, None);
+        txn(&conn, "transfer", 1_000, on, 1, Some(bank.id));
+        txn(&conn, "transfer", 300, on, bank.id, Some(1));
+        assert_eq!(balance_of(&conn, 1, on), 3_100);
+        assert_eq!(balance_of(&conn, bank.id, on), 100_700);
+        let all = list(&conn, on).unwrap();
+        assert_eq!(
+            all.accounts.iter().map(|a| a.balance.0).collect::<Vec<_>>(),
+            [3_100, 100_700]
+        );
+        assert_eq!(all.net_balance, Money(103_800));
+    }
+
+    #[test]
+    fn future_dated_rows_are_left_out() {
+        let conn = db();
+        txn(&conn, "income", 5_000, d(2026, 11, 3), 1, None);
+        txn(&conn, "income", 7_000, d(2026, 11, 4), 1, None);
+        assert_eq!(balance_of(&conn, 1, d(2026, 11, 3)), 5_000);
+        assert_eq!(balance_of(&conn, 1, d(2026, 11, 4)), 12_000);
+    }
+
+    #[test]
+    fn a_card_shows_its_amount_owed_and_credit() {
+        let mut conn = db();
+        let visa = create(&mut conn, card("Visa", 64_000), now()).unwrap();
+        let on = today();
+        // CC-2: opening owed + expenses − payments − refunds.
+        txn(&conn, "expense", 1_000, on, visa.id, None);
+        txn(&conn, "income", 500, on, visa.id, None);
+        txn(&conn, "transfer", 2_000, on, 1, Some(visa.id));
+        let visa = get(&conn, visa.id, on).unwrap();
+        assert_eq!(visa.balance, Money(-62_500));
+        let summary = visa.card.expect("a card has a summary");
+        assert_eq!(
+            (
+                summary.amount_owed,
+                summary.available_credit,
+                summary.utilization_percent
+            ),
+            (Money(62_500), Money(937_500), 6)
+        );
+        assert_eq!(get(&conn, 1, on).unwrap().card, None, "Cash isn't a card");
+    }
+
+    #[test]
+    fn cycle_spending_counts_only_this_cycles_expenses_so_far() {
+        let mut conn = db();
+        let visa = create(&mut conn, card("Visa", 0), now()).unwrap();
+        txn(&conn, "expense", 100, d(2026, 10, 20), visa.id, None);
+        txn(&conn, "expense", 200, d(2026, 10, 21), visa.id, None);
+        txn(&conn, "expense", 400, d(2026, 10, 26), visa.id, None);
+        txn(&conn, "income", 800, d(2026, 10, 22), visa.id, None);
+        txn(&conn, "expense", 1_600, d(2026, 10, 27), visa.id, None);
+        txn(&conn, "expense", 3_200, d(2026, 10, 23), 1, None);
+        let summary = get(&conn, visa.id, d(2026, 10, 26)).unwrap().card.unwrap();
+        assert_eq!(summary.cycle_spending, Money(600));
+        // UI_FLOWS §5.3: Oct 21 – Nov 20, due Nov 5.
+        assert_eq!(
+            (summary.cycle_start, summary.cycle_end, summary.due_date),
+            (d(2026, 10, 21), d(2026, 11, 20), d(2026, 11, 5))
+        );
+    }
+
+    #[test]
+    fn the_net_balance_counts_archived_accounts_and_subtracts_card_debt() {
+        let mut conn = db();
+        let bank = create(&mut conn, new("Bank", AccountKind::Bank, 100_000), now()).unwrap();
+        conn.execute("UPDATE accounts SET archived = 1 WHERE id = ?1", [bank.id])
+            .unwrap();
+        create(&mut conn, card("Visa", 64_000), now()).unwrap();
+        assert_eq!(list(&conn, today()).unwrap().net_balance, Money(36_000));
     }
 }

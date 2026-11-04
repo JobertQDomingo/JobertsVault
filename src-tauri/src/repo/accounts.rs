@@ -1,3 +1,4 @@
+use chrono::NaiveDate;
 use rusqlite::{Connection, OptionalExtension, params};
 
 /// One `accounts` row as stored (DATA_MODEL §3.1).
@@ -11,6 +12,8 @@ pub struct Row {
     pub due_day: Option<u8>,
     pub sort_order: i64,
     pub archived: bool,
+    /// Calculated as of the date asked for, never stored (DATA_MODEL §5.1).
+    pub balance: i64,
 }
 
 /// The columns a create or an edit writes.
@@ -22,7 +25,16 @@ pub struct Values<'a> {
     pub due_day: Option<u8>,
 }
 
-const SELECT: &str = "SELECT id, name, kind, opening_balance, credit_limit, statement_day, due_day, sort_order, archived FROM accounts";
+/// `?1` is the as-of date: later transactions don't count.
+const SELECT: &str =
+    "SELECT a.id, a.name, a.kind, a.opening_balance, a.credit_limit, a.statement_day,
+            a.due_day, a.sort_order, a.archived,
+            a.opening_balance
+            + COALESCE((SELECT SUM(CASE t.kind WHEN 'income' THEN t.amount ELSE -t.amount END)
+                        FROM transactions t WHERE t.account_id = a.id AND t.date <= ?1), 0)
+            + COALESCE((SELECT SUM(t.amount)
+                        FROM transactions t WHERE t.to_account_id = a.id AND t.date <= ?1), 0)
+     FROM accounts a";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
     Ok(Row {
@@ -35,19 +47,24 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
         due_day: r.get(6)?,
         sort_order: r.get(7)?,
         archived: r.get(8)?,
+        balance: r.get(9)?,
     })
 }
 
 /// Every account, archived included, in display order.
-pub fn all(conn: &Connection) -> rusqlite::Result<Vec<Row>> {
-    conn.prepare(&format!("{SELECT} ORDER BY sort_order, id"))?
-        .query_map([], row)?
+pub fn all(conn: &Connection, as_of: NaiveDate) -> rusqlite::Result<Vec<Row>> {
+    conn.prepare(&format!("{SELECT} ORDER BY a.sort_order, a.id"))?
+        .query_map([as_of.to_string()], row)?
         .collect()
 }
 
-pub fn find(conn: &Connection, id: i64) -> rusqlite::Result<Option<Row>> {
-    conn.query_row(&format!("{SELECT} WHERE id = ?1"), [id], row)
-        .optional()
+pub fn find(conn: &Connection, id: i64, as_of: NaiveDate) -> rusqlite::Result<Option<Row>> {
+    conn.query_row(
+        &format!("{SELECT} WHERE a.id = ?2"),
+        params![as_of.to_string(), id],
+        row,
+    )
+    .optional()
 }
 
 /// Whether another account already has `name`. The column is `COLLATE NOCASE`, so case is ignored.
@@ -88,6 +105,21 @@ pub fn set_sort_order(
     conn.execute(
         "UPDATE accounts SET sort_order = ?2, updated_at = ?3 WHERE id = ?1",
         params![id, order, now],
+    )
+}
+
+/// The account's expenses dated `start` through `end`, both included.
+pub fn expenses_between(
+    conn: &Connection,
+    id: i64,
+    start: NaiveDate,
+    end: NaiveDate,
+) -> rusqlite::Result<i64> {
+    conn.query_row(
+        "SELECT COALESCE(SUM(amount), 0) FROM transactions
+         WHERE kind = 'expense' AND account_id = ?1 AND date BETWEEN ?2 AND ?3",
+        params![id, start.to_string(), end.to_string()],
+        |r| r.get(0),
     )
 }
 
