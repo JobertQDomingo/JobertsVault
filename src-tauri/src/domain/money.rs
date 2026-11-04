@@ -5,7 +5,7 @@ use ts_rs::TS;
 /// one-field tuple struct as its bare value, so it crosses IPC as a plain number.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, TS)]
 #[ts(export)]
-pub struct Money(#[ts(type = "number")] i64);
+pub struct Money(#[ts(type = "number")] pub i64);
 
 /// How many decimal places the currency shows: `currency_decimals` is 0 or 2 (DATA_MODEL §3.5).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,6 +24,7 @@ impl Decimals {
 }
 
 impl Money {
+    pub const ZERO: Money = Money(0);
     /// The largest amount any field accepts (DATA_MODEL §6).
     pub const MAX: Money = Money(999_999_999_999);
 
