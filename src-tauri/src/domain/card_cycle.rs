@@ -12,7 +12,7 @@ pub struct CardCycle {
 }
 
 /// `statement_day` and `due_day` are 1–31; a shorter month uses its last day. `None` only for a
-/// `today` at the end of chrono's date range.
+/// `today` within a month of either end of chrono's date range.
 pub fn card_cycle(statement_day: u8, due_day: u8, today: NaiveDate) -> Option<CardCycle> {
     let end = on_or_after(today, statement_day)?;
     let previous_month = end.with_day(1)?.checked_sub_months(Months::new(1))?;
@@ -25,6 +25,7 @@ pub fn card_cycle(statement_day: u8, due_day: u8, today: NaiveDate) -> Option<Ca
 
 /// That day of `d`'s month, or the month's last day when it's shorter.
 fn on_day(d: NaiveDate, day: u8) -> Option<NaiveDate> {
+    // The accounts table only allows 1–31 (DATA_MODEL §3.1); clamping keeps a 0 from panicking.
     d.with_day(u32::from(day).clamp(1, d.num_days_in_month().into()))
 }
 
@@ -123,7 +124,8 @@ mod tests {
     }
 
     #[test]
-    fn a_date_at_the_calendar_limit_has_no_cycle_instead_of_panicking() {
+    fn a_date_at_the_calendar_limits_has_no_cycle_instead_of_panicking() {
         assert_eq!(card_cycle(20, 5, NaiveDate::MAX), None);
+        assert_eq!(card_cycle(20, 5, NaiveDate::MIN), None);
     }
 }
