@@ -2,5 +2,6 @@
 
 pub mod account;
 pub mod card_cycle;
+pub mod category;
 pub mod money;
 pub mod period;

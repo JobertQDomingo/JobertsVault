@@ -470,7 +470,7 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | A transaction's category kind matches the transaction kind | category |
 | A transfer's destination differs from its source | to_account |
 | A **new** transaction can't use an archived account, category or payment method. Existing transactions keep theirs. | account / category |
-| Name lengths (account ≤ 50, category ≤ 40, payee ≤ 100, note ≤ 500) | that field |
+| Name lengths (account ≤ 50, category ≤ 40, payment method ≤ 40, payee ≤ 100, note ≤ 500) | that field |
 | Names are unique within their scope | name |
 | Credit card fields are present if and only if the account is a credit card | the card fields |
 | `currency_decimals` can't change once any amount is stored: a transaction, or an account's non-zero opening balance or credit limit (§1) | settings |
@@ -486,7 +486,7 @@ Text is trimmed before saving, and empty optional text is stored as `NULL`.
 
 **Payment methods:** Cash, Debit Card, Credit Card, Bank Transfer, E-wallet, Other
 
-Income and expense colors are **numbered separately**, because the breakdown chart never shows income and expense together. The 12 most common expense categories each get their own color, and only 5 rarely used ones share. A category the user adds later defaults to the least-used color of its kind, and the user can change it.
+Income and expense colors are **numbered separately**, because the breakdown chart never shows income and expense together. The 12 most common expense categories each get their own color, and only 5 rarely used ones share. A category the user adds later defaults to the least-used color among the **active** categories of its kind, the lowest number on a tie (e.g. `cat-2` before `cat-10`), and the user can change it.
 
 **Income categories:**
 
@@ -558,6 +558,11 @@ None at the moment. Answered on 2026-10-26:
 
 1. **Refunds** count as income. They offset net cashflow, and the PRD wording (CC-5) was updated to match.
 2. **Archived accounts** still count toward the net balance. Archiving one whose balance isn't 0 shows a warning (§5.1).
+
+Answered on 2026-11-04:
+
+3. **Payment method names** are 1–40 characters, the same as categories (§6).
+4. **A new category's default color** counts only active categories of its kind, so archived ones don't hold a color, and a tie goes to the lowest palette number (§7).
 
 Answered on 2026-11-01:
 

@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use chrono::{DateTime, Local, NaiveDate};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -10,7 +8,7 @@ use crate::domain::card_cycle::card_cycle;
 use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
-use crate::services::invalid;
+use crate::services::{invalid, new_order, stamp};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -166,21 +164,14 @@ pub fn update(
 
 /// Gives each account in `ids` its position as `sort_order` (UI_FLOWS §5.1).
 pub fn reorder(conn: &mut Connection, ids: Vec<i64>, now: DateTime<Local>) -> Result<(), AppError> {
-    let mut seen = HashSet::new();
-    if !ids.iter().all(|id| seen.insert(*id)) {
-        return Err(invalid("ids", "Each account can appear only once"));
-    }
     let tx = conn.transaction()?;
-    // Accounts left out (e.g. archived ones the list doesn't drag) follow in their old order,
-    // so no two accounts share a position.
-    let rest: Vec<i64> = repo::accounts::all(&tx, now.date_naive())?
+    let existing = repo::accounts::all(&tx, now.date_naive())?
         .into_iter()
-        .map(|row| row.id)
-        .filter(|id| !seen.contains(id))
-        .collect();
+        .map(|row| row.id);
+    let order = new_order(ids, existing)?;
     let now = stamp(now);
-    for (order, id) in (0_i64..).zip(ids.into_iter().chain(rest)) {
-        if repo::accounts::set_sort_order(&tx, id, order, &now)? == 0 {
+    for (position, id) in (0_i64..).zip(order) {
+        if repo::accounts::set_sort_order(&tx, id, position, &now)? == 0 {
             return Err(not_found(id));
         }
     }
@@ -429,15 +420,7 @@ fn kind_text(kind: AccountKind) -> &'static str {
 }
 
 fn not_found(id: i64) -> AppError {
-    AppError::NotFound {
-        entity: "account".into(),
-        id,
-    }
-}
-
-/// `created_at` / `updated_at` text (DATA_MODEL §1).
-fn stamp(now: DateTime<Local>) -> String {
-    now.to_utc().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+    super::not_found("account", id)
 }
 
 #[cfg(test)]
