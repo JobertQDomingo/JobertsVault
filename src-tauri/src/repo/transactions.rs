@@ -102,6 +102,18 @@ pub fn update(conn: &Connection, id: i64, v: &Values, now: &str) -> rusqlite::Re
     Ok(())
 }
 
+/// The source account of the latest transaction whose source is an active non-card account.
+pub fn latest_non_card_source(conn: &Connection) -> rusqlite::Result<Option<i64>> {
+    conn.query_row(
+        "SELECT t.account_id FROM transactions t JOIN accounts a ON a.id = t.account_id
+         WHERE a.archived = 0 AND a.kind <> 'credit_card'
+         ORDER BY t.date DESC, t.id DESC LIMIT 1",
+        [],
+        |r| r.get(0),
+    )
+    .optional()
+}
+
 /// The number of rows deleted: 0 when there's no such transaction.
 pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<usize> {
     conn.execute("DELETE FROM transactions WHERE id = ?1", [id])

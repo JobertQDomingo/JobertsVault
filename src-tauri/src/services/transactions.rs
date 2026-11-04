@@ -6,7 +6,7 @@ use ts_rs::TS;
 use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
-use crate::services::{invalid, not_found, stamp};
+use crate::services::{accounts, invalid, not_found, stamp};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -66,6 +66,65 @@ pub struct Transaction {
 
 /// The settings key quick-add's default account comes from (DATA_MODEL §5.8).
 const LAST_USED_ACCOUNT: &str = "last_used_account_id";
+
+/// What quick-add starts with (UI_FLOWS §4). A duplicate uses `today` too (TXN-2).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct TransactionDefaults {
+    #[ts(type = "number | null")]
+    pub account_id: Option<i64>,
+    pub today: NaiveDate,
+}
+
+/// What Pay bill's transfer starts with (CC-9, UI_FLOWS F2).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PayBillDefaults {
+    #[ts(type = "number | null")]
+    pub from_account_id: Option<i64>,
+    /// The amount owed, or `None` when nothing is owed, so the field starts empty.
+    pub amount: Option<Money>,
+    pub today: NaiveDate,
+}
+
+/// The last account used, if it's still active, else the first active one (DATA_MODEL §5.8).
+pub fn defaults(conn: &Connection, today: NaiveDate) -> Result<TransactionDefaults, AppError> {
+    let last = repo::settings::get(conn, LAST_USED_ACCOUNT)?.and_then(|v| v.parse().ok());
+    let last = match last {
+        Some(id) => repo::accounts::find(conn, id, today)?.filter(|a| !a.archived),
+        None => None,
+    };
+    let account_id = match last {
+        Some(account) => Some(account.id),
+        None => repo::accounts::first_active(conn, true)?,
+    };
+    Ok(TransactionDefaults { account_id, today })
+}
+
+/// DATA_MODEL §5.8: the latest non-card source, else the first non-card account, and the amount owed.
+pub fn pay_bill_defaults(
+    conn: &Connection,
+    card_id: i64,
+    today: NaiveDate,
+) -> Result<PayBillDefaults, AppError> {
+    let owed = accounts::get(conn, card_id, today)?
+        .card
+        .ok_or_else(|| AppError::Conflict {
+            message: "Only a credit card has a bill to pay".into(),
+        })?
+        .amount_owed;
+    let from_account_id = match repo::transactions::latest_non_card_source(conn)? {
+        Some(id) => Some(id),
+        None => repo::accounts::first_active(conn, false)?,
+    };
+    Ok(PayBillDefaults {
+        from_account_id,
+        amount: (owed > Money::ZERO).then_some(owed),
+        today,
+    })
+}
 
 pub fn get(conn: &Connection, id: i64) -> Result<Transaction, AppError> {
     view(repo::transactions::find(conn, id)?.ok_or_else(|| not_found("transaction", id))?)
@@ -764,5 +823,194 @@ mod tests {
             (TransactionKind::Transfer, None, Some(cash))
         );
         assert_eq!((balance(&conn, bank), balance(&conn, cash)), (9_000, 1_000));
+    }
+
+    fn d(y: i32, m: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, day).expect("a real test date")
+    }
+
+    /// Saves an expense of `amount` on `account`, dated `date`.
+    fn spend(conn: &mut Connection, amount: i64, account: i64, date: NaiveDate) -> Transaction {
+        let f = TransactionFields {
+            date: date.to_string(),
+            ..expense(conn, amount, account)
+        };
+        create(conn, f, now()).unwrap()
+    }
+
+    /// A card owing `owed`, with a 10,000.00 limit, closing on the 20th and due on the 5th.
+    fn card(conn: &mut Connection, name: &str, owed: i64) -> i64 {
+        accounts::create(
+            conn,
+            NewAccount {
+                kind: AccountKind::CreditCard,
+                fields: AccountFields {
+                    name: name.into(),
+                    opening_balance: Money(owed),
+                    credit_limit: Some(Money(1_000_000)),
+                    statement_day: Some(20),
+                    due_day: Some(5),
+                },
+            },
+            now(),
+        )
+        .unwrap()
+        .id
+    }
+
+    #[test]
+    fn defaults_use_the_last_account_or_the_first_active_one() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        // `today` is whatever the caller passes: the service never reads the clock.
+        assert_eq!(
+            defaults(&conn, d(2027, 1, 1)).unwrap(),
+            TransactionDefaults {
+                account_id: Some(cash),
+                today: d(2027, 1, 1)
+            }
+        );
+        let bank = bank(&mut conn, "Bank", 0);
+        spend(&mut conn, 100, bank, today());
+        assert_eq!(defaults(&conn, today()).unwrap().account_id, Some(bank));
+        accounts::archive(&mut conn, bank, true, now()).unwrap();
+        assert_eq!(defaults(&conn, today()).unwrap().account_id, Some(cash));
+        // The first active one by sort order, not by id.
+        let savings = accounts::create(
+            &mut conn,
+            NewAccount {
+                kind: AccountKind::Bank,
+                fields: AccountFields {
+                    name: "Savings".into(),
+                    opening_balance: Money(0),
+                    credit_limit: None,
+                    statement_day: None,
+                    due_day: None,
+                },
+            },
+            now(),
+        )
+        .unwrap()
+        .id;
+        accounts::reorder(&mut conn, vec![savings, cash], now()).unwrap();
+        assert_eq!(defaults(&conn, today()).unwrap().account_id, Some(savings));
+        for gone in ["999", "junk"] {
+            repo::settings::set(&conn, LAST_USED_ACCOUNT, gone).unwrap();
+            assert_eq!(defaults(&conn, today()).unwrap().account_id, Some(savings));
+        }
+    }
+
+    #[test]
+    fn duplicating_copies_the_row_with_todays_date() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        let mut f = expense(&conn, 1_234, cash);
+        f.date = "2026-10-01".into();
+        f.payee = Some("Market".into());
+        f.note = Some("weekly shop".into());
+        let original = create(&mut conn, f, now()).unwrap();
+        // What the form does (ARCHITECTURE §4.5): load the row, take today from the defaults, save.
+        let row = get(&conn, original.id).unwrap();
+        let copy = TransactionFields {
+            kind: row.kind,
+            amount: row.amount,
+            date: defaults(&conn, today()).unwrap().today.to_string(),
+            account_id: row.account_id,
+            to_account_id: row.to_account_id,
+            category_id: row.category_id,
+            payee: row.payee,
+            payment_method_id: row.payment_method_id,
+            note: row.note,
+        };
+        let copy = create(&mut conn, copy, now()).unwrap();
+        assert_ne!(copy.id, original.id);
+        assert_eq!(
+            copy,
+            Transaction {
+                id: copy.id,
+                date: today(),
+                ..original.clone()
+            }
+        );
+        assert_eq!(get(&conn, original.id).unwrap(), original);
+    }
+
+    #[test]
+    fn pay_bill_defaults_pick_the_latest_non_card_source() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        let visa = card(&mut conn, "Visa", 50_000);
+        let wallet = bank(&mut conn, "Wallet", 100_000);
+        let bank = bank(&mut conn, "Bank", 100_000);
+        let from = |conn: &Connection| {
+            pay_bill_defaults(conn, visa, today())
+                .unwrap()
+                .from_account_id
+        };
+        assert_eq!(from(&conn), Some(cash));
+        // The latest by date, then by id.
+        spend(&mut conn, 100, bank, d(2026, 11, 2));
+        spend(&mut conn, 100, wallet, d(2026, 11, 1));
+        assert_eq!(from(&conn), Some(bank));
+        // A card is never the From account.
+        spend(&mut conn, 100, visa, today());
+        assert_eq!(from(&conn), Some(bank));
+        spend(&mut conn, 100, wallet, d(2026, 11, 2));
+        assert_eq!(from(&conn), Some(wallet));
+        accounts::archive(&mut conn, wallet, true, now()).unwrap();
+        assert_eq!(from(&conn), Some(bank));
+    }
+
+    #[test]
+    fn pay_bill_from_is_empty_without_an_active_non_card_account() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        let visa = card(&mut conn, "Visa", 50_000);
+        accounts::archive(&mut conn, cash, false, now()).unwrap();
+        assert_eq!(
+            pay_bill_defaults(&conn, visa, today())
+                .unwrap()
+                .from_account_id,
+            None
+        );
+    }
+
+    #[test]
+    fn pay_bill_amount_is_the_amount_owed_or_empty() {
+        let mut conn = db();
+        let cash = cash(&conn);
+        let visa = card(&mut conn, "Visa", 50_000);
+        assert_eq!(
+            pay_bill_defaults(&conn, visa, today()).unwrap(),
+            PayBillDefaults {
+                from_account_id: Some(cash),
+                amount: Some(Money(50_000)),
+                today: today()
+            }
+        );
+        create(&mut conn, transfer(50_000, cash, visa), now()).unwrap();
+        assert_eq!(
+            pay_bill_defaults(&conn, visa, today()).unwrap().amount,
+            None
+        );
+        // Overpaid: credit on the card, nothing owed.
+        create(&mut conn, transfer(1_000, cash, visa), now()).unwrap();
+        assert_eq!(
+            pay_bill_defaults(&conn, visa, today()).unwrap().amount,
+            None
+        );
+    }
+
+    #[test]
+    fn pay_bill_needs_a_card() {
+        let conn = db();
+        assert!(matches!(
+            pay_bill_defaults(&conn, cash(&conn), today()),
+            Err(AppError::Conflict { .. })
+        ));
+        assert!(matches!(
+            pay_bill_defaults(&conn, 999, today()),
+            Err(AppError::NotFound { .. })
+        ));
     }
 }
