@@ -7,6 +7,14 @@ pub fn now() -> DateTime<Local> {
     Local.with_ymd_and_hms(2026, 11, 3, 14, 5, 0).unwrap()
 }
 
+/// An in-memory database with every migration and the seed data applied.
+pub fn db() -> rusqlite::Connection {
+    let mut conn = crate::db::open(Path::new(":memory:")).unwrap();
+    let ms = crate::db::migrations(now().to_utc());
+    crate::db::prepare(&mut conn, &ms, Path::new("unused"), now()).unwrap();
+    conn
+}
+
 /// A folder under the system temp dir, wiped when created and when dropped.
 pub struct TempDir(PathBuf);
 
