@@ -39,6 +39,17 @@ describe("parseAmount", () => {
     },
   );
 
+  test.each(["12,50", "1,2345", "1,2,3", ",5", "1234,567", "1,"])(
+    "takes a comma only as a thousands separator, so rejects %j",
+    (text) => {
+      expect(parseAmount(text, 2)).toBeNull();
+    },
+  );
+
+  test("reads amounts grouped in thousands", () => {
+    expect(parseAmount("12,345,678.90", 2)).toBe(1234567890);
+  });
+
   test("never rounds extra fraction digits", () => {
     expect(parseAmount("12.5", 0)).toBeNull();
     expect(parseAmount("1.234", 2)).toBeNull();

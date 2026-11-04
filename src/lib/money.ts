@@ -16,11 +16,12 @@ export const MAX_AMOUNT = 999_999_999_999;
 const MINUS = "\u2212";
 
 /**
- * Reads typed or pasted text: digits, one ".", and commas in the whole part (DESIGN_SYSTEM §7).
+ * Reads typed or pasted text: digits, one ".", and commas as thousands separators (DESIGN_SYSTEM §7).
  * Anything else, or more than MAX_AMOUNT, is null. Never rounds.
  */
 export function parseAmount(text: string, decimals: Decimals): number | null {
-  const match = /^([\d,]*)(?:\.(\d*))?$/.exec(text.trim());
+  // The whole part is plain digits or grouped in threes ("12,345"), so "12,50" is refused.
+  const match = /^(\d*|\d{1,3}(?:,\d{3})+)(?:\.(\d*))?$/.exec(text.trim());
   if (!match) return null;
   const whole = match[1].replace(/,/g, "");
   const fraction = match[2] ?? "";

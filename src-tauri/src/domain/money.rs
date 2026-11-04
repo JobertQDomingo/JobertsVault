@@ -5,7 +5,23 @@ use ts_rs::TS;
 /// one-field tuple struct as its bare value, so it crosses IPC as a plain number.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, TS)]
 #[ts(export)]
-pub struct Money(#[ts(type = "number")] pub i64);
+pub struct Money(#[ts(type = "number")] i64);
+
+/// How many decimal places the currency shows: `currency_decimals` is 0 or 2 (DATA_MODEL §3.5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Decimals {
+    Zero,
+    Two,
+}
+
+impl Decimals {
+    fn places(self) -> usize {
+        match self {
+            Self::Zero => 0,
+            Self::Two => 2,
+        }
+    }
+}
 
 impl Money {
     /// The largest amount any field accepts (DATA_MODEL §6).
@@ -19,92 +35,103 @@ impl Money {
         self.0.checked_sub(other.0).map(Money)
     }
 
-    /// Reads typed or pasted text: digits, one `.`, and commas in the whole part
+    /// Reads typed or pasted text: digits, one `.`, and commas as thousands separators
     /// (DESIGN_SYSTEM §7). Anything else, or more than `MAX`, is `None`. Never rounds.
-    pub fn parse(text: &str, decimals: u32) -> Option<Money> {
+    pub fn parse(text: &str, decimals: Decimals) -> Option<Money> {
         let text = text.trim();
         let (whole, fraction) = text.split_once('.').unwrap_or((text, ""));
-        let whole: String = whole.chars().filter(|&c| c != ',').collect();
-        let digits = |s: &str| s.chars().all(|c| c.is_ascii_digit());
-        let width = decimals as usize;
-        if !digits(&whole) || !digits(fraction) || fraction.len() > width {
+        let whole = whole_digits(whole)?;
+        let width = decimals.places();
+        let fraction_ok = fraction.len() <= width && fraction.chars().all(|c| c.is_ascii_digit());
+        if !fraction_ok || (whole.is_empty() && fraction.is_empty()) {
             return None;
         }
-        if whole.is_empty() && fraction.is_empty() {
-            return None;
-        }
-        let padding = std::iter::repeat_n('0', width - fraction.len());
-        let mut minor: i64 = 0;
-        for c in whole.chars().chain(fraction.chars()).chain(padding) {
-            minor = minor
-                .checked_mul(10)?
-                .checked_add(i64::from(c.to_digit(10)?))?;
-        }
+        // Only digits are left, so this can't read a sign, and it reports overflow itself.
+        let minor: i64 = format!("{whole}{fraction:0<width$}").parse().ok()?;
         (minor <= Money::MAX.0).then_some(Money(minor))
     }
 
     /// Plain text for files: no symbol or separators, and `-` when negative (DATA_MODEL §8).
-    pub fn to_plain(self, decimals: u32) -> String {
+    pub fn to_plain(self, decimals: Decimals) -> String {
         let sign = if self.0 < 0 { "-" } else { "" };
         let abs = self.0.unsigned_abs();
-        if decimals == 0 {
+        let width = decimals.places();
+        if width == 0 {
             return format!("{sign}{abs}");
         }
-        let unit = 10u64.pow(decimals);
-        format!(
-            "{sign}{}.{:0width$}",
-            abs / unit,
-            abs % unit,
-            width = decimals as usize
-        )
+        let unit = 10u64.pow(width as u32);
+        format!("{sign}{}.{:0width$}", abs / unit, abs % unit)
     }
+}
+
+/// The digits of the whole part: plain, or grouped by commas in threes, as in "12,345".
+fn whole_digits(whole: &str) -> Option<String> {
+    let groups: Vec<&str> = whole.split(',').collect();
+    let well_grouped = groups.len() == 1
+        || groups.iter().enumerate().all(|(i, group)| match i {
+            0 => (1..=3).contains(&group.len()),
+            _ => group.len() == 3,
+        });
+    let digits = groups.concat();
+    (well_grouped && digits.chars().all(|c| c.is_ascii_digit())).then_some(digits)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn parsed(text: &str, decimals: u32) -> Option<i64> {
+    fn parsed(text: &str, decimals: Decimals) -> Option<i64> {
         Money::parse(text, decimals).map(|money| money.0)
     }
 
     #[test]
     fn parses_typed_and_pasted_amounts() {
-        assert_eq!(parsed("1,234.5", 2), Some(123_450));
-        assert_eq!(parsed("1234.50", 2), Some(123_450));
-        assert_eq!(parsed(" 12 ", 2), Some(1_200));
-        assert_eq!(parsed(".5", 2), Some(50));
-        assert_eq!(parsed("12.", 2), Some(1_200));
-        assert_eq!(parsed("0", 2), Some(0));
-        assert_eq!(parsed("1,234", 0), Some(1_234));
+        assert_eq!(parsed("1,234.5", Decimals::Two), Some(123_450));
+        assert_eq!(parsed("1234.50", Decimals::Two), Some(123_450));
+        assert_eq!(parsed(" 12 ", Decimals::Two), Some(1_200));
+        assert_eq!(parsed(".5", Decimals::Two), Some(50));
+        assert_eq!(parsed("12.", Decimals::Two), Some(1_200));
+        assert_eq!(parsed("0", Decimals::Two), Some(0));
+        assert_eq!(parsed("1,234", Decimals::Zero), Some(1_234));
     }
 
     #[test]
     fn parses_up_to_the_largest_amount() {
-        assert_eq!(parsed("999,999,999,999", 0), Some(Money::MAX.0));
-        assert_eq!(parsed("9,999,999,999.99", 2), Some(Money::MAX.0));
-        assert_eq!(parsed("10,000,000,000", 2), None);
-        assert_eq!(parsed("99999999999999999999", 0), None);
+        assert_eq!(
+            parsed("999,999,999,999", Decimals::Zero),
+            Some(Money::MAX.0)
+        );
+        assert_eq!(
+            parsed("9,999,999,999.99", Decimals::Two),
+            Some(Money::MAX.0)
+        );
+        assert_eq!(parsed("10,000,000,000", Decimals::Two), None);
+        assert_eq!(parsed("99999999999999999999", Decimals::Zero), None);
     }
 
     #[test]
     fn rejects_anything_else_instead_of_guessing() {
         for text in ["", ".", "-5", "+5", "1.2.3", "₱5", "1e3", "12.3,4"] {
-            assert_eq!(parsed(text, 2), None, "{text:?}");
+            assert_eq!(parsed(text, Decimals::Two), None, "{text:?}");
         }
+        // A comma is only a thousands separator. "12,50" isn't ₱1,250.00.
+        for text in ["12,50", "1,2345", "1,2,3", ",5", "1234,567", "1,"] {
+            assert_eq!(parsed(text, Decimals::Two), None, "{text:?}");
+        }
+        assert_eq!(parsed("12,345,678.90", Decimals::Two), Some(1_234_567_890));
         // Never rounded: more fraction digits than the currency has is a typo.
-        assert_eq!(parsed("12.5", 0), None);
-        assert_eq!(parsed("1.234", 2), None);
+        assert_eq!(parsed("12.5", Decimals::Zero), None);
+        assert_eq!(parsed("1.234", Decimals::Two), None);
     }
 
     #[test]
     fn formats_plain_amounts_for_csv() {
-        assert_eq!(Money(123_450).to_plain(2), "1234.50");
-        assert_eq!(Money(-123_450).to_plain(2), "-1234.50");
-        assert_eq!(Money(5).to_plain(2), "0.05");
-        assert_eq!(Money(0).to_plain(2), "0.00");
-        assert_eq!(Money(1_234).to_plain(0), "1234");
-        assert!(Money(i64::MIN).to_plain(2).starts_with('-'));
+        assert_eq!(Money(123_450).to_plain(Decimals::Two), "1234.50");
+        assert_eq!(Money(-123_450).to_plain(Decimals::Two), "-1234.50");
+        assert_eq!(Money(5).to_plain(Decimals::Two), "0.05");
+        assert_eq!(Money(0).to_plain(Decimals::Two), "0.00");
+        assert_eq!(Money(1_234).to_plain(Decimals::Zero), "1234");
+        assert!(Money(i64::MIN).to_plain(Decimals::Two).starts_with('-'));
     }
 
     #[test]
