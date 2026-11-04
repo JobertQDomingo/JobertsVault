@@ -30,6 +30,7 @@ pub fn run() {
             commands::system::get_startup_status,
             commands::system::open_data_folder,
             commands::period::get_period,
+            commands::dashboard::get_dashboard,
             commands::settings::get_settings,
             commands::settings::update_settings,
             commands::accounts::list_accounts,

@@ -421,7 +421,7 @@ fn values(f: &TransactionFields) -> repo::transactions::Values<'_> {
     }
 }
 
-fn view(row: repo::transactions::Row) -> Result<Transaction, AppError> {
+pub(crate) fn view(row: repo::transactions::Row) -> Result<Transaction, AppError> {
     let bad = |what: &str| AppError::Database {
         message: format!("Transaction {} has an invalid {what}", row.id),
     };

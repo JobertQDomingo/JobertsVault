@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod categories;
+pub mod dashboard;
 pub mod payment_methods;
 pub mod period;
 pub mod settings;
