@@ -1,4 +1,5 @@
 pub mod accounts;
+pub mod categories;
 pub mod settings;
 pub mod system;
 
