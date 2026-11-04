@@ -14,6 +14,8 @@ pub struct Row {
     pub archived: bool,
     /// Calculated as of the date asked for, never stored (DATA_MODEL §5.1).
     pub balance: i64,
+    /// Whether any transaction uses it, as its source or as a transfer's destination.
+    pub in_use: bool,
 }
 
 /// The columns a create or an edit writes.
@@ -33,7 +35,9 @@ const SELECT: &str =
             + COALESCE((SELECT SUM(CASE t.kind WHEN 'income' THEN t.amount ELSE -t.amount END)
                         FROM transactions t WHERE t.account_id = a.id AND t.date <= ?1), 0)
             + COALESCE((SELECT SUM(t.amount)
-                        FROM transactions t WHERE t.to_account_id = a.id AND t.date <= ?1), 0)
+                        FROM transactions t WHERE t.to_account_id = a.id AND t.date <= ?1), 0),
+            EXISTS (SELECT 1 FROM transactions t WHERE t.account_id = a.id)
+            OR EXISTS (SELECT 1 FROM transactions t WHERE t.to_account_id = a.id)
      FROM accounts a";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
@@ -48,6 +52,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
         sort_order: r.get(7)?,
         archived: r.get(8)?,
         balance: r.get(9)?,
+        in_use: r.get(10)?,
     })
 }
 
@@ -123,14 +128,6 @@ pub fn expenses_between(
     )
 }
 
-/// `None` when there's no such account.
-pub fn archived(conn: &Connection, id: i64) -> rusqlite::Result<Option<bool>> {
-    conn.query_row("SELECT archived FROM accounts WHERE id = ?1", [id], |r| {
-        r.get(0)
-    })
-    .optional()
-}
-
 /// The number of rows changed: 0 when there's no such account.
 pub fn set_archived(
     conn: &Connection,
@@ -148,16 +145,6 @@ pub fn active_count(conn: &Connection) -> rusqlite::Result<i64> {
     conn.query_row(
         "SELECT count(*) FROM accounts WHERE archived = 0",
         [],
-        |r| r.get(0),
-    )
-}
-
-/// Whether any transaction uses the account, as its source or as a transfer's destination.
-pub fn in_use(conn: &Connection, id: i64) -> rusqlite::Result<bool> {
-    conn.query_row(
-        "SELECT EXISTS (SELECT 1 FROM transactions WHERE account_id = ?1)
-             OR EXISTS (SELECT 1 FROM transactions WHERE to_account_id = ?1)",
-        [id],
         |r| r.get(0),
     )
 }

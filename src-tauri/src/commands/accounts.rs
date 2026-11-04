@@ -65,6 +65,6 @@ pub fn unarchive_account(state: State<'_, AppState>, id: i64) -> Result<(), AppE
 
 #[tauri::command(async)]
 pub fn delete_account(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
-    services::accounts::delete(&mut *state.conn()?, id)
+    services::accounts::delete(&mut *state.conn()?, id, chrono::Local::now())
         .inspect_err(|err| log::record(&state.log_path, err))
 }

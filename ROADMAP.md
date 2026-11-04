@@ -99,7 +99,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [ ] Dashboard ([UI_FLOWS §2](docs/UI_FLOWS.md))
 - [ ] Transactions screen with the filter toolbar ([UI_FLOWS §3](docs/UI_FLOWS.md))
 - [ ] Quick-add and edit dialog, including Save & add another and the keyboard path that saves in under 5 seconds [TXN-5]
-- [ ] Accounts list, new/edit account dialog, and account and credit card details
+- [ ] Accounts list, new/edit account dialog, and account and credit card details. After **Delete** on the details view, remove that account's query (`queryKeys.account(id)`) and go back to `/accounts` before the ledger refresh, so the deleted account isn't fetched again and shown as "not found"
 - [ ] Pay bill: a transfer pre-filled with the full amount owed [CC-9]
 - [ ] Settings: the General, Categories and Payment methods tabs, with drag and keyboard reordering [SET-4]
 - [ ] First-launch setup form at `/welcome`: currency and first accounts, skippable [ONB-1]

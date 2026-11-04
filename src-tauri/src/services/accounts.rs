@@ -121,8 +121,12 @@ pub fn list(conn: &Connection, today: NaiveDate) -> Result<AccountList, AppError
 }
 
 pub fn get(conn: &Connection, id: i64, today: NaiveDate) -> Result<Account, AppError> {
-    let row = repo::accounts::find(conn, id, today)?.ok_or_else(|| not_found(id))?;
-    view(conn, row, today)
+    view(conn, stored(conn, id, today)?, today)
+}
+
+/// The stored row, for writes that don't need the card summary.
+fn stored(conn: &Connection, id: i64, today: NaiveDate) -> Result<repo::accounts::Row, AppError> {
+    repo::accounts::find(conn, id, today)?.ok_or_else(|| not_found(id))
 }
 
 pub fn create(
@@ -151,7 +155,7 @@ pub fn update(
     now: DateTime<Local>,
 ) -> Result<Account, AppError> {
     let tx = conn.transaction()?;
-    let kind = get(&tx, id, now.date_naive())?.kind;
+    let kind = kind_of(&stored(&tx, id, now.date_naive())?)?;
     validate(kind, &mut input)?;
     check_name_free(&tx, &input.name, Some(id))?;
     repo::accounts::update(&tx, id, &values(kind, &input), &stamp(now))?;
@@ -193,12 +197,12 @@ pub fn archive(
     now: DateTime<Local>,
 ) -> Result<(), AppError> {
     let tx = conn.transaction()?;
-    let account = get(&tx, id, now.date_naive())?;
-    if account.archived {
+    let row = stored(&tx, id, now.date_naive())?;
+    if row.archived {
         return Ok(());
     }
     check_not_last_active(&tx)?;
-    if account.balance != Money::ZERO && !acknowledge_balance {
+    if row.balance != 0 && !acknowledge_balance {
         return Err(AppError::Conflict {
             message: "This account's balance isn't 0. Archived accounts still count toward your net balance.".into(),
         });
@@ -210,23 +214,24 @@ pub fn archive(
 
 pub fn unarchive(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result<(), AppError> {
     let tx = conn.transaction()?;
-    if repo::accounts::set_archived(&tx, id, false, &stamp(now))? == 0 {
-        return Err(not_found(id));
+    if !stored(&tx, id, now.date_naive())?.archived {
+        return Ok(());
     }
+    repo::accounts::set_archived(&tx, id, false, &stamp(now))?;
     tx.commit()?;
     Ok(())
 }
 
 /// Only an account no transaction uses can go; any other is archived instead (ACC-3).
-pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
+pub fn delete(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result<(), AppError> {
     let tx = conn.transaction()?;
-    let archived = repo::accounts::archived(&tx, id)?.ok_or_else(|| not_found(id))?;
-    if repo::accounts::in_use(&tx, id)? {
+    let row = stored(&tx, id, now.date_naive())?;
+    if row.in_use {
         return Err(AppError::Conflict {
             message: "This account has transactions, so it can only be archived".into(),
         });
     }
-    if !archived {
+    if !row.archived {
         check_not_last_active(&tx)?;
     }
     repo::accounts::delete(&tx, id)?;
@@ -329,17 +334,7 @@ fn view(
     row: repo::accounts::Row,
     today: NaiveDate,
 ) -> Result<Account, AppError> {
-    let kind = [
-        AccountKind::Cash,
-        AccountKind::Bank,
-        AccountKind::Ewallet,
-        AccountKind::CreditCard,
-    ]
-    .into_iter()
-    .find(|k| kind_text(*k) == row.kind)
-    .ok_or_else(|| AppError::Database {
-        message: format!("Account {} has an unknown kind", row.id),
-    })?;
+    let kind = kind_of(&row)?;
     let opening_balance = if kind == AccountKind::CreditCard {
         // Stored negative; i64::MIN can only come from a hand-edited database.
         row.opening_balance
@@ -374,7 +369,21 @@ fn view(
         archived: row.archived,
         balance,
         card,
-        in_use: repo::accounts::in_use(conn, row.id)?,
+        in_use: row.in_use,
+    })
+}
+
+fn kind_of(row: &repo::accounts::Row) -> Result<AccountKind, AppError> {
+    [
+        AccountKind::Cash,
+        AccountKind::Bank,
+        AccountKind::Ewallet,
+        AccountKind::CreditCard,
+    ]
+    .into_iter()
+    .find(|k| kind_text(*k) == row.kind)
+    .ok_or_else(|| AppError::Database {
+        message: format!("Account {} has an unknown kind", row.id),
     })
 }
 
@@ -970,10 +979,10 @@ mod tests {
         archive(&mut conn, old.id, false, now()).unwrap();
         let keep = "Keep at least one active account";
         assert_eq!(conflict(archive(&mut conn, 1, true, now())), keep);
-        assert_eq!(conflict(delete(&mut conn, 1)), keep);
+        assert_eq!(conflict(delete(&mut conn, 1, now())), keep);
         assert!(!is_archived(&conn, 1));
         // An archived one can still go, since Cash stays active.
-        delete(&mut conn, old.id).unwrap();
+        delete(&mut conn, old.id, now()).unwrap();
     }
 
     #[test]
@@ -989,7 +998,7 @@ mod tests {
     fn an_unused_account_can_be_deleted() {
         let mut conn = db();
         let bank = add(&mut conn, "Bank");
-        delete(&mut conn, bank.id).unwrap();
+        delete(&mut conn, bank.id, now()).unwrap();
         assert!(matches!(
             get(&conn, bank.id, today()),
             Err(AppError::NotFound { .. })
@@ -1007,14 +1016,14 @@ mod tests {
         assert!(get(&conn, bank.id, today()).unwrap().in_use);
         assert!(get(&conn, 1, today()).unwrap().in_use);
         assert!(!get(&conn, savings.id, today()).unwrap().in_use);
-        let message = conflict(delete(&mut conn, bank.id));
+        let message = conflict(delete(&mut conn, bank.id, now()));
         assert!(message.contains("archived"), "{message}");
         assert!(get(&conn, bank.id, today()).is_ok());
 
         // Only ever on the receiving side of a transfer still counts as used.
         let to_only = add(&mut conn, "To only");
         txn(&conn, "transfer", 100, today(), 1, Some(to_only.id));
-        conflict(delete(&mut conn, to_only.id));
+        conflict(delete(&mut conn, to_only.id, now()));
     }
 
     #[test]
@@ -1028,7 +1037,7 @@ mod tests {
         };
         not_found(archive(&mut conn, 99, true, now()));
         not_found(unarchive(&mut conn, 99, now()));
-        not_found(delete(&mut conn, 99));
+        not_found(delete(&mut conn, 99, now()));
     }
 
     #[test]
@@ -1072,5 +1081,19 @@ mod tests {
             input.fields.due_day = Some(bad);
             assert_eq!(field_of(create(&mut conn, input, now())), "dueDay", "{bad}");
         }
+    }
+
+    #[test]
+    fn unarchiving_an_active_account_changes_nothing() {
+        let mut conn = db();
+        conn.execute("UPDATE accounts SET updated_at = 'before' WHERE id = 1", [])
+            .unwrap();
+        unarchive(&mut conn, 1, now()).unwrap();
+        let updated: String = conn
+            .query_row("SELECT updated_at FROM accounts WHERE id = 1", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(updated, "before");
     }
 }
