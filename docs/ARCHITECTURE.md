@@ -151,10 +151,12 @@ pub struct Money(i64);                 // minor units; checked arithmetic, never
 pub enum Decimals { Zero, Two }        // currency_decimals, for Money::parse and Money::to_plain
 pub enum PeriodKind { Day, Week, Month, Year, Custom }
 pub struct Period { kind: PeriodKind, start: NaiveDate, end: NaiveDate }   // inclusive
+pub struct PeriodSettings { week_start: Weekday, month_start_day: u32 }
 impl Period {
-    fn containing(kind, anchor, &PeriodSettings) -> Period;   // DATA_MODEL §5.3
-    fn custom(start, end) -> Period;
-    fn previous(&self, &PeriodSettings) -> Period;  fn next(&self, &PeriodSettings) -> Period;
+    fn containing(kind, anchor, &PeriodSettings) -> Option<Period>;   // DATA_MODEL §5.3; None for Custom
+    fn custom(start, end) -> Option<Period>;                          // None when end < start
+    fn previous(&self, &PeriodSettings) -> Period;
+    fn next(&self, &PeriodSettings, today) -> Option<Period>;         // None when it would start after today
 }
 fn comparison_window(current: &Period, today: NaiveDate, mode: ComparisonMode) -> Period; // §5.4
 fn card_cycle(statement_day: u8, due_day: u8, today: NaiveDate) -> CardCycle;             // §5.5
