@@ -159,7 +159,8 @@ impl Period {
     fn next(&self, &PeriodSettings, today) -> Option<Period>;         // None when it would start after today
 }
 fn comparison_window(current: &Period, today: NaiveDate, mode: ComparisonMode) -> Period; // §5.4
-fn card_cycle(statement_day: u8, due_day: u8, today: NaiveDate) -> CardCycle;             // §5.5
+pub struct CardCycle { start: NaiveDate, end: NaiveDate, due: NaiveDate }  // end = statement closing date
+fn card_cycle(statement_day: u8, due_day: u8, today: NaiveDate) -> Option<CardCycle>;     // §5.5; None past chrono's range
 ```
 
 ### 4.3 Database access
