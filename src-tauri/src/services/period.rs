@@ -31,7 +31,8 @@ pub struct PeriodView {
     pub previous: Option<PeriodQuery>,
     /// `None` when the next period would start after today.
     pub next: Option<PeriodQuery>,
-    /// The period of the same kind that contains today. A custom range moves by its length.
+    /// The period of the same kind that contains today, as ▶ would reach it. A custom range
+    /// moves by its length.
     pub today_query: PeriodQuery,
     /// Whether today falls inside this period.
     pub is_current: bool,
@@ -54,17 +55,11 @@ pub fn get(
 ) -> Result<PeriodView, AppError> {
     let settings = period_settings(conn)?;
     let period = resolve_with(query, today, &settings)?;
-    let today_query = match *query {
-        PeriodQuery::Day { .. } => PeriodQuery::Day { anchor: None },
-        PeriodQuery::Week { .. } => PeriodQuery::Week { anchor: None },
-        PeriodQuery::Month { .. } => PeriodQuery::Month { anchor: None },
-        PeriodQuery::Year { .. } => PeriodQuery::Year { anchor: None },
-        PeriodQuery::Custom { .. } => query_for(
-            &period
-                .in_sequence(today, &settings)
-                .ok_or_else(out_of_range)?,
-        ),
-    };
+    let today_query = query_for(
+        &period
+            .in_sequence(today, &settings)
+            .ok_or_else(out_of_range)?,
+    );
     Ok(PeriodView {
         start: period.start(),
         end: period.end(),
@@ -186,7 +181,7 @@ mod tests {
     }
 
     #[test]
-    fn an_older_month_steps_by_anchor_and_today_has_no_anchor() {
+    fn an_older_month_steps_by_anchor_and_today_matches_where_next_stops() {
         let conn = db();
         let query = PeriodQuery::Month {
             anchor: Some(d(2026, 9, 14)),
@@ -200,7 +195,15 @@ mod tests {
                 anchor: Some(d(2026, 10, 1))
             })
         );
-        assert_eq!(view.today_query, PeriodQuery::Month { anchor: None });
+        // The same query ▶ reaches, so one period has one cache key.
+        let october = get(&conn, &view.next.unwrap(), d(2026, 11, 3)).unwrap();
+        assert_eq!(view.today_query, october.next.unwrap());
+        assert_eq!(
+            view.today_query,
+            PeriodQuery::Month {
+                anchor: Some(d(2026, 11, 1))
+            }
+        );
     }
 
     #[test]

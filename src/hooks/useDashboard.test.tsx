@@ -4,7 +4,8 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
-import { useDashboard, usePeriod } from "./useDashboard";
+import { useDashboard } from "./useDashboard";
+import { usePeriod } from "./usePeriod";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 

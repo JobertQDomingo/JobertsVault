@@ -14,7 +14,8 @@ previous: PeriodQuery | null,
  */
 next: PeriodQuery | null, 
 /**
- * The period of the same kind that contains today. A custom range moves by its length.
+ * The period of the same kind that contains today, as ▶ would reach it. A custom range
+ * moves by its length.
  */
 todayQuery: PeriodQuery, 
 /**
