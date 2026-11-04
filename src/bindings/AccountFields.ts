@@ -6,6 +6,14 @@ import type { Money } from "./Money";
  */
 export type AccountFields = { name: string, 
 /**
- * 0 or more, as typed in the form.
+ * 0 or more, as typed in the form. For a credit card it's the amount owed (DATA_MODEL §5.1).
  */
-openingBalance: Money, };
+openingBalance: Money, 
+/**
+ * Credit card only, like the two days (CC-1).
+ */
+creditLimit: Money | null, 
+/**
+ * 1–31; a shorter month uses its last day.
+ */
+statementDay: number | null, dueDay: number | null, };

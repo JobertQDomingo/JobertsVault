@@ -7,6 +7,6 @@ import type { Money } from "./Money";
  */
 export type Account = { id: number, name: string, kind: AccountKind, 
 /**
- * As the form shows it: 0 or more.
+ * As the form shows it: 0 or more, and the amount owed for a credit card.
  */
-openingBalance: Money, sortOrder: number, archived: boolean, };
+openingBalance: Money, creditLimit: Money | null, statementDay: number | null, dueDay: number | null, sortOrder: number, archived: boolean, };

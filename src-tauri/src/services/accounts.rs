@@ -26,8 +26,13 @@ pub enum AccountKind {
 #[ts(export)]
 pub struct AccountFields {
     pub name: String,
-    /// 0 or more, as typed in the form.
+    /// 0 or more, as typed in the form. For a credit card it's the amount owed (DATA_MODEL §5.1).
     pub opening_balance: Money,
+    /// Credit card only, like the two days (CC-1).
+    pub credit_limit: Option<Money>,
+    /// 1–31; a shorter month uses its last day.
+    pub statement_day: Option<u8>,
+    pub due_day: Option<u8>,
 }
 
 #[derive(Clone, Debug, Deserialize, TS)]
@@ -48,8 +53,11 @@ pub struct Account {
     pub id: i64,
     pub name: String,
     pub kind: AccountKind,
-    /// As the form shows it: 0 or more.
+    /// As the form shows it: 0 or more, and the amount owed for a credit card.
     pub opening_balance: Money,
+    pub credit_limit: Option<Money>,
+    pub statement_day: Option<u8>,
+    pub due_day: Option<u8>,
     #[ts(type = "number")]
     pub sort_order: i64,
     pub archived: bool,
@@ -69,14 +77,13 @@ pub fn create(
     mut input: NewAccount,
     now: DateTime<Utc>,
 ) -> Result<Account, AppError> {
-    validate(&mut input.fields)?;
+    validate(input.kind, &mut input.fields)?;
     let tx = conn.transaction()?;
     check_name_free(&tx, &input.fields.name, None)?;
     let id = repo::accounts::insert(
         &tx,
-        &input.fields.name,
         kind_text(input.kind),
-        input.fields.opening_balance.0,
+        &values(input.kind, &input.fields),
         &stamp(now),
     )?;
     let account = get(&tx, id)?;
@@ -90,11 +97,11 @@ pub fn update(
     mut input: AccountFields,
     now: DateTime<Utc>,
 ) -> Result<Account, AppError> {
-    validate(&mut input)?;
     let tx = conn.transaction()?;
-    get(&tx, id)?;
+    let kind = get(&tx, id)?.kind;
+    validate(kind, &mut input)?;
     check_name_free(&tx, &input.name, Some(id))?;
-    repo::accounts::update(&tx, id, &input.name, input.opening_balance.0, &stamp(now))?;
+    repo::accounts::update(&tx, id, &values(kind, &input), &stamp(now))?;
     let account = get(&tx, id)?;
     tx.commit()?;
     Ok(account)
@@ -118,7 +125,7 @@ pub fn reorder(conn: &mut Connection, ids: Vec<i64>, now: DateTime<Utc>) -> Resu
 }
 
 /// Trims the name and checks every field (DATA_MODEL §6).
-fn validate(fields: &mut AccountFields) -> Result<(), AppError> {
+fn validate(kind: AccountKind, fields: &mut AccountFields) -> Result<(), AppError> {
     fields.name = fields.name.trim().to_owned();
     if !(1..=50).contains(&fields.name.chars().count()) {
         return Err(invalid("name", "Enter a name of 1 to 50 characters"));
@@ -129,7 +136,65 @@ fn validate(fields: &mut AccountFields) -> Result<(), AppError> {
     if fields.opening_balance > Money::MAX {
         return Err(invalid("openingBalance", "That amount is too large"));
     }
+    let card = kind == AccountKind::CreditCard;
+    // Present if and only if the account is a credit card (DATA_MODEL §6).
+    for (field, present, missing) in [
+        (
+            "creditLimit",
+            fields.credit_limit.is_some(),
+            "Enter a credit limit",
+        ),
+        (
+            "statementDay",
+            fields.statement_day.is_some(),
+            "Choose a day from 1 to 31",
+        ),
+        (
+            "dueDay",
+            fields.due_day.is_some(),
+            "Choose a day from 1 to 31",
+        ),
+    ] {
+        if card && !present {
+            return Err(invalid(field, missing));
+        }
+        if !card && present {
+            return Err(invalid(field, "Only a credit card has this field"));
+        }
+    }
+    if let Some(limit) = fields.credit_limit {
+        if limit <= Money::ZERO {
+            return Err(invalid("creditLimit", "Enter a limit above 0"));
+        }
+        if limit > Money::MAX {
+            return Err(invalid("creditLimit", "That amount is too large"));
+        }
+    }
+    for (field, day) in [
+        ("statementDay", fields.statement_day),
+        ("dueDay", fields.due_day),
+    ] {
+        if day.is_some_and(|day| !(1..=31).contains(&day)) {
+            return Err(invalid(field, "Choose a day from 1 to 31"));
+        }
+    }
     Ok(())
+}
+
+/// The row to store: a card keeps its amount owed as a negative opening balance (DATA_MODEL §3.1).
+fn values(kind: AccountKind, fields: &AccountFields) -> repo::accounts::Values<'_> {
+    let opening = fields.opening_balance.0;
+    repo::accounts::Values {
+        name: &fields.name,
+        opening_balance: if kind == AccountKind::CreditCard {
+            -opening
+        } else {
+            opening
+        },
+        credit_limit: fields.credit_limit.map(|limit| limit.0),
+        statement_day: fields.statement_day,
+        due_day: fields.due_day,
+    }
 }
 
 fn check_name_free(conn: &Connection, name: &str, except: Option<i64>) -> Result<(), AppError> {
@@ -151,11 +216,24 @@ fn view(row: repo::accounts::Row) -> Result<Account, AppError> {
     .ok_or_else(|| AppError::Database {
         message: format!("Account {} has an unknown kind", row.id),
     })?;
+    let opening_balance = if kind == AccountKind::CreditCard {
+        // Stored negative; i64::MIN can only come from a hand-edited database.
+        row.opening_balance
+            .checked_neg()
+            .ok_or_else(|| AppError::Database {
+                message: format!("Account {} has an invalid opening balance", row.id),
+            })?
+    } else {
+        row.opening_balance
+    };
     Ok(Account {
         id: row.id,
         name: row.name,
         kind,
-        opening_balance: Money(row.opening_balance),
+        opening_balance: Money(opening_balance),
+        credit_limit: row.credit_limit.map(Money),
+        statement_day: row.statement_day,
+        due_day: row.due_day,
         sort_order: row.sort_order,
         archived: row.archived,
     })
@@ -187,6 +265,8 @@ mod tests {
     use super::*;
     use crate::test_support::{db, now};
 
+    type FieldEdit = fn(&mut AccountFields);
+
     fn field_of<T: std::fmt::Debug>(result: Result<T, AppError>) -> String {
         match result {
             Err(AppError::Validation { field, .. }) => field,
@@ -198,6 +278,22 @@ mod tests {
         AccountFields {
             name: name.into(),
             opening_balance: Money(opening_balance),
+            credit_limit: None,
+            statement_day: None,
+            due_day: None,
+        }
+    }
+
+    /// A card owing `owed`, with a 10,000.00 limit, closing on the 20th and due on the 5th.
+    fn card(name: &str, owed: i64) -> NewAccount {
+        NewAccount {
+            kind: AccountKind::CreditCard,
+            fields: AccountFields {
+                credit_limit: Some(Money(1_000_000)),
+                statement_day: Some(20),
+                due_day: Some(5),
+                ..fields(name, owed)
+            },
         }
     }
 
@@ -228,6 +324,9 @@ mod tests {
                 name: "Bank".into(),
                 kind: AccountKind::Bank,
                 opening_balance: Money(100_000),
+                credit_limit: None,
+                statement_day: None,
+                due_day: None,
                 sort_order: 1,
                 archived: false,
             }
@@ -244,7 +343,7 @@ mod tests {
     }
 
     #[test]
-    fn every_kind_but_a_card_can_be_created() {
+    fn cash_bank_and_ewallet_accounts_can_be_created() {
         let mut conn = db();
         for (name, kind) in [
             ("Wallet", AccountKind::Cash),
@@ -407,6 +506,142 @@ mod tests {
             unchanged,
             ["Wallet", "Cash", "Bank"],
             "a rejected reorder changes nothing"
+        );
+    }
+
+    #[test]
+    fn a_card_stores_its_amount_owed_as_negative() {
+        let mut conn = db();
+        let visa = create(&mut conn, card("Visa", 64_000), now().to_utc()).unwrap();
+        let stored: i64 = conn
+            .query_row(
+                "SELECT opening_balance FROM accounts WHERE id = ?1",
+                [visa.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored, -64_000);
+        assert_eq!(
+            visa.opening_balance,
+            Money(64_000),
+            "the form shows it owed"
+        );
+        assert_eq!(
+            (visa.credit_limit, visa.statement_day, visa.due_day),
+            (Some(Money(1_000_000)), Some(20), Some(5))
+        );
+
+        let edited = update(
+            &mut conn,
+            visa.id,
+            card("Visa", 1_000).fields,
+            now().to_utc(),
+        )
+        .unwrap();
+        assert_eq!(edited.opening_balance, Money(1_000));
+    }
+
+    #[test]
+    fn a_card_needs_all_three_fields() {
+        let mut conn = db();
+        let without = |strip: FieldEdit| {
+            let mut input = card("Visa", 0);
+            strip(&mut input.fields);
+            input
+        };
+        let cases: [(FieldEdit, &str); 3] = [
+            (|f| f.credit_limit = None, "creditLimit"),
+            (|f| f.statement_day = None, "statementDay"),
+            (|f| f.due_day = None, "dueDay"),
+        ];
+        for (strip, field) in cases {
+            assert_eq!(
+                field_of(create(&mut conn, without(strip), now().to_utc())),
+                field
+            );
+        }
+    }
+
+    #[test]
+    fn card_fields_are_only_for_cards() {
+        let mut conn = db();
+        let cases: [(FieldEdit, &str); 3] = [
+            (|f| f.credit_limit = Some(Money(100)), "creditLimit"),
+            (|f| f.statement_day = Some(1), "statementDay"),
+            (|f| f.due_day = Some(1), "dueDay"),
+        ];
+        for (add_field, field) in cases {
+            let mut input = new("Bank", AccountKind::Bank, 0);
+            add_field(&mut input.fields);
+            assert_eq!(
+                field_of(create(&mut conn, input.clone(), now().to_utc())),
+                field
+            );
+            assert_eq!(
+                field_of(update(&mut conn, 1, input.fields, now().to_utc())),
+                field,
+                "editing Cash"
+            );
+        }
+    }
+
+    #[test]
+    fn a_limit_is_1_to_the_largest_amount_and_days_are_1_to_31() {
+        let mut conn = db();
+        let with = |limit: i64, statement: u8, due: u8| {
+            let mut input = card("Visa", 0);
+            input.fields.credit_limit = Some(Money(limit));
+            input.fields.statement_day = Some(statement);
+            input.fields.due_day = Some(due);
+            input
+        };
+        let mut create_with =
+            |limit, statement, due| create(&mut conn, with(limit, statement, due), now().to_utc());
+        assert_eq!(field_of(create_with(0, 20, 5)), "creditLimit");
+        assert_eq!(
+            field_of(create_with(Money::MAX.0 + 1, 20, 5)),
+            "creditLimit"
+        );
+        assert_eq!(field_of(create_with(100, 0, 5)), "statementDay");
+        assert_eq!(field_of(create_with(100, 32, 5)), "statementDay");
+        assert_eq!(field_of(create_with(100, 20, 0)), "dueDay");
+        assert_eq!(field_of(create_with(100, 20, 32)), "dueDay");
+        assert!(create_with(Money::MAX.0, 31, 31).is_ok());
+    }
+
+    #[test]
+    fn any_number_of_cards_can_be_added() {
+        let mut conn = db();
+        for name in ["Visa", "Mastercard", "Amex"] {
+            create(&mut conn, card(name, 0), now().to_utc()).unwrap();
+        }
+        let cards = list(&conn)
+            .unwrap()
+            .into_iter()
+            .filter(|a| a.kind == AccountKind::CreditCard)
+            .count();
+        assert_eq!(cards, 3);
+    }
+
+    #[test]
+    fn update_can_change_the_card_fields() {
+        let mut conn = db();
+        let visa = create(&mut conn, card("Visa", 0), now().to_utc()).unwrap();
+        let mut changed = card("Visa", 0).fields;
+        changed.credit_limit = Some(Money(2_000_000));
+        changed.statement_day = Some(31);
+        changed.due_day = Some(15);
+        let saved = update(&mut conn, visa.id, changed, now().to_utc()).unwrap();
+        assert_eq!(
+            (saved.credit_limit, saved.statement_day, saved.due_day),
+            (Some(Money(2_000_000)), Some(31), Some(15))
+        );
+        // A card still needs its fields when edited.
+        let mut stripped = card("Visa", 0).fields;
+        stripped.due_day = None;
+        assert_eq!(
+            field_of(update(&mut conn, visa.id, stripped, now().to_utc())),
+            "dueDay"
         );
     }
 }

@@ -15,6 +15,9 @@ test("creating an account sends it and refreshes the ledger", async () => {
     kind: "bank",
     name: "Bank",
     openingBalance: 100000,
+    creditLimit: null,
+    statementDay: null,
+    dueDay: null,
   };
   vi.mocked(invoke).mockResolvedValueOnce({ id: 2, ...account });
   const client = new QueryClient();

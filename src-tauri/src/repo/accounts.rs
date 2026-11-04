@@ -6,11 +6,23 @@ pub struct Row {
     pub name: String,
     pub kind: String,
     pub opening_balance: i64,
+    pub credit_limit: Option<i64>,
+    pub statement_day: Option<u8>,
+    pub due_day: Option<u8>,
     pub sort_order: i64,
     pub archived: bool,
 }
 
-const SELECT: &str = "SELECT id, name, kind, opening_balance, sort_order, archived FROM accounts";
+/// The columns a create or an edit writes.
+pub struct Values<'a> {
+    pub name: &'a str,
+    pub opening_balance: i64,
+    pub credit_limit: Option<i64>,
+    pub statement_day: Option<u8>,
+    pub due_day: Option<u8>,
+}
+
+const SELECT: &str = "SELECT id, name, kind, opening_balance, credit_limit, statement_day, due_day, sort_order, archived FROM accounts";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
     Ok(Row {
@@ -18,8 +30,11 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
         name: r.get(1)?,
         kind: r.get(2)?,
         opening_balance: r.get(3)?,
-        sort_order: r.get(4)?,
-        archived: r.get(5)?,
+        credit_limit: r.get(4)?,
+        statement_day: r.get(5)?,
+        due_day: r.get(6)?,
+        sort_order: r.get(7)?,
+        archived: r.get(8)?,
     })
 }
 
@@ -45,31 +60,20 @@ pub fn name_taken(conn: &Connection, name: &str, except: Option<i64>) -> rusqlit
 }
 
 /// Adds the account after every other one and returns its id.
-pub fn insert(
-    conn: &Connection,
-    name: &str,
-    kind: &str,
-    opening_balance: i64,
-    now: &str,
-) -> rusqlite::Result<i64> {
+pub fn insert(conn: &Connection, kind: &str, v: &Values, now: &str) -> rusqlite::Result<i64> {
     conn.execute(
-        "INSERT INTO accounts (name, kind, opening_balance, sort_order, created_at, updated_at)
-         VALUES (?1, ?2, ?3, (SELECT COALESCE(MAX(sort_order) + 1, 0) FROM accounts), ?4, ?4)",
-        params![name, kind, opening_balance, now],
+        "INSERT INTO accounts (name, kind, opening_balance, credit_limit, statement_day, due_day, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, (SELECT COALESCE(MAX(sort_order) + 1, 0) FROM accounts), ?7, ?7)",
+        params![v.name, kind, v.opening_balance, v.credit_limit, v.statement_day, v.due_day, now],
     )?;
     Ok(conn.last_insert_rowid())
 }
 
-pub fn update(
-    conn: &Connection,
-    id: i64,
-    name: &str,
-    opening_balance: i64,
-    now: &str,
-) -> rusqlite::Result<()> {
+pub fn update(conn: &Connection, id: i64, v: &Values, now: &str) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE accounts SET name = ?2, opening_balance = ?3, updated_at = ?4 WHERE id = ?1",
-        params![id, name, opening_balance, now],
+        "UPDATE accounts SET name = ?2, opening_balance = ?3, credit_limit = ?4, statement_day = ?5,
+         due_day = ?6, updated_at = ?7 WHERE id = ?1",
+        params![id, v.name, v.opening_balance, v.credit_limit, v.statement_day, v.due_day, now],
     )?;
     Ok(())
 }
