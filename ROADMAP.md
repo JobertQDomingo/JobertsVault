@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-04 |
-| **Current focus** | **Phase 1, 1.2: Settings** |
+| **Current focus** | **Phase 1, 1.3: Accounts** |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -18,7 +18,7 @@ This file is the progress tracker.
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
-| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 11 / 53 |
+| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 12 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
@@ -60,7 +60,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] Domain: credit card statement cycle and next due date, with tests (DATA_MODEL §5.5)
 
 ### 1.2 Settings
-- [ ] Commands `get_settings` and `update_settings`: currency (₱ default), symbol position, decimals (locked once any transaction exists), week start, month start day, payment method field, `onboarding_completed`, `auto_update_enabled` [SET-1] [SET-2] [SET-6] [ONB-1] [UPD-3]
+- [x] Commands `get_settings` and `update_settings`: currency (₱ default), symbol position, decimals (locked once any transaction exists), week start, month start day, payment method field, `onboarding_completed`, `auto_update_enabled` [SET-1] [SET-2] [SET-6] [ONB-1] [UPD-3]
 
 ### 1.3 Accounts
 - [ ] Create, edit, list and reorder accounts, with opening balances of 0 or more [ACC-1] [ACC-2]

@@ -211,7 +211,7 @@ All commands use `camelCase` parameter names in TypeScript and `snake_case` in R
 | 1 | Payment methods | `list_payment_methods`, `create_payment_method`, `update_payment_method`, `archive_payment_method`, `unarchive_payment_method`, `delete_payment_method`, `reorder_payment_methods` |
 | 1 | Transactions | `list_transactions(filter, page)`, `get_transaction`, `create_transaction`, `update_transaction`, `delete_transaction`, `get_transaction_defaults` → account and today (DATA_MODEL §5.8), `get_pay_bill_defaults(card_id)` → From account, amount and today |
 | 1 | Dashboard | `get_dashboard(query)` → period, totals, balances, net balance, card summary, recent transactions, `today` |
-| 1 | Settings | `get_settings` (includes whether decimals are locked), `update_settings` |
+| 1 | Settings | `get_settings` → every Phase 1 key and whether decimals are locked; `update_settings(settings)` saves the whole set and returns it the same way |
 | 2 | Reports | `get_timeseries`, `get_category_breakdown`, `get_comparison`, `suggest_payees(prefix)` |
 | 2 | Backup | `backup_now`, `list_backups`, `restore_backup(path)`, `export_csv(range, path)` |
 | 3 | Planning | `list/create/update/pause/delete_recurring_rule`, `list_due_occurrences`, `post_occurrence`, `skip_occurrence`, budget CRUD + `get_budget_progress`, goal CRUD + `get_goal_progress` |

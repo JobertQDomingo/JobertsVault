@@ -1,14 +1,15 @@
 // The only code that converts between text and minor units (ARCHITECTURE §5.3). It works on
 // digit strings, never floats, so amounts stay exact (ADR 0002).
 
-export type Decimals = 0 | 2;
+import type { Settings } from "@/bindings/Settings";
 
-/** The money settings (DATA_MODEL §3.5), as `get_settings` will return them. */
-export type MoneySettings = {
-  currencySymbol: string;
-  currencyPosition: "before" | "after";
-  currencyDecimals: Decimals;
-};
+export type Decimals = Settings["currencyDecimals"];
+
+/** The money settings (DATA_MODEL §3.5), as `get_settings` returns them. */
+export type MoneySettings = Pick<
+  Settings,
+  "currencySymbol" | "currencyPosition" | "currencyDecimals"
+>;
 
 /** The largest amount any field accepts (DATA_MODEL §6). */
 export const MAX_AMOUNT = 999_999_999_999;
