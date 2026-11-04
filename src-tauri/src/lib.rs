@@ -4,6 +4,7 @@ use state::AppState;
 
 pub mod commands;
 pub mod db;
+pub mod domain;
 pub mod error;
 pub mod log;
 pub mod services;

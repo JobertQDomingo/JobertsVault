@@ -148,6 +148,7 @@ jobertsvault/
 
 ```rust
 pub struct Money(i64);                 // minor units; checked arithmetic, never f64
+pub enum Decimals { Zero, Two }        // currency_decimals, for Money::parse and Money::to_plain
 pub enum PeriodKind { Day, Week, Month, Year, Custom }
 pub struct Period { kind: PeriodKind, start: NaiveDate, end: NaiveDate }   // inclusive
 impl Period {
