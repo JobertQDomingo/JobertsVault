@@ -150,12 +150,12 @@ jobertsvault/
 pub struct Money(i64);                 // minor units; checked arithmetic, never f64
 pub enum Decimals { Zero, Two }        // currency_decimals, for Money::parse and Money::to_plain
 pub enum PeriodKind { Day, Week, Month, Year, Custom }
-pub struct Period { kind: PeriodKind, start: NaiveDate, end: NaiveDate }   // inclusive
+pub struct Period { kind: PeriodKind, start: NaiveDate, end: NaiveDate }   // inclusive; private fields, read by kind()/start()/end()
 pub struct PeriodSettings { week_start: Weekday, month_start_day: u32 }
 impl Period {
     fn containing(kind, anchor, &PeriodSettings) -> Option<Period>;   // DATA_MODEL §5.3; None for Custom
     fn custom(start, end) -> Option<Period>;                          // None when end < start
-    fn previous(&self, &PeriodSettings) -> Period;
+    fn previous(&self, &PeriodSettings) -> Option<Period>;            // every fn is None past chrono's date range
     fn next(&self, &PeriodSettings, today) -> Option<Period>;         // None when it would start after today
 }
 fn comparison_window(current: &Period, today: NaiveDate, mode: ComparisonMode) -> Period; // §5.4

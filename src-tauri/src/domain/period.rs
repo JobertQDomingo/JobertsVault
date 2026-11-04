@@ -17,14 +17,16 @@ pub struct PeriodSettings {
     pub month_start_day: u32,
 }
 
-/// A closed date range that includes both ends (DATA_MODEL §5.3).
+/// A closed date range that includes both ends (DATA_MODEL §5.3). The fields are private so
+/// `start <= end` always holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Period {
-    pub kind: PeriodKind,
-    pub start: NaiveDate,
-    pub end: NaiveDate,
+    kind: PeriodKind,
+    start: NaiveDate,
+    end: NaiveDate,
 }
 
+/// Every function here is `None` instead of panicking for a date past chrono's range.
 impl Period {
     /// The period of `kind` that contains `anchor`. Custom has no anchor, so it's `None`.
     pub fn containing(
@@ -35,12 +37,12 @@ impl Period {
         let (start, end) = match kind {
             PeriodKind::Day => (anchor, anchor),
             PeriodKind::Week => {
-                let start =
-                    anchor - Days::new(anchor.weekday().days_since(settings.week_start).into());
-                (start, start + Days::new(6))
+                let back = anchor.weekday().days_since(settings.week_start);
+                let start = anchor.checked_sub_days(Days::new(back.into()))?;
+                (start, start.checked_add_days(Days::new(6))?)
             }
-            PeriodKind::Month => month(anchor, settings.month_start_day),
-            PeriodKind::Year => year(anchor),
+            PeriodKind::Month => month(anchor, settings.month_start_day)?,
+            PeriodKind::Year => year(anchor)?,
             PeriodKind::Custom => return None,
         };
         Some(Period { kind, start, end })
@@ -55,67 +57,74 @@ impl Period {
         })
     }
 
-    pub fn previous(&self, settings: &PeriodSettings) -> Period {
+    pub fn kind(&self) -> PeriodKind {
+        self.kind
+    }
+
+    pub fn start(&self) -> NaiveDate {
+        self.start
+    }
+
+    pub fn end(&self) -> NaiveDate {
+        self.end
+    }
+
+    pub fn previous(&self, settings: &PeriodSettings) -> Option<Period> {
         self.step(false, settings)
     }
 
     /// `None` when the next period would start after `today` (DATA_MODEL §5.3).
     pub fn next(&self, settings: &PeriodSettings, today: NaiveDate) -> Option<Period> {
-        let next = self.step(true, settings);
-        (next.start <= today).then_some(next)
+        self.step(true, settings).filter(|next| next.start <= today)
     }
 
-    fn step(&self, forward: bool, settings: &PeriodSettings) -> Period {
-        let outside = if forward {
-            self.end + Days::new(1)
-        } else {
-            self.start - Days::new(1)
+    fn step(&self, forward: bool, settings: &PeriodSettings) -> Option<Period> {
+        let shift = |d: NaiveDate, days: Days| {
+            if forward {
+                d.checked_add_days(days)
+            } else {
+                d.checked_sub_days(days)
+            }
         };
+        let outside = shift(if forward { self.end } else { self.start }, Days::new(1))?;
         let (start, end) = match self.kind {
             // Months and years vary in length, so take the one around the next or previous day.
-            PeriodKind::Month => month(outside, settings.month_start_day),
-            PeriodKind::Year => year(outside),
+            PeriodKind::Month => month(outside, settings.month_start_day)?,
+            PeriodKind::Year => year(outside)?,
             // Days, weeks and custom ranges move by their own length, counting both ends.
             PeriodKind::Day | PeriodKind::Week | PeriodKind::Custom => {
                 let length = Days::new((self.end - self.start).num_days().unsigned_abs() + 1);
-                if forward {
-                    (self.start + length, self.end + length)
-                } else {
-                    (self.start - length, self.end - length)
-                }
+                (shift(self.start, length)?, shift(self.end, length)?)
             }
         };
-        Period {
+        Some(Period {
             kind: self.kind,
             start,
             end,
-        }
+        })
     }
 }
 
 /// The month that starts on day `start_day`: from that day in `d`'s month, or the month before
 /// when `d` comes earlier, to the day before the next one starts.
-fn month(d: NaiveDate, start_day: u32) -> (NaiveDate, NaiveDate) {
+fn month(d: NaiveDate, start_day: u32) -> Option<(NaiveDate, NaiveDate)> {
+    // Settings only allow 1–28 (DATA_MODEL §3.5); clamping keeps a bad value from panicking.
     let s = start_day.clamp(1, 28);
     let start = if d.day() >= s {
-        d - Days::new((d.day() - s).into())
+        d.with_day(s)?
     } else {
-        let last_of_previous = d - Days::new(d.day().into());
-        last_of_previous - Days::new((last_of_previous.day() - s).into())
+        d.checked_sub_days(Days::new(d.day().into()))?.with_day(s)?
     };
-    (
-        start,
-        start + Days::new(u64::from(start.num_days_in_month()) - 1),
-    )
+    let end = start.checked_add_days(Days::new(u64::from(start.num_days_in_month()) - 1))?;
+    Some((start, end))
 }
 
 /// Always the calendar year, whatever `month_start_day` is.
-fn year(d: NaiveDate) -> (NaiveDate, NaiveDate) {
-    let start = d - Days::new(d.ordinal0().into());
-    (
-        start,
-        start + Days::new(if start.leap_year() { 365 } else { 364 }),
-    )
+fn year(d: NaiveDate) -> Option<(NaiveDate, NaiveDate)> {
+    Some((
+        NaiveDate::from_ymd_opt(d.year(), 1, 1)?,
+        NaiveDate::from_ymd_opt(d.year(), 12, 31)?,
+    ))
 }
 
 #[cfg(test)]
@@ -158,7 +167,7 @@ mod tests {
         let day = Period::containing(PeriodKind::Day, d(2026, 10, 26), &MONDAY_1).unwrap();
         assert_eq!(span(day), (d(2026, 10, 26), d(2026, 10, 26)));
         assert_eq!(
-            span(day.previous(&MONDAY_1)),
+            span(day.previous(&MONDAY_1).unwrap()),
             (d(2026, 10, 25), d(2026, 10, 25))
         );
         let next = day.next(&MONDAY_1, d(2026, 10, 27)).unwrap();
@@ -199,7 +208,7 @@ mod tests {
     fn weeks_move_by_seven_days() {
         let week = Period::containing(PeriodKind::Week, d(2026, 10, 26), &MONDAY_1).unwrap();
         assert_eq!(
-            span(week.previous(&MONDAY_1)),
+            span(week.previous(&MONDAY_1).unwrap()),
             (d(2026, 10, 19), d(2026, 10, 25))
         );
         assert_eq!(
@@ -227,9 +236,9 @@ mod tests {
         assert_eq!(span(feb), (d(2026, 2, 1), d(2026, 2, 28)));
         let mar = feb.next(&MONDAY_1, d(2026, 12, 31)).unwrap();
         assert_eq!(span(mar), (d(2026, 3, 1), d(2026, 3, 31)));
-        assert_eq!(span(mar.previous(&MONDAY_1)), span(feb));
+        assert_eq!(span(mar.previous(&MONDAY_1).unwrap()), span(feb));
         assert_eq!(
-            span(jan.previous(&MONDAY_1)),
+            span(jan.previous(&MONDAY_1).unwrap()),
             (d(2025, 12, 1), d(2025, 12, 31))
         );
     }
@@ -277,7 +286,7 @@ mod tests {
         let s25 = settings(Weekday::Mon, 25);
         let month = Period::containing(PeriodKind::Month, d(2026, 1, 10), &s25).unwrap();
         assert_eq!(
-            span(month.previous(&s25)),
+            span(month.previous(&s25).unwrap()),
             (d(2025, 11, 25), d(2025, 12, 24))
         );
         assert_eq!(
@@ -300,7 +309,7 @@ mod tests {
         );
         let p = Period::containing(PeriodKind::Year, d(2026, 6, 15), &MONDAY_1).unwrap();
         assert_eq!(
-            span(p.previous(&MONDAY_1)),
+            span(p.previous(&MONDAY_1).unwrap()),
             (d(2025, 1, 1), d(2025, 12, 31))
         );
         let leap = p
@@ -316,7 +325,7 @@ mod tests {
         let p = Period::custom(d(2026, 10, 1), d(2026, 10, 10)).unwrap();
         assert_eq!(p.kind, PeriodKind::Custom);
         assert_eq!(
-            span(p.previous(&MONDAY_1)),
+            span(p.previous(&MONDAY_1).unwrap()),
             (d(2026, 9, 21), d(2026, 9, 30))
         );
         let next = p.next(&MONDAY_1, d(2026, 10, 11)).unwrap();
@@ -328,7 +337,7 @@ mod tests {
     fn a_one_day_custom_range_moves_by_one_day() {
         let p = Period::custom(d(2026, 10, 5), d(2026, 10, 5)).unwrap();
         assert_eq!(
-            span(p.previous(&MONDAY_1)),
+            span(p.previous(&MONDAY_1).unwrap()),
             (d(2026, 10, 4), d(2026, 10, 4))
         );
     }
@@ -360,7 +369,58 @@ mod tests {
         let today = d(2026, 10, 26);
         let october = Period::containing(PeriodKind::Month, today, &MONDAY_1).unwrap();
         assert_eq!(october.next(&MONDAY_1, today), None);
-        let september = october.previous(&MONDAY_1);
+        let september = october.previous(&MONDAY_1).unwrap();
         assert_eq!(september.next(&MONDAY_1, today), Some(october));
+    }
+
+    #[test]
+    fn a_sunday_start_week_anchored_on_sunday_starts_that_day() {
+        let sunday = settings(Weekday::Sun, 1);
+        assert_eq!(
+            range(PeriodKind::Week, d(2026, 10, 25), &sunday),
+            (d(2026, 10, 25), d(2026, 10, 31))
+        );
+    }
+
+    #[test]
+    fn weeks_move_across_the_year_end() {
+        let week = Period::containing(PeriodKind::Week, d(2025, 12, 22), &MONDAY_1).unwrap();
+        assert_eq!(
+            span(week.next(&MONDAY_1, far()).unwrap()),
+            (d(2025, 12, 29), d(2026, 1, 4))
+        );
+    }
+
+    #[test]
+    fn a_28th_start_month_moves_across_a_leap_february() {
+        let s28 = settings(Weekday::Mon, 28);
+        let jan = Period::containing(PeriodKind::Month, d(2028, 2, 10), &s28).unwrap();
+        assert_eq!(span(jan), (d(2028, 1, 28), d(2028, 2, 27)));
+        let feb = jan.next(&s28, far()).unwrap();
+        assert_eq!(span(feb), (d(2028, 2, 28), d(2028, 3, 27)));
+        assert_eq!(span(feb.previous(&s28).unwrap()), span(jan));
+    }
+
+    #[test]
+    fn a_shifted_month_has_no_next_before_its_start_day() {
+        let s25 = settings(Weekday::Mon, 25);
+        let month = Period::containing(PeriodKind::Month, d(2026, 10, 10), &s25).unwrap();
+        assert_eq!(month.next(&s25, d(2026, 10, 24)), None);
+        assert!(month.next(&s25, d(2026, 10, 25)).is_some());
+    }
+
+    #[test]
+    fn dates_at_the_calendar_limits_have_no_period_instead_of_panicking() {
+        let s25 = settings(Weekday::Mon, 25);
+        let first = Period::containing(PeriodKind::Day, NaiveDate::MIN, &MONDAY_1).unwrap();
+        assert_eq!(first.previous(&MONDAY_1), None);
+        let last = Period::containing(PeriodKind::Day, NaiveDate::MAX, &MONDAY_1).unwrap();
+        assert_eq!(last.next(&MONDAY_1, NaiveDate::MAX), None);
+        assert_eq!(
+            Period::containing(PeriodKind::Month, NaiveDate::MIN, &s25),
+            None
+        );
+        let year = Period::containing(PeriodKind::Year, NaiveDate::MAX, &MONDAY_1).unwrap();
+        assert_eq!(year.next(&MONDAY_1, NaiveDate::MAX), None);
     }
 }
