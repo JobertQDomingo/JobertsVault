@@ -88,4 +88,21 @@ mod tests {
         assert_eq!(least_used_color(all_but_2_and_10), "cat-2");
         assert_eq!(least_used_color(["#ff0000", "cat-1"]), "cat-2");
     }
+
+    #[test]
+    fn curated_icons_match_the_frontend() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../src/lib/categoryIcons.ts");
+        let source = std::fs::read_to_string(path).expect("src/lib/categoryIcons.ts exists");
+        // Entries look like `"shopping-cart": ShoppingCart,` or, unquoted, `car: Car,`.
+        let mut frontend: Vec<&str> = source
+            .lines()
+            .filter_map(|line| line.trim().split_once(": "))
+            .filter(|(_, value)| value.starts_with(|c: char| c.is_ascii_uppercase()))
+            .map(|(key, _)| key.trim_matches('"'))
+            .collect();
+        let mut backend = ICONS.to_vec();
+        frontend.sort_unstable();
+        backend.sort_unstable();
+        assert_eq!(frontend, backend);
+    }
 }
