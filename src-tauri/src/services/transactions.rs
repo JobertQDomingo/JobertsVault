@@ -1348,4 +1348,69 @@ mod tests {
         };
         assert_eq!(page(&conn, custom, 0).summary.count, 1);
     }
+
+    fn card_now(conn: &Connection, card: i64) -> accounts::CardSummary {
+        accounts::get(conn, card, today()).unwrap().card.unwrap()
+    }
+
+    #[test]
+    fn a_card_purchase_is_an_expense_on_the_day() {
+        let mut conn = db();
+        let visa = card(&mut conn, "Visa", 0);
+        spend(&mut conn, 2_500, visa, today());
+        let c = card_now(&conn, visa);
+        assert_eq!(
+            (c.amount_owed, c.cycle_spending),
+            (Money(2_500), Money(2_500))
+        );
+        assert_eq!(page(&conn, this_month(), 0).summary.expense, Money(2_500));
+    }
+
+    #[test]
+    fn a_card_payment_never_changes_the_expense_total() {
+        let mut conn = db();
+        let bank = bank(&mut conn, "Bank", 100_000);
+        let visa = card(&mut conn, "Visa", 0);
+        spend(&mut conn, 30_000, visa, today());
+        let before = page(&conn, this_month(), 0);
+        create(&mut conn, transfer(30_000, bank, visa), now()).unwrap();
+        let after = page(&conn, this_month(), 0);
+        assert_eq!(
+            (after.summary.income, after.summary.expense),
+            (before.summary.income, before.summary.expense)
+        );
+        assert_eq!(after.summary.count, before.summary.count + 1);
+        assert_eq!(after.day_nets, before.day_nets);
+        let of_card = TransactionFilter {
+            account_id: Some(visa),
+            ..this_month()
+        };
+        assert_eq!(page(&conn, of_card, 0).summary.expense, Money(30_000));
+        // The payment lowers what's owed and the bank's balance, not the cycle's spending.
+        let c = card_now(&conn, visa);
+        assert_eq!((c.amount_owed, c.cycle_spending), (Money(0), Money(30_000)));
+        assert_eq!(balance(&conn, bank), 70_000);
+    }
+
+    #[test]
+    fn a_refund_is_income_and_lowers_the_amount_owed() {
+        let mut conn = db();
+        let visa = card(&mut conn, "Visa", 0);
+        spend(&mut conn, 10_000, visa, today());
+        let refund = TransactionFields {
+            category_id: Some(id_of(&conn, "categories", "Refund")),
+            ..income(&conn, 2_000, visa)
+        };
+        create(&mut conn, refund, now()).unwrap();
+        let c = card_now(&conn, visa);
+        assert_eq!(
+            (c.amount_owed, c.cycle_spending),
+            (Money(8_000), Money(10_000))
+        );
+        let summary = page(&conn, this_month(), 0).summary;
+        assert_eq!(
+            (summary.income, summary.expense),
+            (Money(2_000), Money(10_000))
+        );
+    }
 }
