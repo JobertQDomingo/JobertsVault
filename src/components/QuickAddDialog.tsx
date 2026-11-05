@@ -111,7 +111,9 @@ export function QuickAddDialog({
   const [start, setStart] = useState<{ values: Values; today: string } | null>(
     null,
   );
-  const defaults = useTransactionDefaults();
+  // A payment starts from its own defaults (they carry today too), so it needs no others.
+  const paying = request.payBill !== undefined;
+  const defaults = useTransactionDefaults(!paying);
   const source = useTransaction(start ? undefined : sourceId);
   const payBill = usePayBillDefaults(start ? undefined : request.payBill);
   const accounts = useAccounts();
@@ -123,49 +125,45 @@ export function QuickAddDialog({
   const [discarding, setDiscarding] = useState(false);
   const close = () => (dirty ? setDiscarding(true) : onClose());
 
+  const own = paying ? payBill : defaults;
   const queries = [
-    defaults,
+    own,
     accounts,
     categories,
     methods,
     settingsQuery,
     ...(sourceId !== undefined ? [source] : []),
-    ...(request.payBill !== undefined ? [payBill] : []),
   ];
   const failed = queries.filter((q) => q.isError);
+  const today = own.data?.today;
   // The cache can be old (an edit elsewhere, or past midnight), so the starting values wait for
   // this opening's own answers. A failed one still leaves the old data, so a failure stops it too.
   if (
     !start &&
     !failed.length &&
-    defaults.isFetchedAfterMount &&
-    defaults.data &&
+    own.isFetchedAfterMount &&
+    today &&
     accounts.data &&
     categories.data &&
     methods.data &&
     settings &&
-    (sourceId === undefined || (source.isFetchedAfterMount && source.data)) &&
-    (request.payBill === undefined ||
-      (payBill.isFetchedAfterMount && payBill.data))
+    (sourceId === undefined || (source.isFetchedAfterMount && source.data))
   )
     setStart({
       values: source.data
         ? // A duplicate is dated today (TXN-2).
-          fromRow(
-            source.data,
-            request.duplicate !== undefined ? defaults.data.today : null,
-          )
-        : request.payBill !== undefined && payBill.data
+          fromRow(source.data, request.duplicate !== undefined ? today : null)
+        : paying && payBill.data
           ? // A transfer to the card for what's owed, from the backend's account (UI_FLOWS F2).
             {
-              ...blank(payBill.data.fromAccountId, payBill.data.today),
+              ...blank(payBill.data.fromAccountId, today),
               kind: "transfer",
               amount: payBill.data.amount,
-              toAccountId: String(request.payBill),
+              toAccountId: text(request.payBill ?? null),
               note: "Credit card payment",
             }
-          : blank(defaults.data.accountId, defaults.data.today),
-      today: defaults.data.today,
+          : blank(defaults.data?.accountId ?? null, today),
+      today,
     });
 
   return (
@@ -190,7 +188,7 @@ export function QuickAddDialog({
           ) : start && settings ? (
             <TransactionForm
               editId={request.edit}
-              payment={request.payBill !== undefined}
+              payment={paying}
               initial={start.values}
               today={start.today}
               weekStart={settings.weekStart}
@@ -296,6 +294,8 @@ function TransactionForm({
   const update = useUpdateTransaction();
   const remove = useDeleteTransaction();
   const [deleting, setDeleting] = useState(false);
+  // An edit and a payment are saved once; a payment's type is fixed too.
+  const addAnother = editId === undefined && !payment;
   // The ids an archived record may still be offered for: the row being edited or copied. Save &
   // add another starts a new row, which keeps none.
   const [kept, setKept] = useState(initial);
@@ -390,6 +390,8 @@ function TransactionForm({
             value={field.value}
             onChange={field.onChange}
             placeholder="Choose an account"
+            // Paying a card: the card it pays stays (UI_FLOWS F2).
+            disabled={payment && name === "toAccountId"}
           />
         </Field>
       )}
@@ -419,8 +421,8 @@ function TransactionForm({
             !(e.target instanceof HTMLButtonElement)
           ) {
             e.preventDefault();
-            // Shift+Enter is Save & add another, which an edit or a payment doesn't have.
-            save(e.shiftKey && editId === undefined && !payment);
+            // Shift+Enter is Save & add another, when there is one.
+            save(e.shiftKey && addAnother);
           }
         }}
       >
@@ -596,7 +598,7 @@ function TransactionForm({
             </Button>
           )}
           <Button onClick={onCancel}>Cancel</Button>
-          {editId === undefined && !payment && (
+          {addAnother && (
             <Button
               title="Shift+Enter"
               aria-keyshortcuts="Shift+Enter"

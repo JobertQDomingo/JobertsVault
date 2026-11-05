@@ -37,10 +37,10 @@ export const useTransaction = (id?: number) =>
     queryFn: id === undefined ? skipToken : () => getTransaction(id),
   });
 
-export const useTransactionDefaults = () =>
+export const useTransactionDefaults = (enabled = true) =>
   useQuery({
     queryKey: queryKeys.transactionDefaults,
-    queryFn: getTransactionDefaults,
+    queryFn: enabled ? getTransactionDefaults : skipToken,
   });
 
 /** Only loads when given a card. */

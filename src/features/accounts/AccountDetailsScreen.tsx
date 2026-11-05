@@ -123,7 +123,8 @@ function Summary({
           {account.archived && (
             <span className="text-small text-muted-foreground">Archived</span>
           )}
-          {card && <PayBillButton cardId={account.id} />}
+          {/* The backend takes no new transfers to an archived account. */}
+          {card && !account.archived && <PayBillButton cardId={account.id} />}
           <Actions account={account} money={money} />
         </div>
       </div>

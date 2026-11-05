@@ -163,3 +163,39 @@ test("a failed reload never starts the form from the old cached amount", async (
   ).toBeTruthy();
   expect(within(dialog).queryByRole("textbox", { name: "Amount" })).toBeNull();
 });
+
+test("an archived card has no Pay bill (the backend refuses transfers to it)", async () => {
+  const archived = ACCOUNTS.map((a) =>
+    a.id === 4 ? { ...a, archived: true } : a,
+  );
+  renderRoute("/accounts/4", {
+    ...ANSWERS,
+    list_accounts: { ...ACCOUNT_LIST, accounts: archived },
+    get_account: ({ id }: { id: number }) => archived.find((a) => a.id === id),
+  });
+  await screen.findByText("Archived");
+  expect(screen.queryByRole("button", { name: "Pay bill" })).toBeNull();
+});
+
+test("To stays the card while paying it", async () => {
+  const dialog = await payBill();
+  expect(
+    (within(dialog).getByRole("combobox", { name: "To" }) as HTMLInputElement)
+      .disabled,
+  ).toBe(true);
+});
+
+test("a payment needs only its own defaults, and dates by their today", async () => {
+  const dialog = await payBill({
+    ...ANSWERS,
+    get_transaction_defaults: () => {
+      throw { code: "database", message: "disk I/O error" };
+    },
+    get_pay_bill_defaults: { ...PAY_BILL_DEFAULTS, today: "2026-11-06" },
+  });
+  expect(
+    (within(dialog).getByRole("textbox", { name: "Date" }) as HTMLInputElement)
+      .value,
+  ).toBe("11/06/2026");
+  expect(calls("get_transaction_defaults")).toEqual([]);
+});
