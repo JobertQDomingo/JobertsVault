@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, type RouteObject } from "react-router";
 import { AppShell } from "./components/AppShell";
 import { AccountDetailsScreen } from "./features/accounts/AccountDetailsScreen";
 import { AccountsScreen } from "./features/accounts/AccountsScreen";
+import { SettingsScreen } from "./features/settings/SettingsScreen";
 import { DashboardScreen } from "./features/dashboard/DashboardScreen";
 import { TransactionsScreen } from "./features/transactions/TransactionsScreen";
 
@@ -31,7 +32,11 @@ export const routes: RouteObject[] = [
         element: <AccountDetailsScreen />,
         handle: { title: "Accounts" },
       },
-      { path: "settings", element: null, handle: { title: "Settings" } },
+      {
+        path: "settings",
+        element: <SettingsScreen />,
+        handle: { title: "Settings" },
+      },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },

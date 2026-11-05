@@ -75,10 +75,9 @@ export function AccountsScreen() {
           items={data.accounts.filter((a) => !a.archived)}
           label={(a) => a.name}
           onReorder={(ids) =>
-            reorder.mutateAsync(ids).catch((error: Error) => {
-              notify.error(error.message);
-              throw error;
-            })
+            reorder
+              .mutateAsync(ids)
+              .catch((error: Error) => notify.error(error.message))
           }
         >
           {(account, handle) => (
