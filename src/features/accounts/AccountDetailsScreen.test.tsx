@@ -145,7 +145,11 @@ test("after Delete it goes back to the list and never asks for the deleted accou
   let accounts = ACCOUNTS.map((a) => (a.id === 3 ? { ...a, inUse: false } : a));
   const { router } = renderRoute("/accounts/3", {
     ...answers(),
-    list_accounts: () => ({ ...ACCOUNT_LIST, accounts }),
+    // The refresh takes a moment, as in the app, so the screen has gone before it ends.
+    list_accounts: () =>
+      new Promise((resolve) =>
+        setTimeout(() => resolve({ ...ACCOUNT_LIST, accounts }), 50),
+      ),
     get_account: ({ id }: { id: number }) => {
       const found = accounts.find((a) => a.id === id);
       if (!found) throw notFound(id);

@@ -180,10 +180,12 @@ function Actions({
   const navigate = useNavigate();
   const archive = useArchiveAccount();
   const unarchive = useUnarchiveAccount();
-  // Gone before the refresh, so the deleted account isn't fetched again (ROADMAP 1.9).
+  // Gone before the refresh, so the deleted account isn't fetched again (ROADMAP 1.9). The toast
+  // is here too: leaving unmounts this menu, and an unmounted mutate() skips its own callbacks.
   const remove = useDeleteAccount((id) => {
     client.removeQueries({ queryKey: queryKeys.account(id) });
     navigate("/accounts");
+    notify.success("Deleted");
   });
   const [open, setOpen] = useState<"edit" | "archive" | "delete" | null>(null);
   const failed = (error: Error) => notify.error(error.message);
@@ -251,12 +253,7 @@ function Actions({
         message="This can't be undone."
         confirmLabel="Delete"
         destructive
-        onConfirm={() =>
-          remove.mutate(account.id, {
-            onSuccess: () => notify.success("Deleted"),
-            onError: failed,
-          })
-        }
+        onConfirm={() => remove.mutate(account.id, { onError: failed })}
       />
     </>
   );
