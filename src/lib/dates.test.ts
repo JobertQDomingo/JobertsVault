@@ -25,7 +25,14 @@ test("typed US dates are read, with or without leading zeros", () => {
 });
 
 test("impossible or other-format dates are refused", () => {
-  for (const text of ["02/30/2026", "13/01/2026", "2026-01-05", "abc", "", "1/5/26"])
+  for (const text of [
+    "02/30/2026",
+    "13/01/2026",
+    "2026-01-05",
+    "abc",
+    "",
+    "1/5/26",
+  ])
     expect(parseInputDate(text), text).toBeNull();
 });
 
