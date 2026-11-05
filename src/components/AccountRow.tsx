@@ -5,6 +5,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import type { Account } from "@/bindings/Account";
 import type { AccountKind } from "@/bindings/AccountKind";
 import { formatShortDate } from "@/lib/dates";
@@ -19,15 +20,25 @@ export const ACCOUNT_ICONS: Record<AccountKind, LucideIcon> = {
   credit_card: CreditCard,
 };
 
+export const ACCOUNT_KINDS: Record<AccountKind, string> = {
+  cash: "Cash",
+  bank: "Bank",
+  ewallet: "E-wallet",
+  credit_card: "Credit card",
+};
+
 /**
  * The account's icon in a `--wash` square, its name and its balance (DESIGN_SYSTEM §9.2). A credit
- * card shows what's owed, with "Available ₱X · Due Nov 5" under its name.
+ * card shows what's owed, with "Available ₱X · Due Nov 5" under its name, unless `subtitle`
+ * replaces that line.
  */
 export function AccountRow({
   account,
+  subtitle,
   className,
 }: {
   account: Account;
+  subtitle?: ReactNode;
   className?: string;
 }) {
   const Icon = ACCOUNT_ICONS[account.kind];
@@ -44,20 +55,24 @@ export function AccountRow({
       </span>
       <div className="min-w-0">
         <p className="truncate">{account.name}</p>
-        {card && (
-          <p className="text-small text-muted-foreground">
-            Available{" "}
-            <MoneyText
-              amount={card.availableCredit}
-              kind="balance"
-              // Past the limit it's negative, and keeps its red.
-              className={cn(
-                "font-normal",
-                card.availableCredit >= 0 && "text-muted-foreground",
-              )}
-            />{" "}
-            · Due {formatShortDate(card.dueDate)}
-          </p>
+        {subtitle ? (
+          <p className="text-small text-muted-foreground">{subtitle}</p>
+        ) : (
+          card && (
+            <p className="text-small text-muted-foreground">
+              Available{" "}
+              <MoneyText
+                amount={card.availableCredit}
+                kind="balance"
+                // Past the limit it's negative, and keeps its red.
+                className={cn(
+                  "font-normal",
+                  card.availableCredit >= 0 && "text-muted-foreground",
+                )}
+              />{" "}
+              · Due {formatShortDate(card.dueDate)}
+            </p>
+          )
         )}
       </div>
       {/* An overpaid card has a credit, which shows as a plain balance. */}
