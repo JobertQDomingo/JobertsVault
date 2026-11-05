@@ -20,4 +20,5 @@ export const queryKeys = {
   period: (query: PeriodQuery) => ["ledger", "period", query] as const,
   dashboard: (query: PeriodQuery) => ["ledger", "dashboard", query] as const,
   settings: ["settings"],
+  startup: ["startup"],
 } as const;
