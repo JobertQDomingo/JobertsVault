@@ -110,7 +110,7 @@
 
 /* Tailwind names for the tokens. Shadows stay raw tokens: `--shadow-panel` here would refer to itself. */
 @theme inline {
-  /* Only the design tokens exist as colors, so a stray `bg-blue-500` doesn't compile. */
+  /* Only the design tokens exist as colors: a stray `bg-blue-500` (or `bg-white`) generates nothing. */
   --color-*: initial;
   --color-canvas: var(--canvas);
   --color-glass: var(--glass);
@@ -176,6 +176,9 @@
   --text-h3--font-weight: 600;
   --text-body: 14px;
   --text-body--line-height: 20px;
+  --text-body-strong: 14px;
+  --text-body-strong--line-height: 20px;
+  --text-body-strong--font-weight: 600;
   --text-small: 12px;
   --text-small--line-height: 16px;
 }
@@ -206,7 +209,7 @@
 }
 
 /* One layer of blur: a panel inside a panel is a flat tint (§2.3, §9.1 Toolbar). */
-:is(.glass, .glass-raised) .glass {
+:is(.glass, .glass-raised) :is(.glass, .glass-raised) {
   background: var(--wash);
   border-color: transparent;
   backdrop-filter: none;
@@ -222,8 +225,7 @@
   body {
     background: var(--canvas);
     color: var(--foreground);
-    font-size: 14px;
-    line-height: 20px;
+    @apply text-body;
     -webkit-font-smoothing: antialiased;
   }
   /* Every action works from the keyboard, with a visible focus ring (§1). */

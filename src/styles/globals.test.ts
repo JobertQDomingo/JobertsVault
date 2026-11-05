@@ -54,6 +54,27 @@ test("every design token is defined", () => {
   expect(tokensIn(":root")).toEqual(expect.arrayContaining(DESIGN_TOKENS));
 });
 
+test("every type style is defined", () => {
+  // DESIGN_SYSTEM §4
+  for (const style of [
+    "display",
+    "h1",
+    "h2",
+    "h3",
+    "body",
+    "body-strong",
+    "small",
+  ])
+    expect(css).toContain(`--text-${style}:`);
+});
+
+test("glass inside glass is never blurred again", () => {
+  // Either level nested in either level (DESIGN_SYSTEM §2.3).
+  expect(css).toContain(
+    ":is(.glass, .glass-raised) :is(.glass, .glass-raised) {",
+  );
+});
+
 test("transparency off makes glass solid", () => {
   const start = css.indexOf("@media (prefers-reduced-transparency: reduce)");
   expect(start).toBeGreaterThanOrEqual(0);
