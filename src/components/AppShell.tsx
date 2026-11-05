@@ -31,6 +31,11 @@ function Layout() {
     "Ctrl+2": () => navigate("/transactions"),
     "Ctrl+3": () => navigate("/accounts"),
     "Ctrl+,": () => navigate("/settings"),
+    // These mean the period (PeriodSwitcher handles them). Claimed here too, so on a screen
+    // without one they do nothing instead of WebView2's Back and Forward.
+    "Alt+ArrowLeft": () => {},
+    "Alt+ArrowRight": () => {},
+    "Alt+Home": () => {},
   });
   return (
     <div className="grid h-full grid-cols-[228px_minmax(0,1fr)] gap-3 p-3">

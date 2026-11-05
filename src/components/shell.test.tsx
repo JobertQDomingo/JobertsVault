@@ -160,3 +160,27 @@ test("each screen's link names its shortcut", () => {
   );
   expect(link("Settings").title).toBe("Settings (Ctrl+,)");
 });
+
+test("shortcuts also wait while a menu or an alert dialog is open", () => {
+  renderAt("/");
+  for (const role of ["menu", "alertdialog"]) {
+    const overlay = document.body.appendChild(document.createElement("div"));
+    overlay.setAttribute("role", role);
+    press("3", { ctrlKey: true });
+    overlay.remove();
+  }
+  expect(router.state.location.pathname).toBe("/");
+});
+
+test("Ctrl+1–3 follow the key's place, so other keyboard layouts work", async () => {
+  renderAt("/settings");
+  // On AZERTY the 1 key types "&".
+  press("&", { ctrlKey: true, code: "Digit1" });
+  await waitFor(() => expect(title()).toBe("Dashboard"));
+});
+
+test("Alt+← and Alt+→ never go Back or Forward, even on screens without a period", () => {
+  renderAt("/settings");
+  for (const key of ["ArrowLeft", "ArrowRight", "Home"])
+    expect(press(key, { altKey: true })).toBe(false);
+});
