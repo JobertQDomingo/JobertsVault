@@ -12,6 +12,7 @@ export function Segmented<V extends string>({
   onReselect,
   options,
   className,
+  disabled,
   "aria-label": ariaLabel,
 }: {
   value: V;
@@ -20,6 +21,7 @@ export function Segmented<V extends string>({
   onReselect?: () => void;
   options: { value: V; label: ReactNode }[];
   className?: string;
+  disabled?: boolean;
   "aria-label": string;
 }) {
   return (
@@ -31,7 +33,11 @@ export function Segmented<V extends string>({
         next ? onChange(next as V) : onReselect?.()
       }
       aria-label={ariaLabel}
-      className={cn("inline-flex rounded-control bg-wash p-[3px]", className)}
+      disabled={disabled}
+      className={cn(
+        "inline-flex rounded-control bg-wash p-[3px] data-[disabled]:opacity-50",
+        className,
+      )}
     >
       {options.map((option) => (
         <ToggleGroup.Item
