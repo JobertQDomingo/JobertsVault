@@ -33,11 +33,20 @@ export function Field({
   error?: string;
   help?: ReactNode;
   className?: string;
-  children: ReactElement<{ "aria-describedby"?: string }>;
+  children: ReactElement<{
+    "aria-describedby"?: string;
+    "aria-invalid"?: boolean | "true" | "false";
+  }>;
 }) {
   const messageId = `${htmlFor}-message`;
   const message = error ?? help;
   const control = Children.only(children);
+  const describedBy = [
+    isValidElement(control) && control.props["aria-describedby"],
+    message && messageId,
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
     <div className={cn("grid gap-1", className)}>
       <label
@@ -46,8 +55,11 @@ export function Field({
       >
         {label}
       </label>
-      {isValidElement(control) && message
-        ? cloneElement(control, { "aria-describedby": messageId })
+      {isValidElement(control)
+        ? cloneElement(control, {
+            "aria-describedby": describedBy || undefined,
+            ...(error ? { "aria-invalid": true } : {}),
+          })
         : control}
       {error ? (
         <p id={messageId} role="alert" className="text-small text-danger">

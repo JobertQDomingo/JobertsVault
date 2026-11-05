@@ -70,3 +70,22 @@ test("toasts use the app font, not sonner's system font", async () => {
   ) as HTMLElement;
   expect(toaster.style.fontFamily).toBe("inherit");
 });
+
+test("a confirm dialog opens on Cancel, and confirming closes it", () => {
+  const onConfirm = vi.fn();
+  const onOpenChange = vi.fn();
+  render(
+    <ConfirmDialog
+      open
+      onOpenChange={onOpenChange}
+      title="Archive Old Wallet?"
+      message="It will be hidden from lists but its history stays."
+      confirmLabel="Archive"
+      onConfirm={onConfirm}
+    />,
+  );
+  expect(document.activeElement?.textContent).toBe("Cancel");
+  fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+  expect(onOpenChange).toHaveBeenCalledWith(false);
+  expect(onConfirm).toHaveBeenCalledOnce();
+});

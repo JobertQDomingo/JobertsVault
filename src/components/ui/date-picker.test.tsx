@@ -54,13 +54,33 @@ test("a typed date is read when you leave the field", () => {
   expect((input() as HTMLInputElement).value).toBe("10/05/2026");
 });
 
-test("an impossible date is dropped and the field shows the date again", () => {
+test("a date that can't be read is passed on as typed, for the backend to explain", () => {
   const onChange = vi.fn();
   render(<Picker onChange={onChange} />);
   fireEvent.change(input(), { target: { value: "02/30/2026" } });
   fireEvent.blur(input());
+  expect(onChange).toHaveBeenCalledWith("02/30/2026");
+  expect((input() as HTMLInputElement).value).toBe("02/30/2026");
+  onChange.mockClear();
+  fireEvent.keyDown(input(), { key: "ArrowUp" });
   expect(onChange).not.toHaveBeenCalled();
-  expect((input() as HTMLInputElement).value).toBe("10/26/2026");
+});
+
+test("a typed future date is passed on, so the backend can say it's in the future", () => {
+  const onChange = vi.fn();
+  render(<Picker onChange={onChange} />);
+  fireEvent.change(input(), { target: { value: "11/15/2026" } });
+  fireEvent.blur(input());
+  expect(onChange).toHaveBeenCalledWith("2026-11-15");
+});
+
+test("Enter reads the typed date before the form saves", () => {
+  const onChange = vi.fn();
+  render(<Picker onChange={onChange} />);
+  fireEvent.change(input(), { target: { value: "10/5/2026" } });
+  const notCancelled = fireEvent.keyDown(input(), { key: "Enter" });
+  expect(onChange).toHaveBeenCalledWith("2026-10-05");
+  expect(notCancelled).toBe(true);
 });
 
 test("the calendar starts the week on the week start setting", () => {

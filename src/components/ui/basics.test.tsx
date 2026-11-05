@@ -75,3 +75,16 @@ test("a segmented control changes but never empties", () => {
   fireEvent.click(screen.getByRole("radio", { name: "Income" }));
   expect(onChange).toHaveBeenCalledWith("income");
 });
+
+test("a field marks its control invalid and keeps the control's own description", () => {
+  render(
+    <Field label="Amount" htmlFor="amount" error="Amount must be more than 0">
+      <Input id="amount" aria-describedby="amount-hint" />
+    </Field>,
+  );
+  const input = screen.getByLabelText("Amount");
+  expect(input.getAttribute("aria-invalid")).toBe("true");
+  expect(input.getAttribute("aria-describedby")).toBe(
+    `amount-hint ${screen.getByRole("alert").id}`,
+  );
+});

@@ -41,3 +41,8 @@ test("adding days crosses months, years and leap days", () => {
   expect(addDays("2024-02-28", 1)).toBe("2024-02-29");
   expect(addDays("2026-01-01", -1)).toBe("2025-12-31");
 });
+
+test("text that isn't a stored date is shown as typed", () => {
+  expect(formatInputDate("")).toBe("");
+  expect(formatInputDate("13/05/2026")).toBe("13/05/2026");
+});

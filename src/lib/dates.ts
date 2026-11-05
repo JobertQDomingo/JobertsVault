@@ -9,9 +9,13 @@ export const toDate = (iso: string) => parse(iso, ISO, new Date());
 
 export const toIso = (date: Date) => format(date, ISO);
 
-/** What the date input shows: always US order (DESIGN_SYSTEM §8). */
+/** Whether `text` is a real `YYYY-MM-DD` date. */
+export const isIsoDate = (text: string) =>
+  /^\d{4}-\d{2}-\d{2}$/.test(text) && isValid(toDate(text));
+
+/** What the date input shows: always US order (DESIGN_SYSTEM §8). Other text is shown as it is. */
 export const formatInputDate = (iso: string) =>
-  format(toDate(iso), "MM/dd/yyyy");
+  isIsoDate(iso) ? format(toDate(iso), "MM/dd/yyyy") : iso;
 
 /** A typed `M/D/YYYY` date, or null if it isn't one (e.g. Feb 30). */
 export function parseInputDate(text: string): string | null {

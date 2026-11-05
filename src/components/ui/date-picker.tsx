@@ -6,6 +6,7 @@ import type { WeekStart } from "@/bindings/WeekStart";
 import {
   addDays,
   formatInputDate,
+  isIsoDate,
   parseInputDate,
   toDate,
   toIso,
@@ -22,6 +23,8 @@ type InputProps = Pick<
 /**
  * A `MM/DD/YYYY` input with a calendar (DESIGN_SYSTEM §8, §9.1). ↑/↓ move one day. Days after
  * `max` (today, until Phase 3 allows future dates) can't be picked. Weeks start on `weekStart`.
+ * Typed text that isn't a date, or is after `max`, still goes to `onChange`, so the backend's
+ * message ("Enter a real date", "Date can't be in the future") shows under the field.
  */
 export function DatePicker({
   value,
@@ -40,14 +43,13 @@ export function DatePicker({
   const [open, setOpen] = useState(false);
   // What's typed, while it's being typed; null shows `value`.
   const [draft, setDraft] = useState<string | null>(null);
-  // ISO dates compare correctly as text.
-  const change = (iso: string) => {
-    if (iso !== value && (!max || iso <= max)) onChange(iso);
+  const valid = isIsoDate(value);
+  const change = (next: string) => {
+    if (next !== value) onChange(next);
   };
   const commit = () => {
     if (draft === null) return;
-    const typed = parseInputDate(draft);
-    if (typed) change(typed);
+    change(parseInputDate(draft) ?? draft.trim());
     setDraft(null);
   };
 
@@ -66,8 +68,11 @@ export function DatePicker({
             onKeyDown={(e) => {
               if (e.key === "ArrowUp" || e.key === "ArrowDown") {
                 e.preventDefault();
+                if (!valid) return;
                 setDraft(null);
-                change(addDays(value, e.key === "ArrowUp" ? 1 : -1));
+                const next = addDays(value, e.key === "ArrowUp" ? 1 : -1);
+                // ISO dates compare correctly as text.
+                if (!max || next <= max) change(next);
               } else if (e.key === "Enter") commit(); // and let the form save
             }}
           />
@@ -94,8 +99,8 @@ export function DatePicker({
             mode="single"
             required
             autoFocus
-            selected={toDate(value)}
-            defaultMonth={toDate(value)}
+            selected={valid ? toDate(value) : undefined}
+            defaultMonth={valid ? toDate(value) : max ? toDate(max) : undefined}
             endMonth={max ? toDate(max) : undefined}
             weekStartsOn={weekStart === "monday" ? 1 : 0}
             disabled={max ? { after: toDate(max) } : undefined}

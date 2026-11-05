@@ -33,22 +33,26 @@ export function DialogContent({
         )}
         {...props}
       >
-        <div className="flex items-center justify-between gap-2 px-[22px] pt-[18px] pb-2">
-          <DialogPrimitive.Title className="text-h2">
-            {title}
-          </DialogPrimitive.Title>
-          <DialogPrimitive.Close asChild>
-            <Button variant="ghost" size="icon" aria-label="Close">
-              <X />
-            </Button>
-          </DialogPrimitive.Close>
-        </div>
+        <DialogPrimitive.Title className="px-[22px] pt-[18px] pr-14 pb-2 text-h2">
+          {title}
+        </DialogPrimitive.Title>
         {description && (
           <DialogPrimitive.Description className="px-[22px] py-2 text-muted-foreground">
             {description}
           </DialogPrimitive.Description>
         )}
         {children}
+        {/* Last in the tab order, so opening focuses the form or Cancel, never ✕. */}
+        <DialogPrimitive.Close asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Close"
+            className="absolute top-4 right-4"
+          >
+            <X />
+          </Button>
+        </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   );
@@ -94,7 +98,11 @@ export function ConfirmDialog({
           <Button onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
             variant={destructive ? "destructive" : "primary"}
-            onClick={onConfirm}
+            // Closes first, so a second click can't run the action twice.
+            onClick={() => {
+              onOpenChange(false);
+              onConfirm();
+            }}
           >
             {confirmLabel}
           </Button>

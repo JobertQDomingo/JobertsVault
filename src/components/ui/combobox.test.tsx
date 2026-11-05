@@ -52,11 +52,50 @@ test("typing filters, Enter picks the best match without saving", () => {
   expect((input() as HTMLInputElement).value).toBe("Dining Out");
 });
 
-test("Enter on a closed combobox saves the form", () => {
-  const onSubmit = vi.fn();
-  render(<Form onSubmit={onSubmit} />);
+test("Enter on a closed combobox is left to the form, Shift included", () => {
+  const onFormKey = vi.fn();
+  render(
+    <div onKeyDown={(e) => onFormKey(e.key, e.shiftKey)}>
+      <Form />
+    </div>,
+  );
+  // Not cancelled, so the browser submits the form.
+  expect(fireEvent.keyDown(input(), { key: "Enter" })).toBe(true);
+  fireEvent.keyDown(input(), { key: "Enter", shiftKey: true });
+  expect(onFormKey).toHaveBeenLastCalledWith("Enter", true);
+});
+
+test("shortcuts still reach the window from a closed combobox", () => {
+  const onShortcut = vi.fn();
+  window.addEventListener("keydown", onShortcut);
+  render(<Form />);
+  fireEvent.keyDown(input(), { key: "n", ctrlKey: true });
+  window.removeEventListener("keydown", onShortcut);
+  expect(onShortcut).toHaveBeenCalledOnce();
+  expect(fireEvent.keyDown(input(), { key: "Home" })).toBe(true);
+});
+
+test("opening the list starts on the current choice", () => {
+  const onPick = vi.fn();
+  render(<Form onPick={onPick} />);
+  fireEvent.click(input());
+  fireEvent.click(screen.getByRole("option", { name: "Transportation" }));
+  key("ArrowDown");
   key("Enter");
-  expect(onSubmit).toHaveBeenCalledOnce();
+  expect(onPick).toHaveBeenLastCalledWith("3");
+});
+
+test("names that start with what you typed come first", () => {
+  render(<Form />);
+  type("d");
+  const options = screen.getAllByRole("option");
+  expect(options.map((o) => o.textContent)).toEqual([
+    "Dining Out",
+    "Digital Subscriptions",
+    "Food & Groceries",
+  ]);
+  expect(options[0].getAttribute("aria-selected")).toBe("true");
+  expect(input().getAttribute("aria-activedescendant")).toBe(options[0].id);
 });
 
 test("arrow keys move the highlight", () => {
