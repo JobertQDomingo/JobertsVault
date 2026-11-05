@@ -13,7 +13,8 @@ import { useCategories } from "@/hooks/useCategories";
 import { usePeriod } from "@/hooks/usePeriod";
 import { usePeriodQuery } from "@/hooks/usePeriodQuery";
 import { useTransactions } from "@/hooks/useTransactions";
-import { formatDayHeader, formatPeriodLabel } from "@/lib/dates";
+import { formatDayHeader, formatPeriodLabel, groupByDate } from "@/lib/dates";
+import { cn } from "@/lib/utils";
 
 /**
  * The transaction list (UI_FLOWS §3, TXN-3): a summary over every match, then the rows grouped by
@@ -50,7 +51,14 @@ export function TransactionList({
         pending={failed.some((q) => q.isFetching)}
       />
     );
-  else if (!pages || !accounts.data || !categories.data || !view)
+  // The empty message names the period, so it also waits for the period's own name.
+  else if (
+    !pages ||
+    !accounts.data ||
+    !categories.data ||
+    !view ||
+    (pages[0].summary.count === 0 && period.isPlaceholderData)
+  )
     body = (
       <Loading className="grid gap-2 p-[18px]">
         {Array.from({ length: 8 }, (_, i) => (
@@ -87,12 +95,7 @@ export function TransactionList({
     const nets = new Map(
       pages.flatMap((p) => p.dayNets).map((d) => [d.date, d.net]),
     );
-    const days: { date: string; items: (typeof pages)[0]["items"] }[] = [];
-    for (const t of pages.flatMap((p) => p.items)) {
-      const last = days[days.length - 1];
-      if (last?.date === t.date) last.items.push(t);
-      else days.push({ date: t.date, items: [t] });
-    }
+    const days = groupByDate(pages.flatMap((p) => p.items));
     body = (
       <>
         <p className="border-b border-hairline px-[18px] py-3 text-muted-foreground">
@@ -101,6 +104,8 @@ export function TransactionList({
           <MoneyText amount={summary.expense} kind="expense" />
         </p>
         <ul
+          // A new filter or period gets a fresh list, scrolled to the top.
+          key={JSON.stringify(filter)}
           aria-label="Transactions"
           className="min-h-0 flex-1 overflow-y-auto pb-1.5"
           onScroll={(e) => {
@@ -142,9 +147,22 @@ export function TransactionList({
     );
   }
 
+  // While a new filter loads, the old rows stay but dim (after 150 ms) and are marked busy, so
+  // they never pass for its results (as on the dashboard).
+  const busy = list.isPlaceholderData;
   return (
-    <GlassPanel className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {body}
+    <GlassPanel
+      aria-busy={busy}
+      className="flex min-h-0 flex-1 flex-col overflow-hidden"
+    >
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 flex-col transition-opacity duration-150",
+          busy && "opacity-60 delay-150",
+        )}
+      >
+        {body}
+      </div>
     </GlassPanel>
   );
 }

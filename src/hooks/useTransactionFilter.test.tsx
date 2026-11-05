@@ -1,9 +1,12 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { expect, test } from "vitest";
+import { queryKeys } from "@/lib/queryKeys";
+import { SETTINGS } from "@/test/render";
 import { useTransactionFilter } from "./useTransactionFilter";
 
-function setup(url: string) {
+function setup(url: string, showPaymentMethod = true) {
   const result = {
     current: null as unknown as ReturnType<typeof useTransactionFilter>,
   };
@@ -14,7 +17,15 @@ function setup(url: string) {
   const router = createMemoryRouter([{ path: "/", element: <Probe /> }], {
     initialEntries: [url],
   });
-  render(<RouterProvider router={router} />);
+  const client = new QueryClient({
+    defaultOptions: { queries: { staleTime: Infinity } },
+  });
+  client.setQueryData(queryKeys.settings, { ...SETTINGS, showPaymentMethod });
+  render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
   const params = () =>
     Object.fromEntries(new URLSearchParams(router.state.location.search));
   return { result, router, params };
@@ -82,4 +93,15 @@ test("typing a search replaces the history entry instead of adding one per key",
   expect(after).toBe("PUSH");
   expect(router.state.historyAction).toBe("REPLACE");
   expect(result.current[0].search).toBe("ca");
+});
+
+test("a search of only spaces is no search, and spaces around one don't count", () => {
+  expect(setup("/?search=%20%20").result.current[0].search).toBeNull();
+  expect(setup("/?search=%20cafe%20").result.current[0].search).toBe("cafe");
+});
+
+test("with the payment method field off, a method in the URL is ignored", () => {
+  expect(
+    setup("/?method=2", false).result.current[0].paymentMethodId,
+  ).toBeNull();
 });

@@ -235,3 +235,83 @@ test("if the list can't load, Retry asks again", async () => {
   fireEvent.click(panel.getByRole("button", { name: "Retry" }));
   expect(await screen.findByText("Market · weekly shop")).toBeTruthy();
 });
+
+test("a new filter starts the list at the top, with the old rows marked busy until it loads", async () => {
+  renderRoute("/transactions", {
+    ...ANSWERS,
+    list_transactions: ({ filter }: { filter: TransactionFilter }) =>
+      filter.kind ? new Promise(() => {}) : LIST,
+  });
+  await screen.findByText("Market · weekly shop");
+  const before = screen.getByRole("list", { name: "Transactions" });
+  pick("Type", "Expense");
+  await waitFor(() => expect(lastFilter()?.kind).toBe("expense"));
+  const after = screen.getByRole("list", { name: "Transactions" });
+  expect(after).not.toBe(before); // a fresh list, scrolled to the top
+  expect(after.closest("[aria-busy]")?.getAttribute("aria-busy")).toBe("true");
+});
+
+test("with the method field off, a method in the URL leaves nothing to clear", async () => {
+  renderRoute("/transactions?method=2", {
+    ...ANSWERS,
+    get_settings: { ...SETTINGS, showPaymentMethod: false },
+    list_transactions: EMPTY,
+  });
+  expect(
+    await screen.findByText("Nothing recorded for November 2026."),
+  ).toBeTruthy();
+  expect(
+    (screen.getByRole("button", { name: "Clear" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true);
+});
+
+test("an archived account in the URL is named in the Account box", async () => {
+  renderRoute("/transactions?account=5", ANSWERS);
+  await screen.findByText("Market · weekly shop");
+  expect(
+    (screen.getByRole("combobox", { name: "Account" }) as HTMLInputElement)
+      .value,
+  ).toBe("Old Wallet (archived)");
+});
+
+test("the empty message waits for the new period's name", async () => {
+  let release = () => {};
+  const october = new Promise((done) => {
+    release = () =>
+      done({
+        ...PERIOD,
+        start: "2026-10-01",
+        end: "2026-10-31",
+        isCurrent: false,
+      });
+  });
+  renderRoute("/transactions", {
+    ...ANSWERS,
+    get_period: ({ query }: { query: { anchor: string | null } }) =>
+      query.anchor === "2026-10-01" ? october : PERIOD,
+    list_transactions: ({ filter }: { filter: TransactionFilter }) =>
+      filter.period.kind === "month" &&
+      "anchor" in filter.period &&
+      filter.period.anchor
+        ? EMPTY
+        : LIST,
+  });
+  await screen.findByText("Market · weekly shop");
+  fireEvent.click(screen.getByRole("button", { name: "Previous period" }));
+  await waitFor(() =>
+    expect(lastFilter()?.period).toEqual({
+      kind: "month",
+      anchor: "2026-10-01",
+    }),
+  );
+  // October's (empty) list has arrived; its name hasn't yet.
+  await waitFor(() =>
+    expect(screen.queryByText("Market · weekly shop")).toBeNull(),
+  );
+  expect(screen.queryByText(/Nothing recorded for November/)).toBeNull();
+  release();
+  expect(
+    await screen.findByText("Nothing recorded for October 2026."),
+  ).toBeTruthy();
+});

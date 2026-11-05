@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router";
 import type { TransactionFilter } from "@/bindings/TransactionFilter";
 import type { TransactionKind } from "@/bindings/TransactionKind";
 import { usePeriodQuery } from "./usePeriodQuery";
+import { useSettings } from "./useSettings";
 
 type Filters = Omit<TransactionFilter, "period">;
 
@@ -28,12 +29,15 @@ const id = (text: string | null) =>
 
 /**
  * The Transactions filters in the URL (TXN-4), with the period from `usePeriodQuery`. Anything
- * missing or malformed means "any". `change` keeps the period and the other filters; pass
+ * missing or malformed means "any", and so does a method while SET-6 hides that field. `change`
+ * keeps the period and the other filters; pass
  * `{ replace: true }` while typing, so each key doesn't add a history entry.
  */
 export function useTransactionFilter() {
   const [period] = usePeriodQuery();
   const [params, setParams] = useSearchParams();
+  // With the payment method field off (SET-6), its filter is hidden and ignored.
+  const methodShown = useSettings().data?.showPaymentMethod !== false;
   const filter = useMemo<TransactionFilter>(() => {
     const kind = params.get(PARAMS.kind);
     return {
@@ -41,10 +45,13 @@ export function useTransactionFilter() {
       kind: KINDS.find((k) => k === kind) ?? null,
       accountId: id(params.get(PARAMS.accountId)),
       categoryId: id(params.get(PARAMS.categoryId)),
-      paymentMethodId: id(params.get(PARAMS.paymentMethodId)),
-      search: params.get(PARAMS.search) || null,
+      paymentMethodId: methodShown
+        ? id(params.get(PARAMS.paymentMethodId))
+        : null,
+      // The backend ignores spaces around it, so they don't make a new search.
+      search: params.get(PARAMS.search)?.trim() || null,
     };
-  }, [params, period]);
+  }, [params, period, methodShown]);
 
   const change = useCallback(
     (next: Partial<Filters>, options?: { replace?: boolean }) =>

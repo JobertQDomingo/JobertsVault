@@ -23,10 +23,19 @@ const TYPES: ComboboxOption[] = [
 /** "" (the All option) means any. */
 const toId = (value: string) => (value ? Number(value) : null);
 
+/** Active records, plus an archived one that's the current filter, so the box can name it. */
+const offered = <T extends { id: number; archived: boolean }>(
+  items: T[] | undefined,
+  selected: number | null,
+) => (items ?? []).filter((item) => !item.archived || item.id === selected);
+const named = (item: { name: string; archived: boolean }) =>
+  item.archived ? `${item.name} (archived)` : item.name;
+
 /**
  * The Transactions filters (UI_FLOWS §3, TXN-4) on their own glass toolbar: search in the payee
  * and note, type, account, category and payment method (only while SET-6 shows the field), and
- * Clear. Archived accounts, categories and methods aren't offered (DESIGN_SYSTEM §9.1).
+ * Clear. Archived accounts, categories and methods aren't offered (DESIGN_SYSTEM §9.1), unless the
+ * URL already filters by one.
  */
 export function FilterToolbar() {
   const [filter, change, clear] = useTransactionFilter();
@@ -78,18 +87,16 @@ export function FilterToolbar() {
         className={combo}
         options={[
           { value: "", label: "All accounts" },
-          ...(accounts?.accounts ?? [])
-            .filter((a) => !a.archived)
-            .map((a) => {
-              const Icon = ACCOUNT_ICONS[a.kind];
-              return {
-                value: String(a.id),
-                label: a.name,
-                icon: (
-                  <Icon aria-hidden className="size-4 text-muted-foreground" />
-                ),
-              };
-            }),
+          ...offered(accounts?.accounts, filter.accountId).map((a) => {
+            const Icon = ACCOUNT_ICONS[a.kind];
+            return {
+              value: String(a.id),
+              label: named(a),
+              icon: (
+                <Icon aria-hidden className="size-4 text-muted-foreground" />
+              ),
+            };
+          }),
         ]}
         value={filter.accountId === null ? null : String(filter.accountId)}
         onChange={(id) => change({ accountId: toId(id) })}
@@ -100,13 +107,11 @@ export function FilterToolbar() {
         className={combo}
         options={[
           { value: "", label: "All categories" },
-          ...(categories?.categories ?? [])
-            .filter((c) => !c.archived)
-            .map((c) => ({
-              value: String(c.id),
-              label: c.name,
-              icon: <CategoryChip color={c.color} icon={c.icon} size="sm" />,
-            })),
+          ...offered(categories?.categories, filter.categoryId).map((c) => ({
+            value: String(c.id),
+            label: named(c),
+            icon: <CategoryChip color={c.color} icon={c.icon} size="sm" />,
+          })),
         ]}
         value={filter.categoryId === null ? null : String(filter.categoryId)}
         onChange={(id) => change({ categoryId: toId(id) })}
@@ -118,9 +123,10 @@ export function FilterToolbar() {
           className={combo}
           options={[
             { value: "", label: "All methods" },
-            ...(methods ?? [])
-              .filter((m) => !m.archived)
-              .map((m) => ({ value: String(m.id), label: m.name })),
+            ...offered(methods, filter.paymentMethodId).map((m) => ({
+              value: String(m.id),
+              label: named(m),
+            })),
           ]}
           value={
             filter.paymentMethodId === null
