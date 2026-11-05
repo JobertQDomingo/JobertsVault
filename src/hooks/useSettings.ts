@@ -9,15 +9,18 @@ export const useSettings = () =>
 
 /**
  * Saves a change to the settings. `update_settings` takes the whole set, so the change is laid
- * over the stored settings when the save runs (they're loaded by then: every screen reads them).
+ * over the stored settings when the save runs. Without them loaded it refuses rather than send a
+ * partial set.
  */
 export function useUpdateSettings() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (change: Partial<Settings>) => {
-      const { decimalsLocked, ...stored } =
-        client.getQueryData<SettingsView>(queryKeys.settings) ??
-        ({} as SettingsView);
+    mutationFn: async (change: Partial<Settings>) => {
+      // A reload already on its way read the old values; its answer mustn't land after this one.
+      await client.cancelQueries({ queryKey: queryKeys.settings });
+      const current = client.getQueryData<SettingsView>(queryKeys.settings);
+      if (!current) throw new Error("The settings haven't loaded yet.");
+      const { decimalsLocked, ...stored } = current;
       return updateSettings({ ...stored, ...change });
     },
     // One at a time, each built on the one before: a quick second change keeps the first, and a

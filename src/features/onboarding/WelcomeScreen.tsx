@@ -1,6 +1,6 @@
 import { Plus } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { Navigate, useNavigate } from "react-router";
+import { Navigate } from "react-router";
 import type { AccountKind } from "@/bindings/AccountKind";
 import { ACCOUNT_ICONS, ACCOUNT_KINDS } from "@/components/AccountRow";
 import { ErrorState } from "@/components/ErrorState";
@@ -57,15 +57,20 @@ export function WelcomeScreen() {
   const settings = useSettings();
   const accounts = useAccounts();
   const update = useUpdateSettings();
-  const navigate = useNavigate();
   const [adding, setAdding] = useState<AccountKind | null>(null);
+  // The accounts there when the form opened (Cash on a new database) are the "already added" ones.
+  const [existing, setExisting] = useState<number[] | null>(null);
+  if (!existing && accounts.data)
+    setExisting(accounts.data.accounts.map((a) => a.id));
 
+  // Once done (either button, or an old link) it's the dashboard, replacing this entry.
   if (settings.data?.onboardingCompleted) return <Navigate to="/" replace />;
   const finish = () =>
     update
       .mutateAsync({ onboardingCompleted: true })
-      .then(() => navigate("/", { replace: true }))
       .catch((error: Error) => notify.error(error.message));
+  // The finish save is laid over the loaded settings, so it waits for them.
+  const finishing = !settings.data || update.isPending;
 
   return (
     <main className="grid h-full place-items-center overflow-y-auto p-3">
@@ -101,9 +106,11 @@ export function WelcomeScreen() {
                         className="size-4 text-muted-foreground"
                       />
                       <span>{a.name}</span>
-                      <span className="text-small text-muted-foreground">
-                        already added
-                      </span>
+                      {existing?.includes(a.id) && (
+                        <span className="text-small text-muted-foreground">
+                          already added
+                        </span>
+                      )}
                     </li>
                   );
                 })}
@@ -127,17 +134,13 @@ export function WelcomeScreen() {
         </Step>
         <Step n={3}>
           <div className="flex items-center justify-between gap-3">
-            <Button
-              variant="primary"
-              disabled={update.isPending}
-              onClick={finish}
-            >
+            <Button variant="primary" disabled={finishing} onClick={finish}>
               Start using the app
             </Button>
             <Button
               variant="ghost"
               className="text-primary"
-              disabled={update.isPending}
+              disabled={finishing}
               onClick={finish}
             >
               Set up later

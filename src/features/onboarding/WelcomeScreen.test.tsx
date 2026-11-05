@@ -42,7 +42,13 @@ const saves = () =>
     .map(([, args]) => (args as { settings: Settings }).settings);
 
 test("the first launch goes to the welcome form, and the dashboard never shows", async () => {
-  const { router } = renderRoute("/", answers());
+  // Watches from the first render, with nothing cached, as the app starts.
+  let dashboard = false;
+  const watch = new MutationObserver(() => {
+    if (document.body.textContent?.includes("Net cashflow")) dashboard = true;
+  });
+  watch.observe(document.body, { childList: true, subtree: true });
+  const { router } = renderRoute("/", answers(), { seedSettings: false });
   await waitFor(() => expect(router.state.location.pathname).toBe("/welcome"));
   expect(
     await screen.findByRole("heading", { name: "Welcome to Jobert's Vault" }),
@@ -57,6 +63,28 @@ test("the first launch goes to the welcome form, and the dashboard never shows",
   ).toBe("₱");
   expect(await screen.findByText("already added")).toBeTruthy();
   expect(screen.getByText("Cash")).toBeTruthy();
+  watch.disconnect();
+  expect(dashboard).toBe(false);
+});
+
+test("the finish buttons wait for the settings, so a save never goes out without them", async () => {
+  renderRoute(
+    "/welcome",
+    {
+      ...answers(),
+      get_settings: () => {
+        throw { code: "database", message: "disk I/O error" };
+      },
+    },
+    { seedSettings: false },
+  );
+  expect(await screen.findByRole("button", { name: "Retry" })).toBeTruthy();
+  const start = screen.getByRole("button", { name: "Start using the app" });
+  expect((start as HTMLButtonElement).disabled).toBe(true);
+  expect(
+    (screen.getByRole("button", { name: "Set up later" }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true);
 });
 
 test("+ Bank adds a bank account, listed straight away", async () => {
@@ -73,6 +101,8 @@ test("+ Bank adds a bank account, listed straight away", async () => {
   });
   fireEvent.click(dialog.getByRole("button", { name: "Create account" }));
   expect(await screen.findByText("BPI")).toBeTruthy();
+  // Only what was there before the form opened is "already added".
+  expect(screen.getAllByText("already added")).toHaveLength(1);
   expect(
     vi.mocked(invoke).mock.calls.find(([c]) => c === "create_account")?.[1],
   ).toEqual({
