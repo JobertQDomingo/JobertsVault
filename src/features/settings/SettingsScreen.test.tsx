@@ -20,7 +20,7 @@ const ANSWERS: Answers = {
   }),
 };
 // What update_settings receives: the whole set (DATA_MODEL §3.5).
-const { decimalsLocked: _locked, ...STORED } = SETTINGS;
+const { decimalsLocked, ...STORED } = SETTINGS;
 
 const saves = () =>
   vi

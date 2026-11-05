@@ -76,7 +76,7 @@ export function GeneralTab({ settings }: { settings: SettingsView }) {
   const save = (change: Partial<Settings>) => {
     const keys = Object.keys(change) as Key[];
     draft.current = { ...draft.current, ...change };
-    const { decimalsLocked: _locked, ...stored } = settings;
+    const { decimalsLocked, ...stored } = settings;
     update
       .mutateAsync({ ...stored, ...draft.current })
       .then(() => {

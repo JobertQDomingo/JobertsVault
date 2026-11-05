@@ -8,5 +8,14 @@ export default defineConfig(
   js.configs.recommended,
   tseslint.configs.recommended,
   reactHooks.configs.flat.recommended,
-  { rules: { "no-console": "error" } },
+  {
+    rules: {
+      "no-console": "error",
+      // `const { omitted, ...rest } = x` drops a key without a cast.
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { ignoreRestSiblings: true },
+      ],
+    },
+  },
 );
