@@ -20,6 +20,26 @@ type InputProps = Pick<
   "id" | "aria-label" | "aria-invalid" | "aria-describedby" | "disabled"
 >;
 
+/** The calendar's look, shared with the period switcher's range picker. */
+export const calendarClasses = {
+  months: "relative",
+  month_caption: "flex h-8 items-center px-1 font-semibold",
+  nav: "absolute top-0 right-0 z-10 flex gap-1",
+  button_previous:
+    "grid size-8 place-items-center rounded-chip hover:bg-wash aria-disabled:pointer-events-none aria-disabled:opacity-40",
+  button_next:
+    "grid size-8 place-items-center rounded-chip hover:bg-wash aria-disabled:pointer-events-none aria-disabled:opacity-40",
+  chevron: "size-4 fill-current",
+  month_grid: "mt-2 border-collapse",
+  weekday: "size-8 text-small font-normal text-muted-foreground",
+  day: "p-0 text-center",
+  day_button:
+    "size-8 rounded-chip tabular-nums transition-colors duration-150 hover:bg-wash",
+  today: "[&>button]:font-semibold",
+  outside: "text-muted-foreground",
+  disabled: "opacity-40 [&>button]:pointer-events-none",
+};
+
 /**
  * A `MM/DD/YYYY` input with a calendar (DESIGN_SYSTEM §8, §9.1). ↑/↓ move one day. Days after
  * `max` (today, until Phase 3 allows future dates) can't be picked. Weeks start on `weekStart`.
@@ -109,24 +129,9 @@ export function DatePicker({
               setOpen(false);
             }}
             classNames={{
-              months: "relative",
-              month_caption: "flex h-8 items-center px-1 font-semibold",
-              nav: "absolute top-0 right-0 z-10 flex gap-1",
-              button_previous:
-                "grid size-8 place-items-center rounded-chip hover:bg-wash aria-disabled:pointer-events-none aria-disabled:opacity-40",
-              button_next:
-                "grid size-8 place-items-center rounded-chip hover:bg-wash aria-disabled:pointer-events-none aria-disabled:opacity-40",
-              chevron: "size-4 fill-current",
-              month_grid: "mt-2 border-collapse",
-              weekday: "size-8 text-small font-normal text-muted-foreground",
-              day: "p-0 text-center",
-              day_button:
-                "size-8 rounded-chip tabular-nums transition-colors duration-150 hover:bg-wash",
+              ...calendarClasses,
               selected:
                 "[&>button]:bg-primary [&>button]:font-semibold [&>button]:text-primary-foreground [&>button]:hover:bg-primary-hover",
-              today: "[&>button]:font-semibold",
-              outside: "text-muted-foreground",
-              disabled: "opacity-40 [&>button]:pointer-events-none",
             }}
           />
         </Popover.Content>

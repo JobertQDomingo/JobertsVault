@@ -9,12 +9,15 @@ import { cn } from "@/lib/utils";
 export function Segmented<V extends string>({
   value,
   onChange,
+  onReselect,
   options,
   className,
   "aria-label": ariaLabel,
 }: {
   value: V;
   onChange: (value: V) => void;
+  /** The selected segment was clicked again (the period bar reopens Custom's picker). */
+  onReselect?: () => void;
   options: { value: V; label: ReactNode }[];
   className?: string;
   "aria-label": string;
@@ -24,7 +27,9 @@ export function Segmented<V extends string>({
       type="single"
       value={value}
       // Radix sends "" when the selected segment is clicked again; keep the selection instead.
-      onValueChange={(next: string) => next && onChange(next as V)}
+      onValueChange={(next: string) =>
+        next ? onChange(next as V) : onReselect?.()
+      }
       aria-label={ariaLabel}
       className={cn("inline-flex rounded-control bg-wash p-[3px]", className)}
     >
