@@ -78,6 +78,7 @@ export const CATEGORIES: CategoryList = {
       icon: "briefcase",
     }),
     category({ id: 4, name: "Transportation", color: "cat-1", icon: "car" }),
+    category({ id: 5, name: "Snacks", archived: true }),
   ],
   defaultColors: { income: "cat-1", expense: "cat-3" },
 };

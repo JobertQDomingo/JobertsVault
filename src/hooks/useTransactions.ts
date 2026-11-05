@@ -1,5 +1,6 @@
 import {
   keepPreviousData,
+  skipToken,
   useInfiniteQuery,
   useQuery,
   useQueryClient,
@@ -33,8 +34,7 @@ export const useTransactions = (filter: TransactionFilter) =>
 export const useTransaction = (id?: number) =>
   useQuery({
     queryKey: queryKeys.transaction(id ?? 0),
-    queryFn: () => getTransaction(id as number),
-    enabled: id !== undefined,
+    queryFn: id === undefined ? skipToken : () => getTransaction(id),
   });
 
 export const useTransactionDefaults = () =>

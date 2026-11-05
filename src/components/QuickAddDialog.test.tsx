@@ -13,6 +13,7 @@ import {
   RECENT,
   TODAY,
 } from "@/test/fixtures";
+import { queryKeys } from "@/lib/queryKeys";
 import { renderRoute, SETTINGS, type Answers } from "@/test/render";
 import { notify } from "./ui/toast";
 
@@ -450,4 +451,186 @@ test("the next quick-add starts on the account just used, not a cached one", asy
   await screen.findByRole("dialog");
   await waitFor(() => expect(document.activeElement).toBe(amount()));
   expect((field("Account") as HTMLInputElement).value).toBe("Bank");
+});
+
+const reopen = async () => {
+  fireEvent.keyDown(window, { key: "n", ctrlKey: true });
+  await screen.findByRole("dialog");
+  await waitFor(() => expect(document.activeElement).toBe(amount()));
+};
+/** Opens ⧉ on the list row whose payee is `payee`. */
+async function duplicateRow(payee: string) {
+  const row = (await screen.findByText(payee)).closest<HTMLElement>(".group")!;
+  fireEvent.click(within(row).getByRole("button", { name: "Duplicate" }));
+  await screen.findByRole("dialog", { name: "Add transaction" });
+}
+
+test("reopening a row just edited shows the saved values, not cached ones", async () => {
+  const rows = new Map(RECENT.map((t) => [t.id, t]));
+  renderRoute("/", {
+    ...ANSWERS,
+    get_transaction: ({ id }: { id: number }) => rows.get(id),
+    update_transaction: ({
+      id,
+      transaction,
+    }: {
+      id: number;
+      transaction: TransactionFields;
+    }) => {
+      rows.set(id, { id, ...transaction });
+      return { id, ...transaction };
+    },
+  });
+  fireEvent.click(await screen.findByText("Food & Groceries · Market"));
+  await waitFor(() => expect(amount().value).toBe("85.20"));
+  type(amount(), "90");
+  key("Enter");
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  fireEvent.click(await screen.findByText("Food & Groceries · Market"));
+  await screen.findByRole("dialog", { name: "Edit transaction" });
+  await waitFor(() => expect(amount().value).toBe("90.00"));
+});
+
+test("each opening asks for today again (the app can stay open past midnight)", async () => {
+  let today = TODAY;
+  await openQuickAdd({
+    ...ANSWERS,
+    get_transaction_defaults: () => ({ accountId: 4, today }),
+  });
+  key("Escape");
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  today = "2026-11-06";
+  await reopen();
+  expect(
+    (dialog().getByRole("textbox", { name: "Date" }) as HTMLInputElement).value,
+  ).toBe("11/06/2026");
+});
+
+test("an error for a field that isn't shown is a toast, and Save still works after", async () => {
+  let fail = true;
+  renderRoute("/transactions", {
+    ...ANSWERS,
+    get_settings: { ...SETTINGS, showPaymentMethod: false },
+    get_transaction: ({ id }: { id: number }) => ({
+      ...RECENT.find((t) => t.id === id),
+      paymentMethodId: 3,
+    }),
+    create_transaction: ({
+      transaction,
+    }: {
+      transaction: TransactionFields;
+    }) => {
+      if (fail)
+        throw {
+          code: "validation",
+          field: "paymentMethodId",
+          message: "This payment method is archived",
+        };
+      return saved(transaction);
+    },
+  });
+  await duplicateRow("Corner Cafe");
+  await waitFor(() => expect(amount().value).toBe("12.50"));
+  fireEvent.click(dialog().getByRole("button", { name: "Save" }));
+  expect(
+    await screen.findByText("This payment method is archived"),
+  ).toBeTruthy();
+  fail = false;
+  fireEvent.click(dialog().getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(calls("create_transaction")).toHaveLength(2));
+});
+
+test("if the settings can't load, the dialog says so instead of loading forever", async () => {
+  const { client } = renderRoute("/settings", {
+    ...ANSWERS,
+    get_settings: () => {
+      throw { code: "database", message: "disk I/O error" };
+    },
+  });
+  client.removeQueries({ queryKey: queryKeys.settings });
+  fireEvent.keyDown(window, { key: "n", ctrlKey: true });
+  expect(await dialog().findByRole("button", { name: "Retry" })).toBeTruthy();
+});
+
+test("keys pressed in the delete confirm stay there", async () => {
+  renderRoute("/", ANSWERS);
+  fireEvent.click(await screen.findByText("Food & Groceries · Market"));
+  await waitFor(() => expect(amount().value).toBe("85.20"));
+  fireEvent.click(dialog().getByRole("button", { name: "Delete" }));
+  const confirm = await screen.findByRole("dialog", {
+    name: "Delete this transaction?",
+  });
+  fireEvent.keyDown(within(confirm).getByRole("button", { name: "Cancel" }), {
+    key: "t",
+    altKey: true,
+  });
+  fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "Delete this transaction?" }),
+    ).toBeNull(),
+  );
+  expect(
+    dialog()
+      .getByRole("radio", { name: "Expense" })
+      .getAttribute("aria-checked"),
+  ).toBe("true");
+});
+
+test("a duplicate is dated today whatever its id", async () => {
+  renderRoute("/transactions", {
+    ...ANSWERS,
+    list_transactions: { ...LIST, items: [{ ...RECENT[2], id: 0 }] },
+    get_transaction: () => ({ ...RECENT[2], id: 0 }),
+  });
+  await duplicateRow("Corner Cafe");
+  await waitFor(() =>
+    expect(
+      (dialog().getByRole("textbox", { name: "Date" }) as HTMLInputElement)
+        .value,
+    ).toBe("11/05/2026"),
+  );
+});
+
+test("a field's error goes once the field is changed", async () => {
+  await openQuickAdd({
+    ...ANSWERS,
+    create_transaction: () => {
+      throw {
+        code: "validation",
+        field: "amount",
+        message: "Enter an amount above 0",
+      };
+    },
+  });
+  key("Enter");
+  expect(await dialog().findByText("Enter an amount above 0")).toBeTruthy();
+  type(amount(), "250");
+  await waitFor(() =>
+    expect(dialog().queryByText("Enter an amount above 0")).toBeNull(),
+  );
+});
+
+test("after Save & add another, an archived category isn't offered any more", async () => {
+  renderRoute("/transactions", {
+    ...ANSWERS,
+    get_transaction: ({ id }: { id: number }) => ({
+      ...RECENT.find((t) => t.id === id),
+      categoryId: 5,
+    }),
+  });
+  await duplicateRow("Corner Cafe");
+  await waitFor(() =>
+    expect((field("Category") as HTMLInputElement).value).toBe(
+      "Snacks (archived)",
+    ),
+  );
+  type(field("Category"), "din");
+  key("Enter");
+  key("Enter", { shiftKey: true });
+  await waitFor(() => expect(amount().value).toBe(""));
+  fireEvent.click(field("Category"));
+  expect(
+    screen.queryByRole("option", { name: "Snacks (archived)" }),
+  ).toBeNull();
 });

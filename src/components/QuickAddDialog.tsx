@@ -108,7 +108,8 @@ export function QuickAddDialog({
   const accounts = useAccounts();
   const categories = useCategories();
   const methods = usePaymentMethods();
-  const { data: settings } = useSettings();
+  const settingsQuery = useSettings();
+  const settings = settingsQuery.data;
   const [dirty, setDirty] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const close = () => (dirty ? setDiscarding(true) : onClose());
@@ -118,22 +119,29 @@ export function QuickAddDialog({
     accounts,
     categories,
     methods,
+    settingsQuery,
     ...(sourceId !== undefined ? [source] : []),
   ];
   const failed = queries.filter((q) => q.isError);
+  // The cache can be old (an edit elsewhere, or past midnight), so the starting values wait for
+  // this opening's own answers.
   if (
     !start &&
+    defaults.isFetchedAfterMount &&
     defaults.data &&
     accounts.data &&
     categories.data &&
     methods.data &&
     settings &&
-    (sourceId === undefined || source.data)
+    (sourceId === undefined || (source.isFetchedAfterMount && source.data))
   )
     setStart({
       values: source.data
         ? // A duplicate is dated today (TXN-2).
-          fromRow(source.data, request.duplicate ? defaults.data.today : null)
+          fromRow(
+            source.data,
+            request.duplicate !== undefined ? defaults.data.today : null,
+          )
         : blank(defaults.data.accountId, defaults.data.today),
       today: defaults.data.today,
     });
@@ -258,6 +266,9 @@ function TransactionForm({
   const update = useUpdateTransaction();
   const remove = useDeleteTransaction();
   const [deleting, setDeleting] = useState(false);
+  // The ids an archived record may still be offered for: the row being edited or copied. Save &
+  // add another starts a new row, which keeps none.
+  const [kept, setKept] = useState(initial);
   // Set before the save starts, so a second Enter in the same moment can't save twice.
   const saving = useRef(false);
   const kind = useWatch({ control, name: "kind" });
@@ -276,6 +287,21 @@ function TransactionForm({
     setValue("kind", next, { shouldDirty: true });
   };
 
+  // The fields on screen, so a message always lands where it can be seen.
+  const shown: (keyof Values)[] = [
+    "amount",
+    "date",
+    "accountId",
+    "note",
+    ...(transfer
+      ? (["toAccountId"] as const)
+      : ([
+          "categoryId",
+          "payee",
+          ...(showMethod ? (["paymentMethodId"] as const) : []),
+        ] as const)),
+  ];
+
   const save = (another: boolean) => {
     if (saving.current) return;
     saving.current = true;
@@ -288,29 +314,34 @@ function TransactionForm({
         notify.success("Saved");
         if (another) {
           // Keeps the type, account and date; clears the rest (UI_FLOWS §4).
-          reset({
+          const next = {
             ...blank(num(values.accountId), values.date),
             kind: values.kind,
-          });
+          };
+          reset(next);
+          setKept(next);
           // The same input stays, so it can take the cursor straight away.
           document.getElementById("qa-amount")?.focus();
         } else onDone();
       } catch (error) {
         const detail = error instanceof ApiError ? error.detail : null;
-        if (detail?.code === "validation" && detail.field in initial)
+        if (
+          detail?.code === "validation" &&
+          shown.some((f) => f === detail.field)
+        )
           setError(detail.field as keyof Values, { message: detail.message });
         else
           notify.error(error instanceof Error ? error.message : String(error));
-      } finally {
-        saving.current = false;
       }
-    })();
+    })().finally(() => {
+      saving.current = false;
+    });
   };
 
   const accountOptions = offered(
     accounts,
-    num(initial.accountId),
-    num(initial.toAccountId),
+    num(kept.accountId),
+    num(kept.toAccountId),
   ).map((a) => {
     const Icon = ACCOUNT_ICONS[a.kind];
     return {
@@ -343,216 +374,223 @@ function TransactionForm({
   );
 
   return (
-    <form
-      noValidate
-      onSubmit={(e) => {
-        e.preventDefault();
-        save(false);
-      }}
-      onKeyDown={(e) => {
-        const altKind =
-          e.altKey && !e.ctrlKey ? ALT_KINDS[e.key.toLowerCase()] : undefined;
-        if (altKind) {
+    <>
+      <form
+        noValidate
+        onSubmit={(e) => {
           e.preventDefault();
-          // Sonner's Alt+T (jump to notifications) listens on the document; this one wins here.
-          e.stopPropagation();
-          changeKind(altKind);
-        } else if (
-          e.key === "Enter" &&
-          // An open list takes Enter itself (it picks), and a focused button clicks.
-          !e.defaultPrevented &&
-          !(e.target instanceof HTMLButtonElement)
-        ) {
-          e.preventDefault();
-          // Shift+Enter is Save & add another, which an edit doesn't have.
-          save(e.shiftKey && editId === undefined);
-        }
-      }}
-    >
-      <DialogBody>
-        <Controller
-          control={control}
-          name="kind"
-          render={({ field }) => (
-            <Segmented
-              aria-label="Type"
-              value={field.value}
-              onChange={changeKind}
-              options={KINDS}
-              className="justify-self-start"
-            />
-          )}
-        />
-        <Controller
-          control={control}
-          name="amount"
-          render={({ field }) => (
-            <Field
-              label="Amount"
-              htmlFor="qa-amount"
-              error={errors.amount?.message}
-              className={ROW}
-            >
-              <AmountInput
-                id="qa-amount"
-                ref={field.ref}
-                autoFocus
+          save(false);
+        }}
+        onKeyDown={(e) => {
+          const altKind =
+            e.altKey && !e.ctrlKey ? ALT_KINDS[e.key.toLowerCase()] : undefined;
+          if (altKind) {
+            e.preventDefault();
+            // Sonner's Alt+T (jump to notifications) listens on the document; this one wins here.
+            e.stopPropagation();
+            changeKind(altKind);
+          } else if (
+            e.key === "Enter" &&
+            // An open list takes Enter itself (it picks), and a focused button clicks.
+            !e.defaultPrevented &&
+            !(e.target instanceof HTMLButtonElement)
+          ) {
+            e.preventDefault();
+            // Shift+Enter is Save & add another, which an edit doesn't have.
+            save(e.shiftKey && editId === undefined);
+          }
+        }}
+      >
+        <DialogBody>
+          <Controller
+            control={control}
+            name="kind"
+            render={({ field }) => (
+              <Segmented
+                aria-label="Type"
                 value={field.value}
-                onChange={field.onChange}
-                onBlur={field.onBlur}
+                onChange={changeKind}
+                options={KINDS}
+                className="justify-self-start"
               />
-            </Field>
-          )}
-        />
-        {transfer ? (
-          <>
-            {account("accountId", "From")}
-            {account("toAccountId", "To")}
-          </>
-        ) : (
-          <>
-            <Controller
-              control={control}
-              name="categoryId"
-              render={({ field }) => (
-                <Field
-                  label="Category"
-                  htmlFor="qa-category"
-                  error={errors.categoryId?.message}
-                  className={ROW}
-                >
-                  <Combobox
-                    id="qa-category"
-                    options={offered(
-                      categories.filter((c) => c.kind === kind),
-                      num(initial.categoryId),
-                    ).map((c) => ({
-                      value: String(c.id),
-                      label: named(c),
-                      icon: (
-                        <CategoryChip color={c.color} icon={c.icon} size="sm" />
-                      ),
-                    }))}
-                    value={field.value}
-                    onChange={field.onChange}
-                    placeholder="Choose a category"
-                  />
-                </Field>
-              )}
-            />
-            {account("accountId", "Account")}
-          </>
-        )}
-        <Controller
-          control={control}
-          name="date"
-          render={({ field }) => (
-            <Field
-              label="Date"
-              htmlFor="qa-date"
-              error={errors.date?.message}
-              className={ROW}
-            >
-              <DatePicker
-                id="qa-date"
-                value={field.value}
-                onChange={field.onChange}
-                weekStart={weekStart}
-                // Until Phase 3 nothing is recorded after today (TXN-8).
-                max={today}
-              />
-            </Field>
-          )}
-        />
-        {!transfer && (
-          <>
-            <Field
-              label="Payee"
-              htmlFor="qa-payee"
-              error={errors.payee?.message}
-              className={ROW}
-            >
-              <Input
-                id="qa-payee"
-                autoComplete="off"
-                placeholder="Optional"
-                {...register("payee")}
-              />
-            </Field>
-            {showMethod && (
+            )}
+          />
+          <Controller
+            control={control}
+            name="amount"
+            render={({ field }) => (
+              <Field
+                label="Amount"
+                htmlFor="qa-amount"
+                error={errors.amount?.message}
+                className={ROW}
+              >
+                <AmountInput
+                  id="qa-amount"
+                  ref={field.ref}
+                  autoFocus
+                  value={field.value}
+                  onChange={field.onChange}
+                  onBlur={field.onBlur}
+                />
+              </Field>
+            )}
+          />
+          {transfer ? (
+            <>
+              {account("accountId", "From")}
+              {account("toAccountId", "To")}
+            </>
+          ) : (
+            <>
               <Controller
                 control={control}
-                name="paymentMethodId"
+                name="categoryId"
                 render={({ field }) => (
                   <Field
-                    label="Method"
-                    htmlFor="qa-method"
-                    error={errors.paymentMethodId?.message}
+                    label="Category"
+                    htmlFor="qa-category"
+                    error={errors.categoryId?.message}
                     className={ROW}
                   >
                     <Combobox
-                      id="qa-method"
+                      id="qa-category"
                       options={offered(
-                        methods,
-                        num(initial.paymentMethodId),
-                      ).map((m) => ({
-                        value: String(m.id),
-                        label: named(m),
+                        categories.filter((c) => c.kind === kind),
+                        num(kept.categoryId),
+                      ).map((c) => ({
+                        value: String(c.id),
+                        label: named(c),
+                        icon: (
+                          <CategoryChip
+                            color={c.color}
+                            icon={c.icon}
+                            size="sm"
+                          />
+                        ),
                       }))}
                       value={field.value}
                       onChange={field.onChange}
-                      placeholder="Optional"
+                      placeholder="Choose a category"
                     />
                   </Field>
                 )}
               />
+              {account("accountId", "Account")}
+            </>
+          )}
+          <Controller
+            control={control}
+            name="date"
+            render={({ field }) => (
+              <Field
+                label="Date"
+                htmlFor="qa-date"
+                error={errors.date?.message}
+                className={ROW}
+              >
+                <DatePicker
+                  id="qa-date"
+                  value={field.value}
+                  onChange={field.onChange}
+                  weekStart={weekStart}
+                  // Until Phase 3 nothing is recorded after today (TXN-8).
+                  max={today}
+                />
+              </Field>
             )}
-          </>
-        )}
-        <Field
-          label="Note"
-          htmlFor="qa-note"
-          error={errors.note?.message}
-          className={ROW}
-        >
-          <Input
-            id="qa-note"
-            autoComplete="off"
-            placeholder="Optional"
-            {...register("note")}
           />
-        </Field>
-      </DialogBody>
-      <DialogFooter>
-        {editId !== undefined && (
-          <Button
-            variant="destructive"
-            className="mr-auto"
-            onClick={() => setDeleting(true)}
+          {!transfer && (
+            <>
+              <Field
+                label="Payee"
+                htmlFor="qa-payee"
+                error={errors.payee?.message}
+                className={ROW}
+              >
+                <Input
+                  id="qa-payee"
+                  autoComplete="off"
+                  placeholder="Optional"
+                  {...register("payee")}
+                />
+              </Field>
+              {showMethod && (
+                <Controller
+                  control={control}
+                  name="paymentMethodId"
+                  render={({ field }) => (
+                    <Field
+                      label="Method"
+                      htmlFor="qa-method"
+                      error={errors.paymentMethodId?.message}
+                      className={ROW}
+                    >
+                      <Combobox
+                        id="qa-method"
+                        options={offered(
+                          methods,
+                          num(kept.paymentMethodId),
+                        ).map((m) => ({
+                          value: String(m.id),
+                          label: named(m),
+                        }))}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Optional"
+                      />
+                    </Field>
+                  )}
+                />
+              )}
+            </>
+          )}
+          <Field
+            label="Note"
+            htmlFor="qa-note"
+            error={errors.note?.message}
+            className={ROW}
           >
-            <Trash2 />
-            Delete
-          </Button>
-        )}
-        <Button onClick={onCancel}>Cancel</Button>
-        {editId === undefined && (
+            <Input
+              id="qa-note"
+              autoComplete="off"
+              placeholder="Optional"
+              {...register("note")}
+            />
+          </Field>
+        </DialogBody>
+        <DialogFooter>
+          {editId !== undefined && (
+            <Button
+              variant="destructive"
+              className="mr-auto"
+              onClick={() => setDeleting(true)}
+            >
+              <Trash2 />
+              Delete
+            </Button>
+          )}
+          <Button onClick={onCancel}>Cancel</Button>
+          {editId === undefined && (
+            <Button
+              title="Shift+Enter"
+              aria-keyshortcuts="Shift+Enter"
+              onClick={() => save(true)}
+            >
+              Save &amp; add another
+            </Button>
+          )}
           <Button
-            title="Shift+Enter"
-            aria-keyshortcuts="Shift+Enter"
-            onClick={() => save(true)}
+            variant="primary"
+            type="submit"
+            title="Enter"
+            aria-keyshortcuts="Enter"
           >
-            Save &amp; add another
+            Save
           </Button>
-        )}
-        <Button
-          variant="primary"
-          type="submit"
-          title="Enter"
-          aria-keyshortcuts="Enter"
-        >
-          Save
-        </Button>
-      </DialogFooter>
+        </DialogFooter>
+      </form>
+      {/* Outside the form: React events cross portals, and the form's keys mustn't act on it. */}
       {editId !== undefined && (
         <ConfirmDialog
           open={deleting}
@@ -572,6 +610,6 @@ function TransactionForm({
           }
         />
       )}
-    </form>
+    </>
   );
 }
