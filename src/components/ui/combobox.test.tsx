@@ -136,3 +136,15 @@ test("Esc inside a dialog closes only the list", () => {
   expect(screen.queryByRole("listbox")).toBeNull();
   expect(onOpenChange).not.toHaveBeenCalled();
 });
+
+test("after a pick the name is selected, so typing starts a new search", () => {
+  render(<Form />);
+  input().focus();
+  type("din");
+  key("Enter");
+  const field = input() as HTMLInputElement;
+  expect([field.selectionStart, field.selectionEnd]).toEqual([
+    0,
+    "Dining Out".length,
+  ]);
+});

@@ -68,8 +68,10 @@ export function Combobox({
       ...(list?.querySelectorAll<HTMLElement>("[cmdk-item]") ?? []),
     ].find((item) => item.dataset.value === highlight);
     active?.scrollIntoView({ block: "nearest" });
-    // Set here, not in JSX: cmdk only names its elements once they're in the DOM.
     const input = inputRef.current;
+    // Once the list closes, the name is selected, so typing starts a new search.
+    if (!open && input === document.activeElement) input?.select();
+    // Set here, not in JSX: cmdk only names its elements once they're in the DOM.
     for (const [name, id] of [
       ["aria-controls", list?.id],
       ["aria-activedescendant", active?.id],
