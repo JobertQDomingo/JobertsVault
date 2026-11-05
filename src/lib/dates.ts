@@ -1,6 +1,7 @@
 // Dates cross the Rust boundary as 'YYYY-MM-DD' strings. This file is the only place that turns
 // them into Date objects (for the date picker) or display text (ARCHITECTURE §2, DESIGN_SYSTEM §8).
 import { addDays as addDaysToDate, format, isValid, parse } from "date-fns";
+import type { PeriodQuery } from "@/bindings/PeriodQuery";
 
 const ISO = "yyyy-MM-dd";
 
@@ -30,3 +31,29 @@ export const addDays = (iso: string, days: number) =>
 
 /** A date without its year, e.g. `Nov 5` (a card's due date). */
 export const formatShortDate = (iso: string) => format(toDate(iso), "MMM d");
+
+/** `Oct 26 – Nov 1, 2026`, or with both years when they differ (DESIGN_SYSTEM §8). */
+function formatRange(start: Date, end: Date) {
+  return start.getFullYear() === end.getFullYear()
+    ? `${format(start, "MMM d")} – ${format(end, "MMM d, yyyy")}`
+    : `${format(start, "MMM d, yyyy")} – ${format(end, "MMM d, yyyy")}`;
+}
+
+/** The period switcher's label (DESIGN_SYSTEM §8), from `get_period`'s dates. */
+export function formatPeriodLabel(
+  kind: PeriodQuery["kind"],
+  start: string,
+  end: string,
+) {
+  const from = toDate(start);
+  // A one-day custom range reads like a day.
+  if (kind === "day" || start === end) return format(from, "EEE, MMM d, yyyy");
+  switch (kind) {
+    case "year":
+      return format(from, "yyyy");
+    case "month":
+      // A month that starts on the 1st is a calendar month; with month_start_day > 1 it's a range.
+      if (from.getDate() === 1) return format(from, "MMMM yyyy");
+  }
+  return formatRange(from, toDate(end));
+}

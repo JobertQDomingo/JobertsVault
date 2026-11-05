@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   addDays,
   formatInputDate,
+  formatPeriodLabel,
   parseInputDate,
   toDate,
   toIso,
@@ -45,4 +46,32 @@ test("adding days crosses months, years and leap days", () => {
 test("text that isn't a stored date is shown as typed", () => {
   expect(formatInputDate("")).toBe("");
   expect(formatInputDate("13/05/2026")).toBe("13/05/2026");
+});
+
+test("period labels follow DESIGN_SYSTEM §8", () => {
+  expect(formatPeriodLabel("day", "2026-10-26", "2026-10-26")).toBe(
+    "Mon, Oct 26, 2026",
+  );
+  expect(formatPeriodLabel("week", "2026-10-26", "2026-11-01")).toBe(
+    "Oct 26 – Nov 1, 2026",
+  );
+  expect(formatPeriodLabel("week", "2025-12-29", "2026-01-04")).toBe(
+    "Dec 29, 2025 – Jan 4, 2026",
+  );
+  expect(formatPeriodLabel("month", "2026-10-01", "2026-10-31")).toBe(
+    "October 2026",
+  );
+  expect(formatPeriodLabel("month", "2026-09-25", "2026-10-24")).toBe(
+    "Sep 25 – Oct 24, 2026",
+  );
+  expect(formatPeriodLabel("year", "2026-01-01", "2026-12-31")).toBe("2026");
+  expect(formatPeriodLabel("custom", "2026-10-01", "2026-10-10")).toBe(
+    "Oct 1 – Oct 10, 2026",
+  );
+});
+
+test("a one-day custom range reads like a day", () => {
+  expect(formatPeriodLabel("custom", "2026-10-01", "2026-10-01")).toBe(
+    "Thu, Oct 1, 2026",
+  );
 });
