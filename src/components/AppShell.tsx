@@ -42,8 +42,9 @@ function Layout() {
       <Sidebar />
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
         <TopBar />
-        {/* Spans the 12 px around it, so the panels' shadows aren't cut off at its edges. */}
-        <main className="-m-3 grid min-h-0 flex-1 content-start gap-3 overflow-y-auto p-3">
+        {/* Spans the 12 px around it, so the panels' shadows aren't cut off at its edges. A
+            column, so a screen's list panel can take the height left and scroll inside itself. */}
+        <main className="-m-3 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
           <Outlet />
         </main>
       </div>

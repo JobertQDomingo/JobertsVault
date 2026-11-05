@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   useInfiniteQuery,
   useQuery,
   useQueryClient,
@@ -24,6 +25,8 @@ export const useTransactions = (filter: TransactionFilter) =>
     initialPageParam: 0,
     getNextPageParam: (last, _all, page) =>
       last.hasMore ? page + 1 : undefined,
+    // A new filter keeps the old rows until its own arrive, instead of blanking.
+    placeholderData: keepPreviousData,
   });
 
 export const useTransaction = (id: number) =>

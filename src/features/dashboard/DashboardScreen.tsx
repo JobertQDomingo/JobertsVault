@@ -2,7 +2,6 @@ import { Plus, ReceiptText } from "lucide-react";
 import { Link } from "react-router";
 import type { Category } from "@/bindings/Category";
 import type { Dashboard } from "@/bindings/Dashboard";
-import type { Transaction } from "@/bindings/Transaction";
 import { AccountRow } from "@/components/AccountRow";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -17,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useCategories } from "@/hooks/useCategories";
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePeriodQuery } from "@/hooks/usePeriodQuery";
-import { formatDayHeader } from "@/lib/dates";
+import { formatDayHeader, groupByDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 const COLUMNS =
@@ -40,17 +39,6 @@ function CardHeader({
       </Link>
     </div>
   );
-}
-
-/** Consecutive transactions on the same date, newest first as the backend sends them. */
-function byDay(transactions: Transaction[]) {
-  const days: { date: string; items: Transaction[] }[] = [];
-  for (const t of transactions) {
-    const last = days[days.length - 1];
-    if (last?.date === t.date) last.items.push(t);
-    else days.push({ date: t.date, items: [t] });
-  }
-  return days;
 }
 
 /**
@@ -146,7 +134,7 @@ function DashboardBody({
               }
             />
           ) : (
-            byDay(data.recent).map(({ date, items }) => (
+            groupByDate(data.recent).map(({ date, items }) => (
               <section key={date}>
                 <h3 className="px-[18px] pt-2.5 pb-1.5 text-small font-semibold text-muted-foreground">
                   {formatDayHeader(date, data.today)}

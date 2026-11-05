@@ -3,8 +3,10 @@ import type { Account } from "@/bindings/Account";
 import type { Category } from "@/bindings/Category";
 import type { CategoryList } from "@/bindings/CategoryList";
 import type { Dashboard } from "@/bindings/Dashboard";
+import type { PaymentMethod } from "@/bindings/PaymentMethod";
 import type { PeriodView } from "@/bindings/PeriodView";
 import type { Transaction } from "@/bindings/Transaction";
+import type { TransactionList } from "@/bindings/TransactionList";
 
 export const TODAY = "2026-11-05";
 
@@ -151,4 +153,23 @@ export const DASHBOARD: Dashboard = {
   netBalance: 828575,
   recent: RECENT,
   today: TODAY,
+};
+
+export const ACCOUNT_LIST = { accounts: ACCOUNTS, netBalance: 828575 };
+
+export const PAYMENT_METHODS: PaymentMethod[] = [
+  { id: 1, name: "Cash", sortOrder: 1, archived: false, inUse: true },
+  { id: 2, name: "Credit Card", sortOrder: 2, archived: false, inUse: true },
+  { id: 3, name: "Old card", sortOrder: 3, archived: true, inUse: true },
+];
+
+/** `list_transactions` for this month: one page, with figures over every match. */
+export const LIST: TransactionList = {
+  items: RECENT.slice(0, 4),
+  hasMore: false,
+  summary: { count: 4, income: 420000, expense: 9770 },
+  dayNets: [
+    { date: TODAY, net: -8520 },
+    { date: "2026-11-04", net: 418750 },
+  ],
 };

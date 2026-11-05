@@ -32,6 +32,17 @@ export const addDays = (iso: string, days: number) =>
 /** A date without its year, e.g. `Nov 5` (a card's due date). */
 export const formatShortDate = (iso: string) => format(toDate(iso), "MMM d");
 
+/** Consecutive items on the same date, in the order given (newest first, as the backend sends). */
+export function groupByDate<T extends { date: string }>(items: T[]) {
+  const days: { date: string; items: T[] }[] = [];
+  for (const item of items) {
+    const last = days[days.length - 1];
+    if (last?.date === item.date) last.items.push(item);
+    else days.push({ date: item.date, items: [item] });
+  }
+  return days;
+}
+
 /** A list's day header (DESIGN_SYSTEM §8), relative to the backend's `today`. */
 export function formatDayHeader(iso: string, today: string) {
   if (iso === today) return "Today";
