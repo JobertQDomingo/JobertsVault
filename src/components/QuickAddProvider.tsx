@@ -7,25 +7,33 @@ import {
 } from "react";
 import { Dialog, DialogContent } from "./ui/dialog";
 
-type QuickAdd = { add: () => void; edit: (id: number) => void };
+type QuickAdd = {
+  add: () => void;
+  edit: (id: number) => void;
+  /** The form starts as a copy of that transaction, dated today (TXN-2). */
+  duplicate: (id: number) => void;
+};
 
 const QuickAddContext = createContext<QuickAdd>({
   add: () => {},
   edit: () => {},
+  duplicate: () => {},
 });
 
-/** Opens quick-add (UI_FLOWS §4) from any screen: + Add and Ctrl+N, or a row to edit it. */
+/** Opens quick-add (UI_FLOWS §4) from any screen: + Add and Ctrl+N, or a row to edit or copy it. */
 export const useQuickAdd = () => useContext(QuickAddContext);
+
+type Open = { edit?: number; duplicate?: number };
 
 /** Holds the one quick-add dialog for the whole app. ROADMAP 1.9 fills in its form. */
 export function QuickAddProvider({ children }: { children: ReactNode }) {
-  // null: closed; { editing: null }: adding; { editing: id }: editing that transaction.
-  const [open, setOpen] = useState<{ editing: number | null } | null>(null);
+  const [open, setOpen] = useState<Open | null>(null);
   // Stable, so opening the dialog doesn't re-render every screen that can open it.
   const actions = useMemo<QuickAdd>(
     () => ({
-      add: () => setOpen({ editing: null }),
-      edit: (id) => setOpen({ editing: id }),
+      add: () => setOpen({}),
+      edit: (id) => setOpen({ edit: id }),
+      duplicate: (id) => setOpen({ duplicate: id }),
     }),
     [],
   );
@@ -34,7 +42,7 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
       {children}
       <Dialog open={open !== null} onOpenChange={() => setOpen(null)}>
         <DialogContent
-          title={open?.editing != null ? "Edit transaction" : "Add transaction"}
+          title={open?.edit != null ? "Edit transaction" : "Add transaction"}
         />
       </Dialog>
     </QuickAddContext.Provider>
