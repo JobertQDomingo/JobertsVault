@@ -68,11 +68,25 @@ test("every type style is defined", () => {
     expect(css).toContain(`--text-${style}:`);
 });
 
-test("glass inside glass is never blurred again", () => {
-  // Either level nested in either level (DESIGN_SYSTEM §2.3).
-  expect(css).toContain(
-    ":is(.glass, .glass-raised) :is(.glass, .glass-raised) {",
-  );
+/** The declarations of the rule whose selector is exactly `selector`. */
+function rule(selector: string) {
+  const start = css.indexOf(`\n${selector} {`);
+  expect(start, selector).toBeGreaterThanOrEqual(0);
+  return css.slice(start, css.indexOf("\n}", start));
+}
+
+test("a panel inside a panel is a flat tint", () => {
+  // DESIGN_SYSTEM §2.3, §9.1 Toolbar.
+  const flat = rule(":is(.glass, .glass-raised) .glass");
+  expect(flat).toContain("background: var(--wash)");
+  expect(flat).toMatch(/backdrop-filter:\s*none/);
+});
+
+test("a raised element inside a panel keeps its material but isn't blurred again", () => {
+  // An inline menu must stay readable over the card (§2.1), with one layer of blur (§2.3).
+  const raised = rule(":is(.glass, .glass-raised) .glass-raised");
+  expect(raised).toMatch(/backdrop-filter:\s*none/);
+  expect(raised).not.toContain("background");
 });
 
 test("transparency off makes glass solid", () => {
