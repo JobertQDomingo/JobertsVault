@@ -13,6 +13,40 @@ pub mod state;
 #[cfg(test)]
 mod test_support;
 
+/// 1440 × 900, or 1280 × 800 zoomed to 8/9 when that doesn't fit the monitor's usable area
+/// (ADR 0008, ARCHITECTURE §11). Runs before the window is shown.
+fn fit_window(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    let Some(monitor) = window.current_monitor()? else {
+        return Ok(());
+    };
+    let mut work = *monitor.work_area();
+    // Debug builds can pretend to be on a smaller screen, to see the fallback:
+    // JV_WORK_AREA=1366x728 npm run tauri dev
+    if cfg!(debug_assertions)
+        && let Some((w, h)) = std::env::var("JV_WORK_AREA")
+            .ok()
+            .and_then(|v| v.split_once('x').map(|(w, h)| (w.parse(), h.parse())))
+            .and_then(|(w, h)| Some((w.ok()?, h.ok()?)))
+    {
+        work.size = tauri::PhysicalSize::new(w, h);
+    }
+    let (outer, inner) = (window.outer_size()?, window.inner_size()?);
+    let fit = domain::window::window_fit(
+        (work.size.width, work.size.height),
+        (
+            outer.width.saturating_sub(inner.width),
+            outer.height.saturating_sub(inner.height),
+        ),
+        monitor.scale_factor(),
+    );
+    if fit != domain::window::FULL {
+        window.set_size(tauri::LogicalSize::new(fit.width, fit.height))?;
+        window.set_zoom(fit.zoom)?;
+        window.center()?;
+    }
+    Ok(())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
@@ -22,6 +56,8 @@ pub fn run() {
             // The window starts hidden and is shown once startup is done, even if it failed
             // (ARCHITECTURE §6).
             if let Some(window) = app.get_webview_window("main") {
+                // Best effort: if the monitor can't be read, it stays 1440 × 900.
+                let _ = fit_window(&window);
                 window.show()?;
             }
             Ok(())
