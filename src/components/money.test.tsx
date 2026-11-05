@@ -141,3 +141,11 @@ test("a reset clears what was being typed", () => {
   fireEvent.click(screen.getByRole("button", { name: "Reset" }));
   expect(input().value).toBe("");
 });
+
+test("a pasted negative amount is refused, not flipped", () => {
+  const onChange = vi.fn();
+  renderWithSettings(<Amount onChange={onChange} />);
+  for (const text of ["-500", "−1,234.50"]) typeText(text);
+  expect(onChange).not.toHaveBeenCalled();
+  expect(input().value).toBe("");
+});

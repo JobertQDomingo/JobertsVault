@@ -50,13 +50,18 @@ export function AccountRow({
             <MoneyText
               amount={card.availableCredit}
               kind="balance"
-              className="font-normal text-muted-foreground"
+              // Past the limit it's negative, and keeps its red.
+              className={cn(
+                "font-normal",
+                card.availableCredit >= 0 && "text-muted-foreground",
+              )}
             />{" "}
             · Due {formatShortDate(card.dueDate)}
           </p>
         )}
       </div>
-      {card ? (
+      {/* An overpaid card has a credit, which shows as a plain balance. */}
+      {card && account.balance <= 0 ? (
         <MoneyText amount={card.amountOwed} kind="owed" />
       ) : (
         <MoneyText amount={account.balance} kind="balance" />

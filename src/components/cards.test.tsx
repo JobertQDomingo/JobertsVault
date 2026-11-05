@@ -46,3 +46,9 @@ test("the percent is written next to the bar", () => {
   renderWithSettings(<ProgressBar percent={6} />);
   expect(screen.getByText("6%")).toBeTruthy();
 });
+
+test("the bar is named by its label and never reports below 0", () => {
+  renderWithSettings(<ProgressBar percent={-5} label="Utilization" />);
+  const bar = screen.getByRole("progressbar", { name: "Utilization" });
+  expect(bar.getAttribute("aria-valuenow")).toBe("0");
+});

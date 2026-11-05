@@ -40,8 +40,12 @@ export function AmountInput({
         className,
       )}
       {...props}
+      // Until the settings arrive, the number of decimals isn't known.
+      disabled={!settings || props.disabled}
       value={shown}
       onChange={(e) => {
+        // Never negative: a minus is refused rather than silently dropped.
+        if (/[-−]/.test(e.target.value)) return;
         // Pasted symbols and spaces drop out; a keystroke that only adds one of them changes nothing.
         const text = e.target.value.replace(/[^\d.,]/g, "");
         const points = text.split(".").length - 1;

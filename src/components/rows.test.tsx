@@ -183,3 +183,52 @@ test("a compact row (dashboard) has no account column or buttons", () => {
   expect(row.queryByRole("button", { name: "Duplicate" })).toBeNull();
   expect(row.getByText("Food & Groceries · Market")).toBeTruthy();
 });
+
+test("a card past its limit shows negative available credit in red", () => {
+  renderWithSettings(
+    <AccountRow
+      account={{ ...CARD, card: { ...CARD.card!, availableCredit: -200000 } }}
+    />,
+  );
+  expect(screen.getByText("−₱2,000.00").className).toContain("text-expense");
+});
+
+test("an overpaid card shows its credit, not ₱0.00 owed", () => {
+  renderWithSettings(
+    <AccountRow
+      account={{
+        ...CARD,
+        balance: 50000,
+        card: { ...CARD.card!, amountOwed: 0 },
+      }}
+    />,
+  );
+  expect(screen.getByText("₱500.00")).toBeTruthy();
+  expect(screen.queryByText(/owed/)).toBeNull();
+});
+
+test("a row only offers the actions it was given", () => {
+  renderWithSettings(
+    <TransactionRow
+      transaction={txn({})}
+      category={GROCERIES}
+      account={CASH}
+      onOpen={() => {}}
+    />,
+  );
+  expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Duplicate" })).toBeNull();
+});
+
+test("a compact row's button holds only inline content", () => {
+  renderWithSettings(
+    <TransactionRow
+      compact
+      transaction={txn({})}
+      category={GROCERIES}
+      account={CASH}
+      onOpen={() => {}}
+    />,
+  );
+  expect(screen.getByRole("button").querySelector("p, div")).toBeNull();
+});

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,6 +17,7 @@ export function ProgressBar({
   className?: string;
   "aria-label"?: string;
 }) {
+  const labelId = useId();
   const color =
     percent >= 100 ? "bg-danger" : percent >= 80 ? "bg-warning" : "bg-primary";
   return (
@@ -24,7 +25,8 @@ export function ProgressBar({
       <div
         role="progressbar"
         aria-label={ariaLabel}
-        aria-valuenow={percent}
+        aria-labelledby={ariaLabel ? undefined : labelId}
+        aria-valuenow={Math.max(0, percent)}
         aria-valuemin={0}
         // A card can go past its limit, so the scale grows with it.
         aria-valuemax={Math.max(100, percent)}
@@ -35,7 +37,10 @@ export function ProgressBar({
           style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
         />
       </div>
-      <span className="text-small whitespace-nowrap text-muted-foreground tabular-nums">
+      <span
+        id={labelId}
+        className="text-small whitespace-nowrap text-muted-foreground tabular-nums"
+      >
         {label ?? `${percent}%`}
       </span>
     </div>

@@ -60,7 +60,7 @@ export function TransactionRow({
         className={cn(rowClasses, "grid-cols-[32px_minmax(0,1fr)_auto]")}
       >
         {chip}
-        <p className="truncate">{label}</p>
+        <span className="truncate">{label}</span>
         {amount}
       </Root>
     );
@@ -87,30 +87,34 @@ export function TransactionRow({
       {amount}
       {/* Shown on hover, and whenever one has keyboard focus. */}
       <div className="flex justify-end gap-0.5 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Edit"
-          title="Edit"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpen?.();
-          }}
-        >
-          <Pencil />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Duplicate"
-          title="Duplicate"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDuplicate?.();
-          }}
-        >
-          <Copy />
-        </Button>
+        {onOpen && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Edit"
+            title="Edit"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpen();
+            }}
+          >
+            <Pencil />
+          </Button>
+        )}
+        {onDuplicate && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Duplicate"
+            title="Duplicate"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate();
+            }}
+          >
+            <Copy />
+          </Button>
+        )}
       </div>
     </div>
   );
