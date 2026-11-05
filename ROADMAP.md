@@ -18,7 +18,7 @@ This file is the progress tracker.
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
-| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 29 / 53 |
+| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 30 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
@@ -88,7 +88,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] `AuroraBackground` and `GlassPanel`
 - [x] Restyle the shadcn/ui basics: Button, Input, Select/Combobox, Dialog, Toast, Tabs, Segmented control, Date picker (follows `week_start`, US dates)
 - [x] `MoneyText`, `AmountInput`, `CategoryChip`, `AccountRow`, `TransactionRow`, `StatCard`, `ProgressBar`
-- [ ] Empty states, skeletons (shown after 150 ms) and the startup error screen
+- [x] Empty states, skeletons (shown after 150 ms) and the startup error screen
 
 ### 1.8 App shell
 - [ ] Sidebar with the logo, top bar with + Add, routes, `PeriodSwitcher` with the period saved in the URL
