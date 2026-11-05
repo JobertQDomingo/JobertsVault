@@ -43,10 +43,12 @@ export const useTransactionDefaults = () =>
     queryFn: getTransactionDefaults,
   });
 
-export const usePayBillDefaults = (cardId: number) =>
+/** Only loads when given a card. */
+export const usePayBillDefaults = (cardId?: number) =>
   useQuery({
-    queryKey: queryKeys.payBillDefaults(cardId),
-    queryFn: () => getPayBillDefaults(cardId),
+    queryKey: queryKeys.payBillDefaults(cardId ?? 0),
+    queryFn:
+      cardId === undefined ? skipToken : () => getPayBillDefaults(cardId),
   });
 
 export const useCreateTransaction = () => useLedgerMutation(createTransaction);

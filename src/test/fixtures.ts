@@ -177,3 +177,10 @@ export const LIST: TransactionList = {
 
 /** Quick-add starts on the card, the account used last (DATA_MODEL §5.8). */
 export const DEFAULTS = { accountId: 4, today: TODAY };
+
+/** Pay bill on the card (id 4): from Bank, the full ₱640.00 owed (DATA_MODEL §5.8). */
+export const PAY_BILL_DEFAULTS = {
+  fromAccountId: 2,
+  amount: 64000,
+  today: TODAY,
+};

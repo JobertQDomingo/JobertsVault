@@ -12,15 +12,21 @@ type QuickAdd = {
   edit: (id: number) => void;
   /** The form starts as a copy of that transaction, dated today (TXN-2). */
   duplicate: (id: number) => void;
+  /** A transfer to the card for what's owed (CC-9). */
+  payBill: (cardId: number) => void;
 };
 
 const QuickAddContext = createContext<QuickAdd>({
   add: () => {},
   edit: () => {},
   duplicate: () => {},
+  payBill: () => {},
 });
 
-/** Opens quick-add (UI_FLOWS §4) from any screen: + Add and Ctrl+N, or a row to edit or copy it. */
+/**
+ * Opens quick-add (UI_FLOWS §4) from any screen: + Add and Ctrl+N, a row to edit or copy it, or a
+ * card's Pay bill.
+ */
 export const useQuickAdd = () => useContext(QuickAddContext);
 
 /** Holds the one quick-add dialog for the whole app, mounted fresh for each opening. */
@@ -32,6 +38,7 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
       add: () => setOpen({}),
       edit: (id) => setOpen({ edit: id }),
       duplicate: (id) => setOpen({ duplicate: id }),
+      payBill: (cardId) => setOpen({ payBill: cardId }),
     }),
     [],
   );

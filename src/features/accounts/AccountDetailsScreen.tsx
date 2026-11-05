@@ -1,4 +1,4 @@
-import { Ellipsis, SearchX } from "lucide-react";
+import { Banknote, Ellipsis, SearchX } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { ApiError } from "@/api/client";
@@ -11,6 +11,7 @@ import { Loading, Skeleton } from "@/components/Loading";
 import { MoneyText } from "@/components/MoneyText";
 import { PeriodSwitcher } from "@/components/PeriodSwitcher";
 import { ProgressBar } from "@/components/ProgressBar";
+import { useQuickAdd } from "@/components/QuickAddProvider";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
@@ -122,6 +123,7 @@ function Summary({
           {account.archived && (
             <span className="text-small text-muted-foreground">Archived</span>
           )}
+          {card && <PayBillButton cardId={account.id} />}
           <Actions account={account} money={money} />
         </div>
       </div>
@@ -190,6 +192,16 @@ function Summary({
         )}
       </div>
     </GlassPanel>
+  );
+}
+
+function PayBillButton({ cardId }: { cardId: number }) {
+  const { payBill } = useQuickAdd();
+  return (
+    <Button variant="primary" size="sm" onClick={() => payBill(cardId)}>
+      <Banknote />
+      Pay bill
+    </Button>
   );
 }
 
