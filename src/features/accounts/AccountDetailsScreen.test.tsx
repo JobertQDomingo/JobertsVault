@@ -165,6 +165,8 @@ test("after Delete it goes back to the list and never asks for the deleted accou
   const [, ok] = confirm("Delete E-wallet?");
   fireEvent.click(ok);
   await waitFor(() => expect(router.state.location.pathname).toBe("/accounts"));
+  // Replaced, so Back doesn't return to the deleted account.
+  expect(router.state.historyAction).toBe("REPLACE");
   expect(await screen.findByText("Deleted")).toBeTruthy();
   await screen.findByText("Net balance");
   expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
@@ -173,8 +175,27 @@ test("after Delete it goes back to the list and never asks for the deleted accou
   ).toHaveLength(1);
 });
 
-test("an account that doesn't exist shows the error with Retry", async () => {
-  renderRoute("/accounts/999", answers());
+test("an account that doesn't exist says so, with a way back instead of Retry", async () => {
+  const { router } = renderRoute("/accounts/999", answers());
+  expect(await screen.findByText("This account doesn't exist.")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "All accounts" }));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/accounts"));
+});
+
+test("an id that isn't a number never reaches the backend", async () => {
+  renderRoute("/accounts/abc", answers());
+  expect(await screen.findByText("This account doesn't exist.")).toBeTruthy();
+  expect(calls("get_account")).toEqual([]);
+});
+
+test("any other error offers Retry", async () => {
+  renderRoute("/accounts/2", {
+    ...answers(),
+    get_account: () => {
+      throw { code: "database", message: "disk I/O error" };
+    },
+  });
   expect(await screen.findByRole("button", { name: "Retry" })).toBeTruthy();
 });
 

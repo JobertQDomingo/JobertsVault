@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   archiveAccount,
   createAccount,
@@ -15,14 +15,27 @@ import { useLedgerMutation } from "./useLedgerMutation";
 export const useAccounts = () =>
   useQuery({ queryKey: queryKeys.accounts, queryFn: listAccounts });
 
-export const useAccount = (id: number) =>
-  useQuery({ queryKey: queryKeys.account(id), queryFn: () => getAccount(id) });
+/** Asks nothing for `null` (an id in the URL that isn't a number). */
+export const useAccount = (id: number | null) =>
+  useQuery({
+    queryKey: queryKeys.account(id ?? 0),
+    queryFn: id === null ? skipToken : () => getAccount(id),
+  });
 
 export const useCreateAccount = () => useLedgerMutation(createAccount);
 export const useUpdateAccount = () => useLedgerMutation(updateAccount);
 export const useReorderAccounts = () => useLedgerMutation(reorderAccounts);
 export const useArchiveAccount = () => useLedgerMutation(archiveAccount);
 export const useUnarchiveAccount = () => useLedgerMutation(unarchiveAccount);
-/** `before` runs once deleted, before the refresh (see useLedgerMutation). */
-export const useDeleteAccount = (before?: (id: number) => void) =>
-  useLedgerMutation(deleteAccount, before);
+/**
+ * Drops the deleted account's query before the ledger refresh, then runs `onDeleted` (still before
+ * it), so a screen showing the account can leave first and the account isn't fetched again.
+ */
+export const useDeleteAccount = (onDeleted?: (id: number) => void) => {
+  const client = useQueryClient();
+  return useLedgerMutation(async (id: number) => {
+    await deleteAccount(id);
+    client.removeQueries({ queryKey: queryKeys.account(id) });
+    onDeleted?.(id);
+  });
+};

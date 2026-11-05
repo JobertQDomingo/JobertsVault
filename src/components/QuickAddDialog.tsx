@@ -1,7 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { ApiError } from "@/api/client";
 import type { Account } from "@/bindings/Account";
 import type { Category } from "@/bindings/Category";
 import type { PaymentMethod } from "@/bindings/PaymentMethod";
@@ -21,6 +20,7 @@ import {
   useUpdateTransaction,
 } from "@/hooks/useTransactions";
 import { named, offered } from "@/lib/records";
+import { showSaveError } from "@/lib/saveError";
 import { ACCOUNT_ICONS } from "./AccountRow";
 import { AmountInput } from "./AmountInput";
 import { CategoryChip } from "./CategoryChip";
@@ -324,14 +324,7 @@ function TransactionForm({
           document.getElementById("qa-amount")?.focus();
         } else onDone();
       } catch (error) {
-        const detail = error instanceof ApiError ? error.detail : null;
-        if (
-          detail?.code === "validation" &&
-          shown.some((f) => f === detail.field)
-        )
-          setError(detail.field as keyof Values, { message: detail.message });
-        else
-          notify.error(error instanceof Error ? error.message : String(error));
+        showSaveError(error, shown, setError);
       }
     })().finally(() => {
       saving.current = false;

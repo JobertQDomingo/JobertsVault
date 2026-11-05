@@ -1,6 +1,5 @@
 import { useRef } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { ApiError } from "@/api/client";
 import type { Account } from "@/bindings/Account";
 import type { AccountFields } from "@/bindings/AccountFields";
 import type { AccountKind } from "@/bindings/AccountKind";
@@ -17,6 +16,7 @@ import {
 import { Field, Input } from "@/components/ui/input";
 import { notify } from "@/components/ui/toast";
 import { useCreateAccount, useUpdateAccount } from "@/hooks/useAccounts";
+import { showSaveError } from "@/lib/saveError";
 
 type Values = {
   kind: AccountKind;
@@ -109,13 +109,7 @@ export function AccountDialog({
       notify.success("Saved");
       onClose();
     } catch (error) {
-      const detail = error instanceof ApiError ? error.detail : null;
-      if (
-        detail?.code === "validation" &&
-        shown.some((f) => f === detail.field)
-      )
-        setError(detail.field as keyof Values, { message: detail.message });
-      else notify.error(error instanceof Error ? error.message : String(error));
+      showSaveError(error, shown, setError);
     } finally {
       saving.current = false;
     }

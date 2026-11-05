@@ -14,13 +14,15 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
  * A list reordered by dragging its ⋮⋮ handles, or by focusing one and pressing ↑/↓ (UI_FLOWS §5.1).
  * `onReorder` gets every id in the new order. The new order shows straight away and stays until
- * the ids in `items` change (the save's refresh), so it doesn't flash back while saving.
+ * every save has finished. Saves run one at a time, and moves made during one go as a single save
+ * after it, so a held key or quick presses never race or jump back. Once all are done, `items`
+ * (the refreshed order, or the old one after a failure) shows again.
  */
 export function SortableList<T extends { id: number }>({
   items,
@@ -33,24 +35,33 @@ export function SortableList<T extends { id: number }>({
   onReorder: (ids: number[]) => Promise<unknown>;
   children: (item: T, handle: ReactNode) => ReactNode;
 }) {
-  // Keyed by the ids, since callers filter the list afresh on every render.
-  const key = items.map((item) => item.id).join();
-  const [moved, setMoved] = useState<{ from: string; ids: number[] } | null>(
-    null,
-  );
-  const ids = moved?.from === key ? moved.ids : items.map((item) => item.id);
+  const [moved, setMoved] = useState<number[] | null>(null);
+  const queued = useRef<number[] | null>(null);
+  const saving = useRef(false);
+  const ids = moved ?? items.map((item) => item.id);
   const byId = new Map(items.map((item) => [item.id, item]));
   const sensors = useSensors(
     // A few pixels first, so a click on the handle isn't a drag.
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
 
+  const save = async () => {
+    saving.current = true;
+    for (let next = queued.current; next; next = queued.current) {
+      queued.current = null;
+      // The caller shows a failure; the next queued order still goes.
+      await onReorder(next).catch(() => {});
+    }
+    saving.current = false;
+    setMoved(null);
+  };
+
   const move = (from: number, to: number) => {
     if (to < 0 || to >= ids.length || from === to) return;
     const next = arrayMove(ids, from, to);
-    setMoved({ from: key, ids: next });
-    // A failed save puts the old order back (the caller shows the error).
-    onReorder(next).catch(() => setMoved(null));
+    setMoved(next);
+    queued.current = next;
+    if (!saving.current) void save();
   };
 
   const onDragEnd = ({ active, over }: DragEndEvent) => {
@@ -94,8 +105,9 @@ function SortableItem({
   onMove: (by: number) => void;
   children: (handle: ReactNode) => ReactNode;
 }) {
+  // dnd-kit's `attributes` aren't spread: they announce its Space-to-pick-up keys, which this
+  // handle doesn't use (↑/↓ move it).
   const {
-    attributes,
     listeners,
     setNodeRef,
     setActivatorNodeRef,
@@ -107,7 +119,6 @@ function SortableItem({
     <button
       type="button"
       ref={setActivatorNodeRef}
-      {...attributes}
       {...listeners}
       aria-label={`Move ${label}`}
       aria-keyshortcuts="ArrowUp ArrowDown"

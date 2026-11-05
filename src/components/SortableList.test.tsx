@@ -8,7 +8,11 @@ const ITEMS = [
   { id: 3, name: "Three" },
 ];
 
-function renderList(onReorder = vi.fn(() => Promise.resolve())) {
+function renderList(
+  onReorder: (ids: number[]) => Promise<unknown> = vi.fn(() =>
+    Promise.resolve(),
+  ),
+) {
   render(
     <SortableList
       items={ITEMS}
@@ -85,4 +89,36 @@ test("the new order stays while the same items arrive again", () => {
   expect(order()).toEqual(["Two", "One", "Three"]);
   rerender(ui([ITEMS[1], ITEMS[0], ITEMS[2]]));
   expect(order()).toEqual(["Two", "One", "Three"]);
+});
+
+test("moves made while a save runs wait for it, then go as one save, and the list never jumps back", async () => {
+  const saves: { ids: number[]; done: () => void }[] = [];
+  const onReorder = vi.fn(
+    (ids: number[]) =>
+      new Promise<void>((resolve) => saves.push({ ids, done: resolve })),
+  );
+  renderList(onReorder);
+  const down = () =>
+    fireEvent.keyDown(screen.getByRole("button", { name: "Move One" }), {
+      key: "ArrowDown",
+    });
+  down();
+  down();
+  fireEvent.keyDown(screen.getByRole("button", { name: "Move One" }), {
+    key: "ArrowUp",
+  });
+  down();
+  expect(saves.map((s) => s.ids)).toEqual([[2, 1, 3]]);
+  expect(order()).toEqual(["Two", "Three", "One"]);
+  saves[0].done();
+  await waitFor(() => expect(saves).toHaveLength(2));
+  expect(saves[1].ids).toEqual([2, 3, 1]);
+  expect(order()).toEqual(["Two", "Three", "One"]);
+});
+
+test("the handle doesn't announce dnd-kit's Space instructions, which it doesn't use", () => {
+  renderList();
+  const handle = screen.getByRole("button", { name: "Move One" });
+  expect(handle.getAttribute("aria-describedby")).toBeNull();
+  expect(handle.getAttribute("aria-roledescription")).toBeNull();
 });

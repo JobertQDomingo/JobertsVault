@@ -1,9 +1,10 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { Ellipsis } from "lucide-react";
+import { Ellipsis, SearchX } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
+import { ApiError } from "@/api/client";
 import type { Account } from "@/bindings/Account";
 import { ACCOUNT_ICONS } from "@/components/AccountRow";
+import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { GlassPanel } from "@/components/GlassPanel";
 import { Loading, Skeleton } from "@/components/Loading";
@@ -24,8 +25,7 @@ import {
 import { usePeriodQuery } from "@/hooks/usePeriodQuery";
 import { useSettings } from "@/hooks/useSettings";
 import { formatShortDate } from "@/lib/dates";
-import { formatMoney } from "@/lib/money";
-import { queryKeys } from "@/lib/queryKeys";
+import { formatMoney, type MoneySettings } from "@/lib/money";
 import { AccountDialog } from "./AccountDialog";
 
 /**
@@ -33,10 +33,30 @@ import { AccountDialog } from "./AccountDialog";
  * account's own transactions (incoming transfers too) under the period switcher.
  */
 export function AccountDetailsScreen() {
-  const id = Number(useParams().id);
+  const param = useParams().id ?? "";
+  const id = /^\d{1,15}$/.test(param) ? Number(param) : null;
   const account = useAccount(id);
+  const settings = useSettings().data;
   const [period] = usePeriodQuery();
+  const navigate = useNavigate();
 
+  // Retrying can't bring back a deleted account (Back, or an old link), so it gets a way out.
+  if (
+    id === null ||
+    (account.error instanceof ApiError &&
+      account.error.detail.code === "not_found")
+  )
+    return (
+      <GlassPanel>
+        <EmptyState
+          icon={SearchX}
+          message="This account doesn't exist."
+          action={
+            <Button onClick={() => navigate("/accounts")}>All accounts</Button>
+          }
+        />
+      </GlassPanel>
+    );
   if (account.isError)
     return (
       <GlassPanel>
@@ -48,8 +68,9 @@ export function AccountDetailsScreen() {
     );
   return (
     <>
-      {account.data ? (
-        <Summary account={account.data} />
+      {/* Its amounts are written with the money settings, so it waits for them too. */}
+      {account.data && settings ? (
+        <Summary account={account.data} settings={settings} />
       ) : (
         <Loading>
           <GlassPanel className="grid gap-3 p-5">
@@ -75,10 +96,14 @@ export function AccountDetailsScreen() {
   );
 }
 
-function Summary({ account }: { account: Account }) {
-  const settings = useSettings().data;
-  const money = (amount: number) =>
-    settings ? formatMoney(amount, settings) : "";
+function Summary({
+  account,
+  settings,
+}: {
+  account: Account;
+  settings: MoneySettings;
+}) {
+  const money = (amount: number) => formatMoney(amount, settings);
   const Icon = ACCOUNT_ICONS[account.kind];
   const card = account.card;
   // An overpaid card has a credit, which shows as a plain balance (as in AccountRow). The owed
@@ -176,15 +201,14 @@ function Actions({
   account: Account;
   money: (amount: number) => string;
 }) {
-  const client = useQueryClient();
   const navigate = useNavigate();
   const archive = useArchiveAccount();
   const unarchive = useUnarchiveAccount();
-  // Gone before the refresh, so the deleted account isn't fetched again (ROADMAP 1.9). The toast
-  // is here too: leaving unmounts this menu, and an unmounted mutate() skips its own callbacks.
-  const remove = useDeleteAccount((id) => {
-    client.removeQueries({ queryKey: queryKeys.account(id) });
-    navigate("/accounts");
+  // Leaves before the refresh, so the deleted account isn't fetched again (ROADMAP 1.9), and
+  // replaces this entry so Back doesn't return to it. The toast is here too: leaving unmounts this
+  // menu, and an unmounted mutate() skips its own callbacks.
+  const remove = useDeleteAccount(() => {
+    navigate("/accounts", { replace: true });
     notify.success("Deleted");
   });
   const [open, setOpen] = useState<"edit" | "archive" | "delete" | null>(null);
