@@ -191,10 +191,13 @@ test("editing opens the dialog as Edit transaction, whatever the id", async () =
     const { edit } = useQuickAdd();
     return <button onClick={() => edit(0)}>Edit</button>;
   }
+  vi.mocked(invoke).mockReturnValue(new Promise(() => {}));
   render(
-    <QuickAddProvider>
-      <EditZero />
-    </QuickAddProvider>,
+    <QueryClientProvider client={createQueryClient()}>
+      <QuickAddProvider>
+        <EditZero />
+      </QuickAddProvider>
+    </QueryClientProvider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Edit" }));
   expect(

@@ -1,5 +1,6 @@
 import {
   keepPreviousData,
+  skipToken,
   useInfiniteQuery,
   useQuery,
   useQueryClient,
@@ -29,10 +30,11 @@ export const useTransactions = (filter: TransactionFilter) =>
     placeholderData: keepPreviousData,
   });
 
-export const useTransaction = (id: number) =>
+/** Loads only with an id: quick-add asks for one only to edit or duplicate. */
+export const useTransaction = (id?: number) =>
   useQuery({
-    queryKey: queryKeys.transaction(id),
-    queryFn: () => getTransaction(id),
+    queryKey: queryKeys.transaction(id ?? 0),
+    queryFn: id === undefined ? skipToken : () => getTransaction(id),
   });
 
 export const useTransactionDefaults = () =>

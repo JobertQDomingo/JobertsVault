@@ -78,6 +78,7 @@ export const CATEGORIES: CategoryList = {
       icon: "briefcase",
     }),
     category({ id: 4, name: "Transportation", color: "cat-1", icon: "car" }),
+    category({ id: 5, name: "Snacks", archived: true }),
   ],
   defaultColors: { income: "cat-1", expense: "cat-3" },
 };
@@ -173,3 +174,6 @@ export const LIST: TransactionList = {
     { date: "2026-11-04", net: 418750 },
   ],
 };
+
+/** Quick-add starts on the card, the account used last (DATA_MODEL §5.8). */
+export const DEFAULTS = { accountId: 4, today: TODAY };
