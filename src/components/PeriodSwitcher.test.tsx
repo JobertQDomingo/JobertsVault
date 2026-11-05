@@ -154,3 +154,19 @@ test("while the next period loads, the old label stays", async () => {
   );
   expect(screen.getByText("November 2026")).toBeTruthy();
 });
+
+test("from the current period, switching kind goes to the one containing today", async () => {
+  renderSwitcher("/?period=month&anchor=2026-11-01");
+  await screen.findByText("November 2026");
+  fireEvent.click(screen.getByRole("radio", { name: "Week" }));
+  await waitFor(() => expect(params()).toEqual({ period: "week" }));
+});
+
+test("Custom opens on the month being looked at", async () => {
+  renderSwitcher("/?period=month&anchor=2026-10-01");
+  await screen.findByText("October 2026");
+  fireEvent.click(screen.getByRole("radio", { name: "Custom" }));
+  expect(screen.getByRole("grid").getAttribute("aria-label")).toBe(
+    "October 2026",
+  );
+});

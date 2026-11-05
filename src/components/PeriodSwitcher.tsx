@@ -21,7 +21,7 @@ const KINDS: { value: PeriodQuery["kind"]; label: string }[] = [
 ];
 
 const ENDS =
-  "[&>button]:bg-primary [&>button]:font-semibold [&>button]:text-primary-foreground";
+  "[&>button]:bg-primary [&>button]:font-semibold [&>button]:text-primary-foreground [&>button]:hover:bg-primary-hover";
 
 /**
  * The period bar (DESIGN_SYSTEM §9.2, UI_FLOWS F8): `[Day│Week│Month│Year│Custom] ◀ label ▶ [Today]`,
@@ -43,10 +43,15 @@ export function PeriodSwitcher() {
       );
       setPicking(true);
     } else if (kind !== query.kind)
-      // Keeps the place: a custom range hands over its last day.
+      // Keeps the place: today while looking at the current period, else the same day (a
+      // custom range hands over its last day).
       setQuery({
         kind,
-        anchor: query.kind === "custom" ? query.end : query.anchor,
+        anchor: view?.isCurrent
+          ? null
+          : query.kind === "custom"
+            ? query.end
+            : query.anchor,
       });
   };
 
@@ -114,7 +119,7 @@ export function PeriodSwitcher() {
             selected={range}
             onSelect={setRange}
             defaultMonth={
-              range?.from ?? (view ? toDate(view.today) : undefined)
+              range?.from ?? (view ? toDate(view.start) : undefined)
             }
             endMonth={view ? toDate(view.today) : undefined}
             weekStartsOn={settings?.weekStart === "sunday" ? 0 : 1}

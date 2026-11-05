@@ -35,10 +35,13 @@ function renderApp(status: object) {
 
 beforeEach(() => vi.mocked(invoke).mockReset());
 
-test("when startup works, the app shows its name on glass", async () => {
+test("when startup works, the app shell opens on the dashboard", async () => {
   renderApp({ status: "ok" });
-  const title = await screen.findByRole("heading", { name: "Jobert's Vault" });
+  const title = await screen.findByRole("heading", { name: "Dashboard" });
   expect(title.closest(".glass")).toBeTruthy();
+  expect(
+    screen.getByRole("navigation", { name: "Main" }).closest(".glass"),
+  ).toBeTruthy();
 });
 
 test("when startup fails, the error screen shows the error and the database path", async () => {

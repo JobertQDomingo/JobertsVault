@@ -1,8 +1,9 @@
+import { RouterProvider } from "react-router";
 import { AuroraBackground } from "./components/AuroraBackground";
-import { GlassPanel } from "./components/GlassPanel";
 import { StartupErrorScreen } from "./components/StartupErrorScreen";
 import { Toaster } from "./components/ui/toast";
 import { useStartupStatus } from "./hooks/useStartupStatus";
+import { router } from "./routes";
 
 export default function App() {
   const startup = useStartupStatus();
@@ -20,11 +21,7 @@ export default function App() {
         // Never a blank window, even if the status itself can't be read.
         <StartupErrorScreen message={startup.error.message} />
       ) : status?.status === "ok" ? (
-        <main className="flex h-full items-center justify-center">
-          <GlassPanel className="px-8 py-6">
-            <h1 className="text-h1">Jobert's Vault</h1>
-          </GlassPanel>
-        </main>
+        <RouterProvider router={router} />
       ) : null}
     </>
   );
