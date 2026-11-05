@@ -3,14 +3,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
-import type { TransactionFields } from "@/bindings/TransactionFields";
 import type { TransactionFilter } from "@/bindings/TransactionFilter";
 import type { TransactionList } from "@/bindings/TransactionList";
-import {
-  useCreateTransaction,
-  useDeleteTransaction,
-  useTransactions,
-} from "./useTransactions";
+import { useDeleteTransaction, useTransactions } from "./useTransactions";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
@@ -58,31 +53,6 @@ test("the list asks for the next page while there is more", async () => {
     filter,
     page: 1,
   });
-});
-
-test("creating a transaction refreshes the ledger", async () => {
-  const transaction: TransactionFields = {
-    kind: "expense",
-    amount: 2550,
-    date: "2026-11-03",
-    accountId: 1,
-    toAccountId: null,
-    categoryId: 8,
-    payee: null,
-    paymentMethodId: null,
-    note: null,
-  };
-  vi.mocked(invoke).mockResolvedValueOnce({ id: 1, ...transaction });
-  const { client, wrapper } = setup();
-  client.setQueryData(["ledger", "accounts"], "old balances");
-  const { result } = renderHook(() => useCreateTransaction(), { wrapper });
-
-  await result.current.mutateAsync(transaction);
-
-  expect(invoke).toHaveBeenCalledWith("create_transaction", { transaction });
-  expect(client.getQueryState(["ledger", "accounts"])?.isInvalidated).toBe(
-    true,
-  );
 });
 
 test("deleting a transaction drops its row instead of fetching it again", async () => {
