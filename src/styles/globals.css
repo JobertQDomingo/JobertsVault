@@ -209,11 +209,16 @@
 }
 
 /* One layer of blur: a panel inside a panel is a flat tint (§2.3, §9.1 Toolbar). */
-:is(.glass, .glass-raised) :is(.glass, .glass-raised) {
+:is(.glass, .glass-raised) .glass {
   background: var(--wash);
   border-color: transparent;
   backdrop-filter: none;
   box-shadow: none;
+}
+
+/* A raised element that isn't portaled keeps its material so it stays readable, minus the blur. */
+:is(.glass, .glass-raised) .glass-raised {
+  backdrop-filter: none;
 }
 
 @layer base {
@@ -221,6 +226,10 @@
   body,
   #root {
     height: 100%;
+  }
+  /* The aurora's -z-10 stays inside the app, above the body's own background. */
+  #root {
+    isolation: isolate;
   }
   body {
     background: var(--canvas);

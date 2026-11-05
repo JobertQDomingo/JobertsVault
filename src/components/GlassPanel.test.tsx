@@ -4,9 +4,10 @@ import { GlassPanel } from "./GlassPanel";
 
 test("a panel is Level 1 glass", () => {
   render(<GlassPanel>Income</GlassPanel>);
-  const panel = screen.getByText("Income");
-  expect(panel.className).toContain("glass");
-  expect(panel.className).toContain("rounded-panel");
+  const classes = screen.getByText("Income").className.split(" ");
+  expect(classes).toContain("glass");
+  expect(classes).toContain("rounded-panel");
+  expect(classes).not.toContain("glass-raised");
 });
 
 test("raised is Level 2 glass", () => {
