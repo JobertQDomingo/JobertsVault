@@ -66,7 +66,7 @@ Jobert's Vault is a single **Tauri 2** desktop app. The window shows a React UI 
 | Migrations | **rusqlite_migration** (`2.6`) | Tracks the schema version in `PRAGMA user_version` |
 | Dates | **chrono** | Date arithmetic and the local "today" |
 | Errors | **thiserror** | A typed `AppError` enum |
-| Serialization | **serde** | Converts data to and from JSON for IPC. Fields are renamed from `snake_case` to `camelCase` for the frontend. |
+| Serialization | **serde** | Converts data to and from JSON for IPC. Fields are renamed from `snake_case` to `camelCase` for the frontend. **serde_json** is a direct dependency only because `tauri::generate_context!()` needs it once `tauri.conf.json` has a `plugins` section. |
 | Rust → TS types | **ts-rs** | Generates TypeScript types from Rust structs, so the two sides can't drift apart |
 | Updates | **tauri-plugin-updater** (`2`, with default features off and `native-tls`, `system-proxy` and `zip` on) | Downloads and verifies signed updates (§11.1). Stay on version `2`, because crates.io's newest is a `3.0.0` alpha. |
 | Release builds | **tauri-apps/tauri-action** (`v0`, GitHub Actions only) | Builds and signs the installer, and writes `latest.json` (§11.1) |

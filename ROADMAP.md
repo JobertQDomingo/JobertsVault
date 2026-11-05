@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Active |
-| **Last updated** | 2026-11-05 |
+| **Last updated** | 2026-11-06 |
 | **Current focus** | **Phase 1, 1.10: Automatic updates and releases** |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
@@ -18,7 +18,7 @@ This file is the progress tracker.
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
-| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 41 / 53 |
+| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 42 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
@@ -106,7 +106,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] Fixed-window fallback: open at 1280 × 800, zoomed to 88.9%, if 1440 × 900 doesn't fit the screen ([ADR 0008](docs/decisions/0008-fixed-window-size.md), [ARCHITECTURE §11](docs/ARCHITECTURE.md))
 
 ### 1.10 Automatic updates and releases
-- [ ] The owner generates the signing key, backs it up off this PC, and adds the two GitHub secrets. The public key goes in `tauri.conf.json` ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md)) [UPD-4]
+- [x] The owner generates the signing key, backs it up off this PC, and adds the two GitHub secrets. The public key goes in `tauri.conf.json` ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md)) [UPD-4]
 - [ ] Updater backend: `tauri-plugin-updater` and its config, `check_update` and `install_update` with the 3-second check and no limit on the download, `get_app_version`, `AppError::Update`, and nothing happens in debug builds [UPD-1] [UPD-2] [UPD-4] [UPD-7]
 - [ ] Startup flow: "Checking for updates…" and "Updating Jobert's Vault to X…", and a failed check starts the app normally [UPD-1] [UPD-2]
 - [ ] Settings: the version, **Check for updates**, **Update now**, the automatic updates switch, and **Check for updates** on the startup error screen ([UI_FLOWS §6](docs/UI_FLOWS.md)) [UPD-3] [UPD-6]
