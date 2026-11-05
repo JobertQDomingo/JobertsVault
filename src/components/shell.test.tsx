@@ -145,8 +145,10 @@ test("Ctrl+F focuses the screen's search box", () => {
     ],
     { initialEntries: ["/"] },
   );
+  const client = createQueryClient();
+  client.setQueryData(queryKeys.settings, SETTINGS);
   render(
-    <QueryClientProvider client={createQueryClient()}>
+    <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
