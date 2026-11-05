@@ -120,6 +120,7 @@ jobertsvault/
       ├─ state.rs                  # AppState { db: Mutex<Connection>, … }
       ├─ error.rs                  # AppError, and how it's serialized
       ├─ log.rs                    # appends to the error log (§4.4)
+      ├─ updater.rs                # check and install through tauri-plugin-updater (§11.1); Tauri-specific, so not a service
       ├─ db/  mod.rs  migrations.rs  seed.rs
       ├─ domain/                   # pure, unit-tested, no database
       │  ├─ money.rs  period.rs  comparison.rs (P2)  card_cycle.rs  recurrence.rs (P3)
@@ -422,7 +423,7 @@ A failed release stays a hidden draft, so no installed copy ever sees it.
 
 **In the app**
 - **At startup:** if `auto_update_enabled` is true, the frontend calls `check_update`, then `install_update` if there's a newer version. "Checking for updates…" appears only if the check takes more than 150 ms. Any failure is logged, and the app carries on (UPD-2).
-- **Timeouts:** the check gives up after 3 seconds. The plugin's builder timeout also limits the download, so `install_update` must clear it (`update.timeout = None`) or a slow connection would fail every install.
+- **Timeouts:** the check gives up after 3 seconds. The plugin's builder timeout also limits the download, so `install_update` must clear it (`update.timeout = None`) or a slow connection would fail every install. A download that stops sending data for 30 seconds still fails (a read timeout), so a dropped connection can't leave the app on "Updating…" forever. `install_update` installs the update the last `check_update` found, without checking again.
 - **Debug builds:** `check_update` returns nothing and `install_update` refuses, checked in Rust with `cfg!(debug_assertions)` (UPD-7).
 - **Only at safe moments:** the app updates at startup or when the user clicks **Update now**, never in the background, so it can't restart while a transaction is being typed. Every write is a database transaction, so closing for the installer can't leave data half-saved.
 - **The installer doesn't touch `%APPDATA%`.** The uninstaller's "delete the application data" checkbox doesn't apply during an update.

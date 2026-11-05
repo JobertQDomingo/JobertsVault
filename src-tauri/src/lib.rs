@@ -12,6 +12,7 @@ pub mod services;
 pub mod state;
 #[cfg(test)]
 mod test_support;
+pub mod updater;
 
 /// 1440 × 900, or 1280 × 800 zoomed to 8/9 when that doesn't fit the monitor's usable area
 /// (ADR 0008, ARCHITECTURE §11). Runs before the window is shown.
@@ -49,6 +50,7 @@ pub fn run() {
     tauri::Builder::default()
         // Only Rust uses it: the frontend gets no updater permissions (ARCHITECTURE §10).
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updater::Pending::default())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             let now = chrono::Local::now();
