@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate, type RouteObject } from "react-router";
 import { AppShell } from "./components/AppShell";
 import { PeriodSwitcher } from "./components/PeriodSwitcher";
+import { DashboardScreen } from "./features/dashboard/DashboardScreen";
 
 // The Phase 1 routes (ARCHITECTURE §5.4). Each screen's `handle.title` is the top bar's title.
 // shortcut: the screens are placeholders, ROADMAP 1.9 builds them.
@@ -10,7 +11,7 @@ export const routes: RouteObject[] = [
     children: [
       {
         index: true,
-        element: <PeriodSwitcher />,
+        element: <DashboardScreen />,
         handle: { title: "Dashboard" },
       },
       {

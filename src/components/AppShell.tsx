@@ -18,10 +18,10 @@ export function AppShell() {
 
 function Layout() {
   const navigate = useNavigate();
-  const openQuickAdd = useQuickAdd();
+  const { add } = useQuickAdd();
   // The shortcuts that work everywhere (UI_FLOWS §10). The period ones live in PeriodSwitcher.
   useShortcuts({
-    "Ctrl+N": openQuickAdd,
+    "Ctrl+N": add,
     // The screen's search box, on Transactions and an account's details.
     "Ctrl+F": () =>
       document

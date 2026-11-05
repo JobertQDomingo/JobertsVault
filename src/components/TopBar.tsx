@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
 
 /** The page title from the route's `handle.title`, and + Add on every screen (UI_FLOWS §1). */
 export function TopBar() {
-  const openQuickAdd = useQuickAdd();
+  const { add } = useQuickAdd();
   const title = useMatches()
     .map((match) => (match.handle as { title?: string } | undefined)?.title)
     .filter(Boolean)
@@ -19,7 +19,7 @@ export function TopBar() {
         aria-label="Add transaction"
         title="Add transaction (Ctrl+N)"
         aria-keyshortcuts="Control+N"
-        onClick={openQuickAdd}
+        onClick={add}
       >
         <Plus />
         Add

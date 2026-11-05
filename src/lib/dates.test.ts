@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   addDays,
   formatInputDate,
+  formatDayHeader,
   formatPeriodLabel,
   parseInputDate,
   toDate,
@@ -74,4 +75,12 @@ test("a one-day custom range reads like a day", () => {
   expect(formatPeriodLabel("custom", "2026-10-01", "2026-10-01")).toBe(
     "Thu, Oct 1, 2026",
   );
+});
+
+test("day headers: Today, Yesterday, else the weekday and date, with the year if it's another", () => {
+  expect(formatDayHeader("2026-11-05", "2026-11-05")).toBe("Today");
+  expect(formatDayHeader("2026-11-04", "2026-11-05")).toBe("Yesterday");
+  expect(formatDayHeader("2025-12-31", "2026-01-01")).toBe("Yesterday");
+  expect(formatDayHeader("2026-10-26", "2026-11-05")).toBe("Mon, Oct 26");
+  expect(formatDayHeader("2025-10-26", "2026-11-05")).toBe("Sun, Oct 26, 2025");
 });

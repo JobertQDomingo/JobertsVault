@@ -1,27 +1,41 @@
 import {
   createContext,
-  useCallback,
   useContext,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
 import { Dialog, DialogContent } from "./ui/dialog";
 
-const QuickAddContext = createContext<() => void>(() => {});
+type QuickAdd = { add: () => void; edit: (id: number) => void };
 
-/** Opens quick-add (UI_FLOWS §4) from any screen: + Add, Ctrl+N, a row, Pay bill. */
+const QuickAddContext = createContext<QuickAdd>({
+  add: () => {},
+  edit: () => {},
+});
+
+/** Opens quick-add (UI_FLOWS §4) from any screen: + Add and Ctrl+N, or a row to edit it. */
 export const useQuickAdd = () => useContext(QuickAddContext);
 
 /** Holds the one quick-add dialog for the whole app. ROADMAP 1.9 fills in its form. */
 export function QuickAddProvider({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(false);
+  // null: closed; { editing: null }: adding; { editing: id }: editing that transaction.
+  const [open, setOpen] = useState<{ editing: number | null } | null>(null);
   // Stable, so opening the dialog doesn't re-render every screen that can open it.
-  const show = useCallback(() => setOpen(true), []);
+  const actions = useMemo<QuickAdd>(
+    () => ({
+      add: () => setOpen({ editing: null }),
+      edit: (id) => setOpen({ editing: id }),
+    }),
+    [],
+  );
   return (
-    <QuickAddContext.Provider value={show}>
+    <QuickAddContext.Provider value={actions}>
       {children}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent title="Add transaction" />
+      <Dialog open={open !== null} onOpenChange={() => setOpen(null)}>
+        <DialogContent
+          title={open?.editing != null ? "Edit transaction" : "Add transaction"}
+        />
       </Dialog>
     </QuickAddContext.Provider>
   );
