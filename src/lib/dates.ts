@@ -46,9 +46,9 @@ export function formatPeriodLabel(
   end: string,
 ) {
   const from = toDate(start);
+  // A one-day custom range reads like a day.
+  if (kind === "day" || start === end) return format(from, "EEE, MMM d, yyyy");
   switch (kind) {
-    case "day":
-      return format(from, "EEE, MMM d, yyyy");
     case "year":
       return format(from, "yyyy");
     case "month":

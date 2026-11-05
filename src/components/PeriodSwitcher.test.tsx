@@ -55,11 +55,11 @@ function periodFor(query: PeriodQuery): PeriodView {
 
 let router: ReturnType<typeof createMemoryRouter>;
 
-function renderSwitcher(url = "/") {
+function renderSwitcher(url = "/", answer = periodFor) {
   vi.mocked(invoke).mockImplementation((command: string, args?: unknown) =>
     Promise.resolve(
       command === "get_period"
-        ? periodFor((args as { query: PeriodQuery }).query)
+        ? answer((args as { query: PeriodQuery }).query)
         : null,
     ),
   );
@@ -135,13 +135,18 @@ test("Custom picks a range without future days", async () => {
   await waitFor(() => expect(screen.queryByRole("grid")).toBeNull());
 });
 
-test("clicking Custom again reopens the picker on the chosen range", async () => {
+test("clicking Custom again reopens the picker for a fresh range", async () => {
   renderSwitcher("/?period=custom&start=2026-11-02&end=2026-11-04");
   await screen.findByText("Nov 2 – Nov 4, 2026");
   fireEvent.click(screen.getByRole("radio", { name: "Custom" }));
-  const day = screen.getByRole("button", { name: /November 3(rd)?,/ });
-  expect(day.closest("[data-selected]")).toBeTruthy();
-  expect(button("Apply").disabled).toBe(false);
+  expect(screen.getByRole("grid").getAttribute("aria-label")).toBe(
+    "November 2026",
+  );
+  // Two clicks always make the new range, even inside the old one.
+  fireEvent.click(screen.getByRole("button", { name: /November 3(rd)?,/ }));
+  fireEvent.click(screen.getByRole("button", { name: /November 4(th)?,/ }));
+  fireEvent.click(button("Apply"));
+  await screen.findByText("Nov 3 – Nov 4, 2026");
 });
 
 test("while the next period loads, the old label stays", async () => {
@@ -169,4 +174,39 @@ test("Custom opens on the month being looked at", async () => {
   expect(screen.getByRole("grid").getAttribute("aria-label")).toBe(
     "October 2026",
   );
+});
+
+test("while the next period loads, ◀ waits for it instead of repeating a step", async () => {
+  renderSwitcher();
+  await screen.findByText("November 2026");
+  vi.mocked(invoke).mockReturnValue(new Promise(() => {}));
+  fireEvent.click(button("Previous period"));
+  await waitFor(() => expect(params().anchor).toBe("2026-10-01"));
+  const key = router.state.location.key;
+  fireEvent.click(button("Previous period"));
+  fireEvent.click(button("Today"));
+  expect(router.state.location.key).toBe(key);
+});
+
+test("switching kind while the next period loads keeps the new place", async () => {
+  renderSwitcher();
+  await screen.findByText("November 2026");
+  vi.mocked(invoke).mockReturnValue(new Promise(() => {}));
+  fireEvent.click(button("Previous period"));
+  await waitFor(() => expect(params().anchor).toBe("2026-10-01"));
+  fireEvent.click(screen.getByRole("radio", { name: "Week" }));
+  await waitFor(() =>
+    expect(params()).toEqual({ period: "week", anchor: "2026-10-01" }),
+  );
+});
+
+test("if the period can't be loaded, it says so and Today goes back to this month", async () => {
+  renderSwitcher("/?period=week&anchor=2026-10-01", () => {
+    throw { code: "database", message: "disk I/O error" };
+  });
+  expect(await screen.findByText("Couldn't load this period")).toBeTruthy();
+  fireEvent.click(screen.getByRole("radio", { name: "Custom" }));
+  expect(screen.queryByRole("grid")).toBeNull();
+  fireEvent.click(button("Today"));
+  await waitFor(() => expect(params()).toEqual({ period: "month" }));
 });

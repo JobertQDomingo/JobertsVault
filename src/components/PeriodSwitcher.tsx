@@ -29,29 +29,32 @@ const ENDS =
  */
 export function PeriodSwitcher() {
   const [query, setQuery] = usePeriodQuery();
-  const { data: view } = usePeriod(query);
+  // While the next period loads, `view` is the previous one, shown but not acted on.
+  const { data: view, isPlaceholderData: loading, isError } = usePeriod(query);
   const { data: settings } = useSettings();
   const [picking, setPicking] = useState(false);
   const [range, setRange] = useState<DateRange | undefined>();
 
+  const go = (next: PeriodQuery | null | undefined) => {
+    if (next && !loading) setQuery(next);
+  };
   const pickKind = (kind: PeriodQuery["kind"]) => {
     if (kind === "custom") {
-      setRange(
-        query.kind === "custom"
-          ? { from: toDate(query.start), to: toDate(query.end) }
-          : undefined,
-      );
+      // Needs the backend's today to rule out future days. Each opening starts a fresh range.
+      if (!view) return;
+      setRange(undefined);
       setPicking(true);
     } else if (kind !== query.kind)
       // Keeps the place: today while looking at the current period, else the same day (a
       // custom range hands over its last day).
       setQuery({
         kind,
-        anchor: view?.isCurrent
-          ? null
-          : query.kind === "custom"
-            ? query.end
-            : query.anchor,
+        anchor:
+          view?.isCurrent && !loading
+            ? null
+            : query.kind === "custom"
+              ? query.end
+              : query.anchor,
       });
   };
 
@@ -73,7 +76,7 @@ export function PeriodSwitcher() {
               aria-label="Previous period"
               title="Previous period (Alt+←)"
               disabled={!view?.previous}
-              onClick={() => view?.previous && setQuery(view.previous)}
+              onClick={() => go(view?.previous)}
             >
               <ChevronLeft />
             </Button>
@@ -82,8 +85,10 @@ export function PeriodSwitcher() {
               className="min-w-[200px] text-center font-semibold tabular-nums"
             >
               {/* The view's own kind (Today keeps it), so a loading switch never mislabels it. */}
-              {view &&
-                formatPeriodLabel(view.todayQuery.kind, view.start, view.end)}
+              {isError
+                ? "Couldn't load this period"
+                : view &&
+                  formatPeriodLabel(view.todayQuery.kind, view.start, view.end)}
             </span>
             <Button
               variant="ghost"
@@ -91,7 +96,7 @@ export function PeriodSwitcher() {
               aria-label="Next period"
               title="Next period (Alt+→)"
               disabled={!view?.next}
-              onClick={() => view?.next && setQuery(view.next)}
+              onClick={() => go(view?.next)}
             >
               <ChevronRight />
             </Button>
@@ -99,8 +104,11 @@ export function PeriodSwitcher() {
           <Button
             size="sm"
             title="Go to today (Alt+Home)"
-            disabled={!view || view.isCurrent}
-            onClick={() => view && setQuery(view.todayQuery)}
+            // After an error, Today is the way out: back to this month, the default.
+            disabled={!isError && (!view || view.isCurrent)}
+            onClick={() =>
+              go(isError ? { kind: "month", anchor: null } : view?.todayQuery)
+            }
           >
             Today
           </Button>

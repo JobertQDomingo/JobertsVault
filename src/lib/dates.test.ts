@@ -69,3 +69,9 @@ test("period labels follow DESIGN_SYSTEM §8", () => {
     "Oct 1 – Oct 10, 2026",
   );
 });
+
+test("a one-day custom range reads like a day", () => {
+  expect(formatPeriodLabel("custom", "2026-10-01", "2026-10-01")).toBe(
+    "Thu, Oct 1, 2026",
+  );
+});
