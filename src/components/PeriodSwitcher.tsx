@@ -5,6 +5,7 @@ import { DayPicker, type DateRange } from "react-day-picker";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
 import { usePeriod } from "@/hooks/usePeriod";
 import { usePeriodQuery } from "@/hooks/usePeriodQuery";
+import { useShortcuts } from "@/hooks/useShortcuts";
 import { useSettings } from "@/hooks/useSettings";
 import { formatPeriodLabel, toDate, toIso } from "@/lib/dates";
 import { GlassPanel } from "./GlassPanel";
@@ -38,6 +39,16 @@ export function PeriodSwitcher() {
   const go = (next: PeriodQuery | null | undefined) => {
     if (next && !loading) setQuery(next);
   };
+  // After an error, Today is the way out: back to this month, the default.
+  const canGoToday = isError || (!!view && !view.isCurrent);
+  const goToday = () =>
+    canGoToday &&
+    go(isError ? { kind: "month", anchor: null } : view?.todayQuery);
+  useShortcuts({
+    "Alt+ArrowLeft": () => go(view?.previous),
+    "Alt+ArrowRight": () => go(view?.next),
+    "Alt+Home": goToday,
+  });
   const pickKind = (kind: PeriodQuery["kind"]) => {
     if (kind === "custom") {
       // Needs the backend's today to rule out future days. Each opening starts a fresh range.
@@ -75,6 +86,7 @@ export function PeriodSwitcher() {
               size="icon"
               aria-label="Previous period"
               title="Previous period (Alt+←)"
+              aria-keyshortcuts="Alt+ArrowLeft"
               disabled={!view?.previous}
               onClick={() => go(view?.previous)}
             >
@@ -95,6 +107,7 @@ export function PeriodSwitcher() {
               size="icon"
               aria-label="Next period"
               title="Next period (Alt+→)"
+              aria-keyshortcuts="Alt+ArrowRight"
               disabled={!view?.next}
               onClick={() => go(view?.next)}
             >
@@ -104,11 +117,9 @@ export function PeriodSwitcher() {
           <Button
             size="sm"
             title="Go to today (Alt+Home)"
-            // After an error, Today is the way out: back to this month, the default.
-            disabled={!isError && (!view || view.isCurrent)}
-            onClick={() =>
-              go(isError ? { kind: "month", anchor: null } : view?.todayQuery)
-            }
+            aria-keyshortcuts="Alt+Home"
+            disabled={!canGoToday}
+            onClick={goToday}
           >
             Today
           </Button>

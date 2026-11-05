@@ -14,14 +14,19 @@ function Item({
   to,
   icon: Icon,
   label,
+  shortcut,
 }: {
   to: string;
   icon: LucideIcon;
   label: string;
+  /** The key after Ctrl (UI_FLOWS §10); AppShell handles it. */
+  shortcut: string;
 }) {
   return (
     <NavLink
       to={to}
+      title={`${label} (Ctrl+${shortcut})`}
+      aria-keyshortcuts={`Control+${shortcut}`}
       // Only the dashboard needs an exact match: /accounts/5 still lights up Accounts.
       end={to === "/"}
       className={({ isActive }) =>
@@ -50,12 +55,17 @@ export function Sidebar() {
         Jobert's Vault
       </div>
       <nav aria-label="Main" className="flex flex-1 flex-col gap-0.5">
-        <Item to="/" icon={LayoutDashboard} label="Dashboard" />
-        <Item to="/transactions" icon={List} label="Transactions" />
-        <Item to="/accounts" icon={Landmark} label="Accounts" />
+        <Item to="/" icon={LayoutDashboard} label="Dashboard" shortcut="1" />
+        <Item
+          to="/transactions"
+          icon={List}
+          label="Transactions"
+          shortcut="2"
+        />
+        <Item to="/accounts" icon={Landmark} label="Accounts" shortcut="3" />
         <div className="flex-1" />
         <hr className="mx-1 my-2 border-hairline" />
-        <Item to="/settings" icon={Settings} label="Settings" />
+        <Item to="/settings" icon={Settings} label="Settings" shortcut="," />
       </nav>
     </GlassPanel>
   );

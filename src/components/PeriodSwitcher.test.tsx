@@ -210,3 +210,36 @@ test("if the period can't be loaded, it says so and Today goes back to this mont
   fireEvent.click(button("Today"));
   await waitFor(() => expect(params()).toEqual({ period: "month" }));
 });
+
+const alt = (key: string) => fireEvent.keyDown(window, { key, altKey: true });
+
+test("Alt+← and Alt+→ move one period, and Alt+Home goes to today", async () => {
+  renderSwitcher();
+  await screen.findByText("November 2026");
+  expect(alt("ArrowLeft")).toBe(false); // not the browser's Back
+  await screen.findByText("October 2026");
+  expect(params()).toEqual({ period: "month", anchor: "2026-10-01" });
+  alt("ArrowRight");
+  await screen.findByText("November 2026");
+  alt("ArrowLeft");
+  await screen.findByText("October 2026");
+  alt("Home");
+  await waitFor(() => expect(params()).toEqual({ period: "month" }));
+});
+
+test("Alt+→ and Alt+Home do nothing on the current period", async () => {
+  renderSwitcher();
+  await screen.findByText("November 2026");
+  const key = router.state.location.key;
+  alt("ArrowRight");
+  alt("Home");
+  expect(router.state.location.key).toBe(key);
+});
+
+test("the period keys wait while the custom picker is open", async () => {
+  renderSwitcher();
+  await screen.findByText("November 2026");
+  fireEvent.click(screen.getByRole("radio", { name: "Custom" }));
+  alt("ArrowLeft");
+  expect(params()).toEqual({});
+});
