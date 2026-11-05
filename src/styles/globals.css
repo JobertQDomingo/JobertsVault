@@ -3,7 +3,241 @@
 @import "@fontsource/sora/600.css";
 @import "@fontsource/sora/700.css";
 
+/* Dark mode is the .dark class on <html>, which lib/theme.ts keeps in step with Windows. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Light values (DESIGN_SYSTEM §2.2, §3). Components use these names, never raw colors. */
+:root {
+  color-scheme: light;
+  --canvas: #eef1fa;
+  --aurora-1: #ff8bd0;
+  --aurora-2: #7fa8ff;
+  --aurora-3: #5eead4;
+  --aurora-4: #fdba74;
+  --grain: 0.09;
+  --glass: rgb(255 255 255 / 0.62);
+  --glass-strong: rgb(255 255 255 / 0.86);
+  --glass-solid: #f7f8fc;
+  --glass-hover: rgb(255 255 255 / 0.5);
+  --field: rgb(255 255 255 / 0.72);
+  --field-edge: rgb(11 16 32 / 0.16);
+  --edge: rgb(255 255 255 / 0.8);
+  --hairline: rgb(11 16 32 / 0.08);
+  --wash: rgb(11 16 32 / 0.05);
+  --overlay: rgb(11 16 32 / 0.28);
+  --shadow-panel:
+    inset 0 1px 0 rgb(255 255 255 / 0.9), 0 10px 30px rgb(31 38 100 / 0.12);
+  --shadow-raised:
+    inset 0 1px 0 rgb(255 255 255 / 0.9), 0 24px 60px rgb(31 38 100 / 0.24);
+  --foreground: #0b1020;
+  --muted-foreground: #3d4560;
+  --primary: #3730a3;
+  --primary-hover: #312e81;
+  --primary-foreground: #ffffff;
+  --ring: #3730a3;
+  --income: #03684a;
+  --expense: #b4183a;
+  --transfer: #3d4560;
+  --warning: #8a4500;
+  --danger: #b4183a;
+  --danger-foreground: #ffffff;
+  --success: #03684a;
+  --cat-1: #1d4ed8;
+  --cat-2: #c2410c;
+  --cat-3: #0f766e;
+  --cat-4: #be185d;
+  --cat-5: #6d28d9;
+  --cat-6: #b45309;
+  --cat-7: #0e7490;
+  --cat-8: #be123c;
+  --cat-9: #4d7c0f;
+  --cat-10: #a21caf;
+  --cat-11: #57534e;
+  --cat-12: #047857;
+  /* How much of a meaning or category color its chip and banner tints use (§3.3). */
+  --tint: 16%;
+}
+
+.dark {
+  color-scheme: dark;
+  --canvas: #070815;
+  --aurora-1: #7c3aed;
+  --aurora-2: #1d4ed8;
+  --aurora-3: #0e7490;
+  --aurora-4: #be185d;
+  --grain: 0.07;
+  --glass: rgb(20 22 38 / 0.62);
+  --glass-strong: rgb(20 22 38 / 0.86);
+  --glass-solid: #151729;
+  --glass-hover: rgb(255 255 255 / 0.06);
+  --field: rgb(255 255 255 / 0.06);
+  --field-edge: rgb(255 255 255 / 0.16);
+  --edge: rgb(255 255 255 / 0.14);
+  --hairline: rgb(255 255 255 / 0.08);
+  --wash: rgb(255 255 255 / 0.07);
+  --overlay: rgb(0 0 0 / 0.5);
+  --shadow-panel:
+    inset 0 1px 0 rgb(255 255 255 / 0.1), 0 10px 30px rgb(0 0 0 / 0.35);
+  --shadow-raised:
+    inset 0 1px 0 rgb(255 255 255 / 0.1), 0 24px 60px rgb(0 0 0 / 0.55);
+  --foreground: #f5f7ff;
+  --muted-foreground: #c3c9de;
+  --primary: #a5b4fc;
+  --primary-hover: #c7d2fe;
+  --primary-foreground: #0b1020;
+  --ring: #a5b4fc;
+  --income: #6ee7b7;
+  --expense: #fda4af;
+  --transfer: #c3c9de;
+  --warning: #fcd34d;
+  --danger: #fda4af;
+  --danger-foreground: #0b1020;
+  --success: #6ee7b7;
+  --cat-1: #93c5fd;
+  --cat-2: #fdba74;
+  --cat-3: #5eead4;
+  --cat-4: #f9a8d4;
+  --cat-5: #c4b5fd;
+  --cat-6: #fcd34d;
+  --cat-7: #67e8f9;
+  --cat-8: #fda4af;
+  --cat-9: #bef264;
+  --cat-10: #f0abfc;
+  --cat-11: #d6d3d1;
+  --cat-12: #6ee7b7;
+  --tint: 20%;
+}
+
+/* Tailwind names for the tokens. Shadows stay raw tokens: `--shadow-panel` here would refer to itself. */
 @theme inline {
+  /* Only the design tokens exist as colors, so a stray `bg-blue-500` doesn't compile. */
+  --color-*: initial;
+  --color-canvas: var(--canvas);
+  --color-glass: var(--glass);
+  --color-glass-strong: var(--glass-strong);
+  --color-glass-solid: var(--glass-solid);
+  --color-glass-hover: var(--glass-hover);
+  --color-field: var(--field);
+  --color-field-edge: var(--field-edge);
+  --color-edge: var(--edge);
+  --color-hairline: var(--hairline);
+  --color-wash: var(--wash);
+  --color-overlay: var(--overlay);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--ring);
+  --color-income: var(--income);
+  --color-expense: var(--expense);
+  --color-transfer: var(--transfer);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-success: var(--success);
+  --color-cat-1: var(--cat-1);
+  --color-cat-2: var(--cat-2);
+  --color-cat-3: var(--cat-3);
+  --color-cat-4: var(--cat-4);
+  --color-cat-5: var(--cat-5);
+  --color-cat-6: var(--cat-6);
+  --color-cat-7: var(--cat-7);
+  --color-cat-8: var(--cat-8);
+  --color-cat-9: var(--cat-9);
+  --color-cat-10: var(--cat-10);
+  --color-cat-11: var(--cat-11);
+  --color-cat-12: var(--cat-12);
+
+  /* §5 */
+  --radius-chip: 10px;
+  --radius-control: 12px;
+  --radius-toolbar: 16px;
+  --radius-panel: 20px;
+  --radius-dialog: 24px;
+  --radius-pill: 999px;
+
+  /* §4 */
   --font-sans:
     "Sora", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --text-display: 30px;
+  --text-display--line-height: 36px;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 700;
+  --text-h1: 24px;
+  --text-h1--line-height: 32px;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h1--font-weight: 700;
+  --text-h2: 18px;
+  --text-h2--line-height: 28px;
+  --text-h2--font-weight: 600;
+  --text-h3: 16px;
+  --text-h3--line-height: 24px;
+  --text-h3--font-weight: 600;
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+  --text-small: 12px;
+  --text-small--line-height: 16px;
+}
+
+/* Level 1: sidebar, top bar, toolbars, cards, banners (§2.1). */
+@utility glass {
+  background: var(--glass);
+  border: 1px solid var(--edge);
+  backdrop-filter: blur(22px) saturate(170%);
+  box-shadow: var(--shadow-panel);
+}
+
+/* Level 2: dialogs, menus, popovers, the date picker, toasts (§2.1). */
+@utility glass-raised {
+  background: var(--glass-strong);
+  border: 1px solid var(--edge);
+  backdrop-filter: blur(32px) saturate(180%);
+  box-shadow: var(--shadow-raised);
+}
+
+/* Windows' Transparency effects off: solid panels, no blur; the aurora stays (§2.4). */
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-raised {
+    background: var(--glass-solid);
+    backdrop-filter: none;
+  }
+}
+
+/* One layer of blur: a panel inside a panel is a flat tint (§2.3, §9.1 Toolbar). */
+:is(.glass, .glass-raised) .glass {
+  background: var(--wash);
+  border-color: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: var(--canvas);
+    color: var(--foreground);
+    font-size: 14px;
+    line-height: 20px;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Every action works from the keyboard, with a visible focus ring (§1). */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  /* §10: nothing moves. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
 }
