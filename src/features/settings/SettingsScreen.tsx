@@ -9,6 +9,7 @@ import { GeneralTab } from "./GeneralTab";
 import { PaymentMethodsTab } from "./PaymentMethodsTab";
 
 const TABS = ["general", "categories", "methods"] as const;
+const CONTENT = "min-h-0 flex-1 overflow-y-auto px-5 outline-none";
 type Tab = (typeof TABS)[number];
 
 /**
@@ -22,19 +23,21 @@ export function SettingsScreen() {
   const settings = useSettings();
 
   return (
-    <GlassPanel className="px-5">
+    // The tabs stay; the content scrolls inside the one panel (DESIGN_SYSTEM §11).
+    <GlassPanel className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <Tabs
+        className="flex min-h-0 flex-1 flex-col"
         value={tab}
         onValueChange={(next) =>
           setParams(next === "general" ? {} : { tab: next }, { replace: true })
         }
       >
-        <TabsList className="mb-2">
+        <TabsList className="mx-5 mb-2">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="methods">Payment methods</TabsTrigger>
         </TabsList>
-        <TabsContent value="general" className="outline-none">
+        <TabsContent value="general" className={CONTENT}>
           {settings.data ? (
             <GeneralTab settings={settings.data} />
           ) : settings.isError ? (
@@ -50,10 +53,10 @@ export function SettingsScreen() {
             </Loading>
           )}
         </TabsContent>
-        <TabsContent value="categories" className="outline-none">
+        <TabsContent value="categories" className={CONTENT}>
           <CategoriesTab />
         </TabsContent>
-        <TabsContent value="methods" className="outline-none">
+        <TabsContent value="methods" className={CONTENT}>
           <PaymentMethodsTab />
         </TabsContent>
       </Tabs>

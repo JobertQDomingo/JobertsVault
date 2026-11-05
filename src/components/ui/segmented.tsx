@@ -35,7 +35,9 @@ export function Segmented<V extends string>({
       aria-label={ariaLabel}
       disabled={disabled}
       className={cn(
-        "inline-flex rounded-control bg-wash p-[3px] data-[disabled]:opacity-50",
+        "inline-flex rounded-control bg-wash p-[3px]",
+        // Radix marks only the items as disabled, so the group is dimmed here.
+        disabled && "opacity-50",
         className,
       )}
     >

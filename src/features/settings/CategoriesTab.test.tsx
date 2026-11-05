@@ -204,4 +204,25 @@ test("Merge offers only other active categories of the same kind, then confirms 
   await waitFor(() =>
     expect(calls("merge_categories")).toEqual([{ fromId: 2, intoId: 1 }]),
   );
+  // The dialog has closed by now; the result is still shown.
+  expect(await screen.findByText("Merged")).toBeTruthy();
+});
+
+test("a refused merge says why, though its dialog has closed", async () => {
+  open({
+    ...ANSWERS,
+    merge_categories: () => {
+      throw { code: "conflict", message: "Choose an active category" };
+    },
+  });
+  await menu("Dining Out");
+  fireEvent.click(await item("Merge into…"));
+  fireEvent.click(dialog().getByRole("combobox", { name: "Into" }));
+  fireEvent.click(screen.getByRole("option", { name: "Transportation" }));
+  fireEvent.click(dialog().getByRole("button", { name: "Merge" }));
+  const confirm = await screen.findByRole("dialog", {
+    name: "Merge categories?",
+  });
+  fireEvent.click(within(confirm).getByRole("button", { name: "Merge" }));
+  expect(await screen.findByText("Choose an active category")).toBeTruthy();
 });

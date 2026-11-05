@@ -219,15 +219,14 @@ function MergeDialog({
         message={`Move ${count(from.transactionCount)} from '${from.name}' to '${target?.name}' and delete '${from.name}'?`}
         confirmLabel="Merge"
         destructive
+        // A promise, not mutate()'s callbacks: closing the confirm unmounts this dialog, and an
+        // unmounted mutate() skips them.
         onConfirm={() =>
           target &&
-          merge.mutate(
-            { fromId: from.id, intoId: target.id },
-            {
-              onSuccess: () => notify.success("Merged"),
-              onError: (error) => notify.error(error.message),
-            },
-          )
+          merge
+            .mutateAsync({ fromId: from.id, intoId: target.id })
+            .then(() => notify.success("Merged"))
+            .catch((error: Error) => notify.error(error.message))
         }
       />
     </>

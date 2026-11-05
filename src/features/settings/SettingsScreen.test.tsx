@@ -130,6 +130,12 @@ test("decimal places are locked once amounts are saved, and say why", async () =
   await waitFor(() =>
     expect((radio("0") as HTMLButtonElement).disabled).toBe(true),
   );
+  // It looks disabled too (Radix marks only the items, not the group).
+  expect(
+    screen
+      .getByRole("radiogroup", { name: "Decimal places" })
+      .className.split(" "),
+  ).toContain("opacity-50");
   expect(
     screen.getByText(
       "Locked because amounts are already saved. Changing it would change every stored amount.",
