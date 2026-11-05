@@ -94,3 +94,12 @@ test("days after the latest allowed day can't be picked, earlier ones can", () =
   expect(onChange).toHaveBeenCalledWith("2026-10-20");
   expect(screen.queryByRole("grid")).toBeNull();
 });
+
+test("next month looks disabled at the latest allowed month", () => {
+  render(<Picker />);
+  fireEvent.click(screen.getByRole("button", { name: "Choose date" }));
+  const next = screen.getByRole("button", { name: /next month/i });
+  // react-day-picker marks it aria-disabled, not disabled.
+  expect(next.getAttribute("aria-disabled")).toBe("true");
+  expect(next.className).toContain("aria-disabled:opacity-40");
+});

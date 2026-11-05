@@ -58,3 +58,15 @@ test("toasts show their message, and an error can be closed", async () => {
   const toast = error.closest("[data-sonner-toast]") as HTMLElement;
   expect(toast.querySelector("[data-close-button]")).toBeTruthy();
 });
+
+test("toasts use the app font, not sonner's system font", async () => {
+  render(<Toaster />);
+  act(() => {
+    notify.success("Saved");
+  });
+  await screen.findByText("Saved");
+  const toaster = document.querySelector(
+    "[data-sonner-toaster]",
+  ) as HTMLElement;
+  expect(toaster.style.fontFamily).toBe("inherit");
+});

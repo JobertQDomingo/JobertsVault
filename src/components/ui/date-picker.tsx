@@ -108,9 +108,9 @@ export function DatePicker({
               month_caption: "flex h-8 items-center px-1 font-semibold",
               nav: "absolute top-0 right-0 z-10 flex gap-1",
               button_previous:
-                "grid size-8 place-items-center rounded-chip hover:bg-wash disabled:opacity-40",
+                "grid size-8 place-items-center rounded-chip hover:bg-wash aria-disabled:pointer-events-none aria-disabled:opacity-40",
               button_next:
-                "grid size-8 place-items-center rounded-chip hover:bg-wash disabled:opacity-40",
+                "grid size-8 place-items-center rounded-chip hover:bg-wash aria-disabled:pointer-events-none aria-disabled:opacity-40",
               chevron: "size-4 fill-current",
               month_grid: "mt-2 border-collapse",
               weekday: "size-8 text-small font-normal text-muted-foreground",

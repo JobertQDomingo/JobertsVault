@@ -7,6 +7,8 @@ export function Toaster() {
     <Sonner
       position="bottom-right"
       duration={4000}
+      // Sonner's own stylesheet sets a system font, and it outranks Tailwind's classes.
+      style={{ fontFamily: "inherit" }}
       icons={{
         success: <CircleCheck className="size-4 text-success" />,
         error: <CircleAlert className="size-4 text-danger" />,
