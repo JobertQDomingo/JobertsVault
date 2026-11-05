@@ -6,6 +6,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { createQueryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
 import { routes } from "@/routes";
+import { AppShell } from "./AppShell";
 import { SETTINGS } from "@/test/render";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -85,4 +86,77 @@ test("screens not built yet render without router warnings", () => {
   renderAt("/settings");
   expect(warn).not.toHaveBeenCalled();
   warn.mockRestore();
+});
+
+const press = (key: string, mods: Partial<KeyboardEventInit> = {}) =>
+  fireEvent.keyDown(window, { key, ...mods });
+
+test("Ctrl+N opens quick-add on any screen, instead of a new window", async () => {
+  renderAt("/settings");
+  expect(press("n", { ctrlKey: true })).toBe(false); // the browser's default was prevented
+  expect(
+    await screen.findByRole("dialog", { name: "Add transaction" }),
+  ).toBeTruthy();
+});
+
+test("Ctrl+N works with Caps Lock on, but Ctrl+Shift+N isn't it", async () => {
+  renderAt("/");
+  press("N", { ctrlKey: true, shiftKey: true });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  press("N", { ctrlKey: true });
+  expect(await screen.findByRole("dialog")).toBeTruthy();
+});
+
+test("Ctrl+1–3 and Ctrl+, go to the screens", async () => {
+  renderAt("/");
+  for (const [key, name] of [
+    ["2", "Transactions"],
+    ["3", "Accounts"],
+    [",", "Settings"],
+    ["1", "Dashboard"],
+  ]) {
+    press(key, { ctrlKey: true });
+    await waitFor(() => expect(title()).toBe(name));
+  }
+});
+
+test("with a dialog open, shortcuts don't act behind it", async () => {
+  renderAt("/");
+  press("n", { ctrlKey: true });
+  await screen.findByRole("dialog");
+  expect(press("3", { ctrlKey: true })).toBe(false);
+  expect(router.state.location.pathname).toBe("/");
+});
+
+test("Ctrl+F focuses the screen's search box", () => {
+  vi.mocked(invoke).mockResolvedValue(null);
+  router = createMemoryRouter(
+    [
+      {
+        element: <AppShell />,
+        children: [
+          {
+            index: true,
+            element: <input type="search" aria-label="Search" />,
+          },
+        ],
+      },
+    ],
+    { initialEntries: ["/"] },
+  );
+  render(
+    <QueryClientProvider client={createQueryClient()}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+  expect(press("f", { ctrlKey: true })).toBe(false);
+  expect(document.activeElement).toBe(screen.getByRole("searchbox"));
+});
+
+test("each screen's link names its shortcut", () => {
+  renderAt("/");
+  expect(link("Transactions").getAttribute("aria-keyshortcuts")).toBe(
+    "Control+2",
+  );
+  expect(link("Settings").title).toBe("Settings (Ctrl+,)");
 });
