@@ -181,6 +181,21 @@
   --text-body-strong--font-weight: 600;
   --text-small: 12px;
   --text-small--line-height: 16px;
+
+  /* §10: dialogs fade in while growing from 98% in 180 ms; the backdrop fades with them. */
+  --animate-dialog-in: dialog-in 180ms ease-out;
+  --animate-fade-in: fade-in 180ms ease-out;
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      scale: 0.98;
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
 }
 
 /* Level 1: sidebar, top bar, toolbars, cards, banners (§2.1). */
@@ -236,6 +251,10 @@
     color: var(--foreground);
     @apply text-body;
     -webkit-font-smoothing: antialiased;
+  }
+  /* §6: every lucide icon uses stroke width 1.75. */
+  svg.lucide {
+    stroke-width: 1.75;
   }
   /* Every action works from the keyboard, with a visible focus ring (§1). */
   :focus-visible {
