@@ -5,3 +5,4 @@ pub mod card_cycle;
 pub mod category;
 pub mod money;
 pub mod period;
+pub mod window;

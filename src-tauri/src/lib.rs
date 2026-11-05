@@ -13,6 +13,38 @@ pub mod state;
 #[cfg(test)]
 mod test_support;
 
+/// 1440 × 900, or 1280 × 800 zoomed to 8/9 when that doesn't fit the monitor's usable area
+/// (ADR 0008, ARCHITECTURE §11). Runs before the window is shown.
+fn fit_window(window: &tauri::WebviewWindow) -> tauri::Result<()> {
+    let Some(monitor) = window.current_monitor()? else {
+        return Ok(());
+    };
+    let mut work = monitor.work_area().size;
+    // Debug builds can pretend to be on a smaller screen, to see the fallback:
+    // JV_WORK_AREA=1600x860 npm run tauri dev
+    if cfg!(debug_assertions)
+        && let Some((w, h)) = std::env::var("JV_WORK_AREA").ok().and_then(|v| {
+            let (w, h) = v.split_once('x')?;
+            Some((w.parse().ok()?, h.parse().ok()?))
+        })
+    {
+        work = tauri::PhysicalSize::new(w, h);
+    }
+    // Created hidden at 1440 × 900, so its outer size is what that takes on this monitor.
+    let outer = window.outer_size()?;
+    let fit = domain::window::window_fit((outer.width, outer.height), (work.width, work.height));
+    if fit != domain::window::FULL {
+        // Zoom first: if the resize then fails, the zoom goes back, so the page is never cut off.
+        window.set_zoom(fit.zoom)?;
+        if let Err(err) = window.set_size(tauri::LogicalSize::new(fit.width, fit.height)) {
+            window.set_zoom(domain::window::FULL.zoom)?;
+            return Err(err);
+        }
+        window.center()?;
+    }
+    Ok(())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
@@ -22,6 +54,16 @@ pub fn run() {
             // The window starts hidden and is shown once startup is done, even if it failed
             // (ARCHITECTURE §6).
             if let Some(window) = app.get_webview_window("main") {
+                // Best effort: if it fails, the window stays 1440 × 900 and the log says why.
+                if let Err(err) = fit_window(&window) {
+                    let log_path = &app.state::<AppState>().log_path;
+                    log::record(
+                        log_path,
+                        &error::AppError::Io {
+                            message: format!("window size: {err}"),
+                        },
+                    );
+                }
                 window.show()?;
             }
             Ok(())
