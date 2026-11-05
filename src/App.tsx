@@ -18,7 +18,7 @@ export default function App() {
         />
       ) : startup.isError ? (
         // Never a blank window, even if the status itself can't be read.
-        <StartupErrorScreen message={startup.error.message} databasePath="" />
+        <StartupErrorScreen message={startup.error.message} />
       ) : status?.status === "ok" ? (
         <main className="flex h-full items-center justify-center">
           <GlassPanel className="px-8 py-6">

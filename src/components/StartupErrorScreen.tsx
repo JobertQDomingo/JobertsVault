@@ -15,7 +15,8 @@ export function StartupErrorScreen({
   databasePath,
 }: {
   message: string;
-  databasePath: string;
+  /** Unknown when the status itself couldn't be read. */
+  databasePath?: string;
 }) {
   const open = useMutation({
     mutationFn: openDataFolder,

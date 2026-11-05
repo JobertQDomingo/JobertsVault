@@ -3,12 +3,12 @@ import { cn } from "@/lib/utils";
 
 /** A flat `--wash` block, with no shimmer (DESIGN_SYSTEM §9.1). */
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("rounded-[6px] bg-wash", className)} />;
+  return <div className={cn("rounded-chip bg-wash", className)} />;
 }
 
 /**
  * Shows `children` (a skeleton layout) only once loading has taken 150 ms, so a fast load never
- * flashes one (UI_FLOWS §9). Screen readers hear "Loading" straight away.
+ * flashes one (UI_FLOWS §9). The status region says "Loading" for screen readers.
  */
 export function Loading({
   children,
@@ -23,7 +23,8 @@ export function Loading({
     return () => clearTimeout(timer);
   }, []);
   return (
-    <div role="status" aria-label="Loading" className={className}>
+    <div role="status" className={className}>
+      <span className="sr-only">Loading</span>
       {late && children}
     </div>
   );

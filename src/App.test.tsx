@@ -1,8 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  focusManager,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
+import { createQueryClient } from "./lib/queryClient";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
@@ -62,4 +67,23 @@ test("if the data folder can't be opened, a toast says why", async () => {
   });
   fireEvent.click(button);
   expect(await screen.findByText("Couldn't open Explorer.")).toBeTruthy();
+});
+
+test("if the status itself can't be read, the error screen still shows, and it isn't asked again", async () => {
+  vi.mocked(invoke).mockRejectedValueOnce("IPC is broken");
+  render(
+    <QueryClientProvider client={createQueryClient()}>
+      <App />
+    </QueryClientProvider>,
+  );
+  expect(
+    await screen.findByRole("heading", {
+      name: "Jobert's Vault couldn't start",
+    }),
+  ).toBeTruthy();
+  expect(screen.getByText("IPC is broken")).toBeTruthy();
+  expect(screen.queryByText("Database")).toBeNull();
+  focusManager.setFocused(false);
+  focusManager.setFocused(true);
+  expect(invoke).toHaveBeenCalledOnce();
 });

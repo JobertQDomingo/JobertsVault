@@ -8,4 +8,6 @@ export const useStartupStatus = () =>
     queryKey: queryKeys.startup,
     queryFn: getStartupStatus,
     staleTime: Infinity,
+    // An error is final too: it isn't asked again when the window gets focus.
+    refetchOnWindowFocus: false,
   });
