@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::error::AppError;
 use crate::state::{AppState, StartupStatus};
@@ -13,4 +13,10 @@ pub fn get_startup_status(state: State<'_, AppState>) -> StartupStatus {
 pub fn open_data_folder(state: State<'_, AppState>) -> Result<(), AppError> {
     services::system::open_folder(&state.data_dir)
         .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+/// The installed version, from package.json (ARCHITECTURE §11.1).
+#[tauri::command(async)]
+pub fn get_app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
 }

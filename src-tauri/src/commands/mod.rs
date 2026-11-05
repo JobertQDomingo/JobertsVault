@@ -6,6 +6,7 @@ pub mod period;
 pub mod settings;
 pub mod system;
 pub mod transactions;
+pub mod updates;
 
 #[cfg(test)]
 mod tests {

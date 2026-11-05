@@ -11,6 +11,7 @@ const CODES: Record<AppError["code"], true> = {
   conflict: true,
   database: true,
   io: true,
+  update: true,
 };
 
 function messageFor(detail: ApiErrorDetail): string {

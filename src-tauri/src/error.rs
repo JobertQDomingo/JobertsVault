@@ -20,6 +20,9 @@ pub enum AppError {
     Database { message: String },
     #[error("{message}")]
     Io { message: String },
+    /// A failed update check or install. The message says why, and that nothing changed.
+    #[error("{message}")]
+    Update { message: String },
 }
 
 impl From<rusqlite::Error> for AppError {

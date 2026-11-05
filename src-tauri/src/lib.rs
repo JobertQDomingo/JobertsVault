@@ -47,6 +47,8 @@ fn fit_window(window: &tauri::WebviewWindow) -> tauri::Result<()> {
 
 pub fn run() {
     tauri::Builder::default()
+        // Only Rust uses it: the frontend gets no updater permissions (ARCHITECTURE §10).
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             let now = chrono::Local::now();
@@ -71,6 +73,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::system::get_startup_status,
             commands::system::open_data_folder,
+            commands::system::get_app_version,
+            commands::updates::check_update,
+            commands::updates::install_update,
             commands::period::get_period,
             commands::dashboard::get_dashboard,
             commands::settings::get_settings,

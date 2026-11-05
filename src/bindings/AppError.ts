@@ -3,4 +3,4 @@
 /**
  * Every error a command can return. The frontend reads it by `code` (ARCHITECTURE §4.4).
  */
-export type AppError = { "code": "validation", field: string, message: string, } | { "code": "not_found", entity: string, id: number, } | { "code": "conflict", message: string, } | { "code": "database", message: string, } | { "code": "io", message: string, };
+export type AppError = { "code": "validation", field: string, message: string, } | { "code": "not_found", entity: string, id: number, } | { "code": "conflict", message: string, } | { "code": "database", message: string, } | { "code": "io", message: string, } | { "code": "update", message: string, };
