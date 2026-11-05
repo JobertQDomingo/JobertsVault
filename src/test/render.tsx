@@ -41,9 +41,14 @@ export type Answers = Record<string, unknown>;
 
 /**
  * Renders the app's routes at `url`, the way the running app does once started. `invoke` (mocked
- * by the test file) answers each command from `answers`; any other command rejects.
+ * by the test file) answers each command from `answers`; any other command rejects. The settings
+ * start in the cache unless `seedSettings` is false (then they load like any query).
  */
-export function renderRoute(url: string, answers: Answers = {}) {
+export function renderRoute(
+  url: string,
+  answers: Answers = {},
+  { seedSettings = true } = {},
+) {
   vi.mocked(invoke).mockImplementation((command: string, args?: unknown) =>
     Promise.resolve().then(() => {
       const all: Answers = { get_settings: SETTINGS, ...answers };
@@ -54,7 +59,7 @@ export function renderRoute(url: string, answers: Answers = {}) {
     }),
   );
   const client = createQueryClient();
-  client.setQueryData(queryKeys.settings, SETTINGS);
+  if (seedSettings) client.setQueryData(queryKeys.settings, SETTINGS);
   const router = createMemoryRouter(routes, { initialEntries: [url] });
   render(
     <QueryClientProvider client={client}>

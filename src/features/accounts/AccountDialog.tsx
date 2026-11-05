@@ -64,9 +64,12 @@ function toFields(v: Values): AccountFields {
  */
 export function AccountDialog({
   account,
+  kind = "cash",
   onClose,
 }: {
   account?: Account;
+  /** A new account's starting type. */
+  kind?: AccountKind;
   onClose: () => void;
 }) {
   const { control, register, handleSubmit, setError, formState } =
@@ -81,7 +84,7 @@ export function AccountDialog({
             dueDay: account.dueDay?.toString() ?? null,
           }
         : {
-            kind: "cash",
+            kind,
             name: "",
             openingBalance: null,
             creditLimit: null,

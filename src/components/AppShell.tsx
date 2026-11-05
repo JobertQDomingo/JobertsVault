@@ -1,4 +1,5 @@
-import { Outlet, useNavigate } from "react-router";
+import { Navigate, Outlet, useNavigate } from "react-router";
+import { useSettings } from "@/hooks/useSettings";
 import { useShortcuts } from "@/hooks/useShortcuts";
 import { QuickAddProvider, useQuickAdd } from "./QuickAddProvider";
 import { Sidebar } from "./Sidebar";
@@ -9,6 +10,13 @@ import { TopBar } from "./TopBar";
  * 12 px apart and from the window edge, and only the content under the top bar scrolls.
  */
 export function AppShell() {
+  const settings = useSettings();
+  // The first launch goes to the setup form (ONB-1, ARCHITECTURE §6). The settings take
+  // milliseconds; waiting for them means the dashboard never flashes first. If they fail, the
+  // screens show their own errors.
+  if (settings.isPending) return null;
+  if (settings.data?.onboardingCompleted === false)
+    return <Navigate to="/welcome" replace />;
   return (
     <QuickAddProvider>
       <Layout />

@@ -250,6 +250,8 @@ test.each(WRITES)(
       ),
     );
     const client = new QueryClient();
+    // Loaded, as in the app: a settings change is laid over them.
+    client.setQueryData(["settings"], { ...settings, decimalsLocked: false });
     // A ledger query a screen is showing, under a key no write names: only refreshing all of
     // ['ledger'] reaches it.
     let loads = 0;

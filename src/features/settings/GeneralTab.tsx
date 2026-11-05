@@ -1,4 +1,3 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type ReactNode } from "react";
 import type { Settings } from "@/bindings/Settings";
 import type { SettingsView } from "@/bindings/SettingsView";
@@ -9,7 +8,6 @@ import { Switch } from "@/components/ui/switch";
 import { notify } from "@/components/ui/toast";
 import { useUpdateSettings } from "@/hooks/useSettings";
 import { formatMoney } from "@/lib/money";
-import { queryKeys } from "@/lib/queryKeys";
 import { showSaveError } from "@/lib/saveError";
 
 type Key = keyof Settings;
@@ -74,24 +72,24 @@ function Row({
  * Settings → General (UI_FLOWS §6, SET-1, SET-2, SET-6). Each change saves at once with a "Saved"
  * toast; the backend checks it, and its message shows beside the setting.
  */
-export function GeneralTab({ settings }: { settings: SettingsView }) {
-  const client = useQueryClient();
+export function GeneralTab({
+  settings,
+  currencyOnly = false,
+}: {
+  settings: SettingsView;
+  /** Only the three currency rows (the first-launch form, ONB-1). */
+  currencyOnly?: boolean;
+}) {
   const update = useUpdateSettings();
   const [errors, setErrors] = useState<Partial<Record<Key, string>>>({});
   const [symbol, setSymbol] = useState(settings.currencySymbol);
   // The symbol last sent, so Enter and the blur after it (or a second blur) don't send it twice.
   const sent = useRef(settings.currencySymbol);
-  // Saves run one after another, each built on what's stored when it starts: a quick second
-  // change keeps the first, and a refused one isn't carried into the next.
-  const queue = useRef(Promise.resolve());
-
   const save = (change: Partial<Settings>) => {
     const keys = Object.keys(change) as Key[];
-    queue.current = queue.current.then(async () => {
-      const { decimalsLocked, ...stored } =
-        client.getQueryData<SettingsView>(queryKeys.settings) ?? settings;
+    void (async () => {
       try {
-        const saved = await update.mutateAsync({ ...stored, ...change });
+        const saved = await update.mutateAsync(change);
         notify.success("Saved");
         // The backend trims it; show what it kept.
         if ("currencySymbol" in change) {
@@ -107,7 +105,7 @@ export function GeneralTab({ settings }: { settings: SettingsView }) {
           setErrors((e) => ({ ...e, [field]: message })),
         );
       }
-    });
+    })();
   };
   const saveSymbol = () => {
     if (symbol === sent.current) return;
@@ -178,48 +176,54 @@ export function GeneralTab({ settings }: { settings: SettingsView }) {
           disabled={settings.decimalsLocked}
         />
       </Row>
-      <Row id="set-week" label="First day of week" error={errors.weekStart}>
-        <Segmented
-          aria-label="First day of week"
-          value={settings.weekStart}
-          onChange={(weekStart) => save({ weekStart })}
-          options={[
-            { value: "monday", label: "Monday" },
-            { value: "sunday", label: "Sunday" },
-          ]}
-        />
-      </Row>
-      <Row
-        id="set-month"
-        label="Month starts on day"
-        labelable
-        error={errors.monthStartDay}
-        help="1 = calendar month. Pick 25 for a payday cycle (25th to 24th)."
-      >
-        <Combobox
-          id="set-month"
-          className="w-[120px]"
-          options={DAYS}
-          value={String(settings.monthStartDay)}
-          aria-describedby={
-            errors.monthStartDay ? "set-month-message" : undefined
-          }
-          onChange={(v) => save({ monthStartDay: Number(v) })}
-        />
-      </Row>
-      <Row
-        id="set-method"
-        label="Payment method field"
-        labelable
-        error={errors.showPaymentMethod}
-        help="Shown in the transaction form"
-      >
-        <Switch
-          id="set-method"
-          checked={settings.showPaymentMethod}
-          onCheckedChange={(showPaymentMethod) => save({ showPaymentMethod })}
-        />
-      </Row>
+      {!currencyOnly && (
+        <>
+          <Row id="set-week" label="First day of week" error={errors.weekStart}>
+            <Segmented
+              aria-label="First day of week"
+              value={settings.weekStart}
+              onChange={(weekStart) => save({ weekStart })}
+              options={[
+                { value: "monday", label: "Monday" },
+                { value: "sunday", label: "Sunday" },
+              ]}
+            />
+          </Row>
+          <Row
+            id="set-month"
+            label="Month starts on day"
+            labelable
+            error={errors.monthStartDay}
+            help="1 = calendar month. Pick 25 for a payday cycle (25th to 24th)."
+          >
+            <Combobox
+              id="set-month"
+              className="w-[120px]"
+              options={DAYS}
+              value={String(settings.monthStartDay)}
+              aria-describedby={
+                errors.monthStartDay ? "set-month-message" : undefined
+              }
+              onChange={(v) => save({ monthStartDay: Number(v) })}
+            />
+          </Row>
+          <Row
+            id="set-method"
+            label="Payment method field"
+            labelable
+            error={errors.showPaymentMethod}
+            help="Shown in the transaction form"
+          >
+            <Switch
+              id="set-method"
+              checked={settings.showPaymentMethod}
+              onCheckedChange={(showPaymentMethod) =>
+                save({ showPaymentMethod })
+              }
+            />
+          </Row>
+        </>
+      )}
     </div>
   );
 }
