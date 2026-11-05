@@ -1,8 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook } from "@testing-library/react";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+} from "@tanstack/react-query";
+import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
+import type { AccountFields } from "@/bindings/AccountFields";
+import type { CategoryFields } from "@/bindings/CategoryFields";
+import type { NewAccount } from "@/bindings/NewAccount";
+import type { NewCategory } from "@/bindings/NewCategory";
 import type { Settings } from "@/bindings/Settings";
 import type { TransactionFields } from "@/bindings/TransactionFields";
 import {
@@ -30,7 +38,12 @@ import {
   useUnarchivePaymentMethod,
   useUpdatePaymentMethod,
 } from "./usePaymentMethods";
+import * as settingsHooks from "./useSettings";
 import { useUpdateSettings } from "./useSettings";
+import * as accountHooks from "./useAccounts";
+import * as categoryHooks from "./useCategories";
+import * as paymentMethodHooks from "./usePaymentMethods";
+import * as transactionHooks from "./useTransactions";
 import {
   useCreateTransaction,
   useDeleteTransaction,
@@ -49,8 +62,14 @@ const account = {
   creditLimit: null,
   statementDay: null,
   dueDay: null,
-};
-const category = { name: "Snacks", color: "cat-2", icon: "cookie" };
+} satisfies AccountFields;
+const newAccount = { kind: "bank", ...account } satisfies NewAccount;
+const category = {
+  name: "Snacks",
+  color: "cat-2",
+  icon: "cookie",
+} satisfies CategoryFields;
+const newCategory = { kind: "expense", ...category } satisfies NewCategory;
 const transaction: TransactionFields = {
   kind: "expense",
   amount: 25000,
@@ -78,9 +97,9 @@ const WRITES = [
   [
     "useCreateAccount",
     useCreateAccount,
-    { kind: "bank", ...account },
+    newAccount,
     "create_account",
-    { account: { kind: "bank", ...account } },
+    { account: newAccount },
   ],
   [
     "useUpdateAccount",
@@ -114,9 +133,9 @@ const WRITES = [
   [
     "useCreateCategory",
     useCreateCategory,
-    { kind: "expense", ...category },
+    newCategory,
     "create_category",
-    { category: { kind: "expense", ...category } },
+    { category: newCategory },
   ],
   [
     "useUpdateCategory",
@@ -223,23 +242,64 @@ const WRITES = [
 test.each(WRITES)(
   "%s sends its command and refreshes every ledger query",
   async (_name, hook, args, command, invokeArgs) => {
-    vi.mocked(invoke).mockResolvedValue({ ...settings, decimalsLocked: false });
+    vi.mocked(invoke).mockImplementation((sent: string) =>
+      Promise.resolve(
+        sent === "update_settings"
+          ? { ...settings, decimalsLocked: false }
+          : null,
+      ),
+    );
     const client = new QueryClient();
-    client.setQueryData(["ledger", "dashboard"], "old totals");
-    client.setQueryData(["ledger", "accounts"], "old balances");
+    // A ledger query a screen is showing, under a key no write names: only refreshing all of
+    // ['ledger'] reaches it.
+    let loads = 0;
     const wrapper = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     );
-    const { result } = renderHook(() => hook(), { wrapper });
+    const { result } = renderHook(
+      () => {
+        useQuery({
+          queryKey: ["ledger", "onScreen"],
+          // Takes a moment, like a real load, so only an awaited refresh is done in time.
+          queryFn: () =>
+            new Promise((done) => setTimeout(() => done(++loads), 10)),
+        });
+        return hook();
+      },
+      { wrapper },
+    );
+    await waitFor(() => expect(loads).toBe(1));
 
     // @ts-expect-error: each row pairs a hook with its own argument type.
     await result.current.mutateAsync(args);
 
     expect(invoke).toHaveBeenCalledWith(command, invokeArgs);
-    for (const key of [
-      ["ledger", "dashboard"],
-      ["ledger", "accounts"],
-    ])
-      expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+    // Already reloaded when the write resolves, so a dialog that closes then shows fresh data.
+    expect(client.getQueryData(["ledger", "onScreen"])).toBe(2);
   },
 );
+
+const READS = [
+  "useAccounts",
+  "useAccount",
+  "useCategories",
+  "usePaymentMethods",
+  "useTransactions",
+  "useTransaction",
+  "useTransactionDefaults",
+  "usePayBillDefaults",
+  "useSettings",
+];
+
+test("the table lists every write hook", () => {
+  const hooks = [
+    accountHooks,
+    categoryHooks,
+    paymentMethodHooks,
+    transactionHooks,
+    settingsHooks,
+  ].flatMap((module) => Object.keys(module));
+  expect(hooks.filter((name) => !READS.includes(name)).sort()).toEqual(
+    WRITES.map(([name]) => name).sort(),
+  );
+});
