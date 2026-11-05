@@ -36,10 +36,7 @@ export function ManagedList<T extends Item>({
   const headingId = useId();
   const [showArchived, setShowArchived] = useState(false);
   const archived = items.filter((i) => i.archived);
-  const failed = (error: Error) => {
-    notify.error(error.message);
-    throw error;
-  };
+  const [unarchiving, setUnarchiving] = useState<number | null>(null);
 
   return (
     <section aria-labelledby={headingId} className="pb-2">
@@ -55,7 +52,9 @@ export function ManagedList<T extends Item>({
       <SortableList
         items={items.filter((i) => !i.archived)}
         label={(i) => i.name}
-        onReorder={(ids) => onReorder(ids).catch(failed)}
+        onReorder={(ids) =>
+          onReorder(ids).catch((error: Error) => notify.error(error.message))
+        }
       >
         {(item, handle) => (
           <div className="flex min-h-11 items-center gap-2 border-t border-hairline">
@@ -107,11 +106,15 @@ export function ManagedList<T extends Item>({
                 <Button
                   size="sm"
                   aria-label={`Unarchive ${item.name}`}
-                  onClick={() =>
+                  // One at a time, so a double click doesn't send it twice.
+                  disabled={unarchiving !== null}
+                  onClick={() => {
+                    setUnarchiving(item.id);
                     onUnarchive(item)
                       .then(() => notify.success("Unarchived"))
                       .catch((error: Error) => notify.error(error.message))
-                  }
+                      .finally(() => setUnarchiving(null));
+                  }}
                 >
                   Unarchive
                 </Button>

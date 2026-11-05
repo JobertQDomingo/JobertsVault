@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type ReactNode } from "react";
 import type { Settings } from "@/bindings/Settings";
 import type { SettingsView } from "@/bindings/SettingsView";
@@ -8,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { notify } from "@/components/ui/toast";
 import { useUpdateSettings } from "@/hooks/useSettings";
 import { formatMoney } from "@/lib/money";
+import { queryKeys } from "@/lib/queryKeys";
 import { showSaveError } from "@/lib/saveError";
 
 type Key = keyof Settings;
@@ -28,21 +30,28 @@ const DAYS = Array.from({ length: 28 }, (_, i) => ({
 function Row({
   id,
   label,
+  labelable = false,
   error,
   help,
   children,
 }: {
   id: string;
   label: string;
+  /** The control is an input or a button a <label> can name; a Segmented names itself. */
+  labelable?: boolean;
   error?: string;
   help?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="grid grid-cols-[220px_minmax(0,1fr)] items-center gap-4 border-t border-hairline py-3.5 first:border-t-0">
-      <label htmlFor={id} id={`${id}-label`} className="font-semibold">
-        {label}
-      </label>
+      {labelable ? (
+        <label htmlFor={id} className="font-semibold">
+          {label}
+        </label>
+      ) : (
+        <span className="font-semibold">{label}</span>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         {children}
         {error ? (
@@ -66,37 +75,44 @@ function Row({
  * toast; the backend checks it, and its message shows beside the setting.
  */
 export function GeneralTab({ settings }: { settings: SettingsView }) {
+  const client = useQueryClient();
   const update = useUpdateSettings();
   const [errors, setErrors] = useState<Partial<Record<Key, string>>>({});
   const [symbol, setSymbol] = useState(settings.currencySymbol);
-  // Changes not yet stored. Each save sends the whole set, so a quick second change must carry
-  // the first even before it's back.
-  const draft = useRef<Partial<Settings>>({});
+  // The symbol last sent, so Enter and the blur after it (or a second blur) don't send it twice.
+  const sent = useRef(settings.currencySymbol);
+  // Saves run one after another, each built on what's stored when it starts: a quick second
+  // change keeps the first, and a refused one isn't carried into the next.
+  const queue = useRef(Promise.resolve());
 
   const save = (change: Partial<Settings>) => {
     const keys = Object.keys(change) as Key[];
-    draft.current = { ...draft.current, ...change };
-    const { decimalsLocked, ...stored } = settings;
-    update
-      .mutateAsync({ ...stored, ...draft.current })
-      .then(() => {
+    queue.current = queue.current.then(async () => {
+      const { decimalsLocked, ...stored } =
+        client.getQueryData<SettingsView>(queryKeys.settings) ?? settings;
+      try {
+        const saved = await update.mutateAsync({ ...stored, ...change });
         notify.success("Saved");
+        // The backend trims it; show what it kept.
+        if ("currencySymbol" in change) {
+          sent.current = saved.currencySymbol;
+          setSymbol(saved.currencySymbol);
+        }
         setErrors((e) => ({
           ...e,
           ...Object.fromEntries(keys.map((k) => [k, undefined])),
         }));
-      })
-      .catch((error: unknown) => {
-        // Refused: the stored value stays, so later saves don't send this one again.
-        for (const k of keys) delete draft.current[k];
+      } catch (error) {
         showSaveError(error, SHOWN, (field, { message }) =>
           setErrors((e) => ({ ...e, [field]: message })),
         );
-      });
+      }
+    });
   };
   const saveSymbol = () => {
-    if (symbol !== settings.currencySymbol || errors.currencySymbol)
-      save({ currencySymbol: symbol });
+    if (symbol === sent.current) return;
+    sent.current = symbol;
+    save({ currencySymbol: symbol });
   };
   const example = (position: Settings["currencyPosition"]) =>
     formatMoney(10 ** settings.currencyDecimals, {
@@ -109,6 +125,7 @@ export function GeneralTab({ settings }: { settings: SettingsView }) {
       <Row
         id="set-symbol"
         label="Currency symbol"
+        labelable
         error={errors.currencySymbol}
       >
         <Input
@@ -122,7 +139,8 @@ export function GeneralTab({ settings }: { settings: SettingsView }) {
           }
           onChange={(e) => setSymbol(e.target.value)}
           onBlur={saveSymbol}
-          onKeyDown={(e) => e.key === "Enter" && saveSymbol()}
+          // Enter leaves the field, and leaving saves it.
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
         />
       </Row>
       <Row
@@ -174,6 +192,7 @@ export function GeneralTab({ settings }: { settings: SettingsView }) {
       <Row
         id="set-month"
         label="Month starts on day"
+        labelable
         error={errors.monthStartDay}
         help="1 = calendar month. Pick 25 for a payday cycle (25th to 24th)."
       >
@@ -182,12 +201,16 @@ export function GeneralTab({ settings }: { settings: SettingsView }) {
           className="w-[120px]"
           options={DAYS}
           value={String(settings.monthStartDay)}
+          aria-describedby={
+            errors.monthStartDay ? "set-month-message" : undefined
+          }
           onChange={(v) => save({ monthStartDay: Number(v) })}
         />
       </Row>
       <Row
         id="set-method"
         label="Payment method field"
+        labelable
         error={errors.showPaymentMethod}
         help="Shown in the transaction form"
       >

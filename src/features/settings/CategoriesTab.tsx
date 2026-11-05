@@ -192,7 +192,7 @@ function MergeDialog({
               <Field
                 label="Into"
                 htmlFor="merge-into"
-                help={`Its ${count(from.transactionCount)} move there, and '${from.name}' is deleted.`}
+                help={`${count(from.transactionCount)} will move there, and '${from.name}' is deleted.`}
               >
                 <Combobox
                   id="merge-into"

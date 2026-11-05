@@ -19,10 +19,6 @@ import { cn } from "@/lib/utils";
 // DESIGN_SYSTEM §3.4: the picker offers only the 12 palette swatches.
 const COLORS = Array.from({ length: 12 }, (_, i) => `cat-${i + 1}`);
 const ICONS = Object.keys(categoryIcons) as CategoryIconName[];
-const KIND_NAMES: Record<CategoryKind, string> = {
-  expense: "expense",
-  income: "income",
-};
 
 type Errors = Partial<Record<"name" | "color" | "icon", string>>;
 
@@ -71,7 +67,7 @@ export function CategoryDialog({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        title={category ? "Edit category" : `New ${KIND_NAMES[kind]} category`}
+        title={category ? "Edit category" : `New ${kind} category`}
       >
         <form
           noValidate

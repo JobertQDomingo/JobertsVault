@@ -64,7 +64,11 @@ test("expense and income categories are listed apart, archived ones folded away"
   fireEvent.click(
     section("Expense").getByRole("button", { name: "Show archived (1)" }),
   );
-  fireEvent.click(screen.getByRole("button", { name: "Unarchive Snacks" }));
+  const unarchive = screen.getByRole("button", { name: "Unarchive Snacks" });
+  fireEvent.click(unarchive);
+  // A second click while it runs does nothing.
+  expect((unarchive as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(unarchive);
   await waitFor(() => expect(calls("unarchive_category")).toEqual([{ id: 5 }]));
 });
 
@@ -187,6 +191,11 @@ test("Merge offers only other active categories of the same kind, then confirms 
   open();
   await menu("Dining Out");
   fireEvent.click(await item("Merge into…"));
+  expect(
+    dialog().getByText(
+      "1 transaction will move there, and 'Dining Out' is deleted.",
+    ),
+  ).toBeTruthy();
   fireEvent.click(dialog().getByRole("combobox", { name: "Into" }));
   expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
     "Food & Groceries",

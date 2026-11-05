@@ -303,3 +303,15 @@ test("the table lists every write hook", () => {
     WRITES.map(([name]) => name).sort(),
   );
 });
+
+test("a ledger write also refreshes the settings, whose decimals lock follows the amounts", async () => {
+  vi.mocked(invoke).mockResolvedValue(null);
+  const client = new QueryClient();
+  client.setQueryData(["settings"], { ...settings, decimalsLocked: false });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  const { result } = renderHook(() => useCreateTransaction(), { wrapper });
+  await result.current.mutateAsync(transaction);
+  expect(client.getQueryState(["settings"])?.isInvalidated).toBe(true);
+});

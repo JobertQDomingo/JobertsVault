@@ -155,3 +155,58 @@ test("the tab is kept in the URL", async () => {
     expect(router.state.location.search).toBe("?tab=categories"),
   );
 });
+
+test("a refused change doesn't take a quick second change down with it", async () => {
+  let finishFirst: () => void = () => {};
+  renderRoute("/settings", {
+    ...ANSWERS,
+    update_settings: ({ settings }: { settings: Settings }) => {
+      if (settings.currencySymbol === "")
+        return new Promise((_, reject) => {
+          finishFirst = () =>
+            reject({
+              code: "validation",
+              field: "currencySymbol",
+              message: "Enter a symbol of 1 to 5 characters",
+            });
+        });
+      return { ...settings, decimalsLocked: false };
+    },
+  });
+  const symbol = (await screen.findByRole("textbox", {
+    name: "Currency symbol",
+  })) as HTMLInputElement;
+  symbol.focus();
+  fireEvent.change(symbol, { target: { value: "" } });
+  fireEvent.blur(symbol);
+  fireEvent.click(radio("Sunday"));
+  await waitFor(() => expect(saves()).toHaveLength(1));
+  finishFirst();
+  await waitFor(() => expect(saves()).toHaveLength(2));
+  expect(saves()[1]).toEqual({ ...STORED, weekStart: "sunday" });
+  expect(
+    await screen.findByText("Enter a symbol of 1 to 5 characters"),
+  ).toBeTruthy();
+});
+
+test("the symbol shows as saved (trimmed), and Enter then leaving saves once", async () => {
+  renderRoute("/settings", {
+    ...ANSWERS,
+    update_settings: ({ settings }: { settings: Settings }) => ({
+      ...settings,
+      currencySymbol: settings.currencySymbol.trim(),
+      decimalsLocked: false,
+    }),
+  });
+  const symbol = (await screen.findByRole("textbox", {
+    name: "Currency symbol",
+  })) as HTMLInputElement;
+  symbol.focus();
+  fireEvent.change(symbol, { target: { value: "$ " } });
+  fireEvent.keyDown(symbol, { key: "Enter" });
+  fireEvent.blur(symbol);
+  await waitFor(() => expect(symbol.value).toBe("$"));
+  fireEvent.blur(symbol);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(saves()).toEqual([{ ...STORED, currencySymbol: "$ " }]);
+});
