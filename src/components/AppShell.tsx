@@ -22,7 +22,7 @@ function Layout() {
   // The shortcuts that work everywhere (UI_FLOWS §10). The period ones live in PeriodSwitcher.
   useShortcuts({
     "Ctrl+N": add,
-    // The screen's search box, on Transactions and an account's details.
+    // The search box on Transactions (account details has none: UI_FLOWS §5.3 shows only the list).
     "Ctrl+F": () =>
       document
         .querySelector<HTMLInputElement>("main input[type=search]")

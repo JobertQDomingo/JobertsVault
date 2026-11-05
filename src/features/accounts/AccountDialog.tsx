@@ -98,7 +98,7 @@ export function AccountDialog({
     ? ["name", "openingBalance", "creditLimit", "statementDay", "dueDay"]
     : ["name", "openingBalance"];
 
-  const save = handleSubmit(async (values) => {
+  const save = async (values: Values) => {
     if (saving.current) return;
     saving.current = true;
     try {
@@ -119,7 +119,7 @@ export function AccountDialog({
     } finally {
       saving.current = false;
     }
-  });
+  };
 
   const day = (name: "statementDay" | "dueDay", label: string) => (
     <Controller
@@ -173,7 +173,7 @@ export function AccountDialog({
           noValidate
           onSubmit={(e) => {
             e.preventDefault();
-            void save();
+            void handleSubmit(save)();
           }}
         >
           <DialogBody>

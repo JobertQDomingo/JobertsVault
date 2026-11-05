@@ -23,4 +23,6 @@ export const useUpdateAccount = () => useLedgerMutation(updateAccount);
 export const useReorderAccounts = () => useLedgerMutation(reorderAccounts);
 export const useArchiveAccount = () => useLedgerMutation(archiveAccount);
 export const useUnarchiveAccount = () => useLedgerMutation(unarchiveAccount);
-export const useDeleteAccount = () => useLedgerMutation(deleteAccount);
+/** `before` runs once deleted, before the refresh (see useLedgerMutation). */
+export const useDeleteAccount = (before?: (id: number) => void) =>
+  useLedgerMutation(deleteAccount, before);
