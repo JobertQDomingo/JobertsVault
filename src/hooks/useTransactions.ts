@@ -29,10 +29,12 @@ export const useTransactions = (filter: TransactionFilter) =>
     placeholderData: keepPreviousData,
   });
 
-export const useTransaction = (id: number) =>
+/** Loads only with an id: quick-add asks for one only to edit or duplicate. */
+export const useTransaction = (id?: number) =>
   useQuery({
-    queryKey: queryKeys.transaction(id),
-    queryFn: () => getTransaction(id),
+    queryKey: queryKeys.transaction(id ?? 0),
+    queryFn: () => getTransaction(id as number),
+    enabled: id !== undefined,
   });
 
 export const useTransactionDefaults = () =>

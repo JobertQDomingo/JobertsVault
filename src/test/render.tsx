@@ -7,6 +7,7 @@ import { vi } from "vitest";
 import type { SettingsView } from "@/bindings/SettingsView";
 import { createQueryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
+import { Toaster } from "@/components/ui/toast";
 import { routes } from "@/routes";
 
 export const SETTINGS: SettingsView = {
@@ -58,6 +59,7 @@ export function renderRoute(url: string, answers: Answers = {}) {
   render(
     <QueryClientProvider client={client}>
       <RouterProvider router={router} />
+      <Toaster />
     </QueryClientProvider>,
   );
   return { router, client };

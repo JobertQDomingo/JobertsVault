@@ -5,7 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Dialog, DialogContent } from "./ui/dialog";
+import { QuickAddDialog, type QuickAddRequest } from "./QuickAddDialog";
 
 type QuickAdd = {
   add: () => void;
@@ -23,12 +23,9 @@ const QuickAddContext = createContext<QuickAdd>({
 /** Opens quick-add (UI_FLOWS §4) from any screen: + Add and Ctrl+N, or a row to edit or copy it. */
 export const useQuickAdd = () => useContext(QuickAddContext);
 
-type Open = { edit?: number; duplicate?: number };
-
-/** Holds the one quick-add dialog for the whole app. */
-// shortcut: no form yet, so `edit` and `duplicate` only set the title; ROADMAP 1.9 task 3 fills it.
+/** Holds the one quick-add dialog for the whole app, mounted fresh for each opening. */
 export function QuickAddProvider({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState<Open | null>(null);
+  const [open, setOpen] = useState<QuickAddRequest | null>(null);
   // Stable, so opening the dialog doesn't re-render every screen that can open it.
   const actions = useMemo<QuickAdd>(
     () => ({
@@ -41,11 +38,7 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
   return (
     <QuickAddContext.Provider value={actions}>
       {children}
-      <Dialog open={open !== null} onOpenChange={() => setOpen(null)}>
-        <DialogContent
-          title={open?.edit != null ? "Edit transaction" : "Add transaction"}
-        />
-      </Dialog>
+      {open && <QuickAddDialog request={open} onClose={() => setOpen(null)} />}
     </QuickAddContext.Provider>
   );
 }

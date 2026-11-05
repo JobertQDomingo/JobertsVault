@@ -11,6 +11,7 @@ import { useCategories } from "@/hooks/useCategories";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import { useSettings } from "@/hooks/useSettings";
 import { isFiltered, useTransactionFilter } from "@/hooks/useTransactionFilter";
+import { named, offered } from "@/lib/records";
 import { cn } from "@/lib/utils";
 
 const TYPES: ComboboxOption[] = [
@@ -22,14 +23,6 @@ const TYPES: ComboboxOption[] = [
 
 /** "" (the All option) means any. */
 const toId = (value: string) => (value ? Number(value) : null);
-
-/** Active records, plus an archived one that's the current filter, so the box can name it. */
-const offered = <T extends { id: number; archived: boolean }>(
-  items: T[] | undefined,
-  selected: number | null,
-) => (items ?? []).filter((item) => !item.archived || item.id === selected);
-const named = (item: { name: string; archived: boolean }) =>
-  item.archived ? `${item.name} (archived)` : item.name;
 
 /**
  * The Transactions filters (UI_FLOWS §3, TXN-4) on their own glass toolbar: search in the payee
