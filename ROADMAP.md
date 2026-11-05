@@ -18,7 +18,7 @@ This file is the progress tracker.
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
-| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 33 / 53 |
+| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 34 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
@@ -96,7 +96,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] Shortcuts: `Ctrl+N`, `Ctrl+F`, `Ctrl+1`–`3`, `Ctrl+,`, `Alt+←/→`, `Alt+Home`
 
 ### 1.9 Screens
-- [ ] Dashboard ([UI_FLOWS §2](docs/UI_FLOWS.md))
+- [x] Dashboard ([UI_FLOWS §2](docs/UI_FLOWS.md))
 - [ ] Transactions screen with the filter toolbar ([UI_FLOWS §3](docs/UI_FLOWS.md))
 - [ ] Quick-add and edit dialog, including Save & add another and the keyboard path that saves in under 5 seconds [TXN-5]
 - [ ] Accounts list, new/edit account dialog, and account and credit card details. After **Delete** on the details view, remove that account's query (`queryKeys.account(id)`) and go back to `/accounts` before the ledger refresh, so the deleted account isn't fetched again and shown as "not found"

@@ -32,6 +32,16 @@ export const addDays = (iso: string, days: number) =>
 /** A date without its year, e.g. `Nov 5` (a card's due date). */
 export const formatShortDate = (iso: string) => format(toDate(iso), "MMM d");
 
+/** A list's day header (DESIGN_SYSTEM §8), relative to the backend's `today`. */
+export function formatDayHeader(iso: string, today: string) {
+  if (iso === today) return "Today";
+  if (iso === addDays(today, -1)) return "Yesterday";
+  const date = toDate(iso);
+  return date.getFullYear() === toDate(today).getFullYear()
+    ? format(date, "EEE, MMM d")
+    : format(date, "EEE, MMM d, yyyy");
+}
+
 /** `Oct 26 – Nov 1, 2026`, or with both years when they differ (DESIGN_SYSTEM §8). */
 function formatRange(start: Date, end: Date) {
   return start.getFullYear() === end.getFullYear()
