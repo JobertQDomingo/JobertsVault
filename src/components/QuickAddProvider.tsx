@@ -34,7 +34,7 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
       {children}
       <Dialog open={open !== null} onOpenChange={() => setOpen(null)}>
         <DialogContent
-          title={open?.editing ? "Edit transaction" : "Add transaction"}
+          title={open?.editing != null ? "Edit transaction" : "Add transaction"}
         />
       </Dialog>
     </QuickAddContext.Provider>

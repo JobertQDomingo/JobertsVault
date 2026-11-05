@@ -7,6 +7,7 @@ import { createQueryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
 import { routes } from "@/routes";
 import { AppShell } from "./AppShell";
+import { QuickAddProvider, useQuickAdd } from "./QuickAddProvider";
 import { SETTINGS } from "@/test/render";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -183,4 +184,20 @@ test("Alt+← and Alt+→ never go Back or Forward, even on screens without a pe
   renderAt("/settings");
   for (const key of ["ArrowLeft", "ArrowRight", "Home"])
     expect(press(key, { altKey: true })).toBe(false);
+});
+
+test("editing opens the dialog as Edit transaction, whatever the id", async () => {
+  function EditZero() {
+    const { edit } = useQuickAdd();
+    return <button onClick={() => edit(0)}>Edit</button>;
+  }
+  render(
+    <QuickAddProvider>
+      <EditZero />
+    </QuickAddProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+  expect(
+    await screen.findByRole("dialog", { name: "Edit transaction" }),
+  ).toBeTruthy();
 });

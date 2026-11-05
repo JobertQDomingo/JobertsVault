@@ -18,6 +18,7 @@ import { useCategories } from "@/hooks/useCategories";
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePeriodQuery } from "@/hooks/usePeriodQuery";
 import { formatDayHeader } from "@/lib/dates";
+import { cn } from "@/lib/utils";
 
 const COLUMNS =
   "grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] items-start gap-3";
@@ -59,20 +60,31 @@ function byDay(transactions: Transaction[]) {
 export function DashboardScreen() {
   const [query] = usePeriodQuery();
   const dashboard = useDashboard(query);
-  // Loaded alongside the dashboard for the rows' names, not after it.
-  const { data: categoryList } = useCategories();
+  // Loaded alongside the dashboard for the rows' names, and part of its loading and errors.
+  const categories = useCategories();
   const data = dashboard.data;
+  const failed = [dashboard, categories].filter((q) => q.isError);
 
   // An error wins over older numbers: a failed refresh never leaves stale totals on screen.
-  const body = dashboard.isError ? (
+  const body = failed.length ? (
     <GlassPanel>
       <ErrorState
-        onRetry={() => dashboard.refetch()}
-        pending={dashboard.isFetching}
+        onRetry={() => failed.forEach((q) => q.refetch())}
+        pending={failed.some((q) => q.isFetching)}
       />
     </GlassPanel>
-  ) : data ? (
-    <DashboardBody data={data} categories={categoryList?.categories ?? []} />
+  ) : data && categories.data ? (
+    // While the next period loads, the old numbers stay but dim (after 150 ms, so a quick load
+    // doesn't flicker) and are marked busy: they never pass for the new period's.
+    <div
+      aria-busy={dashboard.isPlaceholderData}
+      className={cn(
+        "grid gap-3 transition-opacity duration-150",
+        dashboard.isPlaceholderData && "opacity-60 delay-150",
+      )}
+    >
+      <DashboardBody data={data} categories={categories.data.categories} />
+    </div>
   ) : (
     <Loading className="grid gap-3">
       <div className="grid grid-cols-3 gap-3">

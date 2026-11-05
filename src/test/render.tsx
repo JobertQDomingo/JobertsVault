@@ -40,13 +40,16 @@ export type Answers = Record<string, unknown>;
 
 /**
  * Renders the app's routes at `url`, the way the running app does once started. `invoke` (mocked
- * by the test file) answers each command from `answers`, and anything else with null.
+ * by the test file) answers each command from `answers`; any other command rejects.
  */
 export function renderRoute(url: string, answers: Answers = {}) {
   vi.mocked(invoke).mockImplementation((command: string, args?: unknown) =>
     Promise.resolve().then(() => {
-      const answer: unknown = { get_settings: SETTINGS, ...answers }[command];
-      return typeof answer === "function" ? answer(args) : (answer ?? null);
+      const all: Answers = { get_settings: SETTINGS, ...answers };
+      // A command the test didn't expect fails loudly instead of looking like an empty load.
+      if (!(command in all)) throw new Error(`unanswered command: ${command}`);
+      const answer = all[command];
+      return typeof answer === "function" ? answer(args) : answer;
     }),
   );
   const client = createQueryClient();

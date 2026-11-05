@@ -29,11 +29,12 @@ test("the stat cards show the period's income, expense and net cashflow", async 
   expect(panel("Net cashflow").getByText("+₱1,249.60")).toBeTruthy();
 });
 
-test("the 5 newest transactions, grouped by day", async () => {
+test("the 5 newest transactions, grouped by day, never without their names", async () => {
   renderRoute("/", ANSWERS);
   await screen.findByText("Recent transactions");
   const recent = panel("Recent transactions");
   for (const text of [
+    "Food & Groceries · Market",
     "Today",
     "Yesterday",
     "Mon, Oct 26",
@@ -41,7 +42,6 @@ test("the 5 newest transactions, grouped by day", async () => {
     "Dining Out · Corner Cafe",
   ])
     expect(recent.getByText(text)).toBeTruthy();
-  expect(await recent.findByText("Food & Groceries · Market")).toBeTruthy();
   expect(recent.getAllByRole("button")).toHaveLength(5);
 });
 
@@ -139,6 +139,13 @@ test("switching period keeps the totals until the new ones arrive", async () => 
     }),
   );
   expect(panel("Income").getByText("+₱4,200.00")).toBeTruthy();
+  // …marked as loading, so they can't pass for the new period's.
+  expect(
+    screen
+      .getByText("Net cashflow")
+      .closest("[aria-busy]")
+      ?.getAttribute("aria-busy"),
+  ).toBe("true");
 });
 
 test("if a refresh fails, the error replaces the old numbers", async () => {
@@ -155,4 +162,19 @@ test("if a refresh fails, the error replaces the old numbers", async () => {
   await client.invalidateQueries({ queryKey: ["ledger"] });
   expect(await screen.findByRole("button", { name: "Retry" })).toBeTruthy();
   expect(screen.queryByText("Net cashflow")).toBeNull();
+});
+
+test("if the categories can't load, the dashboard says so and Retry asks again", async () => {
+  let fail = true;
+  renderRoute("/", {
+    ...ANSWERS,
+    list_categories: () => {
+      if (fail) throw { code: "database", message: "disk I/O error" };
+      return CATEGORIES;
+    },
+  });
+  const retry = await screen.findByRole("button", { name: "Retry" });
+  fail = false;
+  fireEvent.click(retry);
+  expect(await screen.findByText("Food & Groceries · Market")).toBeTruthy();
 });
