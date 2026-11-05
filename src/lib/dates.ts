@@ -27,3 +27,6 @@ export function parseInputDate(text: string): string | null {
 
 export const addDays = (iso: string, days: number) =>
   toIso(addDaysToDate(toDate(iso), days));
+
+/** A date without its year, e.g. `Nov 5` (a card's due date). */
+export const formatShortDate = (iso: string) => format(toDate(iso), "MMM d");
