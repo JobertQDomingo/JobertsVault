@@ -4,7 +4,14 @@ import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 export type MoneyKind =
-  "income" | "expense" | "transfer" | "balance" | "owed" | "net";
+  | "income"
+  | "expense"
+  | "transfer"
+  | "balance"
+  | "owed"
+  | "net"
+  // A change between two amounts: signed, but neither good nor bad by itself.
+  | "difference";
 
 function colorOf(amount: number, kind: MoneyKind) {
   if (amount === 0) return "text-muted-foreground";
@@ -20,6 +27,7 @@ function colorOf(amount: number, kind: MoneyKind) {
     case "balance":
       return amount < 0 ? "text-expense" : "text-foreground";
     case "owed":
+    case "difference":
       return "text-foreground";
   }
 }
@@ -42,7 +50,7 @@ export function MoneyText({
   const { data: settings } = useSettings();
   if (!settings) return null;
   const text = formatMoney(kind === "expense" ? -amount : amount, settings, {
-    plus: kind === "income" || kind === "net",
+    plus: kind === "income" || kind === "net" || kind === "difference",
   });
   return (
     <span

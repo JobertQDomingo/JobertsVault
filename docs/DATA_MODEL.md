@@ -417,7 +417,11 @@ else:
 % change = (current − compare) ÷ |compare| × 100
 ```
 
-If `compare` is 0, the change is shown as "—" instead of a percentage. The percentage is rounded to one decimal place, for display only.
+If `compare` is 0, the change is shown as "—" instead of a percentage. The percentage is rounded to one decimal place, half away from zero, and sent as whole tenths of a percent (−563 means −56.3%), worked out with integers.
+
+- The current side counts `[current.start, min(current.end, today)]` (§5.2), so a period in progress is compared day for day.
+- `mode` is the `comparison_mode` setting (SET-7) unless Reports' **Compare to** picks one for that view (UI_FLOWS §8.1). The dashboard's % change always uses the setting (DSH-3).
+- The comparison table (RPT-4) has income, expense and net cashflow, plus every category with an amount on either side, grouped by kind and ranked by this period's amount, then the comparison's, then category id. Net is income − expense on each side, so its % uses `|compare|` when the comparison's net was negative.
 
 ### 5.5 Credit card statement cycle and due date
 

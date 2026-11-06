@@ -7,12 +7,17 @@ import { GlassPanel } from "@/components/GlassPanel";
 import { IncomeExpenseChart } from "@/components/IncomeExpenseChart";
 import { Loading, Skeleton } from "@/components/Loading";
 import { PeriodSwitcher } from "@/components/PeriodSwitcher";
+import { Combobox } from "@/components/ui/combobox";
 import { Segmented } from "@/components/ui/segmented";
+import { COMPARE } from "@/features/settings/GeneralTab";
 import { useCategories } from "@/hooks/useCategories";
-import { useBreakdown, useTimeseries } from "@/hooks/useReports";
+import { usePeriod } from "@/hooks/usePeriod";
+import { useBreakdown, useComparison, useTimeseries } from "@/hooks/useReports";
 import { usePeriodQuery } from "@/hooks/usePeriodQuery";
+import { useSettings } from "@/hooks/useSettings";
 import { cn } from "@/lib/utils";
 import { CategoryBreakdown } from "./CategoryBreakdown";
+import { ComparisonTable } from "./ComparisonTable";
 
 const KINDS: { value: CategoryKind; label: string }[] = [
   { value: "expense", label: "Expense" },
@@ -73,17 +78,56 @@ function Section<T>({
   );
 }
 
-/** `/reports` (UI_FLOWS §8.1): the period bar and each report for that period. */
+/**
+ * `/reports` (UI_FLOWS §8.1): the period bar and Compare to, then each report for that period. The
+ * breakdown's kind and Compare to are kept in the URL like the period, so Back from a category's
+ * transactions returns to the same view.
+ */
 export function ReportsScreen() {
   const [query] = usePeriodQuery();
   const [params, setParams] = useSearchParams();
-  // Kept in the URL like the period, so Back from a category's transactions returns to it.
+  const setParam = (key: string, value: string | null) =>
+    setParams((current) => {
+      const updated = new URLSearchParams(current);
+      if (value === null) updated.delete(key);
+      else updated.set(key, value);
+      return updated;
+    });
   const kind: CategoryKind =
     params.get("breakdown") === "income" ? "income" : "expense";
+  // None means the setting (SET-7).
+  const mode =
+    COMPARE.find((m) => m.value === params.get("compare"))?.value ?? null;
+  const settings = useSettings().data;
+  const period = usePeriod(query).data;
   const categories = useCategories();
+  const byId = new Map(categories.data?.categories.map((c) => [c.id, c]));
   return (
     <>
-      <PeriodSwitcher />
+      <div className="flex items-center gap-3">
+        <PeriodSwitcher />
+        <GlassPanel
+          className="flex items-center gap-2.5 rounded-toolbar p-1.5 pl-3.5"
+          // RPT-4a: a period that's over has no "so far".
+          title={
+            period && !period.isCurrent
+              ? "A period that's over is always compared in full"
+              : undefined
+          }
+        >
+          <label htmlFor="compare-to" className="font-semibold">
+            Compare to
+          </label>
+          <Combobox
+            id="compare-to"
+            className="w-52"
+            options={COMPARE}
+            value={mode ?? settings?.comparisonMode ?? null}
+            disabled={period ? !period.isCurrent : false}
+            onChange={(next) => setParam("compare", next)}
+          />
+        </GlassPanel>
+      </div>
       <Section
         title="Income vs expense"
         query={useTimeseries(query)}
@@ -99,12 +143,7 @@ export function ReportsScreen() {
             value={kind}
             options={KINDS}
             onChange={(next) =>
-              setParams((current) => {
-                const updated = new URLSearchParams(current);
-                if (next === "income") updated.set("breakdown", next);
-                else updated.delete("breakdown");
-                return updated;
-              })
+              setParam("breakdown", next === "income" ? next : null)
             }
           />
         }
@@ -116,10 +155,18 @@ export function ReportsScreen() {
           <CategoryBreakdown
             breakdown={breakdown}
             query={query}
-            categories={
-              new Map(categories.data?.categories.map((c) => [c.id, c]))
-            }
+            categories={byId}
           />
+        )}
+      </Section>
+      <Section
+        title="Period comparison"
+        query={useComparison(query, mode)}
+        also={[categories]}
+        skeleton="h-[240px]"
+      >
+        {(comparison) => (
+          <ComparisonTable comparison={comparison} categories={byId} />
         )}
       </Section>
     </>

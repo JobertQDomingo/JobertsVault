@@ -1,16 +1,19 @@
+use std::collections::BTreeMap;
+
 use chrono::NaiveDate;
 use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
 use crate::domain::money::Money;
-use crate::domain::period::Period;
+use crate::domain::period::{ComparisonMode, Period, comparison_window};
 use crate::domain::report::{self, Grain};
 use crate::error::AppError;
 use crate::repo::transactions::{self as repo, Filter};
 use crate::services::categories::{self, CategoryKind};
 use crate::services::invalid;
 use crate::services::period::{self, PeriodQuery};
+use crate::services::settings;
 use crate::services::transactions::parse_date;
 
 /// One bar of the income-vs-expense chart: its dates and totals, transfers left out (RPT-1, RPT-6).
@@ -55,6 +58,7 @@ pub fn timeseries(
         })
         .collect();
     let (start, end) = counted(&period, today);
+    let (start, end) = (start.to_string(), end.to_string());
     for (date, income, expense) in repo::daily_totals(conn, &Filter::dates(&start, &end))? {
         let date =
             parse_date(&date).ok_or_else(|| database("A transaction has an invalid date"))?;
@@ -126,6 +130,7 @@ pub fn breakdown(
 ) -> Result<Breakdown, AppError> {
     let period = period::resolve(conn, query, today)?;
     let (start, end) = counted(&period, today);
+    let (start, end) = (start.to_string(), end.to_string());
     let filter = Filter {
         kind: Some(categories::kind_text(kind)),
         ..Filter::dates(&start, &end)
@@ -161,12 +166,161 @@ pub fn breakdown(
     })
 }
 
+/// One row of the comparison table: this period, the comparison and the difference (RPT-4).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Line {
+    pub current: Money,
+    pub compare: Money,
+    /// `current − compare`.
+    pub difference: Money,
+    /// Tenths of a percent of the comparison; none when that's 0, shown as "—" (DATA_MODEL §5.4).
+    #[ts(type = "number | null")]
+    pub change: Option<i64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CategoryLine {
+    #[ts(type = "number")]
+    pub category_id: i64,
+    #[serde(flatten)]
+    #[ts(flatten)]
+    pub line: Line,
+}
+
+/// A period next to the one before it (RPT-4), compared by the rule in RPT-4a.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Comparison {
+    /// The dates counted this period: up to today while it's in progress.
+    pub current_start: NaiveDate,
+    pub current_end: NaiveDate,
+    /// The dates it's compared with (DATA_MODEL §5.4).
+    pub compare_start: NaiveDate,
+    pub compare_end: NaiveDate,
+    pub income: Line,
+    pub expense: Line,
+    pub net: Line,
+    /// Every category with an amount on either side, largest this period first.
+    pub income_categories: Vec<CategoryLine>,
+    pub expense_categories: Vec<CategoryLine>,
+    pub today: NaiveDate,
+}
+
+/// `mode` none means the comparison setting (SET-7).
+pub fn comparison(
+    conn: &Connection,
+    query: &PeriodQuery,
+    mode: Option<ComparisonMode>,
+    today: NaiveDate,
+) -> Result<Comparison, AppError> {
+    let period = period::resolve(conn, query, today)?;
+    let mode = match mode {
+        Some(mode) => mode,
+        None => settings::get(conn)?.settings.comparison_mode,
+    };
+    let window = comparison_window(&period, &period::period_settings(conn)?, today, mode)
+        .ok_or_else(|| invalid("period", "That date is outside the supported range"))?;
+    let (current_start, current_end) = counted(&period, today);
+    let (compare_start, compare_end) = counted(&window, today);
+    let totals = |start: NaiveDate, end: NaiveDate, kind| {
+        let (start, end) = (start.to_string(), end.to_string());
+        let filter = Filter {
+            kind: Some(categories::kind_text(kind)),
+            ..Filter::dates(&start, &end)
+        };
+        repo::category_totals(conn, &filter)
+    };
+    let both = |kind| -> Result<Vec<CategoryLine>, AppError> {
+        lines(
+            totals(current_start, current_end, kind)?,
+            totals(compare_start, compare_end, kind)?,
+        )
+    };
+    let (income_categories, expense_categories) =
+        (both(CategoryKind::Income)?, both(CategoryKind::Expense)?);
+    let (income, expense) = (sum(&income_categories)?, sum(&expense_categories)?);
+    let net = line(
+        income
+            .current
+            .checked_sub(expense.current)
+            .ok_or_else(too_large)?,
+        income
+            .compare
+            .checked_sub(expense.compare)
+            .ok_or_else(too_large)?,
+    )?;
+    Ok(Comparison {
+        current_start,
+        current_end,
+        compare_start,
+        compare_end,
+        income,
+        expense,
+        net,
+        income_categories,
+        expense_categories,
+        today,
+    })
+}
+
+fn line(current: Money, compare: Money) -> Result<Line, AppError> {
+    Ok(Line {
+        current,
+        compare,
+        difference: current.checked_sub(compare).ok_or_else(too_large)?,
+        change: report::percent_change(current, compare),
+    })
+}
+
+/// Each category on either side, largest this period first, then largest before, then by id.
+fn lines(
+    current: Vec<(i64, i64)>,
+    compare: Vec<(i64, i64)>,
+) -> Result<Vec<CategoryLine>, AppError> {
+    let mut both: BTreeMap<i64, (Money, Money)> = BTreeMap::new();
+    for (id, amount) in current {
+        both.entry(id).or_insert((Money::ZERO, Money::ZERO)).0 = Money(amount);
+    }
+    for (id, amount) in compare {
+        both.entry(id).or_insert((Money::ZERO, Money::ZERO)).1 = Money(amount);
+    }
+    let mut lines = both
+        .into_iter()
+        .map(|(category_id, (current, compare))| {
+            Ok(CategoryLine {
+                category_id,
+                line: line(current, compare)?,
+            })
+        })
+        .collect::<Result<Vec<_>, AppError>>()?;
+    lines.sort_by(|a, b| {
+        (b.line.current, b.line.compare, a.category_id).cmp(&(
+            a.line.current,
+            a.line.compare,
+            b.category_id,
+        ))
+    });
+    Ok(lines)
+}
+
+/// The categories' lines added up.
+fn sum(lines: &[CategoryLine]) -> Result<Line, AppError> {
+    let (mut current, mut compare) = (Money::ZERO, Money::ZERO);
+    for l in lines {
+        current = current.checked_add(l.line.current).ok_or_else(too_large)?;
+        compare = compare.checked_add(l.line.compare).ok_or_else(too_large)?;
+    }
+    line(current, compare)
+}
+
 /// The dates of `period` that count: rows dated after today count nowhere (DATA_MODEL §5.2).
-fn counted(period: &Period, today: NaiveDate) -> (String, String) {
-    (
-        period.start().to_string(),
-        period.end().min(today).to_string(),
-    )
+fn counted(period: &Period, today: NaiveDate) -> (NaiveDate, NaiveDate) {
+    (period.start(), period.end().min(today))
 }
 
 fn database(message: &str) -> AppError {
@@ -541,6 +695,187 @@ mod tests {
         spend(&mut conn, 7_000, d(2026, 11, 3));
         let b = breakdown(&conn, &MONTH, CategoryKind::Expense, d(2026, 11, 2)).unwrap();
         assert_eq!(b.total, Money(1_000));
+    }
+
+    /// (category, current, compare, difference, change) for each category line.
+    fn rows(
+        conn: &Connection,
+        lines: &[CategoryLine],
+    ) -> Vec<(String, i64, i64, i64, Option<i64>)> {
+        lines
+            .iter()
+            .map(|c| {
+                let name: String = conn
+                    .query_row(
+                        "SELECT name FROM categories WHERE id = ?1",
+                        [c.category_id],
+                        |r| r.get(0),
+                    )
+                    .unwrap();
+                let l = &c.line;
+                (name, l.current.0, l.compare.0, l.difference.0, l.change)
+            })
+            .collect()
+    }
+
+    fn totals(l: &Line) -> (i64, i64, i64, Option<i64>) {
+        (l.current.0, l.compare.0, l.difference.0, l.change)
+    }
+
+    /// November 1–3 so far, and October: some on the 1st–3rd, some later.
+    fn november_and_october(conn: &mut Connection) {
+        let cash = id_of(conn, "accounts", "Cash");
+        let card = card(conn);
+        let salary = Some("Salary");
+        add(
+            conn,
+            TransactionKind::Income,
+            1_000,
+            d(2026, 11, 2),
+            cash,
+            salary,
+            None,
+        );
+        spend(conn, 300, d(2026, 11, 3));
+        add(
+            conn,
+            TransactionKind::Expense,
+            50,
+            d(2026, 11, 2),
+            cash,
+            Some("Transportation"),
+            None,
+        );
+        add(
+            conn,
+            TransactionKind::Transfer,
+            9_000,
+            d(2026, 11, 2),
+            cash,
+            None,
+            Some(card),
+        );
+        add(
+            conn,
+            TransactionKind::Income,
+            800,
+            d(2026, 10, 2),
+            cash,
+            salary,
+            None,
+        );
+        spend(conn, 200, d(2026, 10, 2));
+        add(
+            conn,
+            TransactionKind::Expense,
+            100,
+            d(2026, 10, 3),
+            card,
+            Some("Dining Out"),
+            None,
+        );
+        spend(conn, 500, d(2026, 10, 20));
+    }
+
+    #[test]
+    fn a_month_in_progress_is_compared_with_the_same_days_last_month() {
+        let mut conn = db();
+        november_and_october(&mut conn);
+        let c = comparison(&conn, &MONTH, Some(ComparisonMode::ToDate), d(2026, 11, 3)).unwrap();
+        assert_eq!(
+            (
+                c.current_start,
+                c.current_end,
+                c.compare_start,
+                c.compare_end
+            ),
+            (
+                d(2026, 11, 1),
+                d(2026, 11, 3),
+                d(2026, 10, 1),
+                d(2026, 10, 3)
+            )
+        );
+        assert_eq!(totals(&c.income), (1_000, 800, 200, Some(250)));
+        assert_eq!(totals(&c.expense), (350, 300, 50, Some(167)));
+        assert_eq!(totals(&c.net), (650, 500, 150, Some(300)));
+        assert_eq!(
+            rows(&conn, &c.expense_categories),
+            [
+                ("Food & Groceries".to_string(), 300, 200, 100, Some(500)),
+                // Nothing to compare with: "—".
+                ("Transportation".to_string(), 50, 0, 50, None),
+                ("Dining Out".to_string(), 0, 100, -100, Some(-1000)),
+            ]
+        );
+        assert_eq!(
+            rows(&conn, &c.income_categories),
+            [("Salary".to_string(), 1_000, 800, 200, Some(250))]
+        );
+    }
+
+    #[test]
+    fn full_compares_the_whole_previous_month() {
+        let mut conn = db();
+        november_and_october(&mut conn);
+        let c = comparison(&conn, &MONTH, Some(ComparisonMode::Full), d(2026, 11, 3)).unwrap();
+        assert_eq!(
+            (c.compare_start, c.compare_end),
+            (d(2026, 10, 1), d(2026, 10, 31))
+        );
+        assert_eq!(totals(&c.expense), (350, 800, -450, Some(-563)));
+    }
+
+    #[test]
+    fn without_a_mode_the_setting_decides() {
+        let mut conn = db();
+        let mut s = settings::get(&conn).unwrap().settings;
+        s.comparison_mode = ComparisonMode::Full;
+        settings::update(&mut conn, s).unwrap();
+        let c = comparison(&conn, &MONTH, None, d(2026, 11, 3)).unwrap();
+        assert_eq!(c.compare_end, d(2026, 10, 31));
+        let default = comparison(&db(), &MONTH, None, d(2026, 11, 3)).unwrap();
+        assert_eq!(default.compare_end, d(2026, 10, 3));
+    }
+
+    #[test]
+    fn a_month_that_is_over_is_compared_in_full_whatever_the_mode() {
+        let mut conn = db();
+        november_and_october(&mut conn);
+        let october = PeriodQuery::Month {
+            anchor: Some(d(2026, 10, 1)),
+        };
+        let c = comparison(
+            &conn,
+            &october,
+            Some(ComparisonMode::ToDate),
+            d(2026, 11, 3),
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                c.current_start,
+                c.current_end,
+                c.compare_start,
+                c.compare_end
+            ),
+            (
+                d(2026, 10, 1),
+                d(2026, 10, 31),
+                d(2026, 9, 1),
+                d(2026, 9, 30)
+            )
+        );
+        // Nothing in September: every change is "—".
+        assert_eq!(totals(&c.expense), (800, 0, 800, None));
+        assert_eq!(c.net.change, None);
+    }
+
+    #[test]
+    fn a_comparison_of_nothing_is_all_zero_with_no_change() {
+        let c = comparison(&db(), &MONTH, None, d(2026, 11, 3)).unwrap();
+        assert_eq!(totals(&c.net), (0, 0, 0, None));
+        assert!(c.income_categories.is_empty() && c.expense_categories.is_empty());
     }
 
     #[test]

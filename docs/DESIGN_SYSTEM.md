@@ -295,7 +295,7 @@ The currency is the **Philippine peso**, shown with the official sign **₱** (U
 
 ### Percent change (Phase 2)
 
-Displayed as `▲ 12.3%` or `▼ 4.0%`, or `—` when there's nothing to compare against.
+Displayed as `▲ 12.3%` or `▼ 4.0%`, or `—` when there's nothing to compare against. No change is `0.0%` in `--muted-foreground`, with no arrow. Screen readers hear "Up" or "Down" instead of the arrow. A difference between two amounts is signed (`+₱126.00`, `−₱256.60`) in `--foreground`, since the % change already says whether it's good.
 
 | Measure | ▲ (up) | ▼ (down) |
 |---|---|---|

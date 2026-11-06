@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
+import type { ComparisonMode } from "@/bindings/ComparisonMode";
 import type { Settings } from "@/bindings/Settings";
 import type { SettingsView } from "@/bindings/SettingsView";
 import { UpdateCheck } from "@/components/UpdateCheck";
@@ -21,7 +22,12 @@ const SHOWN: Key[] = [
   "monthStartDay",
   "showPaymentMethod",
   "autoUpdateEnabled",
+  "comparisonMode",
 ];
+export const COMPARE = [
+  { value: "to_date", label: "Same days so far" },
+  { value: "full", label: "Full previous period" },
+] as const satisfies { value: ComparisonMode; label: string }[];
 const DAYS = Array.from({ length: 28 }, (_, i) => ({
   value: String(i + 1),
   label: String(i + 1),
@@ -218,6 +224,19 @@ export function GeneralTab({
                 errors.monthStartDay ? "set-month-message" : undefined
               }
               onChange={(v) => save({ monthStartDay: Number(v) })}
+            />
+          </Row>
+          <Row
+            id="set-compare"
+            label="Compare periods"
+            error={errors.comparisonMode}
+            help="How a period still in progress is compared, for the dashboard's % change and Reports"
+          >
+            <Segmented
+              aria-label="Compare periods"
+              value={settings.comparisonMode}
+              onChange={(comparisonMode) => save({ comparisonMode })}
+              options={COMPARE}
             />
           </Row>
           <Row

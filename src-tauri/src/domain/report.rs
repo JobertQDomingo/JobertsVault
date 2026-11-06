@@ -63,6 +63,20 @@ pub fn share(part: Money, total: Money) -> i64 {
     i64::try_from((part * 2000 + total) / (2 * total)).unwrap_or(i64::MAX)
 }
 
+/// The % change from `compare` to `current` in tenths of a percent, rounded half away from zero:
+/// (current − compare) ÷ |compare| (DATA_MODEL §5.4). `None` when `compare` is 0, shown as "—".
+pub fn percent_change(current: Money, compare: Money) -> Option<i64> {
+    if compare == Money::ZERO {
+        return None;
+    }
+    // i128, so the difference × 2000 can't overflow. Rounds the size, then puts the sign back.
+    let diff = i128::from(current.0) - i128::from(compare.0);
+    let base = i128::from(compare.0).abs();
+    let size = (diff.abs() * 2000 + base) / (2 * base);
+    let tenths = if diff < 0 { -size } else { size };
+    Some(i64::try_from(tenths).unwrap_or(if diff < 0 { i64::MIN } else { i64::MAX }))
+}
+
 /// The donut's slices from categories ranked largest first: the first `SLICES`, then the rest
 /// added up as one slice with no category. `None` if the rest is too large to add up.
 pub fn slices(ranked: &[(i64, Money)]) -> Option<Vec<(Option<i64>, Money)>> {
@@ -258,6 +272,44 @@ mod tests {
     fn a_share_of_the_largest_amounts_does_not_overflow() {
         let total = Money(i64::MAX);
         assert_eq!(share(Money(i64::MAX / 2), total), 500);
+    }
+
+    #[test]
+    fn a_change_is_in_tenths_of_a_percent_of_the_comparison() {
+        assert_eq!(percent_change(Money(110), Money(100)), Some(100));
+        assert_eq!(percent_change(Money(90), Money(100)), Some(-100));
+        assert_eq!(percent_change(Money(0), Money(100)), Some(-1000));
+        assert_eq!(percent_change(Money(300), Money(100)), Some(2000));
+        assert_eq!(percent_change(Money(100), Money(100)), Some(0));
+    }
+
+    #[test]
+    fn a_change_rounds_half_away_from_zero() {
+        assert_eq!(percent_change(Money(1), Money(3)), Some(-667));
+        assert_eq!(percent_change(Money(2001), Money(2000)), Some(1));
+        assert_eq!(percent_change(Money(1999), Money(2000)), Some(-1));
+        assert_eq!(percent_change(Money(4001), Money(4000)), Some(0));
+    }
+
+    #[test]
+    fn a_negative_comparison_uses_its_size() {
+        // Net cashflow from −₱100 to −₱50 is better: up 50%.
+        assert_eq!(percent_change(Money(-50), Money(-100)), Some(500));
+        assert_eq!(percent_change(Money(-150), Money(-100)), Some(-500));
+        assert_eq!(percent_change(Money(50), Money(-100)), Some(1500));
+    }
+
+    #[test]
+    fn nothing_to_compare_with_has_no_change() {
+        assert_eq!(percent_change(Money(500), Money(0)), None);
+        assert_eq!(percent_change(Money(0), Money(0)), None);
+    }
+
+    #[test]
+    fn a_change_between_the_largest_amounts_does_not_overflow() {
+        assert_eq!(percent_change(Money(i64::MAX), Money(i64::MIN)), Some(2000));
+        assert_eq!(percent_change(Money(i64::MAX), Money(1)), Some(i64::MAX));
+        assert_eq!(percent_change(Money(i64::MIN), Money(1)), Some(i64::MIN));
     }
 
     fn ranked(n: i64) -> Vec<(i64, Money)> {

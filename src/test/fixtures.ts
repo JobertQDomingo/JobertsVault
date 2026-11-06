@@ -3,6 +3,7 @@ import type { Account } from "@/bindings/Account";
 import type { Breakdown } from "@/bindings/Breakdown";
 import type { Category } from "@/bindings/Category";
 import type { CategoryList } from "@/bindings/CategoryList";
+import type { Comparison } from "@/bindings/Comparison";
 import type { Dashboard } from "@/bindings/Dashboard";
 import type { PaymentMethod } from "@/bindings/PaymentMethod";
 import type { PeriodView } from "@/bindings/PeriodView";
@@ -172,6 +173,48 @@ export const BREAKDOWN: Breakdown = {
     { categoryId: 2, amount: 85040, share: 288 },
     { categoryId: 5, amount: 10000, share: 34 },
   ],
+};
+
+/** November 1–5 next to October 1–5: more income, less spent, and Dining Out new this month. */
+export const COMPARISON: Comparison = {
+  currentStart: "2026-11-01",
+  currentEnd: TODAY,
+  compareStart: "2026-10-01",
+  compareEnd: "2026-10-05",
+  income: { current: 420000, compare: 407400, difference: 12600, change: 31 },
+  expense: {
+    current: 295040,
+    compare: 320700,
+    difference: -25660,
+    change: -80,
+  },
+  net: { current: 124960, compare: 86700, difference: 38260, change: 441 },
+  incomeCategories: [
+    {
+      categoryId: 3,
+      current: 420000,
+      compare: 407400,
+      difference: 12600,
+      change: 31,
+    },
+  ],
+  expenseCategories: [
+    {
+      categoryId: 1,
+      current: 200000,
+      compare: 320700,
+      difference: -120700,
+      change: -376,
+    },
+    {
+      categoryId: 2,
+      current: 95040,
+      compare: 0,
+      difference: 95040,
+      change: null,
+    },
+  ],
+  today: TODAY,
 };
 
 export const DASHBOARD: Dashboard = {

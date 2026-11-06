@@ -18,6 +18,7 @@ const settings: Settings = {
   showPaymentMethod: true,
   onboardingCompleted: true,
   autoUpdateEnabled: true,
+  comparisonMode: "to_date",
 };
 const saved = { ...settings, decimalsLocked: false };
 

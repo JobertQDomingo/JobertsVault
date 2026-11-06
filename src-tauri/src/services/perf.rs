@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use chrono::NaiveDate;
 use rusqlite::{Connection, params};
 
+use crate::domain::period::ComparisonMode;
 use crate::services::categories::CategoryKind;
 use crate::services::period::PeriodQuery;
 use crate::services::transactions::{self, TransactionFilter, TransactionKind};
@@ -189,6 +190,19 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
     ] {
         time(label, || {
             reports::breakdown(&conn, &query, kind, today()).unwrap()
+        });
+    }
+    for (label, query, mode) in [
+        (
+            "comparison: month so far",
+            PeriodQuery::Month { anchor: None },
+            ComparisonMode::ToDate,
+        ),
+        ("comparison: October, full", month(), ComparisonMode::Full),
+        ("comparison: all time", all(), ComparisonMode::Full),
+    ] {
+        time(label, || {
+            reports::comparison(&conn, &query, Some(mode), today()).unwrap()
         });
     }
     let list = |label: &str, f: TransactionFilter, page: u32| {
