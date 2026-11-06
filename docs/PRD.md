@@ -252,29 +252,29 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 
 ## 10. Acceptance criteria for the MVP (Phase 1)
 
-- [ ] I can create cash, bank, e-wallet and credit card accounts, each with an opening balance.
-- [ ] I can add, edit, delete and duplicate income, expense and transfer transactions.
-- [ ] Account balances and the amount owed on the card are always correct after any add, edit or delete.
-- [ ] The dashboard shows correct income, expense and net totals for Day, Week (Mon–Sun), Month, Year and Custom, and moving between periods works.
-- [ ] Transfers, including paying the card bill, never appear in income or expense totals.
-- [ ] I can filter and search the transaction list.
-- [ ] A future date is rejected with a clear message.
-- [ ] Ctrl+N opens quick-add from any screen, and I can log a typical transaction with only the keyboard in 5 seconds or less.
-- [ ] **Pay bill** opens a transfer pre-filled with the full amount owed, and a partial payment works.
-- [ ] A card's details show the amount owed, available credit, % of the limit used, cycle spending and next due date.
-- [ ] A refund on the card lowers the amount owed and counts as income.
-- [ ] I can manage categories and payment methods: add, edit, reorder, archive, unarchive and delete unused ones, plus merge categories.
-- [ ] Archiving an account with a balance other than 0 shows a warning, and my last active account can't be archived or deleted.
-- [ ] Settings for currency, week start, month start day and the payment method field work, and decimals lock once an amount is saved.
-- [ ] The first-launch form works, can be skipped, and comes back only if the app was closed before finishing it.
-- [ ] The app follows the Windows light or dark setting, and stays readable with Windows transparency effects off.
-- [ ] Cold start takes under 2 s, and the dashboard and transaction list load in under 300 ms with 50,000 test transactions.
-- [ ] The dashboard and transaction list scroll smoothly on both monitors.
-- [ ] The app runs fully offline on Windows 11, and starts normally with no internet.
+- [x] I can create cash, bank, e-wallet and credit card accounts, each with an opening balance.
+- [x] I can add, edit, delete and duplicate income, expense and transfer transactions.
+- [x] Account balances and the amount owed on the card are always correct after any add, edit or delete.
+- [x] The dashboard shows correct income, expense and net totals for Day, Week (Mon–Sun), Month, Year and Custom, and moving between periods works.
+- [x] Transfers, including paying the card bill, never appear in income or expense totals.
+- [x] I can filter and search the transaction list.
+- [x] A future date is rejected with a clear message.
+- [x] Ctrl+N opens quick-add from any screen, and I can log a typical transaction with only the keyboard in 5 seconds or less.
+- [x] **Pay bill** opens a transfer pre-filled with the full amount owed, and a partial payment works.
+- [x] A card's details show the amount owed, available credit, % of the limit used, cycle spending and next due date.
+- [x] A refund on the card lowers the amount owed and counts as income.
+- [x] I can manage categories and payment methods: add, edit, reorder, archive, unarchive and delete unused ones, plus merge categories.
+- [x] Archiving an account with a balance other than 0 shows a warning, and my last active account can't be archived or deleted.
+- [x] Settings for currency, week start, month start day and the payment method field work, and decimals lock once an amount is saved.
+- [x] The first-launch form works, can be skipped, and comes back only if the app was closed before finishing it.
+- [x] The app follows the Windows light or dark setting, and stays readable with Windows transparency effects off.
+- [x] Cold start takes under 2 s, and the dashboard and transaction list load in under 300 ms with 50,000 test transactions.
+- [x] The dashboard and transaction list scroll smoothly on both monitors.
+- [x] The app runs fully offline on Windows 11, and starts normally with no internet.
 - [ ] An installed copy updates itself to a newer published version at its next start, and all my data is still there afterward.
-- [ ] With automatic updates off, the app doesn't connect by itself, and **Check for updates** in Settings still works.
-- [ ] A tampered update is refused, and nothing changes.
-- [ ] An update with a migration makes a backup of the database first, and a failed backup stops the migration.
+- [x] With automatic updates off, the app doesn't connect by itself, and **Check for updates** in Settings still works.
+- [x] A tampered update is refused, and nothing changes.
+- [x] An update with a migration makes a backup of the database first, and a failed backup stops the migration.
 
 ## 11. Release plan
 
