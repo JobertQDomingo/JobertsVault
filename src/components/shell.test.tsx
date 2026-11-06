@@ -180,9 +180,11 @@ test("shortcuts also wait while a menu or an alert dialog is open", () => {
 
 test("Ctrl+1–4 follow the key's place, so other keyboard layouts work", async () => {
   renderAt("/settings");
-  // On AZERTY the 1 key types "&".
+  // On AZERTY the 1 key types "&", and the 4 key "'".
   press("&", { ctrlKey: true, code: "Digit1" });
   await waitFor(() => expect(title()).toBe("Dashboard"));
+  press("'", { ctrlKey: true, code: "Digit4" });
+  await waitFor(() => expect(title()).toBe("Reports"));
 });
 
 test("Alt+← and Alt+→ never go Back or Forward, even on screens without a period", () => {
