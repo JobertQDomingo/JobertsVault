@@ -9,18 +9,18 @@ argument-hint: "[patch | minor | major | X.Y.Z]"
 
 A release is a PR that changes only the version in `package.json`. Merging it to `main` runs `.github/workflows/release.yml`, which runs every CI check, builds and signs the installer, then publishes `vX.Y.Z` and creates its tag. Every installed copy with automatic updates on installs it at its next start. Never create or push a tag yourself. `RELEASING.md` describes the same steps for doing them by hand.
 
-Run every command with Bash. At the first check that fails, stop and report it.
+Run every command with Bash. Shell variables don't carry over from one Bash call to the next, so write the values you note (the last tag, PR number, merge commit) into later commands literally. At the first check that fails, stop and report it.
 
 ## 1. Start from a clean, current, green main
 - `git status --porcelain` prints nothing. If it prints anything, stop and list what's uncommitted.
 - `git switch main && git pull --ff-only`
 - `gh run list --workflow ci.yml --branch main --limit 1` shows `completed` and `success`. If CI on `main` is red or still running, stop and say so.
-- `LAST=$(git describe --tags --abbrev=0 2>/dev/null)`. If there's no tag yet, this is the first release: everything on `main` ships, and `git log --oneline` lists it. Otherwise `git log $LAST..HEAD --oneline` lists what ships. If the list is empty, stop: there's nothing to release.
+- `git describe --tags --abbrev=0` prints the newest tag; note it as LAST. If there's no tag yet, this is the first release: everything on `main` ships, and `git log --oneline` lists it. Otherwise `git log <LAST>..HEAD --oneline` lists what ships. If the list is empty, stop: there's nothing to release.
 
 ## 2. Pick the version
 - If `$ARGUMENTS` is a version like `0.2.0`, use it. If it's `patch`, `minor` or `major`, work out X.Y.Z from the version in `package.json`.
-- With no argument, suggest one. Any `feat` commit since `$LAST` means minor. Only `fix`, `docs`, `chore` or `ci` commits mean patch. Never suggest major; use it only when the user asks. The first release is `0.1.0` (ROADMAP 1.11), whatever the commits say.
-- X.Y.Z must be higher than the current version. `0.0.0` never releases.
+- With no argument, suggest one. Any `feat` commit since <LAST> means minor. Only `fix`, `docs`, `chore` or `ci` commits mean patch. Never suggest major; use it only when the user asks.
+- X.Y.Z must be higher than the current version. While `package.json` says `0.0.0`, the only allowed version is `0.1.0` (ROADMAP 1.11), whatever the argument or the commits say: stop on anything else, including `patch`.
 - Show the current version, the new version and the commit list. Wait for the user to confirm the number.
 - If `git ls-remote --tags origin vX.Y.Z` prints a line, stop: that version is already released.
 
@@ -33,7 +33,7 @@ Run every command with Bash. At the first check that fails, stop and report it.
     gh pr create --title "chore: release vX.Y.Z" --body "<body>"
 - `git diff --stat` must list only `package.json` and `package-lock.json`.
 - The commit has no Claude attribution line.
-- The body is `Releases **vX.Y.Z**: everything merged since $LAST.` (or `since the start` for the first release), then one bullet per commit title from step 1.
+- The body is `Releases **vX.Y.Z**: everything merged since <LAST>.` (or `since the start` for the first release), then one bullet per commit title from step 1.
 - Note the PR number.
 
 ## 4. Wait for CI
@@ -50,8 +50,8 @@ Merge only on a yes given to this question, even if the user said "go ahead" ear
     git switch main && git pull --ff-only
 
 ## 6. Watch the release run
-- `SHA=$(gh pr view <PR> --json mergeCommit --jq .mergeCommit.oid)`
-- `gh run list --workflow release.yml --commit $SHA` gives the run ID. The run can take a few seconds to appear.
+- `gh pr view <PR> --json mergeCommit --jq .mergeCommit.oid` prints the merge commit; note it as SHA.
+- `gh run list --workflow release.yml --commit <SHA>` gives the run ID. The run can take a few seconds to appear.
 - Run `gh run watch <id> --exit-status` in the background. A release takes 20–30 minutes, because it runs every CI check before it builds.
 - If the run fails, the release stays a hidden draft and nobody gets it. Show `gh run view <id> --log-failed`, then stop. The fix goes through a normal fix PR. Once that merges, `gh workflow run release.yml` finishes the release.
 

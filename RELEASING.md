@@ -93,7 +93,7 @@ The repo includes a Claude Code skill, [`.claude/skills/release/SKILL.md`](.clau
 
 ### By hand
 
-The same steps, if you'd rather type them:
+The same steps, if you'd rather type them yourself. An assistant never does this: it uses `/release`, which asks first ([CLAUDE.md](CLAUDE.md) rule 10).
 
 1. Check `main` is green with `gh run list --workflow ci.yml --branch main --limit 1`.
 2. Branch, bump and open the PR:
@@ -128,7 +128,7 @@ The same steps, if you'd rather type them:
    - Checks that all 4 files are there: `latest.json`, the installer, its `.sig` and `JobertsVault-setup.exe`.
    - Writes the notes (the install text plus the PR titles) and publishes. Publishing creates the tag.
 
-Only the `release` job can write to the repository. Its token is used only by the steps that publish.
+Only the `release` job can write to the repository. The write token goes only to `tauri-action` (it builds and uploads) and the `gh` steps, and the signing key only to `tauri-action`. Checkout doesn't keep the token, so `npm ci` can't read it.
 
 ### How installed copies get it
 
@@ -148,7 +148,7 @@ Only the `release` job can write to the repository. Its token is used only by th
 | "X is missing, so vX.Y.Z stays a draft" | An asset has the wrong name, often from a changed `assetNamePattern` or product name. Fix the workflow in a PR, merge, then `gh workflow run release.yml`. |
 | "X is lower than the newest release" | The version bump went down. Open a new release PR with a higher version. |
 | A published version has a bug | Fix it in a PR, then release a patch. Never delete or move a published release or tag: installed copies only move forward. |
-| An update brought a migration that broke the data | The copy from before the migration is in `%APPDATA%\com.jobertsvault.app\backups\pre-migration\`. Close the app and copy it over `jobertsvault.db` by hand (Restore arrives in Phase 2). Then release a fix, because the broken version would migrate it again. |
+| An update brought a migration that broke the data | The copy from before the migration is in `%APPDATA%\com.jobertsvault.app\backups\pre-migration\`. Close the app, delete `jobertsvault.db-wal` and `jobertsvault.db-shm` if they're there (left over, they would be replayed onto the copy), then copy the backup over `jobertsvault.db` by hand (Restore arrives in Phase 2). Then release a fix, because the broken version would migrate it again. |
 | You merged changes but forgot the bump | Nothing was released. Open a release PR. |
 | "Node.js 20 is deprecated" warnings in Actions | Harmless. Move the named action (e.g. `actions/checkout@v7`) to its newest major version in a `ci/` PR. `tauri-action` is pinned to a commit: move it on purpose, after reading its changes. |
 | `main` rejects a direct push | The **Protect Main** ruleset is working. Use a branch and a PR. |
@@ -171,7 +171,7 @@ Do this whenever you change the updater: `src-tauri/src/updater.rs`, the update 
 
 - **It can't touch your real data.** It has its own identifier, so its data lives in `%APPDATA%\com.jobertsvault.app.rehearsal`.
 - **It uses its own throwaway key**, never `jobertsvault.key`. The rehearsal config replaces the public key with the throwaway one, so the same code checks the same kind of signature.
-- **It builds from a separate worktree**, so a running `npm run tauri dev` never sees the rehearsal's migration.
+- **It builds from a separate worktree** at the commit you're testing, so a running `npm run tauri dev` never sees the rehearsal's migration. Commit your change first.
 - **The second version brings a migration** (an empty `rehearsal_marker` table), to test BAK-5 during an update.
 
 ### 1. Set up
@@ -181,8 +181,8 @@ Run this from the repo folder. `$R` is the rehearsal folder, `$W` the worktree.
 ```powershell
 $R = "$HOME\jv-rehearsal"; $W = "C:\Projects\jv-rehearsal-src"
 New-Item -ItemType Directory -Force $R | Out-Null
-npx tauri signer generate --ci -p '""' -w "$R\rehearsal.key"   # throwaway, empty password
-git worktree add --detach $W main
+npx tauri signer generate --ci -p rehearsal -w "$R\rehearsal.key"   # throwaway; its password is "rehearsal"
+git worktree add --detach $W HEAD   # the commit you're testing
 cmd /c mklink /J "$W\node_modules" "$PWD\node_modules"
 ```
 
@@ -208,7 +208,7 @@ Write `$R\0.9.0.json` as below, with the contents of `$R\rehearsal.key.pub` as `
 
 ```powershell
 $env:TAURI_SIGNING_PRIVATE_KEY = (Get-Content "$R\rehearsal.key" -Raw).Trim()
-$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "rehearsal"   # PowerShell deletes a variable set to ""
 $out = "$W\src-tauri\target\release\bundle\nsis"
 Push-Location $W
 npx tauri build --config "$R\0.9.0.json"
@@ -240,7 +240,7 @@ Write-Latest "0.9.1" "setup-0.9.1.exe" "setup-0.9.1.exe"   # good
 
 ### 4. Serve it
 
-Start and stop it as the tests say:
+It needs Python 3 (the Microsoft Store `python` alias isn't enough). Run it in its own window, and start and stop it as the tests say. The folder is `$R`:
 
 ```powershell
 python -m http.server 8765 --bind 127.0.0.1 --directory "$HOME\jv-rehearsal"
