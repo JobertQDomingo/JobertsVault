@@ -18,7 +18,7 @@ This file is the progress tracker.
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
-| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 45 / 53 |
+| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 46 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
@@ -110,7 +110,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] Updater backend: `tauri-plugin-updater` and its config, `check_update` and `install_update` with the 3-second check and no limit on the download, `get_app_version`, `AppError::Update`, and nothing happens in debug builds [UPD-1] [UPD-2] [UPD-4] [UPD-7]
 - [x] Startup flow: "Checking for updates…" and "Updating Jobert's Vault to X…", and a failed check starts the app normally [UPD-1] [UPD-2]
 - [x] Settings: the version, **Check for updates**, **Update now**, the automatic updates switch, and **Check for updates** on the startup error screen ([UI_FLOWS §6](docs/UI_FLOWS.md)) [UPD-3] [UPD-6]
-- [ ] `.github/workflows/release.yml`, adapted from NBSBuddy: every check from CI, plain ASCII asset names, and `JobertsVault-setup.exe`
+- [x] `.github/workflows/release.yml`, adapted from NBSBuddy: every check from CI, plain ASCII asset names, and `JobertsVault-setup.exe`
 - [ ] The `/release` command (`.claude/skills/release/SKILL.md`) and the rest of `RELEASING.md`: a release, what to do when something goes wrong, the signing key, and the rehearsal. Leave out NBSBuddy's "What's new" check.
 - [ ] Rehearse on this PC with a separate app: starting offline, automatic update, **Update now**, a swapped installer (refused), a relabelled old release (refused), and an update that brings a migration (backup made, data intact) [UPD-1] [UPD-2] [UPD-3] [UPD-4] [UPD-5]
 

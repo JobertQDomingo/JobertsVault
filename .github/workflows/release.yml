@@ -1,0 +1,130 @@
+# Merging a version bump in package.json to main builds, signs and publishes vX.Y.Z (RELEASING.md).
+# A push that doesn't change the version finds its tag already there and stops in seconds, and
+# 0.0.0 (the version until the first release) never releases.
+# The release is built as a hidden draft and only published once every file is uploaded.
+# Never push a tag by hand: publishing creates it.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: [package.json]
+  workflow_dispatch: # re-run by hand after a failed release: gh workflow run release.yml
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      new: ${{ steps.v.outputs.new }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: v
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          V=$(node -p "require('./package.json').version")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "Releases only come from main, not $REF."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          elif [ "$V" = "0.0.0" ]; then
+            echo "0.0.0 means nothing has been released yet, so there's nothing to do."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            # A network error fails this step rather than looking like "no tag yet".
+            tags=$(git ls-remote --tags --refs origin 'refs/tags/v*' | sed 's|.*refs/tags/v||')
+            newest=$(sort -V <<< "$tags" | tail -n 1)
+            if grep -qxF "$V" <<< "$tags"; then
+              echo "v$V is already released, nothing to do."
+              echo "new=false" >> "$GITHUB_OUTPUT"
+            elif [ -n "$newest" ] && [ "$(printf '%s\n%s\n' "$newest" "$V" | sort -V | tail -n 1)" != "$V" ]; then
+              echo "::error::$V is lower than the newest release, v$newest. Releases only move forward."
+              exit 1
+            else
+              echo "new=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+  # The same checks as every PR, from ci.yml itself, so the two can't drift apart.
+  checks:
+    needs: version
+    if: needs.version.outputs.new == 'true'
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: [version, checks]
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      V: ${{ needs.version.outputs.version }}
+    steps:
+      # The token isn't kept in .git/config, where npm or cargo build scripts could read it.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+
+      - name: Remove a draft left by an earlier failed run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$(gh release view "v$V" --json isDraft --jq .isDraft 2>/dev/null)" = "true" ]; then
+            gh release delete "v$V" --yes
+          fi
+
+      # The product name's curly apostrophe and space don't survive as GitHub asset names, and
+      # latest.json would then point at a file that isn't there (ARCHITECTURE §11.1).
+      # Pinned to a commit, because it receives the signing key (v0.6.2).
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v${{ env.V }}
+          releaseName: Jobert's Vault v${{ env.V }}
+          releaseDraft: true
+          assetNamePattern: JobertsVault_[version]_[arch][setup][ext]
+
+      - name: Upload JobertsVault-setup.exe (a stable name for a direct download)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $exe = @(Get-ChildItem "src-tauri/target/release/bundle/nsis/*_$($env:V)_x64-setup.exe")
+          if ($exe.Count -ne 1) { throw "Expected one installer for $env:V, found $($exe.Count)." }
+          Copy-Item -LiteralPath $exe[0].FullName JobertsVault-setup.exe
+          gh release upload "v$env:V" JobertsVault-setup.exe --clobber
+
+      - name: Check every file is there, then publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INSTALL: |
+            Download **JobertsVault-setup.exe** below and run it. Windows SmartScreen may warn because the installer isn't signed: click **More info → Run anyway**.
+            Already have Jobert's Vault? It updates itself at its next start. Your data stays in `%APPDATA%\com.jobertsvault.app`.
+        run: |
+          have=$(gh release view "v$V" --json assets --jq '.assets[].name')
+          for f in latest.json "JobertsVault_${V}_x64-setup.exe" "JobertsVault_${V}_x64-setup.exe.sig" JobertsVault-setup.exe; do
+            grep -qxF "$f" <<< "$have" || { echo "::error::$f is missing, so v$V stays a draft."; exit 1; }
+          done
+          changes=$(gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="v$V" -f target_commitish="$GITHUB_SHA" --jq .body)
+          printf '%s\n%s\n' "$INSTALL" "$changes" > notes.md
+          gh release edit "v$V" --draft=false --latest --notes-file notes.md
