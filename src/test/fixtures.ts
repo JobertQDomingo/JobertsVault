@@ -225,6 +225,7 @@ export const DASHBOARD: Dashboard = {
   expense: 295040,
   net: 124960,
   series: SERIES,
+  comparison: COMPARISON,
   accounts: ACCOUNTS,
   // Archived accounts count too (ACC-5): 8,240.75 + Old Wallet's 45.00.
   netBalance: 828575,

@@ -226,7 +226,7 @@ export function GeneralTab({
             id="set-compare"
             label="Compare periods"
             error={errors.comparisonMode}
-            help="How a period still in progress is compared with the one before, in Reports"
+            help="How a period still in progress is compared with the one before, for the dashboard's % change and Reports"
           >
             <Segmented
               aria-label="Compare periods"

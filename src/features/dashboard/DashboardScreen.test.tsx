@@ -36,6 +36,19 @@ test("the stat cards show the period's income, expense and net cashflow", async 
   expect(panel("Net cashflow").getByText("+₱1,249.60")).toBeTruthy();
 });
 
+test("each stat card shows its % change from the comparison (DSH-3)", async () => {
+  renderRoute("/", ANSWERS);
+  await screen.findByText("Net cashflow", CARD);
+  for (const [card, change] of [
+    ["Income", "▲ Up 3.1%"],
+    ["Expense", "▼ Down 8.0%"],
+    ["Net cashflow", "▲ Up 44.1%"],
+  ]) {
+    const caption = panel(card).getByText("vs Oct 1–5");
+    expect(caption.previousElementSibling!.textContent).toBe(change);
+  }
+});
+
 test("the 5 newest transactions, grouped by day, never without their names", async () => {
   renderRoute("/", ANSWERS);
   await screen.findByText("Recent transactions");

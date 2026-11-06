@@ -19,7 +19,7 @@ This file is the progress tracker.
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
 | **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 53 / 53 |
-| **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 3 / 14 |
+| **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 4 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
 
@@ -129,7 +129,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] Income vs expense chart over time, grouped by the period [RPT-1]
 - [x] Category breakdown (8 largest plus Other) and the ranked list, with clicking through to the transactions [RPT-2] [RPT-3]
 - [x] Period comparison with the "same days so far" rule and the comparison setting [RPT-4] [RPT-4a] [SET-7]
-- [ ] % change on the dashboard stat cards [DSH-3]
+- [x] % change on the dashboard stat cards [DSH-3]
 - [ ] Account filter on reports [RPT-5]
 - [ ] Reports screen ([UI_FLOWS §8.1](docs/UI_FLOWS.md)), its sidebar item and the `Ctrl+4` shortcut
 - [ ] Payee suggestions that fill in the last category used [TXN-6]
