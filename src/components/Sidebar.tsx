@@ -1,4 +1,5 @@
 import {
+  ChartPie,
   LayoutDashboard,
   Landmark,
   List,
@@ -44,7 +45,7 @@ function Item({
 }
 
 /**
- * The logo, the Phase 1 screens and Settings at the bottom (UI_FLOWS §1). Later-phase screens
+ * The logo, the screens built so far and Settings at the bottom (UI_FLOWS §1). Later-phase screens
  * stay hidden until they're built.
  */
 export function Sidebar() {
@@ -63,6 +64,7 @@ export function Sidebar() {
           shortcut="2"
         />
         <Item to="/accounts" icon={Landmark} label="Accounts" shortcut="3" />
+        <Item to="/reports" icon={ChartPie} label="Reports" shortcut="4" />
         <div className="flex-1" />
         <hr className="mx-1 my-2 border-hairline" />
         <Item to="/settings" icon={Settings} label="Settings" shortcut="," />

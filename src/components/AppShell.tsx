@@ -38,6 +38,7 @@ function Layout() {
     "Ctrl+1": () => navigate("/"),
     "Ctrl+2": () => navigate("/transactions"),
     "Ctrl+3": () => navigate("/accounts"),
+    "Ctrl+4": () => navigate("/reports"),
     "Ctrl+,": () => navigate("/settings"),
     // These mean the period (PeriodSwitcher handles them). Claimed here too, so on a screen
     // without one they do nothing instead of WebView2's Back and Forward.
