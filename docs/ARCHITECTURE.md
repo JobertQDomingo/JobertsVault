@@ -70,7 +70,7 @@ Jobert's Vault is a single **Tauri 2** desktop app. The window shows a React UI 
 | Rust → TS types | **ts-rs** | Generates TypeScript types from Rust structs, so the two sides can't drift apart |
 | Updates | **tauri-plugin-updater** (`2`, with default features off and `native-tls`, `system-proxy` and `zip` on) | Downloads and verifies signed updates (§11.1). Stay on version `2`, because crates.io's newest is a `3.0.0` alpha. |
 | Release builds | **tauri-apps/tauri-action** (`v0`, GitHub Actions only) | Builds and signs the installer, and writes `latest.json` (§11.1) |
-| File dialogs (Phase 2) | **tauri-plugin-dialog** (`2`) and its JavaScript half **@tauri-apps/plugin-dialog** | Folder and file pickers for backup, restore and export. The frontend may use only the open and save pickers (§10). The crate depends on the `tauri-plugin-fs` crate, but only to widen the fs plugin's scope when that plugin is registered. It never is, so no fs command exists. |
+| File dialogs (Phase 2) | **tauri-plugin-dialog** (`2`) and its JavaScript half **@tauri-apps/plugin-dialog** | Folder and file pickers for backup, restore and export. The frontend may use only the open and save pickers (§10). After a pick, the plugin adds the path to two scopes: the fs plugin's, which does nothing because that plugin is never registered (its crate is only a dependency, so no fs command exists), and the asset protocol's, which is off (no `protocol-asset` feature or `assetProtocol` setting). Turning the asset protocol on would let the page read every picked path, so don't. |
 
 Exact versions are pinned in `Cargo.lock` and `package-lock.json`, and upgraded on purpose rather than automatically.
 

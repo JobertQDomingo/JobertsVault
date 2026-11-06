@@ -17,18 +17,32 @@ mod tests {
     // No fs, shell or http plugin, and of the dialog plugin only its pickers (ARCHITECTURE §10).
     #[test]
     fn the_frontend_gets_only_the_window_and_the_file_pickers() {
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("capabilities");
-        // Tauri loads every file here, so a second one would add to these.
-        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
-        let capability: serde_json::Value =
-            serde_json::from_str(&fs::read_to_string(dir.join("default.json")).unwrap()).unwrap();
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        // Tauri loads every capability file in the folder, and any written into the config.
+        let files: Vec<String> = fs::read_dir(root.join("capabilities"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| {
+                [".json", ".json5", ".toml"]
+                    .iter()
+                    .any(|e| name.ends_with(e))
+            })
+            .collect();
+        assert_eq!(files, ["default.json"]);
+        let read = |path: &str| -> serde_json::Value {
+            serde_json::from_str(&fs::read_to_string(root.join(path)).unwrap()).unwrap()
+        };
+        assert!(read("tauri.conf.json")["app"]["security"]["capabilities"].is_null());
+        let mut capability = read("capabilities/default.json");
+        capability.as_object_mut().unwrap().remove("description");
         assert_eq!(
-            capability["permissions"],
-            serde_json::json!([
-                "core:window:default",
-                "dialog:allow-open",
-                "dialog:allow-save"
-            ])
+            capability,
+            serde_json::json!({
+                "$schema": "../gen/schemas/desktop-schema.json",
+                "identifier": "default",
+                "windows": ["main"],
+                "permissions": ["core:window:default", "dialog:allow-open", "dialog:allow-save"]
+            })
         );
     }
 
