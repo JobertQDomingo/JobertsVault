@@ -217,7 +217,7 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 | **General** | Currency symbol, its position (before or after the amount), decimal places (**locked** once any amount is saved, with an explanation), first day of week, month start day (1–28), **compare periods** (same days so far or full previous period, SET-7, Phase 2), show payment method field. **Updates:** the current version, **Check for updates** and a switch, "Install updates automatically when the app starts" | SET-1, SET-2, SET-6, SET-7, UPD-3 |
 | **Categories** | Two lists (Income and Expense). Add, rename, change color (12 swatches) and icon (curated list), reorder, archive, unarchive, **merge**, delete if unused | CAT-2, CAT-4 |
 | **Payment methods** | Add, rename, reorder, archive, unarchive, delete if unused | TXN-7 |
-| **Backup** (Phase 2) | See §8.1 | BAK-* |
+| **Backup** (Phase 2) | **Back up now** (BAK-1, F9). **Restore from backup…** (BAK-4). **Export to CSV**, with From and To dates, from the start of this month to today by default (BAK-6). The backup folder with **Change…**, and a switch for the daily automatic backup (SET-3). The date of the last backup, and the warning when it's more than 7 days old (BAK-7). | BAK-1 to BAK-4, BAK-6, BAK-7, SET-3 |
 | **Appearance** (Phase 4) | Theme: system / light / dark, and a **Reduce transparency** switch | SET-5, SET-8 |
 
 Changes to settings save **immediately**, with a "Saved" toast. There's no Save button.
@@ -284,7 +284,7 @@ Welcome to Jobert's Vault
 - **Phase 2** adds a "Compare to: Same days so far ▾ / Full previous period" option in Reports' Period comparison section (RPT-4a, SET-7, §8.1).
 
 ### F9: Back up and restore (Phase 2)
-- **Back up now:** Settings → Backup → **Back up now** → toast "Backup saved to …" with an **Open folder** link.
+- **Back up now:** Settings → Backup → **Back up now** → toast "Backup saved as jobertsvault-2026-10-26_0930.db" with an **Open folder** link, which opens the backup folder in Explorer.
 - **Restore:** **Restore from backup…** → pick a file → confirm "This replaces all current data with the backup from Oct 20, 2026 09:30. A safety copy of your current data will be saved first." → the app reloads.
 - **Stale-backup warning:** if the last backup is more than 7 days old, a warning banner appears in Settings and on the dashboard (BAK-7).
 
@@ -378,3 +378,8 @@ Answered on 2026-11-06:
 11. **Dashboard chart:** the small income-vs-expense chart under the stat cards is built in Phase 2 with RPT-1, and its data comes from `get_dashboard`, so the dashboard stays one call (§2).
 12. **Compare to:** Settings → General holds the default comparison (SET-7), used by the dashboard's % change and as Reports' starting choice. Reports' **Compare to** changes only that view and is kept in the URL (§6, §8.1).
 13. **Reports controls:** the period bar, Compare to and the account filter don't fit in one row at 1440 px, so **Compare to** sits in the Period comparison section's header, the only report it changes, like the breakdown's Expense / Income switch. The account filter, which changes every section, sits beside the period bar (§8.1).
+
+Answered on 2026-11-07:
+
+14. **The Backup tab** lives at `/settings?tab=backup`, like the other Settings tabs, rather than a route of its own (§6, ARCHITECTURE §5.4).
+15. **Export to CSV** sits in the Backup tab, with its own From and To dates, rather than on the Transactions screen (§6, BAK-6).

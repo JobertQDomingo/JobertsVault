@@ -30,7 +30,7 @@ const DAYS = Array.from({ length: 28 }, (_, i) => ({
 }));
 
 /** A row of the mockup: a 220 px label, the control, and help or the backend's message beside it. */
-function Row({
+export function Row({
   id,
   label,
   labelable = false,

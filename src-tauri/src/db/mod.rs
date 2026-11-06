@@ -96,7 +96,7 @@ fn back_up(
 
 /// Writes a consistent copy of the database to `path`. It goes to `<path>.tmp` first and is
 /// renamed when complete, so a half-written copy never looks like a backup (ARCHITECTURE §7).
-fn vacuum_into(conn: &Connection, path: &Path) -> Result<(), AppError> {
+pub fn vacuum_into(conn: &Connection, path: &Path) -> Result<(), AppError> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
     }

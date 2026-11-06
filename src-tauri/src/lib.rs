@@ -85,6 +85,8 @@ pub fn run() {
             commands::reports::get_timeseries,
             commands::reports::get_category_breakdown,
             commands::reports::get_comparison,
+            commands::backup::backup_now,
+            commands::backup::open_backup_folder,
             commands::settings::get_settings,
             commands::settings::update_settings,
             commands::accounts::list_accounts,

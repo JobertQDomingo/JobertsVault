@@ -19,6 +19,9 @@ export function Toaster() {
           toast:
             "glass-raised flex w-[356px] items-center gap-2.5 rounded-toolbar py-2.5 pr-3 pl-3.5 text-body text-foreground",
           content: "min-w-0 flex-1",
+          // A ghost `sm` button (§9.1).
+          actionButton:
+            "h-8 shrink-0 rounded-chip px-2.5 text-[13px] font-semibold text-primary hover:bg-wash",
           closeButton:
             "order-last grid size-6 shrink-0 place-items-center rounded-chip text-muted-foreground hover:bg-wash hover:text-foreground [&_svg]:size-3.5",
         },
@@ -28,7 +31,9 @@ export function Toaster() {
 }
 
 export const notify = {
-  success: (message: string) => toast.success(message),
+  /** With an `action` (e.g. Open folder), it stays 10 s, so there's time to reach it. */
+  success: (message: string, action?: { label: string; onClick: () => void }) =>
+    toast.success(message, action && { action, duration: 10_000 }),
   // Errors stay until closed, so they can't be missed.
   error: (message: string) =>
     toast.error(message, { duration: Infinity, closeButton: true }),

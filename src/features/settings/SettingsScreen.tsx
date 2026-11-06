@@ -4,17 +4,18 @@ import { GlassPanel } from "@/components/GlassPanel";
 import { Loading, Skeleton } from "@/components/Loading";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSettings } from "@/hooks/useSettings";
+import { BackupTab } from "./BackupTab";
 import { CategoriesTab } from "./CategoriesTab";
 import { GeneralTab } from "./GeneralTab";
 import { PaymentMethodsTab } from "./PaymentMethodsTab";
 
-const TABS = ["general", "categories", "methods"] as const;
+const TABS = ["general", "categories", "methods", "backup"] as const;
 const CONTENT = "min-h-0 flex-1 overflow-y-auto px-5 outline-none";
 type Tab = (typeof TABS)[number];
 
 /**
- * `/settings` (UI_FLOWS §6): General, Categories and Payment methods, the tab kept in `?tab=` so
- * Back and reloads keep it. The Backup (P2) and Appearance (P4) tabs come with their phases.
+ * `/settings` (UI_FLOWS §6): General, Categories, Payment methods and Backup, the tab kept in
+ * `?tab=` so Back and reloads keep it. The Appearance tab (P4) comes with its phase.
  */
 export function SettingsScreen() {
   const [params, setParams] = useSearchParams();
@@ -36,6 +37,7 @@ export function SettingsScreen() {
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="methods">Payment methods</TabsTrigger>
+          <TabsTrigger value="backup">Backup</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className={CONTENT}>
           {settings.data ? (
@@ -58,6 +60,9 @@ export function SettingsScreen() {
         </TabsContent>
         <TabsContent value="methods" className={CONTENT}>
           <PaymentMethodsTab />
+        </TabsContent>
+        <TabsContent value="backup" className={CONTENT}>
+          <BackupTab />
         </TabsContent>
       </Tabs>
     </GlassPanel>
