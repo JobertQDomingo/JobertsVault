@@ -8,7 +8,7 @@ use crate::error::AppError;
 use crate::repo;
 use crate::services::accounts::{self, Account};
 use crate::services::period::{self, PeriodQuery, PeriodView};
-use crate::services::reports::{self, Timeseries};
+use crate::services::reports::{self, Comparison, Timeseries};
 use crate::services::transactions::{self, Transaction};
 
 /// Everything the dashboard shows, from one call so its numbers agree (ARCHITECTURE §4.5).
@@ -23,6 +23,9 @@ pub struct Dashboard {
     pub net: Money,
     /// The period's income-vs-expense chart under the stat cards (UI_FLOWS §2, RPT-1).
     pub series: Timeseries,
+    /// The cards' % change: the period against the previous one by the comparison setting
+    /// (DSH-3, SET-7), as `get_comparison` returns it with no mode.
+    pub comparison: Comparison,
     /// Every account, archived included, with balances and card summaries as of today (DSH-4, DSH-5).
     pub accounts: Vec<Account>,
     pub net_balance: Money,
@@ -49,6 +52,7 @@ pub fn get(
         expense = expense.checked_add(bar.expense).ok_or_else(too_large)?;
     }
     let net = income.checked_sub(expense).ok_or_else(too_large)?;
+    let comparison = reports::comparison(conn, query, None, today)?;
     let accounts::AccountList {
         accounts,
         net_balance,
@@ -63,6 +67,7 @@ pub fn get(
         expense,
         net,
         series,
+        comparison,
         accounts,
         net_balance,
         recent,
@@ -74,8 +79,10 @@ pub fn get(
 mod tests {
     use super::*;
     use crate::domain::money::Money;
+    use crate::domain::period::ComparisonMode;
     use crate::services::accounts::{self, AccountFields, AccountKind, NewAccount};
     use crate::services::period::{self, PeriodQuery};
+    use crate::services::settings;
     use crate::services::transactions::{self, TransactionFields, TransactionKind};
     use crate::test_support::{db, now};
     use chrono::NaiveDate;
@@ -204,6 +211,54 @@ mod tests {
             reports::timeseries(&conn, &MONTH, d(2026, 11, 3)).unwrap()
         );
         assert_eq!(dash.today, d(2026, 11, 3));
+    }
+
+    #[test]
+    fn the_cards_compare_with_the_previous_period_by_the_setting() {
+        let mut conn = db();
+        let cash = id_of(&conn, "accounts", "Cash");
+        let salary = Some("Salary");
+        let income = TransactionKind::Income;
+        add(&mut conn, income, 4_000, d(2026, 10, 2), cash, salary, None);
+        add(
+            &mut conn,
+            income,
+            6_000,
+            d(2026, 10, 20),
+            cash,
+            salary,
+            None,
+        );
+        add(&mut conn, income, 5_000, d(2026, 11, 2), cash, salary, None);
+        spend(&mut conn, 1_000, d(2026, 10, 3), cash);
+        spend(&mut conn, 3_000, d(2026, 11, 3), cash);
+
+        // The month so far against Oct 1–3 (the default, DSH-3 and RPT-4a).
+        let dash = get(&conn, &MONTH, d(2026, 11, 3)).unwrap();
+        let c = &dash.comparison;
+        assert_eq!(
+            *c,
+            reports::comparison(&conn, &MONTH, None, d(2026, 11, 3)).unwrap()
+        );
+        assert_eq!(
+            (c.compare_start, c.compare_end),
+            (d(2026, 10, 1), d(2026, 10, 3))
+        );
+        // The cards' totals are the comparison's current side.
+        assert_eq!(
+            (c.income.current, c.expense.current, c.net.current),
+            (dash.income, dash.expense, dash.net)
+        );
+        let changes = (c.income.change, c.expense.change, c.net.change);
+        assert_eq!(changes, (Some(250), Some(2000), Some(-333)));
+
+        // `full` in Settings compares with all of October.
+        let mut s = settings::get(&conn).unwrap().settings;
+        s.comparison_mode = ComparisonMode::Full;
+        settings::update(&mut conn, s).unwrap();
+        let c = get(&conn, &MONTH, d(2026, 11, 3)).unwrap().comparison;
+        assert_eq!(c.compare_end, d(2026, 10, 31));
+        assert_eq!(c.income.change, Some(-500));
     }
 
     #[test]

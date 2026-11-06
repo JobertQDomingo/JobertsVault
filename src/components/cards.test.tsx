@@ -5,16 +5,64 @@ import { ProgressBar } from "./ProgressBar";
 import { StatCard } from "./StatCard";
 
 test("a stat card shows its label and a display-size amount", () => {
-  renderWithSettings(<StatCard label="Income" amount={420000} kind="income" />);
+  renderWithSettings(
+    <StatCard
+      label="Income"
+      amount={420000}
+      kind="income"
+      change={31}
+      vs="Oct 1–5"
+    />,
+  );
   expect(screen.getByText("Income")).toBeTruthy();
   expect(screen.getByText("+₱4,200.00").className).toContain("text-display");
+});
+
+test("a stat card shows the % change and what it's compared with (DSH-3)", () => {
+  renderWithSettings(
+    <>
+      <StatCard
+        label="Expense"
+        amount={295040}
+        kind="expense"
+        change={-80}
+        vs="Oct 1–5"
+      />
+      <StatCard
+        label="Net cashflow"
+        amount={124960}
+        kind="net"
+        change={null}
+        vs="Oct 1–5"
+      />
+    </>,
+  );
+  // Less spent is good news.
+  const down = screen.getByText("Down", { exact: false }).parentElement!;
+  expect(down.textContent).toBe("▼ Down 8.0%");
+  expect(down.className).toContain("text-income");
+  // Nothing to compare with.
+  expect(screen.getByTitle("Nothing to compare with").textContent).toBe("—");
+  expect(screen.getAllByText("vs Oct 1–5")).toHaveLength(2);
 });
 
 test("only the net cashflow card is tinted", () => {
   const { container } = renderWithSettings(
     <>
-      <StatCard label="Expense" amount={295040} kind="expense" />
-      <StatCard label="Net cashflow" amount={124960} kind="net" />
+      <StatCard
+        label="Expense"
+        amount={295040}
+        kind="expense"
+        change={-80}
+        vs="Oct 1–5"
+      />
+      <StatCard
+        label="Net cashflow"
+        amount={124960}
+        kind="net"
+        change={441}
+        vs="Oct 1–5"
+      />
     </>,
   );
   const [expense, net] = [...container.children] as HTMLElement[];

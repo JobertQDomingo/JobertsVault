@@ -348,7 +348,7 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **`MoneyText`** | Displays an amount using the §7 rules. Props: `amount`, `kind` (`income` / `expense` / `transfer` / `balance` / `owed` / `net`), `size`. |
 | **`AmountInput`** | Converts what you type into centavos through `money.ts`. Right-aligned, tabular digits, never negative. |
 | **`PeriodSwitcher`** | A glass toolbar: `[Day│Week│Month│Year│Custom]  ◀  October 2026  ▶  [Today]`. "Today" is disabled when the current period is already selected. ▶ is disabled when the next period would start after today. |
-| **`StatCard`** | A label, a `display`-sized amount, and (from Phase 2) the % change with a caption such as "vs Sep 1–26". The **net cashflow** card is tinted with 12% of `--primary`. Clickable cards lift 2 px on hover. |
+| **`StatCard`** | A label, a `display`-sized amount, and (from Phase 2) the % change (§7) with the dates compared with in `--muted-foreground`, such as "▲ 3.1% vs Sep 1–26", in `small` text. The **net cashflow** card is tinted with 12% of `--primary`. Clickable cards lift 2 px on hover. |
 | **`CategoryChip`** | The icon chip from §6, with the name next to it if needed. |
 | **`AccountRow`** | Account icon in a `--wash` square, the name, and the balance on the right. A credit card also shows "Available ₱X · Due Nov 5". |
 | **`TransactionRow`** | Category chip │ category, plus the payee and note in muted text │ account (or "Bank → Cash") │ amount, right-aligned. Hover adds `--glass-hover` and the edit and duplicate buttons. 52 px tall. |

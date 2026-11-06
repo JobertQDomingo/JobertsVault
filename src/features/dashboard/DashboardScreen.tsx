@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useCategories } from "@/hooks/useCategories";
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePeriodQuery } from "@/hooks/usePeriodQuery";
-import { formatDayHeader, groupByDate } from "@/lib/dates";
+import { formatDayHeader, formatSpan, groupByDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 const COLUMNS =
@@ -81,6 +81,7 @@ export function DashboardScreen() {
           <GlassPanel key={i} className="grid gap-2.5 p-5">
             <Skeleton className="h-5 w-24" />
             <Skeleton className="h-9 w-44" />
+            <Skeleton className="h-4 w-32" />
           </GlassPanel>
         ))}
       </div>
@@ -109,12 +110,32 @@ function DashboardBody({
   const { add, edit } = useQuickAdd();
   const accounts = new Map(data.accounts.map((a) => [a.id, a]));
   const categories = new Map(categoryList.map((c) => [c.id, c]));
+  const { comparison: c } = data;
+  const vs = formatSpan(c.compareStart, c.compareEnd, data.today);
   return (
     <>
       <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Income" amount={data.income} kind="income" />
-        <StatCard label="Expense" amount={data.expense} kind="expense" />
-        <StatCard label="Net cashflow" amount={data.net} kind="net" />
+        <StatCard
+          label="Income"
+          amount={data.income}
+          kind="income"
+          change={c.income.change}
+          vs={vs}
+        />
+        <StatCard
+          label="Expense"
+          amount={data.expense}
+          kind="expense"
+          change={c.expense.change}
+          vs={vs}
+        />
+        <StatCard
+          label="Net cashflow"
+          amount={data.net}
+          kind="net"
+          change={c.net.change}
+          vs={vs}
+        />
       </div>
       <GlassPanel className="grid gap-2 px-[18px] pt-4 pb-3">
         <h2 className="text-h3">Income vs expense</h2>
