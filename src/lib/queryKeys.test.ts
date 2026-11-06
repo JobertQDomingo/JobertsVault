@@ -6,7 +6,9 @@ test("every key except settings, startup and appVersion starts with ledger", () 
     .map(([name, key]) => {
       // The first element never depends on the argument.
       const built: readonly unknown[] =
-        typeof key === "function" ? key(undefined as never) : key;
+        typeof key === "function"
+          ? (key as (...args: never[]) => readonly unknown[])()
+          : key;
       return [name, built[0]];
     })
     .filter(([, first]) => first !== "ledger")

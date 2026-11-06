@@ -1,5 +1,6 @@
 // Sample data matching UI_FLOWS' examples, for screen tests.
 import type { Account } from "@/bindings/Account";
+import type { Breakdown } from "@/bindings/Breakdown";
 import type { Category } from "@/bindings/Category";
 import type { CategoryList } from "@/bindings/CategoryList";
 import type { Dashboard } from "@/bindings/Dashboard";
@@ -155,6 +156,22 @@ export const SERIES: Timeseries = {
     return { start: date, end: date, income, expense, net: income - expense };
   }),
   today: TODAY,
+};
+
+/** November's expenses by category: Food, Dining Out, then the archived Snacks. */
+export const BREAKDOWN: Breakdown = {
+  kind: "expense",
+  total: 295040,
+  categories: [
+    { categoryId: 1, amount: 200000, share: 678 },
+    { categoryId: 2, amount: 85040, share: 288 },
+    { categoryId: 5, amount: 10000, share: 34 },
+  ],
+  slices: [
+    { categoryId: 1, amount: 200000, share: 678 },
+    { categoryId: 2, amount: 85040, share: 288 },
+    { categoryId: 5, amount: 10000, share: 34 },
+  ],
 };
 
 export const DASHBOARD: Dashboard = {

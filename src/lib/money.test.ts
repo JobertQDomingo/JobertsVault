@@ -3,6 +3,7 @@ import {
   formatAmount,
   formatCompact,
   formatMoney,
+  formatShare,
   MAX_AMOUNT,
   parseAmount,
   type MoneySettings,
@@ -136,4 +137,11 @@ describe("formatCompact", () => {
       "12.5k\u00A0₱",
     );
   });
+});
+
+test("formatShare writes tenths of a percent with one decimal", () => {
+  expect(formatShare(333)).toBe("33.3%");
+  expect(formatShare(1000)).toBe("100.0%");
+  expect(formatShare(5)).toBe("0.5%");
+  expect(formatShare(0)).toBe("0.0%");
 });

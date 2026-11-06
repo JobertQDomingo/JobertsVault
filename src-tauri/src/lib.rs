@@ -81,6 +81,7 @@ pub fn run() {
             commands::period::get_period,
             commands::dashboard::get_dashboard,
             commands::reports::get_timeseries,
+            commands::reports::get_category_breakdown,
             commands::settings::get_settings,
             commands::settings::update_settings,
             commands::accounts::list_accounts,

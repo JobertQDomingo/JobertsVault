@@ -164,6 +164,8 @@ pub struct CardCycle { start: NaiveDate, end: NaiveDate, due: NaiveDate }  // en
 fn card_cycle(statement_day: u8, due_day: u8, today: NaiveDate) -> Option<CardCycle>;     // §5.5; None past chrono's range
 fn card_figures(balance: Money, credit_limit: Money) -> CardFigures;  // amount owed, available credit, utilization % (§5.1)
 fn bars(period: &Period, &PeriodSettings) -> Option<(Grain, Vec<(NaiveDate, NaiveDate)>)>;  // the chart's bars (DATA_MODEL §5.9)
+fn share(part: Money, total: Money) -> i64;                       // tenths of a percent, rounded half up (§5.10)
+fn slices(ranked: &[(i64, Money)]) -> Option<Vec<(Option<i64>, Money)>>;  // the 8 largest, then Other
 ```
 
 ### 4.3 Database access
@@ -215,7 +217,7 @@ All commands use `camelCase` parameter names in TypeScript and `snake_case` in R
 | 1 | Transactions | `list_transactions(filter, page)` (below); `get_transaction(id)`; `create_transaction(transaction)` (also saves `last_used_account_id`); `update_transaction(id, transaction)` (the kind can change); `delete_transaction(id)`; `get_transaction_defaults` → account and today (DATA_MODEL §5.8); `get_pay_bill_defaults(card_id)` → From account, amount (none when nothing is owed) and today, and a `Conflict` for an account that isn't a credit card. A transaction carries ids only: the screens take names, colors and icons from the account, category and payment method lists |
 | 1 | Dashboard | `get_dashboard(query)` → the period (as `get_period` returns it); income, expense and net for the period, counting only rows dated today or earlier; from Phase 2, the income-vs-expense chart (`series`, as `get_timeseries` returns it); every account (archived included) with its balance and card summary, as `list_accounts` returns them; the net balance; the 5 newest transactions whatever the period; `today` |
 | 1 | Settings | `get_settings` → every Phase 1 key and whether decimals are locked; `update_settings(settings)` saves the whole set and returns it the same way |
-| 2 | Reports | `get_timeseries(query)` → the chart's `grain` (day, week or month), its `bars` (each one's start, end, income, expense and net, counting only rows dated today or earlier) and `today` (RPT-1, DATA_MODEL §5.9); `get_category_breakdown`, `get_comparison`, `suggest_payees(prefix)` |
+| 2 | Reports | `get_timeseries(query)` → the chart's `grain` (day, week or month), its `bars` (each one's start, end, income, expense and net, counting only rows dated today or earlier) and `today` (RPT-1, DATA_MODEL §5.9); `get_category_breakdown(query, kind)` → its `kind` (expense or income), the `total`, every category with an amount as `categories` (id, amount and `share` in tenths of a percent, largest first) and the donut's `slices` (the 8 largest, then Other with no category) (RPT-2, DATA_MODEL §5.10); `get_comparison`, `suggest_payees(prefix)` |
 | 2 | Backup | `backup_now`, `list_backups`, `restore_backup(path)`, `export_csv(range, path)` |
 | 3 | Planning | `list/create/update/pause/delete_recurring_rule`, `list_due_occurrences`, `post_occurrence`, `skip_occurrence`, budget CRUD + `get_budget_progress`, goal CRUD + `get_goal_progress` |
 

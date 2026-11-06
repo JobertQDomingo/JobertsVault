@@ -470,6 +470,18 @@ The chart has one bar per day, week or month, covering the whole period with no 
 - "6 months after" uses calendar months, with the day clamped to the end of the month: Jan 1 – Jun 30 is by week and Jan 1 – Jul 1 by month. Six months after Aug 31 is Feb 28 (or 29).
 - Bars after today hold 0 (§5.2), and the chart's net line stops at today.
 
+### 5.10 Category breakdown (RPT-2)
+
+```
+amount(category) = Σ amount WHERE kind = <expense or income> AND category_id = category, in the period (§5.2)
+share(category)  = amount(category) ÷ total × 100, in tenths of a percent, rounded half up
+```
+
+- Every category with an amount appears, archived ones included, ranked by amount, largest first (ties by category id).
+- The donut shows the 8 largest, then one **Other** slice with the rest added up (DESIGN_SYSTEM §3.4).
+- Shares are whole tenths of a percent (333 means 33.3%), worked out with integers, so they may add up to 99.9% or 100.1%.
+- Refunds are income, so they appear in the income breakdown and never reduce an expense category (§5.2).
+
 ---
 
 ## 6. Validation rules (checked in Rust)

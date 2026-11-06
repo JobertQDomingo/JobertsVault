@@ -1,3 +1,4 @@
+import type { CategoryKind } from "@/bindings/CategoryKind";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
 import type { TransactionFilter } from "@/bindings/TransactionFilter";
 
@@ -20,6 +21,8 @@ export const queryKeys = {
   period: (query: PeriodQuery) => ["ledger", "period", query] as const,
   dashboard: (query: PeriodQuery) => ["ledger", "dashboard", query] as const,
   timeseries: (query: PeriodQuery) => ["ledger", "timeseries", query] as const,
+  breakdown: (query: PeriodQuery, kind: CategoryKind) =>
+    ["ledger", "breakdown", query, kind] as const,
   settings: ["settings"],
   startup: ["startup"],
   appVersion: ["appVersion"],

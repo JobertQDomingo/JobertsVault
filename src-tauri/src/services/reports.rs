@@ -7,6 +7,7 @@ use crate::domain::money::Money;
 use crate::domain::report::{self, Grain};
 use crate::error::AppError;
 use crate::repo::transactions::{self as repo, Filter};
+use crate::services::categories::{self, CategoryKind};
 use crate::services::invalid;
 use crate::services::period::{self, PeriodQuery};
 use crate::services::transactions::parse_date;
@@ -78,6 +79,93 @@ pub fn timeseries(
         bar.net = bar.income.checked_sub(bar.expense).ok_or_else(too_large)?;
     }
     Ok(Timeseries { grain, bars, today })
+}
+
+/// A category's part of the breakdown (RPT-2).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CategoryShare {
+    #[ts(type = "number")]
+    pub category_id: i64,
+    pub amount: Money,
+    /// Tenths of a percent of the total: 123 is 12.3%.
+    #[ts(type = "number")]
+    pub share: i64,
+}
+
+/// One slice of the breakdown's donut: a category, or Other (no category) for the rest.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Slice {
+    #[ts(type = "number | null")]
+    pub category_id: Option<i64>,
+    pub amount: Money,
+    /// Tenths of a percent of the total.
+    #[ts(type = "number")]
+    pub share: i64,
+}
+
+/// A period's expenses or income by category (RPT-2), transfers left out.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Breakdown {
+    /// Which kind this is, so a screen still showing it while the other kind loads labels it right.
+    pub kind: CategoryKind,
+    pub total: Money,
+    /// Every category with something in the period, largest first.
+    pub categories: Vec<CategoryShare>,
+    /// The donut: the 8 largest categories, then Other with the rest (DESIGN_SYSTEM §3.4).
+    pub slices: Vec<Slice>,
+}
+
+pub fn breakdown(
+    conn: &Connection,
+    query: &PeriodQuery,
+    kind: CategoryKind,
+    today: NaiveDate,
+) -> Result<Breakdown, AppError> {
+    let period = period::resolve(conn, query, today)?;
+    // Rows dated after today count nowhere (DATA_MODEL §5.2).
+    let (start, end) = (
+        period.start().to_string(),
+        period.end().min(today).to_string(),
+    );
+    let filter = Filter {
+        kind: Some(categories::kind_text(kind)),
+        ..Filter::dates(&start, &end)
+    };
+    let ranked: Vec<(i64, Money)> = repo::category_totals(conn, &filter)?
+        .into_iter()
+        .map(|(id, amount)| (id, Money(amount)))
+        .collect();
+    let total = ranked
+        .iter()
+        .try_fold(Money::ZERO, |sum, &(_, amount)| sum.checked_add(amount))
+        .ok_or_else(too_large)?;
+    let slices = report::slices(&ranked).ok_or_else(too_large)?;
+    Ok(Breakdown {
+        kind,
+        total,
+        categories: ranked
+            .into_iter()
+            .map(|(category_id, amount)| CategoryShare {
+                category_id,
+                amount,
+                share: report::share(amount, total),
+            })
+            .collect(),
+        slices: slices
+            .into_iter()
+            .map(|(category_id, amount)| Slice {
+                category_id,
+                amount,
+                share: report::share(amount, total),
+            })
+            .collect(),
+    })
 }
 
 fn database(message: &str) -> AppError {
@@ -282,6 +370,176 @@ mod tests {
         let bars = figures(&series);
         assert_eq!(bars[0], (d(2026, 10, 1), d(2026, 10, 3), 0, 100, -100));
         assert_eq!(bars[1], (d(2026, 10, 4), d(2026, 10, 10), 0, 200, -200));
+    }
+
+    /// Each category's (name, amount, share) in the breakdown.
+    fn parts(conn: &Connection, b: &Breakdown) -> Vec<(String, i64, i64)> {
+        b.categories
+            .iter()
+            .map(|c| {
+                let name = conn
+                    .query_row(
+                        "SELECT name FROM categories WHERE id = ?1",
+                        [c.category_id],
+                        |r| r.get(0),
+                    )
+                    .unwrap();
+                (name, c.amount.0, c.share)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_breakdown_ranks_expense_categories_without_transfers_or_refunds() {
+        let mut conn = db();
+        let cash = id_of(&conn, "accounts", "Cash");
+        let card = card(&mut conn);
+        let day = d(2026, 11, 2);
+        spend(&mut conn, 3_000, day);
+        spend(&mut conn, 3_000, d(2026, 11, 3));
+        add(
+            &mut conn,
+            TransactionKind::Expense,
+            4_000,
+            day,
+            card,
+            Some("Dining Out"),
+            None,
+        );
+        add(
+            &mut conn,
+            TransactionKind::Expense,
+            2_000,
+            day,
+            cash,
+            Some("Transportation"),
+            None,
+        );
+        add(
+            &mut conn,
+            TransactionKind::Transfer,
+            9_000,
+            day,
+            cash,
+            None,
+            Some(card),
+        );
+        add(
+            &mut conn,
+            TransactionKind::Income,
+            1_000,
+            day,
+            card,
+            Some("Refund"),
+            None,
+        );
+        spend(&mut conn, 500, d(2026, 10, 31));
+
+        let b = breakdown(&conn, &MONTH, CategoryKind::Expense, d(2026, 11, 3)).unwrap();
+        assert_eq!(b.total, Money(12_000));
+        assert_eq!(
+            parts(&conn, &b),
+            [
+                ("Food & Groceries".to_string(), 6_000, 500),
+                ("Dining Out".to_string(), 4_000, 333),
+                ("Transportation".to_string(), 2_000, 167),
+            ]
+        );
+        assert_eq!(b.slices.len(), 3);
+        assert_eq!(b.slices[0].category_id, Some(b.categories[0].category_id));
+    }
+
+    #[test]
+    fn the_income_breakdown_counts_refunds() {
+        let mut conn = db();
+        let cash = id_of(&conn, "accounts", "Cash");
+        let day = d(2026, 11, 2);
+        add(
+            &mut conn,
+            TransactionKind::Income,
+            9_000,
+            day,
+            cash,
+            Some("Salary"),
+            None,
+        );
+        add(
+            &mut conn,
+            TransactionKind::Income,
+            1_000,
+            day,
+            cash,
+            Some("Refund"),
+            None,
+        );
+        spend(&mut conn, 5_000, day);
+
+        let b = breakdown(&conn, &MONTH, CategoryKind::Income, d(2026, 11, 3)).unwrap();
+        assert_eq!((b.kind, b.total), (CategoryKind::Income, Money(10_000)));
+        assert_eq!(
+            parts(&conn, &b),
+            [
+                ("Salary".to_string(), 9_000, 900),
+                ("Refund".to_string(), 1_000, 100)
+            ]
+        );
+    }
+
+    #[test]
+    fn past_eight_categories_the_donut_has_an_other_slice() {
+        let mut conn = db();
+        let cash = id_of(&conn, "accounts", "Cash");
+        let names = [
+            "Food & Groceries",
+            "Dining Out",
+            "Transportation",
+            "Rent/Housing",
+            "Utilities",
+            "Phone",
+            "Shopping",
+            "Health & Medical",
+            "Insurance",
+            "Entertainment",
+        ];
+        for (i, name) in names.iter().enumerate() {
+            let amount = 1_000 - 50 * i as i64;
+            add(
+                &mut conn,
+                TransactionKind::Expense,
+                amount,
+                d(2026, 11, 2),
+                cash,
+                Some(name),
+                None,
+            );
+        }
+
+        let b = breakdown(&conn, &MONTH, CategoryKind::Expense, d(2026, 11, 3)).unwrap();
+        assert_eq!(b.categories.len(), 10);
+        assert_eq!(b.slices.len(), 9);
+        // Insurance (600) and Entertainment (550).
+        let other = &b.slices[8];
+        assert_eq!((other.category_id, other.amount), (None, Money(1_150)));
+        assert_eq!(other.share, report::share(Money(1_150), b.total));
+    }
+
+    #[test]
+    fn an_empty_breakdown_has_nothing_and_a_total_of_0() {
+        let conn = db();
+        let b = breakdown(&conn, &MONTH, CategoryKind::Expense, d(2026, 11, 3)).unwrap();
+        assert_eq!(
+            (b.total, b.categories.len(), b.slices.len()),
+            (Money(0), 0, 0)
+        );
+    }
+
+    #[test]
+    fn rows_after_today_are_not_in_the_breakdown() {
+        let mut conn = db();
+        spend(&mut conn, 1_000, d(2026, 11, 2));
+        spend(&mut conn, 7_000, d(2026, 11, 3));
+        let b = breakdown(&conn, &MONTH, CategoryKind::Expense, d(2026, 11, 2)).unwrap();
+        assert_eq!(b.total, Money(1_000));
     }
 
     #[test]
