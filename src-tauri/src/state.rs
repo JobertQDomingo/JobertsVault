@@ -55,13 +55,14 @@ impl AppState {
     }
 
     /// Startup step 7 (BAK-2), run on its own thread so the window never waits for a slow backup
-    /// folder; commands wait for the connection instead. A failure is logged, never a reason not
-    /// to start.
-    pub fn back_up_daily(&self, now: DateTime<Local>) {
+    /// folder; commands wait for the connection instead. `locked` runs once this holds the
+    /// connection (or found none). A failure is logged, never a reason not to start.
+    pub fn back_up_daily(&self, now: DateTime<Local>, locked: impl FnOnce()) {
+        let conn = self.conn();
+        locked();
         if self.db.is_ok()
-            && let Err(err) = self
-                .conn()
-                .and_then(|conn| services::backup::back_up_daily(&conn, &self.data_dir, now))
+            && let Err(err) =
+                conn.and_then(|conn| services::backup::back_up_daily(&conn, &self.data_dir, now))
         {
             log::record(&self.log_path, &err);
         }
@@ -257,7 +258,7 @@ mod tests {
             now(),
         );
         assert_eq!(state.startup_status(), StartupStatus::Ok);
-        state.back_up_daily(now());
+        state.back_up_daily(now(), || {});
         let auto = dir.path().join(db::BACKUPS_DIR).join("auto");
         assert_eq!(fs::read_dir(auto).unwrap().count(), 1);
     }
@@ -276,7 +277,7 @@ mod tests {
             now(),
         );
         assert_eq!(state.startup_status(), StartupStatus::Ok);
-        state.back_up_daily(now());
+        state.back_up_daily(now(), || {});
         assert!(
             fs::read_to_string(&state.log_path)
                 .unwrap()

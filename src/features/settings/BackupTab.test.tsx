@@ -334,12 +334,25 @@ test("an old backup's warning says so", async () => {
 test("Restore opens in the backup folder", async () => {
   vi.mocked(open).mockResolvedValue(null);
   renderRoute("/settings?tab=backup", ANSWERS);
-  fireEvent.click(
-    await screen.findByRole("button", { name: "Restore from backup…" }),
-  );
+  await screen.findByText(FOLDER);
+  fireEvent.click(screen.getByRole("button", { name: "Restore from backup…" }));
   await waitFor(() =>
     expect(open).toHaveBeenCalledWith(
       expect.objectContaining({ defaultPath: FOLDER }),
     ),
   );
+});
+
+test("Restore and Export stay usable when the status can't load", async () => {
+  renderRoute("/settings?tab=backup", {
+    ...ANSWERS,
+    get_backup_status: () => {
+      throw { code: "database", message: "disk I/O error" };
+    },
+  });
+  expect(await screen.findByRole("button", { name: "Retry" })).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Restore from backup…" }),
+  ).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Export…" })).toBeTruthy();
 });

@@ -57,12 +57,16 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             let now = chrono::Local::now();
             app.manage(AppState::open(data_dir, &db::migrations(now.to_utc()), now));
-            // Started before the window shows, so it holds the connection before any command
-            // asks for it: the first screens wait for today's backup rather than miss it.
+            // Setup goes on only once the backup thread holds the connection, so every screen
+            // waits for today's backup rather than reading the state from before it.
             let handle = app.handle().clone();
-            tauri::async_runtime::spawn_blocking(move || {
-                handle.state::<AppState>().back_up_daily(now);
+            let (locked, holding) = std::sync::mpsc::channel();
+            std::thread::spawn(move || {
+                handle.state::<AppState>().back_up_daily(now, || {
+                    let _ = locked.send(());
+                });
             });
+            let _ = holding.recv();
             // The window starts hidden and is shown once startup is done, even if it failed
             // (ARCHITECTURE §6).
             if let Some(window) = app.get_webview_window("main") {

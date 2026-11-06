@@ -35,9 +35,11 @@ pub struct Backup {
 /// `backups-dev`, ARCHITECTURE §6). Only a chosen folder is stored, so the default follows the
 /// app data folder of whichever Windows account opens the data.
 pub fn folder(conn: &Connection, data_dir: &Path) -> Result<PathBuf, AppError> {
-    Ok(repo::settings::get(conn, FOLDER)?
-        .map(PathBuf::from)
-        .unwrap_or_else(|| default_folder(data_dir)))
+    Ok(chosen_folder(conn)?.unwrap_or_else(|| default_folder(data_dir)))
+}
+
+fn chosen_folder(conn: &Connection) -> Result<Option<PathBuf>, AppError> {
+    Ok(repo::settings::get(conn, FOLDER)?.map(PathBuf::from))
 }
 
 fn default_folder(data_dir: &Path) -> PathBuf {
@@ -53,16 +55,19 @@ pub fn back_up_now(
 ) -> Result<Backup, AppError> {
     let file_name = back_up(conn, &folder(conn, data_dir)?, db::NAME, now)
         .map_err(failed("Couldn't save the backup."))?;
-    record(conn, &[(LAST, &stamp(now))])?;
+    record(conn, &[(LAST, Some(&stamp(now)))])?;
     Ok(Backup { file_name })
 }
 
-/// Saves settings rows in one transaction. `unchecked_transaction` lets a caller holding only a
-/// shared `Connection` do so; none of them is already inside one.
-fn record(conn: &Connection, rows: &[(&str, &str)]) -> Result<(), AppError> {
+/// Saves settings rows in one transaction, deleting those set to `None`. `unchecked_transaction`
+/// lets a caller holding only a shared `Connection` do so; none of them is already inside one.
+fn record(conn: &Connection, rows: &[(&str, Option<&str>)]) -> Result<(), AppError> {
     let tx = conn.unchecked_transaction()?;
     for (key, value) in rows {
-        repo::settings::set(&tx, key, value)?;
+        match value {
+            Some(value) => repo::settings::set(&tx, key, value)?,
+            None => repo::settings::delete(&tx, key)?,
+        }
     }
     tx.commit()?;
     Ok(())
@@ -90,9 +95,13 @@ pub fn status(
     today: NaiveDate,
 ) -> Result<BackupStatus, AppError> {
     let last = last_backup(conn)?;
+    let chosen = chosen_folder(conn)?;
     Ok(BackupStatus {
-        folder: folder(conn, data_dir)?.display().to_string(),
-        folder_is_default: repo::settings::get(conn, FOLDER)?.is_none(),
+        folder_is_default: chosen.is_none(),
+        folder: chosen
+            .unwrap_or_else(|| default_folder(data_dir))
+            .display()
+            .to_string(),
         auto_backup: auto_backup_on(conn)?,
         last_backup_at: last.map(|at| at.format("%Y-%m-%dT%H:%M").to_string()),
         due: backup::is_due(last.map(|at| at.date_naive()), today),
@@ -133,6 +142,17 @@ pub fn set_folder(
             if !path.is_absolute() || !path.is_dir() {
                 return Err(invalid("folder", "Choose a folder that exists."));
             }
+            // Manual backups there would be named like automatic ones, and pruned with them if
+            // it ever became some backup folder's `auto`.
+            if path
+                .file_name()
+                .is_some_and(|name| name.eq_ignore_ascii_case("auto"))
+            {
+                return Err(invalid(
+                    "folder",
+                    "Automatic backups use folders named auto. Choose another one.",
+                ));
+            }
             if !can_write_in(path) {
                 return Err(invalid(
                     "folder",
@@ -143,24 +163,15 @@ pub fn set_folder(
             (fs::canonicalize(path).ok() != default).then(|| path.display().to_string())
         }
     };
-    let tx = conn.unchecked_transaction()?;
-    match custom {
-        Some(path) => repo::settings::set(&tx, FOLDER, &path)?,
-        None => repo::settings::delete(&tx, FOLDER)?,
-    }
-    tx.commit()?;
+    record(conn, &[(FOLDER, custom.as_deref())])?;
     status(conn, data_dir, today)
 }
 
-/// Whether a new file can be made in `dir`: makes one and deletes it.
+/// Whether files can be made and deleted in `dir`, as backups and pruning need: writes a probe
+/// and deletes it. One left by an earlier check is reused rather than blocking this one.
 fn can_write_in(dir: &Path) -> bool {
     let probe = dir.join(format!(".{}-write-check.tmp", db::NAME));
-    let made = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&probe)
-        .is_ok();
-    made && fs::remove_file(&probe).is_ok()
+    fs::write(&probe, b"").is_ok() && fs::remove_file(&probe).is_ok()
 }
 
 /// Turns the daily automatic backup on or off (SET-3, BAK-2).
@@ -170,7 +181,7 @@ pub fn set_auto_backup(
     on: bool,
     today: NaiveDate,
 ) -> Result<BackupStatus, AppError> {
-    record(conn, &[(AUTO, &on.to_string())])?;
+    record(conn, &[(AUTO, Some(&on.to_string()))])?;
     status(conn, data_dir, today)
 }
 
@@ -190,7 +201,10 @@ pub fn back_up_daily(
     }
     let dir = folder(conn, data_dir)?.join("auto");
     let made = back_up(conn, &dir, db::NAME, now).map_err(failed("Couldn't save the backup."))?;
-    record(conn, &[(LAST_AUTO, &today), (LAST, &stamp(now))])?;
+    record(
+        conn,
+        &[(LAST_AUTO, Some(&today)), (LAST, Some(&stamp(now)))],
+    )?;
     prune(&dir, &made).map_err(|err| AppError::Io {
         message: format!("Couldn't delete the oldest automatic backups. {err}"),
     })
@@ -424,12 +438,12 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
 
-    /// A database file in `dir` with every migration applied, as the app opens it.
     /// The default backup folder in `dir`.
     fn backups(dir: &TempDir) -> PathBuf {
         dir.path().join(db::BACKUPS_DIR)
     }
 
+    /// A database file in `dir` with every migration applied, as the app opens it.
     fn database(dir: &TempDir) -> Connection {
         let mut conn = db::open(&dir.path().join(format!("{}.db", db::NAME))).unwrap();
         let ms = db::migrations(now().to_utc());
@@ -920,7 +934,8 @@ mod tests {
         set(&conn, "currency_symbol", "\u{20B1}");
         repo::settings::delete(&conn, "backup_folder").unwrap();
         set(&conn, "auto_backup_enabled", "false");
-        set(&conn, "last_backup_at", "2026-11-03T06:05:00Z");
+        // Never what the backup holds: it was stamped 2026-11-03 14:05 local, in any timezone.
+        set(&conn, "last_backup_at", "2026-10-31T12:00:00Z");
         set(&conn, LAST_AUTO, "2026-11-03");
 
         restore(&mut conn, dir.path(), &db_path(&dir), &backup, now()).unwrap();
@@ -935,7 +950,7 @@ mod tests {
         assert_eq!(get("auto_backup_enabled").as_deref(), Some("false"));
         assert_eq!(
             get("last_backup_at").as_deref(),
-            Some("2026-11-03T06:05:00Z")
+            Some("2026-10-31T12:00:00Z")
         );
         assert_eq!(get(LAST_AUTO).as_deref(), Some("2026-11-03"));
     }
@@ -1133,6 +1148,32 @@ mod tests {
             );
         }
         assert_eq!(repo::settings::get(&conn, FOLDER).unwrap(), None);
+    }
+
+    #[test]
+    fn a_folder_named_auto_is_refused() {
+        let dir = TempDir::new("set3-auto-name");
+        let conn = database(&dir);
+        let auto = dir.path().join("Auto");
+        fs::create_dir_all(&auto).unwrap();
+        let result = set_folder(&conn, dir.path(), Some(&auto), today());
+        assert!(
+            matches!(&result, Err(AppError::Validation { field, message })
+                if field == "folder" && message.starts_with("Automatic backups use")),
+            "{result:?}"
+        );
+    }
+
+    #[test]
+    fn a_probe_left_by_an_earlier_check_does_not_block_the_folder() {
+        let dir = TempDir::new("set3-probe");
+        let conn = database(&dir);
+        let chosen = dir.path().join("chosen");
+        fs::create_dir_all(&chosen).unwrap();
+        let probe = chosen.join(format!(".{}-write-check.tmp", db::NAME));
+        fs::write(&probe, b"left by a crash").unwrap();
+        assert!(set_folder(&conn, dir.path(), Some(&chosen), today()).is_ok());
+        assert!(!probe.exists());
     }
 
     #[test]

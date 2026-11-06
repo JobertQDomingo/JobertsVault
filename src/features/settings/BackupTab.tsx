@@ -45,23 +45,36 @@ const showError = (error: Error) => notify.error(error.message);
  */
 export function BackupTab() {
   const status = useBackupStatus();
-  const backup = useBackupNow();
-  if (!status.data)
-    return status.isError ? (
-      <ErrorState
-        onRetry={() => status.refetch()}
-        pending={status.isFetching}
-      />
-    ) : (
-      <Loading className="grid gap-3 py-3">
-        {Array.from({ length: 5 }, (_, i) => (
-          <Skeleton key={i} className="h-9" />
-        ))}
-      </Loading>
-    );
-  const s = status.data;
   return (
     <div className="pb-4">
+      {status.data ? (
+        <StatusRows status={status.data} />
+      ) : status.isError ? (
+        <ErrorState
+          onRetry={() => status.refetch()}
+          pending={status.isFetching}
+        />
+      ) : (
+        <Loading className="grid gap-3 py-3">
+          {Array.from({ length: 3 }, (_, i) => (
+            <Skeleton key={i} className="h-9" />
+          ))}
+        </Loading>
+      )}
+      {/* Neither needs the status, so they're never held up by it. */}
+      <div className="border-t border-hairline">
+        <RestoreRow folder={status.data?.folder} />
+        <ExportRow />
+      </div>
+    </div>
+  );
+}
+
+/** The warning, the folder, the switch and the last backup with Back up now. */
+function StatusRows({ status: s }: { status: BackupStatus }) {
+  const backup = useBackupNow();
+  return (
+    <>
       {s.due && (
         <Banner className="mt-1 mb-2">
           {s.lastBackupAt
@@ -89,10 +102,8 @@ export function BackupTab() {
             {backup.isPending ? "Backing up…" : "Back up now"}
           </Button>
         </Row>
-        <RestoreRow folder={s.folder} />
-        <ExportRow />
       </div>
-    </div>
+    </>
   );
 }
 
@@ -155,7 +166,7 @@ function AutoBackupRow({ status }: { status: BackupStatus }) {
  * Restore from backup… (F9): pick a file, which Rust checks, then confirm with its date. Once
  * restored, every query reloads and the app goes to the dashboard.
  */
-function RestoreRow({ folder }: { folder: string }) {
+function RestoreRow({ folder }: { folder?: string }) {
   const navigate = useNavigate();
   const [chosen, setChosen] = useState<{
     path: string;
