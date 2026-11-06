@@ -253,6 +253,7 @@ There's no global state library. With TanStack Query plus the URL, none is neede
 
 - Every query key that involves money starts with `['ledger', …]`, e.g. `['ledger','dashboard',period]` or `['ledger','transactions',filter]`.
 - **After any successful change, all `['ledger']` queries are refreshed.** This is a deliberately blunt rule: any transaction can affect every balance and total, and reloading the data is cheap.
+- The startup status and the app version use their own keys, `['startup']` and `['appVersion']`, because neither changes while the app runs.
 - Settings use their own key `['settings']`. Changing settings also refreshes `['ledger']`, because things like the week start change the totals.
 - `refetchOnWindowFocus` stays on, so "today" moves forward if the app is left open past midnight.
 
