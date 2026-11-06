@@ -61,7 +61,14 @@ function RestoreRow() {
     modified: string;
   } | null>(null);
   const inspect = useMutation({ mutationFn: inspectBackup });
-  const restore = useLedgerMutation(restoreBackup);
+  // On the mutation, not `mutate`, so they still run if this tab has been left meanwhile.
+  const restore = useLedgerMutation(restoreBackup, {
+    onSuccess: () => {
+      navigate("/");
+      notify.success("Backup restored");
+    },
+    onError: showError,
+  });
   const pick = async () => {
     try {
       const path = await pickBackupFile();
@@ -90,16 +97,7 @@ function RestoreRow() {
         message={`This replaces all current data with the backup from ${chosen ? formatDateTime(chosen.modified) : ""}. A safety copy of your current data will be saved first.`}
         confirmLabel="Restore"
         destructive
-        onConfirm={() =>
-          chosen &&
-          restore.mutate(chosen.path, {
-            onSuccess: () => {
-              navigate("/");
-              notify.success("Backup restored");
-            },
-            onError: showError,
-          })
-        }
+        onConfirm={() => chosen && restore.mutate(chosen.path)}
       />
     </Row>
   );

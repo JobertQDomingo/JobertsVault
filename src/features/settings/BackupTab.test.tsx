@@ -18,7 +18,7 @@ const ANSWERS: Answers = {
   inspect_backup: { modified: "2026-10-20T09:30" },
   restore_backup: null,
 };
-const CHOSEN = "D:\Backups\jobertsvault-2026-10-20_0930.db";
+const CHOSEN = String.raw`D:\Backups\jobertsvault-2026-10-20_0930.db`;
 const called = (command: string) =>
   vi.mocked(invoke).mock.calls.filter(([c]) => c === command).length;
 
@@ -93,7 +93,7 @@ test("closing the picker does nothing", async () => {
 });
 
 test("a refused file says why, and nothing is restored", async () => {
-  vi.mocked(open).mockResolvedValue("D:\notes.db");
+  vi.mocked(open).mockResolvedValue(String.raw`D:\notes.db`);
   const message =
     "This file isn't a Jobert's Vault backup, so nothing was changed.";
   renderRoute("/settings?tab=backup", {

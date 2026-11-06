@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 
 use chrono::{DateTime, Local};
 use rusqlite::Connection;
@@ -136,7 +137,12 @@ pub fn inspect(
         &scratch.0,
         &db::migrations(now.to_utc()),
     )?);
-    let modified: DateTime<Local> = fs::metadata(chosen)?.modified()?.into();
+    // A copy made by hand can have a -wal written after the file itself.
+    let wal = fs::metadata(with_suffix(chosen, "-wal")).and_then(|m| m.modified());
+    let modified = fs::metadata(chosen)?
+        .modified()?
+        .max(wal.unwrap_or(UNIX_EPOCH));
+    let modified: DateTime<Local> = modified.into();
     Ok(BackupFile {
         modified: modified.format("%Y-%m-%dT%H:%M").to_string(),
     })
@@ -163,11 +169,12 @@ fn restore_with(
     ms: &Migrations,
     now: DateTime<Local>,
 ) -> Result<(), AppError> {
-    // 1. A checked copy of the backup, brought up to date (with its own BAK-5 copy first), that
-    // keeps this computer's backup settings.
+    // 1. A checked copy of the backup, brought up to date, that keeps this computer's backup
+    // settings. The chosen file itself is never changed, so it already is the copy from before
+    // the migration that BAK-5 asks for.
     let scratch = Scratch(data_dir.join(format!("{}-restore.db.tmp", db::NAME)));
     let mut copy = open_copy(chosen, db_path, &scratch.0, ms)?;
-    db::prepare(&mut copy, ms, &db::pre_migration_dir(data_dir), now)?;
+    ms.to_latest(&mut copy)?;
     let tx = copy.transaction()?;
     for key in THIS_COMPUTER {
         match repo::settings::get(conn, key)? {
@@ -217,7 +224,7 @@ fn open_copy(
         ));
     }
     for leftover in sidecars(scratch) {
-        remove_if_there(&leftover)?;
+        db::remove_if_there(&leftover)?;
     }
     fs::copy(chosen, scratch)?;
     // A copy made by hand can hold its latest changes in -wal, which SQLite reads on opening.
@@ -291,13 +298,6 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path.as_os_str().to_owned();
     name.push(suffix);
     name.into()
-}
-
-fn remove_if_there(path: &Path) -> std::io::Result<()> {
-    match fs::remove_file(path) {
-        Err(err) if err.kind() != std::io::ErrorKind::NotFound => Err(err),
-        _ => Ok(()),
-    }
 }
 
 #[cfg(test)]
@@ -781,10 +781,11 @@ mod tests {
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
         assert_eq!(version, 2);
-        // BAK-5 copied the restored data before migrating it.
-        let copy = db::pre_migration_dir(dir.path())
-            .join(format!("{}-pre-migration-v1-2026-11-03_1405.db", db::NAME));
-        assert_eq!(account_names(&copy), ["Cash", "Bank"]);
+        assert!(
+            !db::pre_migration_dir(dir.path()).exists(),
+            "the chosen file, unchanged, is the copy from before the migration"
+        );
+        assert_eq!(account_names(&backup), ["Cash", "Bank"]);
     }
 
     #[test]
@@ -865,6 +866,25 @@ mod tests {
             .unwrap();
         }
         drop(running);
+        // The -wal was written after the file, so the confirm gives its time.
+        let at = |hour| {
+            chrono::NaiveDate::from_ymd_opt(2026, 10, 20)
+                .unwrap()
+                .and_hms_opt(hour, 30, 0)
+                .unwrap()
+                .and_local_timezone(Local)
+                .unwrap()
+        };
+        for (suffix, hour) in [("", 9), ("-wal", 18)] {
+            fs::File::options()
+                .write(true)
+                .open(with_suffix(&chosen, suffix))
+                .unwrap()
+                .set_modified(at(hour).into())
+                .unwrap();
+        }
+        let file = inspect(dir.path(), &db_path(&dir), &chosen, now()).unwrap();
+        assert_eq!(file.modified, "2026-10-20T18:30");
         let wal_bytes = fs::read(with_suffix(&chosen, "-wal")).unwrap();
 
         restore(&mut conn, dir.path(), &db_path(&dir), &chosen, now()).unwrap();

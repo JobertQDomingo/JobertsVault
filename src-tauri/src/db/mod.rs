@@ -113,6 +113,14 @@ fn back_up(
     })
 }
 
+/// Deletes `path`, which may already be gone.
+pub fn remove_if_there(path: &Path) -> std::io::Result<()> {
+    match fs::remove_file(path) {
+        Err(err) if err.kind() != ErrorKind::NotFound => Err(err),
+        _ => Ok(()),
+    }
+}
+
 /// Writes a consistent copy of the database to `path`. It goes to `<path>.tmp` first and is
 /// renamed when complete, so a half-written copy never looks like a backup (ARCHITECTURE §7).
 pub fn vacuum_into(conn: &Connection, path: &Path) -> Result<(), AppError> {
@@ -121,11 +129,7 @@ pub fn vacuum_into(conn: &Connection, path: &Path) -> Result<(), AppError> {
     }
     let tmp = path.with_extension("db.tmp");
     // Left by a copy that was cut short. VACUUM INTO refuses to overwrite a file.
-    if let Err(err) = fs::remove_file(&tmp)
-        && err.kind() != ErrorKind::NotFound
-    {
-        return Err(err.into());
-    }
+    remove_if_there(&tmp)?;
     let written = conn
         .execute("VACUUM INTO ?1", [tmp.to_string_lossy()])
         .map_err(AppError::from)

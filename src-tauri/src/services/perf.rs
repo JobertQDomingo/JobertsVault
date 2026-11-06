@@ -15,6 +15,8 @@ use crate::test_support::{TempDir, now};
 
 const ROWS: i64 = 50_000;
 const LIMIT: Duration = Duration::from_millis(300);
+/// Backup and restore run on demand, and may take seconds (ARCHITECTURE §4.3).
+const FILE_LIMIT: Duration = Duration::from_secs(2);
 
 fn today() -> NaiveDate {
     NaiveDate::from_ymd_opt(2026, 11, 3).unwrap()
@@ -107,7 +109,11 @@ fn seed(conn: &mut Connection) {
 }
 
 /// The slowest of three runs, so a lucky cache doesn't hide a slow query.
-fn time<T>(label: &str, mut run: impl FnMut() -> T) {
+fn time<T>(label: &str, run: impl FnMut() -> T) {
+    time_within(LIMIT, label, run);
+}
+
+fn time_within<T>(limit: Duration, label: &str, mut run: impl FnMut() -> T) {
     let slowest = (0..3)
         .map(|_| {
             let start = Instant::now();
@@ -117,7 +123,7 @@ fn time<T>(label: &str, mut run: impl FnMut() -> T) {
         .max()
         .unwrap();
     println!("{label:<36} {:>7.1} ms", slowest.as_secs_f64() * 1000.0);
-    assert!(slowest < LIMIT, "{label} took {slowest:?}");
+    assert!(slowest < limit, "{label} took {slowest:?}");
 }
 
 fn filter(period: PeriodQuery) -> TransactionFilter {
@@ -294,7 +300,24 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
         0,
     );
     // Back up now holds the connection while it copies, so every view waits for it (BAK-1).
-    time("back up now (VACUUM INTO)", || {
+    time_within(FILE_LIMIT, "back up now (VACUUM INTO)", || {
         crate::services::backup::back_up_now(&conn, dir.path(), now()).unwrap()
     });
+    // Restore holds it from the first check to the reopen (BAK-4).
+    use crate::services::backup;
+    let file = backup::back_up_now(&conn, dir.path(), now())
+        .unwrap()
+        .file_name;
+    let chosen = backup::folder(dir.path()).join(file);
+    time_within(FILE_LIMIT, "inspect a backup", || {
+        backup::inspect(dir.path(), &path, &chosen, now()).unwrap()
+    });
+    let mut conn = conn;
+    time_within(FILE_LIMIT, "restore a backup", || {
+        backup::restore(&mut conn, dir.path(), &path, &chosen, now()).unwrap()
+    });
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(count, ROWS, "three restores in a row");
 }
