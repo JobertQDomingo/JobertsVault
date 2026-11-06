@@ -70,7 +70,7 @@ Jobert's Vault is a single **Tauri 2** desktop app. The window shows a React UI 
 | Rust → TS types | **ts-rs** | Generates TypeScript types from Rust structs, so the two sides can't drift apart |
 | Updates | **tauri-plugin-updater** (`2`, with default features off and `native-tls`, `system-proxy` and `zip` on) | Downloads and verifies signed updates (§11.1). Stay on version `2`, because crates.io's newest is a `3.0.0` alpha. |
 | Release builds | **tauri-apps/tauri-action** (`v0`, GitHub Actions only) | Builds and signs the installer, and writes `latest.json` (§11.1) |
-| File dialogs (Phase 2) | **tauri-plugin-dialog** | Folder and file pickers for backup and restore |
+| File dialogs (Phase 2) | **tauri-plugin-dialog** (`2`) and its JavaScript half **@tauri-apps/plugin-dialog** | Folder and file pickers for backup, restore and export. The frontend may use only the open and save pickers (§10). After a pick, the plugin adds the path to two scopes: the fs plugin's, which does nothing because that plugin is never registered (its crate is only a dependency, so no fs command exists), and the asset protocol's, which is off (no `protocol-asset` feature or `assetProtocol` setting). Turning the asset protocol on would let the page read every picked path, so don't. |
 
 Exact versions are pinned in `Cargo.lock` and `package-lock.json`, and upgraded on purpose rather than automatically.
 
@@ -355,7 +355,7 @@ This runs at startup and again whenever the date changes while the app is open (
 
 ## 10. Security and privacy
 
-- **Tauri capabilities:** the frontend is granted only the core window permissions and, from Phase 2, the dialog plugin. There's **no** `fs`, `shell`, `http` or `opener` plugin. If the Tauri project template adds `tauri-plugin-opener`, remove it and its permission during Phase 0. All file work happens in Rust, which validates the paths it's given.
+- **Tauri capabilities:** the frontend is granted only the core window permissions and, from Phase 2, the dialog plugin's open and save pickers (`dialog:allow-open`, `dialog:allow-save`, not its message boxes). `the_frontend_gets_only_the_window_and_the_file_pickers` guards this. There's **no** `fs`, `shell`, `http` or `opener` plugin. If the Tauri project template adds `tauri-plugin-opener`, remove it and its permission during Phase 0. All file work happens in Rust, which validates the paths it's given.
 - **Updates run in Rust.** The frontend gets no updater permissions, and calls only our own `check_update` and `install_update` commands.
 - **Content security policy:** `default-src 'self'; connect-src ipc: http://ipc.localhost; img-src 'self' data:; style-src 'self' 'unsafe-inline'`. With this, the UI can't load anything from the internet.
 - **The updater is the only network use.** It requests `latest.json` and the installer from GitHub, and sends nothing from the database ([ADR 0010](decisions/0010-automatic-updates.md)).
