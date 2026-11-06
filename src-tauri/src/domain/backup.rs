@@ -11,13 +11,17 @@ pub const KEEP: usize = 30;
 /// The files among `names` to delete so that only the newest `KEEP` backups remain. Only names
 /// a backup gets, `<prefix>-YYYY-MM-DD_HHMM.db` or with `-2`, `-3`, … before `.db`, count:
 /// anything else in the folder is never deleted. Newest goes by the time in the name, then
-/// the number, never by the file's dates, which a copy can change.
-pub fn to_prune(prefix: &str, names: &[String]) -> Vec<String> {
-    let mut backups: Vec<((NaiveDateTime, u32), &String)> = names
+/// the number, never by the file's dates, which a copy can change. `just_made` always counts as
+/// the newest, so a clock set back can't delete the backup it has just written.
+pub fn to_prune(prefix: &str, names: &[String], just_made: &str) -> Vec<String> {
+    let mut backups: Vec<((bool, NaiveDateTime, u32), &String)> = names
         .iter()
-        .filter_map(|name| Some((when(prefix, name)?, name)))
+        .filter_map(|name| {
+            let (time, number) = when(prefix, name)?;
+            Some(((name == just_made, time, number), name))
+        })
         .collect();
-    backups.sort_by_key(|(when, _)| std::cmp::Reverse(*when));
+    backups.sort_by_key(|(rank, _)| std::cmp::Reverse(*rank));
     backups
         .into_iter()
         .skip(KEEP)
@@ -33,11 +37,12 @@ fn when(prefix: &str, name: &str) -> Option<(NaiveDateTime, u32)> {
         1
     } else {
         let digits = more.strip_prefix('-')?;
-        // parse() alone would also take "+2".
-        if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        // Only what a backup is named: `-2`, `-3`, … with no `+`, leading zero or `-1`, so no two
+        // names rank the same.
+        if !digits.bytes().all(|b| b.is_ascii_digit()) || digits.starts_with('0') {
             return None;
         }
-        digits.parse().ok()?
+        digits.parse().ok().filter(|n| *n >= 2)?
     };
     let time = NaiveDateTime::parse_from_str(stamp, STAMP).ok()?;
     Some((time, number))
@@ -64,8 +69,8 @@ mod tests {
 
     #[test]
     fn thirty_or_fewer_are_all_kept() {
-        assert!(to_prune("jv", &days(0)).is_empty());
-        assert!(to_prune("jv", &days(30)).is_empty());
+        assert!(to_prune("jv", &days(0), "").is_empty());
+        assert!(to_prune("jv", &days(30), "").is_empty());
     }
 
     #[test]
@@ -74,7 +79,7 @@ mod tests {
         let mut shuffled = all.clone();
         shuffled.reverse();
         shuffled.swap(0, 17);
-        let mut pruned = to_prune("jv", &shuffled);
+        let mut pruned = to_prune("jv", &shuffled, &all[0]);
         pruned.sort();
         let mut oldest = all[30..].to_vec();
         oldest.sort();
@@ -86,7 +91,7 @@ mod tests {
         let mut list = days(29);
         list.push("jv-2025-12-31_2359.db".into());
         list.push("jv-2026-01-01_0000.db".into());
-        assert_eq!(to_prune("jv", &list), ["jv-2025-12-31_2359.db"]);
+        assert_eq!(to_prune("jv", &list, ""), ["jv-2025-12-31_2359.db"]);
     }
 
     #[test]
@@ -95,9 +100,19 @@ mod tests {
         list.push("jv-2020-01-01_0000-2.db".into());
         list.push("jv-2020-01-01_0000.db".into());
         list.push("jv-2020-01-01_0000-10.db".into());
-        let mut pruned = to_prune("jv", &list);
+        let mut pruned = to_prune("jv", &list, "");
         pruned.sort();
         assert_eq!(pruned, ["jv-2020-01-01_0000-2.db", "jv-2020-01-01_0000.db"]);
+    }
+
+    #[test]
+    fn the_backup_just_made_is_kept_even_if_the_clock_went_back() {
+        let mut list = days(30); // Oct 5 to Nov 3
+        list.push("jv-2026-01-01_0900.db".into());
+        assert_eq!(
+            to_prune("jv", &list, "jv-2026-01-01_0900.db"),
+            ["jv-2026-10-05_0905.db"]
+        );
     }
 
     #[test]
@@ -108,6 +123,9 @@ mod tests {
             "jv-2020-01-01_0000.db-wal",
             "jv-2020-01-01_0000-.db",
             "jv-2020-01-01_0000-x.db",
+            "jv-2020-01-01_0000-+2.db",
+            "jv-2020-01-01_0000-1.db",
+            "jv-2020-01-01_0000-02.db",
             "jv-2020-01-01_000.db",
             "jv-2020-13-01_0000.db",
             "jv-pre-migration-v1-2020-01-01_0000.db",
@@ -115,9 +133,9 @@ mod tests {
             "jvx-2020-01-01_0000.db",
             "notes.txt",
         ]));
-        assert!(to_prune("jv", &list).is_empty());
+        assert!(to_prune("jv", &list, "").is_empty());
         // The real prefix in a debug build contains a dash.
         let dev = names(&["jobertsvault-dev-2020-01-01_0000.db"]);
-        assert!(to_prune("jobertsvault", &dev).is_empty());
+        assert!(to_prune("jobertsvault", &dev, "").is_empty());
     }
 }

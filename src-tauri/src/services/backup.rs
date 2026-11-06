@@ -39,7 +39,7 @@ pub fn back_up_now(
 }
 
 /// The daily automatic backup (BAK-2): the first time the app opens on a local day, it copies the
-/// database into `<backup folder>uto` and records the date, then keeps only the newest 30
+/// database into `<backup folder>\auto` and records the date, then keeps only the newest 30
 /// there (BAK-3). A failed copy records nothing, so the next start tries again.
 pub fn back_up_daily(
     conn: &mut Connection,
@@ -51,26 +51,28 @@ pub fn back_up_daily(
         return Ok(());
     }
     let dir = folder(data_dir).join("auto");
-    back_up(conn, &dir, now)?;
+    let made = back_up(conn, &dir, now)?;
     let tx = conn.transaction()?;
     repo::settings::set(&tx, LAST_AUTO, &today)?;
     tx.commit()?;
-    prune(&dir).map_err(|err| AppError::Io {
+    prune(&dir, &made).map_err(|err| AppError::Io {
         message: format!("Couldn't delete the oldest automatic backups. {err}"),
     })
 }
 
-/// Deletes all but the newest 30 automatic backups in `dir`. Other files there are left alone.
-fn prune(dir: &Path) -> std::io::Result<()> {
+/// Deletes all but the newest 30 automatic backups in `dir`, `just_made` among those kept. Other
+/// files there are left alone. A file that can't be deleted doesn't stop the rest; the first
+/// error is returned.
+fn prune(dir: &Path, just_made: &str) -> std::io::Result<()> {
     let names: Vec<String> = fs::read_dir(dir)?
         .filter_map(Result::ok)
         .filter(|entry| entry.file_type().is_ok_and(|t| t.is_file()))
         .filter_map(|entry| entry.file_name().into_string().ok())
         .collect();
-    for name in backup::to_prune(db::NAME, &names) {
-        fs::remove_file(dir.join(name))?;
-    }
-    Ok(())
+    backup::to_prune(db::NAME, &names, just_made)
+        .into_iter()
+        .map(|name| fs::remove_file(dir.join(name)))
+        .fold(Ok(()), Result::and)
 }
 
 /// Copies the database into `dir` under a name stamped with `now`, local time, and returns that
@@ -342,6 +344,45 @@ mod tests {
             folder(dir.path()).join(manual.file_name).exists(),
             "manual backups are never pruned"
         );
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn a_locked_old_backup_does_not_stop_the_others_being_deleted() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let dir = TempDir::new("bak3-locked");
+        let mut conn = database(&dir);
+        let auto = folder(dir.path()).join("auto");
+        fs::create_dir_all(&auto).unwrap();
+        let old = |n: u64| {
+            let day = (now() - chrono::Days::new(n)).format("%Y-%m-%d");
+            auto.join(format!("{}-{day}_0900.db", db::NAME))
+        };
+        for n in 1..=31 {
+            fs::write(old(n), b"old").unwrap();
+        }
+        // The first of the two due to go, held open with no sharing as antivirus or a sync tool
+        // can.
+        let lock = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(old(30))
+            .unwrap();
+
+        let result = back_up_daily(&mut conn, dir.path(), now());
+
+        assert!(
+            matches!(&result, Err(AppError::Io { message }) if message.starts_with("Couldn't delete the oldest")),
+            "{result:?}"
+        );
+        assert!(old(30).exists(), "the locked one stays");
+        assert!(!old(31).exists(), "the other one due still goes");
+        assert_eq!(
+            last_auto(&conn).as_deref(),
+            Some("2026-11-03"),
+            "the backup itself worked"
+        );
+        drop(lock);
     }
 
     #[test]
