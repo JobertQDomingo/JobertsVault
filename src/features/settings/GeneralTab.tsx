@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { notify } from "@/components/ui/toast";
 import { useAppVersion } from "@/hooks/useAppVersion";
 import { useUpdateSettings } from "@/hooks/useSettings";
+import { COMPARE } from "@/lib/comparison";
 import { formatMoney } from "@/lib/money";
 import { showSaveError } from "@/lib/saveError";
 
@@ -21,6 +22,7 @@ const SHOWN: Key[] = [
   "monthStartDay",
   "showPaymentMethod",
   "autoUpdateEnabled",
+  "comparisonMode",
 ];
 const DAYS = Array.from({ length: 28 }, (_, i) => ({
   value: String(i + 1),
@@ -218,6 +220,19 @@ export function GeneralTab({
                 errors.monthStartDay ? "set-month-message" : undefined
               }
               onChange={(v) => save({ monthStartDay: Number(v) })}
+            />
+          </Row>
+          <Row
+            id="set-compare"
+            label="Compare periods"
+            error={errors.comparisonMode}
+            help="How a period still in progress is compared with the one before, in Reports"
+          >
+            <Segmented
+              aria-label="Compare periods"
+              value={settings.comparisonMode}
+              onChange={(comparisonMode) => save({ comparisonMode })}
+              options={COMPARE}
             />
           </Row>
           <Row

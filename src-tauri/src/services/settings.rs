@@ -2,6 +2,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::domain::period::ComparisonMode;
 use crate::error::AppError;
 use crate::repo;
 use crate::services::invalid;
@@ -22,7 +23,7 @@ pub enum WeekStart {
     Sunday,
 }
 
-/// The Phase 1 settings (DATA_MODEL §3.5). A key missing from the table takes its default.
+/// The settings so far (DATA_MODEL §3.5). A key missing from the table takes its default.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -36,6 +37,8 @@ pub struct Settings {
     pub show_payment_method: bool,
     pub onboarding_completed: bool,
     pub auto_update_enabled: bool,
+    /// The comparison the dashboard's % change uses, and Reports by default (SET-7).
+    pub comparison_mode: ComparisonMode,
 }
 
 impl Default for Settings {
@@ -49,6 +52,7 @@ impl Default for Settings {
             show_payment_method: true,
             onboarding_completed: false,
             auto_update_enabled: true,
+            comparison_mode: ComparisonMode::ToDate,
         }
     }
 }
@@ -66,9 +70,14 @@ pub struct SettingsView {
 
 pub fn get(conn: &Connection) -> Result<SettingsView, AppError> {
     Ok(SettingsView {
-        settings: load(conn, |_| true)?,
+        settings: stored(conn)?,
         decimals_locked: decimals_locked(conn)?,
     })
+}
+
+/// The stored settings alone, without the decimals lock's queries.
+pub fn stored(conn: &Connection) -> Result<Settings, AppError> {
+    load(conn, |_| true)
 }
 
 /// Changing the decimals would change the meaning of every stored amount (DATA_MODEL §1).
@@ -138,6 +147,10 @@ pub fn update(conn: &mut Connection, mut settings: Settings) -> Result<SettingsV
             "auto_update_enabled",
             settings.auto_update_enabled.to_string(),
         ),
+        (
+            "comparison_mode",
+            comparison_mode_text(settings.comparison_mode).into(),
+        ),
     ] {
         repo::settings::set(&tx, key, &value)?;
     }
@@ -178,6 +191,11 @@ fn read(settings: &mut Settings, key: &str, value: &str) -> Option<()> {
         "show_payment_method" => settings.show_payment_method = flag()?,
         "onboarding_completed" => settings.onboarding_completed = flag()?,
         "auto_update_enabled" => settings.auto_update_enabled = flag()?,
+        "comparison_mode" => {
+            settings.comparison_mode = [ComparisonMode::ToDate, ComparisonMode::Full]
+                .into_iter()
+                .find(|m| comparison_mode_text(*m) == value)?
+        }
         // Later phases' keys, and last_used_account_id, which transactions own.
         _ => {}
     }
@@ -195,6 +213,13 @@ fn week_start_text(week_start: WeekStart) -> &'static str {
     match week_start {
         WeekStart::Monday => "monday",
         WeekStart::Sunday => "sunday",
+    }
+}
+
+fn comparison_mode_text(mode: ComparisonMode) -> &'static str {
+    match mode {
+        ComparisonMode::ToDate => "to_date",
+        ComparisonMode::Full => "full",
     }
 }
 
@@ -242,6 +267,7 @@ mod tests {
             show_payment_method: true,
             onboarding_completed: false,
             auto_update_enabled: true,
+            comparison_mode: ComparisonMode::ToDate,
         };
         assert_eq!(Settings::default(), defaults);
         assert_eq!(
@@ -265,8 +291,11 @@ mod tests {
             show_payment_method: false,
             onboarding_completed: true,
             auto_update_enabled: false,
+            comparison_mode: ComparisonMode::Full,
         };
         let saved = update(&mut conn, changed.clone()).unwrap();
+        let stored = repo::settings::get(&conn, "comparison_mode").unwrap();
+        assert_eq!(stored.as_deref(), Some("full"));
         assert_eq!(saved.settings, changed);
         assert_eq!(get(&conn).unwrap().settings, changed);
     }
@@ -404,6 +433,13 @@ mod tests {
             }
             other => panic!("expected a database error, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn an_unknown_comparison_mode_is_a_database_error() {
+        let conn = db();
+        store(&conn, "comparison_mode", "half");
+        assert!(matches!(get(&conn), Err(AppError::Database { .. })));
     }
 
     #[test]

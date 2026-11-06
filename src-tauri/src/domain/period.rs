@@ -1,4 +1,6 @@
 use chrono::{Datelike, Days, NaiveDate, TimeDelta, Weekday};
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PeriodKind {
@@ -120,6 +122,36 @@ impl Period {
             end,
         })
     }
+}
+
+/// What a period still in progress is compared with (RPT-4a, SET-7).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum ComparisonMode {
+    /// The same number of days at the start of the previous period.
+    ToDate,
+    /// The whole previous period.
+    Full,
+}
+
+/// The dates `current` is compared with (DATA_MODEL §5.4): the previous period, cut to the same
+/// number of days when `current` is still in progress and `mode` is `ToDate`, but never past the
+/// previous period's end. `None` past chrono's date range.
+pub fn comparison_window(
+    current: &Period,
+    settings: &PeriodSettings,
+    today: NaiveDate,
+    mode: ComparisonMode,
+) -> Option<Period> {
+    let previous = current.previous(settings)?;
+    let in_progress = (current.start..=current.end).contains(&today);
+    if mode == ComparisonMode::Full || !in_progress {
+        return Some(previous);
+    }
+    let elapsed = Days::new((today - current.start).num_days().unsigned_abs());
+    let end = previous.start.checked_add_days(elapsed)?.min(previous.end);
+    Period::custom(previous.start, end)
 }
 
 /// The month that starts on day `start_day`: from that day in `d`'s month, or the month before
@@ -478,6 +510,127 @@ mod tests {
         let month = Period::containing(PeriodKind::Month, d(2026, 10, 10), &s25).unwrap();
         assert_eq!(month.next(&s25, d(2026, 10, 24)), None);
         assert!(month.next(&s25, d(2026, 10, 25)).is_some());
+    }
+
+    /// The comparison window of the `kind` period containing `today`, or of the one containing
+    /// `anchor` when given.
+    fn compare(
+        kind: PeriodKind,
+        anchor: NaiveDate,
+        today: NaiveDate,
+        s: &PeriodSettings,
+        mode: ComparisonMode,
+    ) -> (NaiveDate, NaiveDate) {
+        let current = Period::containing(kind, anchor, s).unwrap();
+        span(comparison_window(&current, s, today, mode).unwrap())
+    }
+
+    use ComparisonMode::{Full, ToDate};
+
+    #[test]
+    fn a_month_in_progress_is_compared_with_the_same_days_last_month() {
+        let today = d(2026, 10, 26);
+        assert_eq!(
+            compare(PeriodKind::Month, today, today, &MONDAY_1, ToDate),
+            (d(2026, 9, 1), d(2026, 9, 26))
+        );
+        assert_eq!(
+            compare(PeriodKind::Month, today, today, &MONDAY_1, Full),
+            (d(2026, 9, 1), d(2026, 9, 30))
+        );
+    }
+
+    #[test]
+    fn the_comparison_stops_at_the_end_of_a_shorter_previous_month() {
+        let mar31 = d(2026, 3, 31);
+        assert_eq!(
+            compare(PeriodKind::Month, mar31, mar31, &MONDAY_1, ToDate),
+            (d(2026, 2, 1), d(2026, 2, 28))
+        );
+        let leap = d(2028, 3, 30);
+        assert_eq!(
+            compare(PeriodKind::Month, leap, leap, &MONDAY_1, ToDate),
+            (d(2028, 2, 1), d(2028, 2, 29))
+        );
+    }
+
+    #[test]
+    fn a_month_starting_on_the_25th_compares_the_same_days_from_the_25th() {
+        let s25 = settings(Weekday::Mon, 25);
+        let today = d(2026, 11, 3);
+        // Oct 25 – Nov 24 is 9 days in, so Sep 25 + 9 days.
+        assert_eq!(
+            compare(PeriodKind::Month, today, today, &s25, ToDate),
+            (d(2026, 9, 25), d(2026, 10, 4))
+        );
+    }
+
+    #[test]
+    fn a_monday_week_in_progress_is_compared_with_last_monday_to_the_same_weekday() {
+        let wednesday = d(2026, 10, 28);
+        assert_eq!(
+            compare(PeriodKind::Week, wednesday, wednesday, &MONDAY_1, ToDate),
+            (d(2026, 10, 19), d(2026, 10, 21))
+        );
+        let sunday = settings(Weekday::Sun, 1);
+        assert_eq!(
+            compare(PeriodKind::Week, wednesday, wednesday, &sunday, ToDate),
+            (d(2026, 10, 18), d(2026, 10, 21))
+        );
+    }
+
+    #[test]
+    fn a_year_in_progress_counts_the_same_number_of_days_across_a_leap_day() {
+        // Mar 1, 2029 is day 60, and day 60 of 2028 is Feb 29.
+        let today = d(2029, 3, 1);
+        assert_eq!(
+            compare(PeriodKind::Year, today, today, &MONDAY_1, ToDate),
+            (d(2028, 1, 1), d(2028, 2, 29))
+        );
+        assert_eq!(
+            compare(PeriodKind::Year, today, today, &MONDAY_1, Full),
+            (d(2028, 1, 1), d(2028, 12, 31))
+        );
+    }
+
+    #[test]
+    fn today_is_compared_with_yesterday() {
+        let today = d(2026, 11, 3);
+        let yesterday = d(2026, 11, 2);
+        assert_eq!(
+            compare(PeriodKind::Day, today, today, &MONDAY_1, ToDate),
+            (yesterday, yesterday)
+        );
+    }
+
+    #[test]
+    fn a_period_that_is_over_is_always_compared_in_full() {
+        let today = d(2026, 11, 3);
+        assert_eq!(
+            compare(PeriodKind::Month, d(2026, 10, 5), today, &MONDAY_1, ToDate),
+            (d(2026, 9, 1), d(2026, 9, 30))
+        );
+    }
+
+    #[test]
+    fn the_first_day_of_a_period_compares_one_day() {
+        let first = d(2026, 11, 1);
+        assert_eq!(
+            compare(PeriodKind::Month, first, first, &MONDAY_1, ToDate),
+            (d(2026, 10, 1), d(2026, 10, 1))
+        );
+    }
+
+    #[test]
+    fn a_custom_range_is_compared_with_the_same_length_before_it() {
+        let today = d(2026, 11, 3);
+        let past = Period::custom(d(2026, 10, 1), d(2026, 10, 10)).unwrap();
+        let window = comparison_window(&past, &MONDAY_1, today, ToDate).unwrap();
+        assert_eq!(span(window), (d(2026, 9, 21), d(2026, 9, 30)));
+        // The range holding today counts the same days so far: Oct 31 – Nov 3 is 4 days.
+        let current = Period::custom(d(2026, 10, 31), d(2026, 11, 9)).unwrap();
+        let window = comparison_window(&current, &MONDAY_1, today, ToDate).unwrap();
+        assert_eq!(span(window), (d(2026, 10, 21), d(2026, 10, 24)));
     }
 
     #[test]

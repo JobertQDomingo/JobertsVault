@@ -310,3 +310,16 @@ test("the automatic updates switch saves at once (UPD-3)", async () => {
     expect(saves()).toEqual([{ ...STORED, autoUpdateEnabled: false }]),
   );
 });
+
+test("Compare periods saves the comparison setting (SET-7)", async () => {
+  renderRoute("/settings", ANSWERS);
+  expect(
+    (
+      await screen.findByRole("radio", { name: "Same days so far" })
+    ).getAttribute("aria-checked"),
+  ).toBe("true");
+  fireEvent.click(radio("Full previous period"));
+  await waitFor(() =>
+    expect(saves()).toEqual([{ ...STORED, comparisonMode: "full" }]),
+  );
+});

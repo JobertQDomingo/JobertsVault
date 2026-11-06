@@ -20,6 +20,7 @@ export const SETTINGS: SettingsView = {
   showPaymentMethod: true,
   onboardingCompleted: true,
   autoUpdateEnabled: true,
+  comparisonMode: "to_date",
 };
 
 /** Renders inside a QueryClient that already holds the settings, as the app does once started. */

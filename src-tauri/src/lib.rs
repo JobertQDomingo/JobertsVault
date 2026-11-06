@@ -82,6 +82,7 @@ pub fn run() {
             commands::dashboard::get_dashboard,
             commands::reports::get_timeseries,
             commands::reports::get_category_breakdown,
+            commands::reports::get_comparison,
             commands::settings::get_settings,
             commands::settings::update_settings,
             commands::accounts::list_accounts,

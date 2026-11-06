@@ -1,4 +1,5 @@
 import type { CategoryKind } from "@/bindings/CategoryKind";
+import type { ComparisonMode } from "@/bindings/ComparisonMode";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
 import type { TransactionFilter } from "@/bindings/TransactionFilter";
 
@@ -23,6 +24,9 @@ export const queryKeys = {
   timeseries: (query: PeriodQuery) => ["ledger", "timeseries", query] as const,
   breakdown: (query: PeriodQuery, kind: CategoryKind) =>
     ["ledger", "breakdown", query, kind] as const,
+  // A null mode follows the setting, which refreshes the ledger when it changes.
+  comparison: (query: PeriodQuery, mode: ComparisonMode | null) =>
+    ["ledger", "comparison", query, mode] as const,
   settings: ["settings"],
   startup: ["startup"],
   appVersion: ["appVersion"],

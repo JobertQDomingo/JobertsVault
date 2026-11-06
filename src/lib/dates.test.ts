@@ -4,6 +4,7 @@ import {
   formatBarDates,
   formatBarLabel,
   formatInputDate,
+  formatSpan,
   formatDayHeader,
   formatPeriodLabel,
   parseInputDate,
@@ -107,6 +108,19 @@ test("a chart bar's dates name a whole month, or show the range", () => {
     "Jan 1 – Mar 31, 2026",
   );
   expect(formatBarDates("2025-12-29", "2026-01-04")).toBe(
+    "Dec 29, 2025 – Jan 4, 2026",
+  );
+});
+
+test("a comparison's dates drop the year when it's this year's", () => {
+  const today = "2026-11-03";
+  expect(formatSpan("2026-11-03", "2026-11-03", today)).toBe("Nov 3");
+  expect(formatSpan("2026-09-01", "2026-09-26", today)).toBe("Sep 1–26");
+  expect(formatSpan("2026-09-25", "2026-10-04", today)).toBe("Sep 25 – Oct 4");
+  expect(formatSpan("2025-01-01", "2025-11-03", today)).toBe(
+    "Jan 1 – Nov 3, 2025",
+  );
+  expect(formatSpan("2025-12-29", "2026-01-04", today)).toBe(
     "Dec 29, 2025 – Jan 4, 2026",
   );
 });

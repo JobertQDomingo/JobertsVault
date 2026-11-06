@@ -90,6 +90,7 @@ const settings: Settings = {
   showPaymentMethod: true,
   onboardingCompleted: true,
   autoUpdateEnabled: true,
+  comparisonMode: "to_date",
 };
 
 // Every write the app can make (ARCHITECTURE §4.5), with the arguments it sends to Rust.

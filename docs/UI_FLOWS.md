@@ -213,7 +213,7 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 
 | Tab | Contents | PRD |
 |---|---|---|
-| **General** | Currency symbol, its position (before or after the amount), decimal places (**locked** once any amount is saved, with an explanation), first day of week, month start day (1–28), show payment method field. **Updates:** the current version, **Check for updates** and a switch, "Install updates automatically when the app starts" | SET-1, SET-2, SET-6, UPD-3 |
+| **General** | Currency symbol, its position (before or after the amount), decimal places (**locked** once any amount is saved, with an explanation), first day of week, month start day (1–28), **compare periods** (same days so far or full previous period, SET-7, Phase 2), show payment method field. **Updates:** the current version, **Check for updates** and a switch, "Install updates automatically when the app starts" | SET-1, SET-2, SET-6, SET-7, UPD-3 |
 | **Categories** | Two lists (Income and Expense). Add, rename, change color (12 swatches) and icon (curated list), reorder, archive, unarchive, **merge**, delete if unused | CAT-2, CAT-4 |
 | **Payment methods** | Add, rename, reorder, archive, unarchive, delete if unused | TXN-7 |
 | **Backup** (Phase 2) | See §8.1 | BAK-* |
@@ -303,10 +303,10 @@ Welcome to Jobert's Vault
 ## 8. Phase 2–4 screens (outline)
 
 ### 8.1 Reports (`/reports`), Phase 2
-- Period switcher plus a "Compare to" dropdown and an account filter (RPT-5).
+- Period switcher plus a "Compare to" dropdown and an account filter (RPT-5). **Compare to** (Same days so far / Full previous period) starts on the Settings choice (SET-7), changes only this view and is kept in the URL (`compare=full`). It's disabled, with a tooltip, and shows Full previous period when `get_comparison` says the period is over, since that's always compared in full (RPT-4a).
 - **Section 1: Income vs expense.** A bar chart grouped by day, week or month (RPT-1, DATA_MODEL §5.9), with net cashflow as a line. Income bars rise above the zero line and expense bars hang below it, so they're told apart by direction as well as color. Hovering a bar shows its dates and the three figures. A hidden table gives screen readers the same figures.
 - **Section 2: Category breakdown.** A donut chart showing the largest 8 categories plus "Other", with the total in its middle, next to a ranked list showing each category's chip, % and amount (DATA_MODEL §5.10). Hovering a slice shows its name, amount and %. An **Expense / Income** switch in the section's header picks the kind, kept in the URL (`breakdown=income`) so Back returns to it. Clicking a category in the list opens `/transactions` filtered to that category and the same period (RPT-2, RPT-3). Archived categories with spending in the period still appear.
-- **Section 3: Comparison table.** Rows for income, expense, net and each category, with columns for this period, the comparison period, the difference and the % change (RPT-4).
+- **Section 3: Period comparison.** Rows for income, expense, net and each category, with columns for this period, the comparison period, the difference and the % change (RPT-4). The column headers are the dates counted, e.g. "Nov 1–6" and "Oct 1–6" (the year appears when it isn't this year). The % change is `▲ 12.3%` or `▼ 4.0%`, green when the direction is good (DESIGN_SYSTEM §7), or "—" when there's nothing to compare with. Income and expense amounts are plain, and the difference is signed, in the plain text color.
 
 ### 8.2 Recurring (`/recurring`), Phase 3
 A list of rules showing the next date, amount, frequency, mode (Auto or Confirm) and whether it's paused. "+ New rule" opens the transaction form plus a schedule section: frequency, every *N*, start date, and when it ends (never, on a date, or after a number of times).
@@ -374,3 +374,4 @@ Answered on 2026-11-01:
 Answered on 2026-11-06:
 
 11. **Dashboard chart:** the small income-vs-expense chart under the stat cards is built in Phase 2 with RPT-1, and its data comes from `get_dashboard`, so the dashboard stays one call (§2).
+12. **Compare to:** Settings → General holds the default comparison (SET-7), used by the dashboard's % change and as Reports' starting choice. Reports' **Compare to** changes only that view and is kept in the URL (§6, §8.1).

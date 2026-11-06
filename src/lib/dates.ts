@@ -103,3 +103,20 @@ export function formatBarDates(start: string, end: string) {
     addDays(end, 1).endsWith("-01");
   return formatPeriodLabel(wholeMonth ? "month" : "custom", start, end);
 }
+
+/**
+ * A comparison's dates (DESIGN_SYSTEM §9.2): `Nov 3`, `Nov 1–3`, `Oct 25 – Nov 3`, with the year
+ * when it isn't `today`'s, and both years when they differ.
+ */
+export function formatSpan(start: string, end: string, today: string) {
+  const [from, to] = [toDate(start), toDate(end)];
+  if (from.getFullYear() !== to.getFullYear()) return formatRange(from, to);
+  const year =
+    to.getFullYear() === toDate(today).getFullYear()
+      ? ""
+      : `, ${to.getFullYear()}`;
+  if (start === end) return `${format(from, "MMM d")}${year}`;
+  return from.getMonth() === to.getMonth()
+    ? `${format(from, "MMM d")}–${format(to, "d")}${year}`
+    : `${format(from, "MMM d")} – ${format(to, "MMM d")}${year}`;
+}
