@@ -350,6 +350,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-06 | RPT-1's chart bars are calendar-aligned: a Day period is one bar, a Year is 12 calendar months, and Custom weeks follow the week start and Custom months are calendar months, cut to the range (DATA_MODEL §5.9) |
 | 2026-11-06 | The dashboard's small income-vs-expense chart (UI_FLOWS §2) is built with RPT-1, from `get_dashboard` |
 | 2026-11-06 | SET-7's default comparison lives in Settings → General. Reports' Compare to changes only that view, kept in the URL (UI_FLOWS §8.1) |
+| 2026-11-06 | Reports' Compare to sits in the Period comparison section's header, and RPT-5's account filter beside the period bar, since all three don't fit in one row (UI_FLOWS §8.1, §11) |
 
 ---
 

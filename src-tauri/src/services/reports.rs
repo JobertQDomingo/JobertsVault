@@ -39,9 +39,11 @@ pub struct Timeseries {
     pub today: NaiveDate,
 }
 
+/// `account` some counts only that account's rows (RPT-5); none counts every account.
 pub fn timeseries(
     conn: &Connection,
     query: &PeriodQuery,
+    account: Option<i64>,
     today: NaiveDate,
 ) -> Result<Timeseries, AppError> {
     let period = period::resolve(conn, query, today)?;
@@ -59,7 +61,11 @@ pub fn timeseries(
         .collect();
     let (start, end) = counted(&period, today);
     let (start, end) = (start.to_string(), end.to_string());
-    for (date, income, expense) in repo::daily_totals(conn, &Filter::dates(&start, &end))? {
+    let filter = Filter {
+        account_id: account,
+        ..Filter::dates(&start, &end)
+    };
+    for (date, income, expense) in repo::daily_totals(conn, &filter)? {
         let date =
             parse_date(&date).ok_or_else(|| database("A transaction has an invalid date"))?;
         // The bars cover the period in order, so the first one ending on or after it holds it.
@@ -122,14 +128,16 @@ pub struct Breakdown {
     pub slices: Vec<Slice>,
 }
 
+/// `account` as for [`timeseries`].
 pub fn breakdown(
     conn: &Connection,
     query: &PeriodQuery,
     kind: CategoryKind,
+    account: Option<i64>,
     today: NaiveDate,
 ) -> Result<Breakdown, AppError> {
     let (start, end) = counted(&period::resolve(conn, query, today)?, today);
-    let ranked: Vec<(i64, Money)> = category_totals(conn, start, end, kind)?
+    let ranked: Vec<(i64, Money)> = category_totals(conn, start, end, kind, account)?
         .into_iter()
         .map(|(id, amount)| (id, Money(amount)))
         .collect();
@@ -209,11 +217,12 @@ pub struct Comparison {
     pub today: NaiveDate,
 }
 
-/// `mode` none means the comparison setting (SET-7).
+/// `mode` none means the comparison setting (SET-7); `account` as for [`timeseries`].
 pub fn comparison(
     conn: &Connection,
     query: &PeriodQuery,
     mode: Option<ComparisonMode>,
+    account: Option<i64>,
     today: NaiveDate,
 ) -> Result<Comparison, AppError> {
     let period = period::resolve(conn, query, today)?;
@@ -229,8 +238,8 @@ pub fn comparison(
     let (compare_start, compare_end) = counted(&window, today);
     let both = |kind| -> Result<Vec<CategoryLine>, AppError> {
         lines(
-            category_totals(conn, current_start, current_end, kind)?,
-            category_totals(conn, compare_start, compare_end, kind)?,
+            category_totals(conn, current_start, current_end, kind, account)?,
+            category_totals(conn, compare_start, compare_end, kind, account)?,
         )
     };
     let (income_categories, expense_categories) =
@@ -312,16 +321,18 @@ fn sum(lines: &[CategoryLine]) -> Result<Line, AppError> {
     line(current, compare)
 }
 
-/// Each category's total of `kind` from `start` to `end`, largest first.
+/// Each category's total of `kind` from `start` to `end`, largest first, from `account` if some.
 fn category_totals(
     conn: &Connection,
     start: NaiveDate,
     end: NaiveDate,
     kind: CategoryKind,
+    account: Option<i64>,
 ) -> Result<Vec<(i64, i64)>, AppError> {
     let (start, end) = (start.to_string(), end.to_string());
     let filter = Filter {
         kind: Some(categories::kind_text(kind)),
+        account_id: account,
         ..Filter::dates(&start, &end)
     };
     Ok(repo::category_totals(conn, &filter)?)
@@ -473,7 +484,7 @@ mod tests {
         spend(&mut conn, 300, d(2026, 11, 3));
         spend(&mut conn, 1_000, d(2026, 10, 31));
 
-        let series = timeseries(&conn, &MONTH, d(2026, 11, 3)).unwrap();
+        let series = timeseries(&conn, &MONTH, None, d(2026, 11, 3)).unwrap();
         assert_eq!((series.grain, series.today), (Grain::Day, d(2026, 11, 3)));
         let bars = figures(&series);
         assert_eq!(bars.len(), 30);
@@ -499,7 +510,7 @@ mod tests {
         spend(&mut conn, 800, d(2025, 12, 31));
 
         let year = PeriodQuery::Year { anchor: None };
-        let series = timeseries(&conn, &year, d(2026, 11, 3)).unwrap();
+        let series = timeseries(&conn, &year, None, d(2026, 11, 3)).unwrap();
         assert_eq!(series.grain, Grain::Month);
         let expense: Vec<i64> = series.bars.iter().map(|b| b.expense.0).collect();
         assert_eq!(expense, [100, 600, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
@@ -511,7 +522,7 @@ mod tests {
         spend(&mut conn, 1_000, d(2026, 11, 2));
         spend(&mut conn, 7_000, d(2026, 11, 3));
 
-        let bars = figures(&timeseries(&conn, &MONTH, d(2026, 11, 2)).unwrap());
+        let bars = figures(&timeseries(&conn, &MONTH, None, d(2026, 11, 2)).unwrap());
         assert_eq!((bars[1].3, bars[2].3), (1_000, 0));
     }
 
@@ -529,7 +540,7 @@ mod tests {
             start: d(2026, 10, 1),
             end: d(2026, 11, 2),
         };
-        let series = timeseries(&conn, &query, d(2026, 11, 3)).unwrap();
+        let series = timeseries(&conn, &query, None, d(2026, 11, 3)).unwrap();
         assert_eq!(series.grain, Grain::Week);
         let bars = figures(&series);
         assert_eq!(bars[0], (d(2026, 10, 1), d(2026, 10, 3), 0, 100, -100));
@@ -599,7 +610,7 @@ mod tests {
         );
         spend(&mut conn, 500, d(2026, 10, 31));
 
-        let b = breakdown(&conn, &MONTH, CategoryKind::Expense, d(2026, 11, 3)).unwrap();
+        let b = breakdown(&conn, &MONTH, CategoryKind::Expense, None, d(2026, 11, 3)).unwrap();
         assert_eq!(b.total, Money(12_000));
         assert_eq!(
             parts(&conn, &b),
@@ -638,7 +649,7 @@ mod tests {
         );
         spend(&mut conn, 5_000, day);
 
-        let b = breakdown(&conn, &MONTH, CategoryKind::Income, d(2026, 11, 3)).unwrap();
+        let b = breakdown(&conn, &MONTH, CategoryKind::Income, None, d(2026, 11, 3)).unwrap();
         assert_eq!((b.kind, b.total), (CategoryKind::Income, Money(10_000)));
         assert_eq!(
             parts(&conn, &b),
@@ -678,7 +689,7 @@ mod tests {
             );
         }
 
-        let b = breakdown(&conn, &MONTH, CategoryKind::Expense, d(2026, 11, 3)).unwrap();
+        let b = breakdown(&conn, &MONTH, CategoryKind::Expense, None, d(2026, 11, 3)).unwrap();
         assert_eq!(b.categories.len(), 10);
         assert_eq!(b.slices.len(), 9);
         // Insurance (600) and Entertainment (550).
@@ -690,7 +701,7 @@ mod tests {
     #[test]
     fn an_empty_breakdown_has_nothing_and_a_total_of_0() {
         let conn = db();
-        let b = breakdown(&conn, &MONTH, CategoryKind::Expense, d(2026, 11, 3)).unwrap();
+        let b = breakdown(&conn, &MONTH, CategoryKind::Expense, None, d(2026, 11, 3)).unwrap();
         assert_eq!(
             (b.total, b.categories.len(), b.slices.len()),
             (Money(0), 0, 0)
@@ -702,7 +713,7 @@ mod tests {
         let mut conn = db();
         spend(&mut conn, 1_000, d(2026, 11, 2));
         spend(&mut conn, 7_000, d(2026, 11, 3));
-        let b = breakdown(&conn, &MONTH, CategoryKind::Expense, d(2026, 11, 2)).unwrap();
+        let b = breakdown(&conn, &MONTH, CategoryKind::Expense, None, d(2026, 11, 2)).unwrap();
         assert_eq!(b.total, Money(1_000));
     }
 
@@ -790,7 +801,14 @@ mod tests {
     fn a_month_in_progress_is_compared_with_the_same_days_last_month() {
         let mut conn = db();
         november_and_october(&mut conn);
-        let c = comparison(&conn, &MONTH, Some(ComparisonMode::ToDate), d(2026, 11, 3)).unwrap();
+        let c = comparison(
+            &conn,
+            &MONTH,
+            Some(ComparisonMode::ToDate),
+            None,
+            d(2026, 11, 3),
+        )
+        .unwrap();
         assert_eq!((c.in_progress, c.mode), (true, ComparisonMode::ToDate));
         assert_eq!(
             (
@@ -828,7 +846,14 @@ mod tests {
     fn full_compares_the_whole_previous_month() {
         let mut conn = db();
         november_and_october(&mut conn);
-        let c = comparison(&conn, &MONTH, Some(ComparisonMode::Full), d(2026, 11, 3)).unwrap();
+        let c = comparison(
+            &conn,
+            &MONTH,
+            Some(ComparisonMode::Full),
+            None,
+            d(2026, 11, 3),
+        )
+        .unwrap();
         assert_eq!(
             (c.compare_start, c.compare_end),
             (d(2026, 10, 1), d(2026, 10, 31))
@@ -842,9 +867,9 @@ mod tests {
         let mut s = settings::get(&conn).unwrap().settings;
         s.comparison_mode = ComparisonMode::Full;
         settings::update(&mut conn, s).unwrap();
-        let c = comparison(&conn, &MONTH, None, d(2026, 11, 3)).unwrap();
+        let c = comparison(&conn, &MONTH, None, None, d(2026, 11, 3)).unwrap();
         assert_eq!(c.compare_end, d(2026, 10, 31));
-        let default = comparison(&db(), &MONTH, None, d(2026, 11, 3)).unwrap();
+        let default = comparison(&db(), &MONTH, None, None, d(2026, 11, 3)).unwrap();
         assert_eq!(default.compare_end, d(2026, 10, 3));
     }
 
@@ -859,6 +884,7 @@ mod tests {
             &conn,
             &october,
             Some(ComparisonMode::ToDate),
+            None,
             d(2026, 11, 3),
         )
         .unwrap();
@@ -883,8 +909,47 @@ mod tests {
     }
 
     #[test]
+    fn every_report_can_be_filtered_by_account() {
+        let mut conn = db();
+        november_and_october(&mut conn);
+        let (cash, card) = (
+            id_of(&conn, "accounts", "Cash"),
+            id_of(&conn, "accounts", "Card"),
+        );
+        let dining = Some("Dining Out");
+        add(
+            &mut conn,
+            TransactionKind::Expense,
+            70,
+            d(2026, 11, 3),
+            card,
+            dining,
+            None,
+        );
+        let today = d(2026, 11, 3);
+        let to_date = Some(ComparisonMode::ToDate);
+
+        // Only the card's own rows count: the 9,000 transfer into it counts nowhere (§5.2).
+        let bars = figures(&timeseries(&conn, &MONTH, Some(card), today).unwrap());
+        let spent: Vec<_> = bars.iter().filter(|b| b.2 != 0 || b.3 != 0).collect();
+        assert_eq!(spent, [&(d(2026, 11, 3), d(2026, 11, 3), 0, 70, -70)]);
+        let b = breakdown(&conn, &MONTH, CategoryKind::Expense, Some(card), today).unwrap();
+        assert_eq!((b.total, b.categories.len()), (Money(70), 1));
+        let c = comparison(&conn, &MONTH, to_date, Some(card), today).unwrap();
+        assert_eq!(totals(&c.expense), (70, 100, -30, Some(-300)));
+        assert_eq!(totals(&c.income), (0, 0, 0, None));
+
+        let c = comparison(&conn, &MONTH, to_date, Some(cash), today).unwrap();
+        assert_eq!(totals(&c.income), (1_000, 800, 200, Some(250)));
+        assert_eq!(totals(&c.expense), (350, 200, 150, Some(750)));
+        // No account means every account.
+        let c = comparison(&conn, &MONTH, to_date, None, today).unwrap();
+        assert_eq!(totals(&c.expense), (420, 300, 120, Some(400)));
+    }
+
+    #[test]
     fn a_comparison_of_nothing_is_all_zero_with_no_change() {
-        let c = comparison(&db(), &MONTH, None, d(2026, 11, 3)).unwrap();
+        let c = comparison(&db(), &MONTH, None, None, d(2026, 11, 3)).unwrap();
         assert_eq!(totals(&c.net), (0, 0, 0, None));
         assert!(c.income_categories.is_empty() && c.expense_categories.is_empty());
     }
@@ -897,7 +962,7 @@ mod tests {
             end: d(2026, 10, 1),
         };
         assert!(matches!(
-            timeseries(&conn, &query, d(2026, 11, 3)),
+            timeseries(&conn, &query, None, d(2026, 11, 3)),
             Err(AppError::Validation { field, .. }) if field == "period"
         ));
     }

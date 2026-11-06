@@ -4,16 +4,19 @@ import { useSearchParams } from "react-router";
 import type { CategoryKind } from "@/bindings/CategoryKind";
 import { ErrorState } from "@/components/ErrorState";
 import { GlassPanel } from "@/components/GlassPanel";
+import { accountOptions } from "@/components/AccountRow";
 import { IncomeExpenseChart } from "@/components/IncomeExpenseChart";
 import { Loading, Skeleton } from "@/components/Loading";
 import { PeriodSwitcher } from "@/components/PeriodSwitcher";
 import { Combobox } from "@/components/ui/combobox";
 import { Segmented } from "@/components/ui/segmented";
+import { useAccounts } from "@/hooks/useAccounts";
 import { useCategories } from "@/hooks/useCategories";
 import { useBreakdown, useComparison, useTimeseries } from "@/hooks/useReports";
 import { usePeriodQuery } from "@/hooks/usePeriodQuery";
 import { useSettings } from "@/hooks/useSettings";
 import { COMPARE } from "@/lib/comparison";
+import { idParam } from "@/lib/records";
 import { cn } from "@/lib/utils";
 import { CategoryBreakdown } from "./CategoryBreakdown";
 import { ComparisonTable } from "./ComparisonTable";
@@ -97,8 +100,11 @@ export function ReportsScreen() {
   // None means the setting (SET-7).
   const mode =
     COMPARE.find((m) => m.value === params.get("compare"))?.value ?? null;
+  // None means every account (RPT-5).
+  const accountId = idParam(params.get("account"));
+  const accounts = useAccounts().data?.accounts;
   const settings = useSettings().data;
-  const comparison = useComparison(query, mode);
+  const comparison = useComparison(query, mode, accountId);
   // A period that's over is compared in full whatever is chosen: the backend says so (RPT-4a).
   const over = comparison.data?.inProgress === false;
   const categories = useCategories();
@@ -107,32 +113,19 @@ export function ReportsScreen() {
     <>
       <div className="flex items-center gap-3">
         <PeriodSwitcher />
-        <GlassPanel
-          className="flex items-center gap-2.5 rounded-toolbar p-1.5 pl-3.5"
-          title={
-            over ? "A period that's over is always compared in full" : undefined
-          }
-        >
-          <label htmlFor="compare-to" className="font-semibold">
-            Compare to
-          </label>
+        <GlassPanel className="rounded-toolbar p-1.5">
           <Combobox
-            id="compare-to"
-            className="w-52"
-            options={COMPARE}
-            value={
-              over
-                ? (comparison.data?.mode ?? null)
-                : (mode ?? settings?.comparisonMode ?? null)
-            }
-            disabled={over}
-            onChange={(next) => setParam("compare", next)}
+            aria-label="Account"
+            className="w-48"
+            options={accountOptions(accounts, accountId)}
+            value={accountId === null ? "" : String(accountId)}
+            onChange={(id) => setParam("account", id || null)}
           />
         </GlassPanel>
       </div>
       <Section
         title="Income vs expense"
-        query={useTimeseries(query)}
+        query={useTimeseries(query, accountId)}
         skeleton="h-[300px]"
       >
         {(series) => <IncomeExpenseChart series={series} height={272} />}
@@ -149,7 +142,7 @@ export function ReportsScreen() {
             }
           />
         }
-        query={useBreakdown(query, kind)}
+        query={useBreakdown(query, kind, accountId)}
         also={[categories]}
         skeleton="h-[216px]"
       >
@@ -157,12 +150,40 @@ export function ReportsScreen() {
           <CategoryBreakdown
             breakdown={breakdown}
             query={query}
+            accountId={accountId}
             categories={byId}
           />
         )}
       </Section>
       <Section
         title="Period comparison"
+        // It changes only this report, so it sits in its header (UI_FLOWS §8.1).
+        action={
+          <div
+            className="flex items-center gap-2.5"
+            title={
+              over
+                ? "A period that's over is always compared in full"
+                : undefined
+            }
+          >
+            <label htmlFor="compare-to" className="text-muted-foreground">
+              Compare to
+            </label>
+            <Combobox
+              id="compare-to"
+              className="w-52"
+              options={COMPARE}
+              value={
+                over
+                  ? (comparison.data?.mode ?? null)
+                  : (mode ?? settings?.comparisonMode ?? null)
+              }
+              disabled={over}
+              onChange={(next) => setParam("compare", next)}
+            />
+          </div>
+        }
         query={comparison}
         also={[categories]}
         skeleton="h-[240px]"

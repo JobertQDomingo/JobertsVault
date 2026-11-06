@@ -1,6 +1,6 @@
 import { Search } from "lucide-react";
 import { useState } from "react";
-import { ACCOUNT_ICONS } from "@/components/AccountRow";
+import { accountOptions } from "@/components/AccountRow";
 import { CategoryChip } from "@/components/CategoryChip";
 import { GlassPanel } from "@/components/GlassPanel";
 import { Button } from "@/components/ui/button";
@@ -78,19 +78,7 @@ export function FilterToolbar() {
         aria-label="Account"
         placeholder="Account"
         className={combo}
-        options={[
-          { value: "", label: "All accounts" },
-          ...offered(accounts?.accounts, filter.accountId).map((a) => {
-            const Icon = ACCOUNT_ICONS[a.kind];
-            return {
-              value: String(a.id),
-              label: named(a),
-              icon: (
-                <Icon aria-hidden className="size-4 text-muted-foreground" />
-              ),
-            };
-          }),
-        ]}
+        options={accountOptions(accounts?.accounts, filter.accountId)}
         value={filter.accountId === null ? null : String(filter.accountId)}
         onChange={(id) => change({ accountId: toId(id) })}
       />

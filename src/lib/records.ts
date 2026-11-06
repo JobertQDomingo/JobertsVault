@@ -8,3 +8,7 @@ export const offered = <T extends { id: number; archived: boolean }>(
 
 export const named = (item: { name: string; archived: boolean }) =>
   item.archived ? `${item.name} (archived)` : item.name;
+
+/** A URL parameter's positive whole id, or null when it's missing or malformed. */
+export const idParam = (text: string | null) =>
+  text && /^\d+$/.test(text) && Number(text) > 0 ? Number(text) : null;

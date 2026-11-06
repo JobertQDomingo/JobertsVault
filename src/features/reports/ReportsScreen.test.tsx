@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import {
+  ACCOUNT_LIST,
   BREAKDOWN,
   CATEGORIES,
   COMPARISON,
@@ -22,6 +23,7 @@ const ANSWERS: Answers = {
   get_category_breakdown: BREAKDOWN,
   get_comparison: COMPARISON,
   list_categories: CATEGORIES,
+  list_accounts: ACCOUNT_LIST,
 };
 
 const comparison = () =>
@@ -45,6 +47,7 @@ test("the chart shows the bars for the period in the URL", async () => {
   expect(within(table).getAllByRole("row")).toHaveLength(31);
   expect(invoke).toHaveBeenCalledWith("get_timeseries", {
     query: { kind: "month", anchor: "2026-11-01" },
+    accountId: null,
   });
   expect(screen.queryByText("Nothing recorded in this period.")).toBeNull();
 });
@@ -90,6 +93,7 @@ test("the breakdown ranks the expense categories with their amounts and shares",
   expect(invoke).toHaveBeenCalledWith("get_category_breakdown", {
     query: { kind: "month", anchor: null },
     kind: "expense",
+    accountId: null,
   });
 });
 
@@ -210,6 +214,7 @@ test("the comparison puts the period next to the same days last month", async ()
   expect(invoke).toHaveBeenCalledWith("get_comparison", {
     query: { kind: "month", anchor: null },
     mode: null,
+    accountId: null,
   });
 });
 
@@ -224,9 +229,62 @@ test("Compare to starts on the setting, and a choice stays in the URL", async ()
     expect(invoke).toHaveBeenCalledWith("get_comparison", {
       query: { kind: "month", anchor: null },
       mode: "full",
+      accountId: null,
     }),
   );
   expect(router.state.location.search).toBe("?compare=full");
+  // It changes only the comparison, so it sits in that section's header.
+  const section = screen
+    .getByRole("heading", { name: "Period comparison" })
+    .closest<HTMLElement>(".glass")!;
+  expect(section.contains(select)).toBe(true);
+});
+
+test("the account filter narrows every report and stays in the URL (RPT-5)", async () => {
+  const { router } = renderRoute("/reports", ANSWERS);
+  await comparison();
+  const select = screen.getByRole("combobox", { name: "Account" });
+  expect((select as HTMLInputElement).value).toBe("All accounts");
+  fireEvent.click(select);
+  // Archived accounts aren't offered.
+  expect(screen.queryByRole("option", { name: /Old Wallet/ })).toBeNull();
+  fireEvent.click(screen.getByRole("option", { name: "Bank" }));
+  const query = { kind: "month", anchor: null };
+  await waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith("get_comparison", {
+      query,
+      mode: null,
+      accountId: 2,
+    }),
+  );
+  expect(invoke).toHaveBeenCalledWith("get_timeseries", {
+    query,
+    accountId: 2,
+  });
+  expect(invoke).toHaveBeenCalledWith("get_category_breakdown", {
+    query,
+    kind: "expense",
+    accountId: 2,
+  });
+  expect(router.state.location.search).toBe("?account=2");
+  // All accounts again drops it from the URL.
+  fireEvent.click(select);
+  fireEvent.click(screen.getByRole("option", { name: "All accounts" }));
+  await waitFor(() => expect(router.state.location.search).toBe(""));
+});
+
+test("a category's transactions keep the account", async () => {
+  const { router } = renderRoute("/reports?account=4", ANSWERS);
+  fireEvent.click(within(await ranked()).getByText("Dining Out"));
+  await waitFor(() =>
+    expect(router.state.location.pathname).toBe("/transactions"),
+  );
+  const params = new URLSearchParams(router.state.location.search);
+  expect(Object.fromEntries(params)).toEqual({
+    period: "month",
+    category: "2",
+    account: "4",
+  });
 });
 
 test("a period that's over is always compared in full", async () => {
