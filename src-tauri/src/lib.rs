@@ -116,8 +116,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building the app")
         .run(|app, event| {
-            if let tauri::RunEvent::Exit = event {
-                app.state::<AppState>().close();
+            if let tauri::RunEvent::Exit = event
+                && let Some(state) = app.try_state::<AppState>()
+            {
+                state.close();
             }
         });
 }
