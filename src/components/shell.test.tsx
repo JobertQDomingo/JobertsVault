@@ -33,13 +33,14 @@ beforeEach(() => {
   vi.mocked(invoke).mockReset();
 });
 
-test("the sidebar lists the Phase 1 screens and marks the current one", () => {
+test("the sidebar lists the screens built so far and marks the current one", () => {
   renderAt("/");
   const nav = screen.getByRole("navigation");
   expect([...nav.querySelectorAll("a")].map((a) => a.textContent)).toEqual([
     "Dashboard",
     "Transactions",
     "Accounts",
+    "Reports",
     "Settings",
   ]);
   expect(link("Dashboard").getAttribute("aria-current")).toBe("page");
@@ -108,11 +109,12 @@ test("Ctrl+N works with Caps Lock on, but Ctrl+Shift+N isn't it", async () => {
   expect(await screen.findByRole("dialog")).toBeTruthy();
 });
 
-test("Ctrl+1–3 and Ctrl+, go to the screens", async () => {
+test("Ctrl+1–4 and Ctrl+, go to the screens", async () => {
   renderAt("/");
   for (const [key, name] of [
     ["2", "Transactions"],
     ["3", "Accounts"],
+    ["4", "Reports"],
     [",", "Settings"],
     ["1", "Dashboard"],
   ]) {
@@ -162,6 +164,7 @@ test("each screen's link names its shortcut", () => {
     "Control+2",
   );
   expect(link("Settings").title).toBe("Settings (Ctrl+,)");
+  expect(link("Reports").getAttribute("aria-keyshortcuts")).toBe("Control+4");
 });
 
 test("shortcuts also wait while a menu or an alert dialog is open", () => {
@@ -175,7 +178,7 @@ test("shortcuts also wait while a menu or an alert dialog is open", () => {
   expect(router.state.location.pathname).toBe("/");
 });
 
-test("Ctrl+1–3 follow the key's place, so other keyboard layouts work", async () => {
+test("Ctrl+1–4 follow the key's place, so other keyboard layouts work", async () => {
   renderAt("/settings");
   // On AZERTY the 1 key types "&".
   press("&", { ctrlKey: true, code: "Digit1" });

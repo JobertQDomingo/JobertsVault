@@ -280,7 +280,7 @@ Welcome to Jobert's Vault
 
 ### F8: Look at a different period (Phase 1)
 - Use the segmented control to switch between Day, Week, Month and Year. ◀ ▶ move one period back or forward, and **Today** jumps back to the current period. Custom opens a date range picker that can't choose future dates, and ◀ ▶ then move by the length of the range. ▶ is disabled once the next period would start after today.
-- **Phase 2** adds a "Compare to: Same days so far ▾ / Full previous period" option on Reports (RPT-4a, SET-7).
+- **Phase 2** adds a "Compare to: Same days so far ▾ / Full previous period" option in Reports' Period comparison section (RPT-4a, SET-7, §8.1).
 
 ### F9: Back up and restore (Phase 2)
 - **Back up now:** Settings → Backup → **Back up now** → toast "Backup saved to …" with an **Open folder** link.
