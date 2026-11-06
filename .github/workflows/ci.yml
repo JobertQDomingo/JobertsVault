@@ -1,13 +1,16 @@
-# Run every check on each pull request and each push to main.
+# Run every check on each pull request and each push to main. release.yml runs it too.
 name: CI
 
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_call:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # Called from release.yml, github.workflow is "Release", so a release's checks and main's own
+  # CI run never cancel each other.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
