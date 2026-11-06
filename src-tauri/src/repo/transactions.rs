@@ -115,7 +115,20 @@ pub struct Filter<'a> {
     pub search: Option<&'a str>,
 }
 
-impl Filter<'_> {
+impl<'a> Filter<'a> {
+    /// Every row dated `start` to `end`, with no other filter.
+    pub fn dates(start: &'a str, end: &'a str) -> Self {
+        Filter {
+            start,
+            end,
+            kind: None,
+            account_id: None,
+            category_id: None,
+            payment_method_id: None,
+            search: None,
+        }
+    }
+
     fn values(&self) -> [&dyn ToSql; 7] {
         [
             &self.start,
@@ -168,6 +181,18 @@ pub fn day_nets(conn: &Connection, f: &Filter) -> rusqlite::Result<Vec<(String, 
          FROM transactions {WHERE} GROUP BY date ORDER BY date DESC"
     ))?
     .query_map(&f.values()[..], |r| Ok((r.get(0)?, r.get(1)?)))?
+    .collect()
+}
+
+/// The income and expense totals of each date with matching rows, oldest first.
+pub fn daily_totals(conn: &Connection, f: &Filter) -> rusqlite::Result<Vec<(String, i64, i64)>> {
+    conn.prepare(&format!(
+        "SELECT date,
+                COALESCE(SUM(CASE kind WHEN 'income' THEN amount END), 0),
+                COALESCE(SUM(CASE kind WHEN 'expense' THEN amount END), 0)
+         FROM transactions {WHERE} GROUP BY date ORDER BY date"
+    ))?
+    .query_map(&f.values()[..], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
     .collect()
 }
 

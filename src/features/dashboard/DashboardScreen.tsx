@@ -6,6 +6,7 @@ import { AccountRow } from "@/components/AccountRow";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { GlassPanel } from "@/components/GlassPanel";
+import { IncomeExpenseChart } from "@/components/IncomeExpenseChart";
 import { Loading, Skeleton } from "@/components/Loading";
 import { MoneyText } from "@/components/MoneyText";
 import { PeriodSwitcher } from "@/components/PeriodSwitcher";
@@ -115,6 +116,10 @@ function DashboardBody({
         <StatCard label="Expense" amount={data.expense} kind="expense" />
         <StatCard label="Net cashflow" amount={data.net} kind="net" />
       </div>
+      <GlassPanel className="grid gap-2 px-[18px] pt-4 pb-3">
+        <h2 className="text-h3">Income vs expense</h2>
+        <IncomeExpenseChart series={data.series} height={140} />
+      </GlassPanel>
       <div className={COLUMNS}>
         <GlassPanel className="overflow-hidden pb-1.5">
           <CardHeader

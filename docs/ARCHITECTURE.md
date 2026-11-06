@@ -163,6 +163,7 @@ fn comparison_window(current: &Period, today: NaiveDate, mode: ComparisonMode) -
 pub struct CardCycle { start: NaiveDate, end: NaiveDate, due: NaiveDate }  // end = statement closing date
 fn card_cycle(statement_day: u8, due_day: u8, today: NaiveDate) -> Option<CardCycle>;     // §5.5; None past chrono's range
 fn card_figures(balance: Money, credit_limit: Money) -> CardFigures;  // amount owed, available credit, utilization % (§5.1)
+fn bars(period: &Period, &PeriodSettings) -> Option<(Grain, Vec<(NaiveDate, NaiveDate)>)>;  // the chart's bars (DATA_MODEL §5.9)
 ```
 
 ### 4.3 Database access
@@ -212,9 +213,9 @@ All commands use `camelCase` parameter names in TypeScript and `snake_case` in R
 | 1 | Categories | `list_categories` → every category (archived included) and each kind's default color for a new one (DATA_MODEL §7); `create_category(category)`; `update_category(id, category)` (name, color and icon; the kind can't change); `archive_category(id)`; `unarchive_category(id)`; `delete_category(id)` (only with no transactions); `reorder_categories(ids)`; `merge_categories(from_id, into_id)` (moves every transaction to the active category `into_id` of the same kind, then deletes `from_id`). Each category carries its `transactionCount`. The last active category of a kind can't be archived or deleted |
 | 1 | Payment methods | `list_payment_methods` → every method, archived included; `create_payment_method(name)`; `update_payment_method(id, name)`; `archive_payment_method(id)`; `unarchive_payment_method(id)`; `delete_payment_method(id)` (unused methods only); `reorder_payment_methods(ids)`. Each method carries `inUse` |
 | 1 | Transactions | `list_transactions(filter, page)` (below); `get_transaction(id)`; `create_transaction(transaction)` (also saves `last_used_account_id`); `update_transaction(id, transaction)` (the kind can change); `delete_transaction(id)`; `get_transaction_defaults` → account and today (DATA_MODEL §5.8); `get_pay_bill_defaults(card_id)` → From account, amount (none when nothing is owed) and today, and a `Conflict` for an account that isn't a credit card. A transaction carries ids only: the screens take names, colors and icons from the account, category and payment method lists |
-| 1 | Dashboard | `get_dashboard(query)` → the period (as `get_period` returns it); income, expense and net for the period, counting only rows dated today or earlier; every account (archived included) with its balance and card summary, as `list_accounts` returns them; the net balance; the 5 newest transactions whatever the period; `today` |
+| 1 | Dashboard | `get_dashboard(query)` → the period (as `get_period` returns it); income, expense and net for the period, counting only rows dated today or earlier; from Phase 2, the income-vs-expense chart (`series`, as `get_timeseries` returns it); every account (archived included) with its balance and card summary, as `list_accounts` returns them; the net balance; the 5 newest transactions whatever the period; `today` |
 | 1 | Settings | `get_settings` → every Phase 1 key and whether decimals are locked; `update_settings(settings)` saves the whole set and returns it the same way |
-| 2 | Reports | `get_timeseries`, `get_category_breakdown`, `get_comparison`, `suggest_payees(prefix)` |
+| 2 | Reports | `get_timeseries(query)` → the chart's `grain` (day, week or month), its `bars` (each one's start, end, income, expense and net, counting only rows dated today or earlier) and `today` (RPT-1, DATA_MODEL §5.9); `get_category_breakdown`, `get_comparison`, `suggest_payees(prefix)` |
 | 2 | Backup | `backup_now`, `list_backups`, `restore_backup(path)`, `export_csv(range, path)` |
 | 3 | Planning | `list/create/update/pause/delete_recurring_rule`, `list_due_occurrences`, `post_occurrence`, `skip_occurrence`, budget CRUD + `get_budget_progress`, goal CRUD + `get_goal_progress` |
 
@@ -448,7 +449,7 @@ A failed release stays a hidden draft, so no installed copy ever sees it.
 | Smooth glass UI | Blur only on panels and raised elements (about 12 or fewer on screen), never on list rows. Lists scroll inside one panel, and nothing is blurred when Windows transparency is off (DESIGN_SYSTEM §11). |
 | Each view loads in < 300 ms with 50,000 transactions | Date and account indexes; totals calculated with SQL `SUM` (never adding up rows in JS); one IPC call for the dashboard; the transaction list loads in pages of 100 |
 
-**Checking the 300 ms target:** `cargo test --manifest-path src-tauri/Cargo.toml --release perf -- --ignored --nocapture` seeds 50,000 transactions into a database file and fails if a dashboard or transaction list query takes 300 ms or more.
+**Checking the 300 ms target:** `cargo test --manifest-path src-tauri/Cargo.toml --release perf -- --ignored --nocapture` seeds 50,000 transactions into a database file and fails if a dashboard, transaction list or report query takes 300 ms or more.
 
 ## 13. Coding conventions
 

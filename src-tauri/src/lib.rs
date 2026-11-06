@@ -80,6 +80,7 @@ pub fn run() {
             commands::updates::install_update,
             commands::period::get_period,
             commands::dashboard::get_dashboard,
+            commands::reports::get_timeseries,
             commands::settings::get_settings,
             commands::settings::update_settings,
             commands::accounts::list_accounts,

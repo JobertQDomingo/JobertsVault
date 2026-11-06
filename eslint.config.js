@@ -4,7 +4,9 @@ import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
-  { ignores: ["dist/", "src-tauri/", "src/bindings/", "docs/"] },
+  {
+    ignores: ["dist/", "src-tauri/", "src/bindings/", "docs/", ".superpowers/"],
+  },
   js.configs.recommended,
   tseslint.configs.recommended,
   reactHooks.configs.flat.recommended,

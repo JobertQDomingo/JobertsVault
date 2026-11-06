@@ -2,6 +2,7 @@
 import type { Account } from "./Account";
 import type { Money } from "./Money";
 import type { PeriodView } from "./PeriodView";
+import type { Timeseries } from "./Timeseries";
 import type { Transaction } from "./Transaction";
 
 /**
@@ -12,6 +13,10 @@ export type Dashboard = { period: PeriodView,
  * The period's income, expense and their difference, transfers excluded (DSH-2).
  */
 income: Money, expense: Money, net: Money, 
+/**
+ * The period's income-vs-expense chart under the stat cards (UI_FLOWS §2, RPT-1).
+ */
+series: Timeseries, 
 /**
  * Every account, archived included, with balances and card summaries as of today (DSH-4, DSH-5).
  */

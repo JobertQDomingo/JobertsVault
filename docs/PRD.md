@@ -347,6 +347,8 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-03 | NBSBuddy's "What's new" tour and download page are not part of the MVP |
 | 2026-11-03 | The preset expense categories follow DATA_MODEL §7's order: the 12 common ones first, then the 5 rarely used ones (so Personal Care comes before Education) |
 | 2026-11-04 | Today on a Custom period jumps to the range, in the same sequence, that contains today, which is where ▶ stops (DATA_MODEL §5.3) |
+| 2026-11-06 | RPT-1's chart bars are calendar-aligned: a Day period is one bar, a Year is 12 calendar months, and Custom weeks follow the week start and Custom months are calendar months, cut to the range (DATA_MODEL §5.9) |
+| 2026-11-06 | The dashboard's small income-vs-expense chart (UI_FLOWS §2) is built with RPT-1, from `get_dashboard` |
 
 ---
 

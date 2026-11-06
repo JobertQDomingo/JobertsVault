@@ -17,13 +17,20 @@ const ANSWERS: Answers = {
   list_categories: CATEGORIES,
 };
 
-/** The glass panel holding a heading or label. */
+// A stat card's label: the chart's legend and table repeat the names.
+const CARD = { selector: "p" };
+
+/** The glass panel holding a heading or a stat card's label. */
 const panel = (name: string) =>
-  within(screen.getByText(name).closest<HTMLElement>(".glass")!);
+  within(
+    screen
+      .getByText(name, { selector: "p, h2" })
+      .closest<HTMLElement>(".glass")!,
+  );
 
 test("the stat cards show the period's income, expense and net cashflow", async () => {
   renderRoute("/", ANSWERS);
-  await screen.findByText("Net cashflow");
+  await screen.findByText("Net cashflow", CARD);
   expect(panel("Income").getByText("+₱4,200.00")).toBeTruthy();
   expect(panel("Expense").getByText("−₱2,950.40")).toBeTruthy();
   expect(panel("Net cashflow").getByText("+₱1,249.60")).toBeTruthy();
@@ -43,6 +50,17 @@ test("the 5 newest transactions, grouped by day, never without their names", asy
   ])
     expect(recent.getByText(text)).toBeTruthy();
   expect(recent.getAllByRole("button")).toHaveLength(5);
+});
+
+test("the income-vs-expense chart has the period's bars, in a table for screen readers", async () => {
+  renderRoute("/", ANSWERS);
+  const table = await screen.findByRole("table", {
+    name: "Income, expense and net cashflow by day",
+  });
+  expect(within(table).getAllByRole("row")).toHaveLength(31);
+  const day = within(table).getByRole("row", { name: /Wed, Nov 4, 2026/ });
+  for (const amount of ["+₱4,200.00", "−₱2,852.70", "+₱1,347.30"])
+    expect(within(day).getByText(amount)).toBeTruthy();
 });
 
 test("clicking a recent transaction opens it for editing", async () => {
@@ -67,7 +85,7 @@ test("View all goes to Transactions, Manage to Accounts", async () => {
 test("accounts: the active ones, the card's details and the backend's net balance", async () => {
   renderRoute("/", ANSWERS);
   await screen.findByText("Net balance");
-  const accounts = panel("Net balance");
+  const accounts = panel("Accounts");
   const names = accounts
     .getAllByRole("link")
     .filter((a) => a.getAttribute("href")?.startsWith("/accounts/"))
@@ -97,7 +115,9 @@ test("with no transactions yet, it says how to add one and the totals are 0", as
       "No transactions yet. Press Ctrl+N to add your first one.",
     ),
   ).toBeTruthy();
-  expect(screen.getAllByText("₱0.00")).toHaveLength(3);
+  expect(
+    screen.getAllByText("₱0.00", { selector: ".text-display" }),
+  ).toHaveLength(3);
   fireEvent.click(
     panel("Recent transactions").getByRole("button", {
       name: /Add transaction/,
@@ -131,7 +151,7 @@ test("switching period keeps the totals until the new ones arrive", async () => 
         ? new Promise(() => {})
         : DASHBOARD,
   });
-  await screen.findByText("Net cashflow");
+  await screen.findByText("Net cashflow", CARD);
   fireEvent.click(screen.getByRole("button", { name: "Previous period" }));
   await waitFor(() =>
     expect(vi.mocked(invoke)).toHaveBeenCalledWith("get_dashboard", {
@@ -142,7 +162,7 @@ test("switching period keeps the totals until the new ones arrive", async () => 
   // …marked as loading, so they can't pass for the new period's.
   expect(
     screen
-      .getByText("Net cashflow")
+      .getByText("Net cashflow", CARD)
       .closest("[aria-busy]")
       ?.getAttribute("aria-busy"),
   ).toBe("true");
@@ -157,11 +177,11 @@ test("if a refresh fails, the error replaces the old numbers", async () => {
       return DASHBOARD;
     },
   });
-  await screen.findByText("Net cashflow");
+  await screen.findByText("Net cashflow", CARD);
   fail = true;
   await client.invalidateQueries({ queryKey: ["ledger"] });
   expect(await screen.findByRole("button", { name: "Retry" })).toBeTruthy();
-  expect(screen.queryByText("Net cashflow")).toBeNull();
+  expect(screen.queryByText("Net cashflow", CARD)).toBeNull();
 });
 
 test("if the categories can't load, the dashboard says so and Retry asks again", async () => {

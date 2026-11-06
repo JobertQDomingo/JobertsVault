@@ -3,6 +3,7 @@ pub mod categories;
 pub mod dashboard;
 pub mod payment_methods;
 pub mod period;
+pub mod reports;
 pub mod settings;
 pub mod system;
 pub mod transactions;
