@@ -70,9 +70,14 @@ pub struct SettingsView {
 
 pub fn get(conn: &Connection) -> Result<SettingsView, AppError> {
     Ok(SettingsView {
-        settings: load(conn, |_| true)?,
+        settings: stored(conn)?,
         decimals_locked: decimals_locked(conn)?,
     })
+}
+
+/// The stored settings alone, without the decimals lock's queries.
+pub fn stored(conn: &Connection) -> Result<Settings, AppError> {
+    load(conn, |_| true)
 }
 
 /// Changing the decimals would change the meaning of every stored amount (DATA_MODEL §1).

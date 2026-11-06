@@ -23,6 +23,9 @@ function Row({
   total?: boolean;
 }) {
   const cell = "px-3 py-2";
+  // The group says income or expense, so amounts are plain and the difference adds up as shown;
+  // only net cashflow, which can be either, keeps its sign.
+  const shown = kind === "net" ? "net" : "balance";
   return (
     <tr className={cn("border-t border-hairline", total && "bg-wash")}>
       <th
@@ -35,10 +38,10 @@ function Row({
         {name}
       </th>
       <td className={cell}>
-        <MoneyText amount={line.current} kind={kind} />
+        <MoneyText amount={line.current} kind={shown} />
       </td>
       <td className={cell}>
-        <MoneyText amount={line.compare} kind={kind} />
+        <MoneyText amount={line.compare} kind={shown} />
       </td>
       <td className={cell}>
         <MoneyText amount={line.difference} kind="difference" />

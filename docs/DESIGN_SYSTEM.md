@@ -295,7 +295,7 @@ The currency is the **Philippine peso**, shown with the official sign **₱** (U
 
 ### Percent change (Phase 2)
 
-Displayed as `▲ 12.3%` or `▼ 4.0%`, or `—` when there's nothing to compare against. No change is `0.0%` in `--muted-foreground`, with no arrow. Screen readers hear "Up" or "Down" instead of the arrow. A difference between two amounts is signed (`+₱126.00`, `−₱256.60`) in `--foreground`, since the % change already says whether it's good.
+Displayed as `▲ 12.3%` or `▼ 4.0%`, or `—` when there's nothing to compare against. No change is `0.0%` in `--muted-foreground`, with no arrow. Screen readers hear "Up" or "Down" instead of the arrow. A difference between two amounts is signed (`+₱126.00`, `−₱256.60`) in `--foreground`, since the % change already says whether it's good. In the comparison table, income and expense amounts are plain (`₱2,950.40`), because the row's group says which, so the difference adds up as shown. Only net cashflow keeps its sign.
 
 | Measure | ▲ (up) | ▼ (down) |
 |---|---|---|

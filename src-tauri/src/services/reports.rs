@@ -128,14 +128,8 @@ pub fn breakdown(
     kind: CategoryKind,
     today: NaiveDate,
 ) -> Result<Breakdown, AppError> {
-    let period = period::resolve(conn, query, today)?;
-    let (start, end) = counted(&period, today);
-    let (start, end) = (start.to_string(), end.to_string());
-    let filter = Filter {
-        kind: Some(categories::kind_text(kind)),
-        ..Filter::dates(&start, &end)
-    };
-    let ranked: Vec<(i64, Money)> = repo::category_totals(conn, &filter)?
+    let (start, end) = counted(&period::resolve(conn, query, today)?, today);
+    let ranked: Vec<(i64, Money)> = category_totals(conn, start, end, kind)?
         .into_iter()
         .map(|(id, amount)| (id, Money(amount)))
         .collect();
@@ -196,6 +190,10 @@ pub struct CategoryLine {
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Comparison {
+    /// Whether today is in the period. One that's over is always compared in full (RPT-4a).
+    pub in_progress: bool,
+    /// The mode used: `full` for a period that's over, whatever was asked.
+    pub mode: ComparisonMode,
     /// The dates counted this period: up to today while it's in progress.
     pub current_start: NaiveDate,
     pub current_end: NaiveDate,
@@ -219,26 +217,20 @@ pub fn comparison(
     today: NaiveDate,
 ) -> Result<Comparison, AppError> {
     let period = period::resolve(conn, query, today)?;
+    let in_progress = (period.start()..=period.end()).contains(&today);
     let mode = match mode {
+        _ if !in_progress => ComparisonMode::Full,
         Some(mode) => mode,
-        None => settings::get(conn)?.settings.comparison_mode,
+        None => settings::stored(conn)?.comparison_mode,
     };
     let window = comparison_window(&period, &period::period_settings(conn)?, today, mode)
         .ok_or_else(|| invalid("period", "That date is outside the supported range"))?;
     let (current_start, current_end) = counted(&period, today);
     let (compare_start, compare_end) = counted(&window, today);
-    let totals = |start: NaiveDate, end: NaiveDate, kind| {
-        let (start, end) = (start.to_string(), end.to_string());
-        let filter = Filter {
-            kind: Some(categories::kind_text(kind)),
-            ..Filter::dates(&start, &end)
-        };
-        repo::category_totals(conn, &filter)
-    };
     let both = |kind| -> Result<Vec<CategoryLine>, AppError> {
         lines(
-            totals(current_start, current_end, kind)?,
-            totals(compare_start, compare_end, kind)?,
+            category_totals(conn, current_start, current_end, kind)?,
+            category_totals(conn, compare_start, compare_end, kind)?,
         )
     };
     let (income_categories, expense_categories) =
@@ -255,6 +247,8 @@ pub fn comparison(
             .ok_or_else(too_large)?,
     )?;
     Ok(Comparison {
+        in_progress,
+        mode,
         current_start,
         current_end,
         compare_start,
@@ -316,6 +310,21 @@ fn sum(lines: &[CategoryLine]) -> Result<Line, AppError> {
         compare = compare.checked_add(l.line.compare).ok_or_else(too_large)?;
     }
     line(current, compare)
+}
+
+/// Each category's total of `kind` from `start` to `end`, largest first.
+fn category_totals(
+    conn: &Connection,
+    start: NaiveDate,
+    end: NaiveDate,
+    kind: CategoryKind,
+) -> Result<Vec<(i64, i64)>, AppError> {
+    let (start, end) = (start.to_string(), end.to_string());
+    let filter = Filter {
+        kind: Some(categories::kind_text(kind)),
+        ..Filter::dates(&start, &end)
+    };
+    Ok(repo::category_totals(conn, &filter)?)
 }
 
 /// The dates of `period` that count: rows dated after today count nowhere (DATA_MODEL §5.2).
@@ -782,6 +791,7 @@ mod tests {
         let mut conn = db();
         november_and_october(&mut conn);
         let c = comparison(&conn, &MONTH, Some(ComparisonMode::ToDate), d(2026, 11, 3)).unwrap();
+        assert_eq!((c.in_progress, c.mode), (true, ComparisonMode::ToDate));
         assert_eq!(
             (
                 c.current_start,
@@ -852,6 +862,7 @@ mod tests {
             d(2026, 11, 3),
         )
         .unwrap();
+        assert_eq!((c.in_progress, c.mode), (false, ComparisonMode::Full));
         assert_eq!(
             (
                 c.current_start,

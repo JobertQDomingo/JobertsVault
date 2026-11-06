@@ -189,18 +189,18 @@ test("the comparison puts the period next to the same days last month", async ()
     "Change",
   ]);
   expect(rows.slice(1).map(cells)).toEqual([
-    ["Income", "+₱4,200.00", "+₱4,074.00", "+₱126.00", "▲ Up 3.1%"],
-    ["Salary", "+₱4,200.00", "+₱4,074.00", "+₱126.00", "▲ Up 3.1%"],
-    ["Expense", "−₱2,950.40", "−₱3,207.00", "−₱256.60", "▼ Down 8.0%"],
+    ["Income", "₱4,200.00", "₱4,074.00", "+₱126.00", "▲ Up 3.1%"],
+    ["Salary", "₱4,200.00", "₱4,074.00", "+₱126.00", "▲ Up 3.1%"],
+    ["Expense", "₱2,950.40", "₱3,207.00", "−₱256.60", "▼ Down 8.0%"],
     [
       "Food & Groceries",
-      "−₱2,000.00",
-      "−₱3,207.00",
+      "₱2,000.00",
+      "₱3,207.00",
       "−₱1,207.00",
       "▼ Down 37.6%",
     ],
     // Nothing last time: no % change.
-    ["Dining Out", "−₱950.40", "₱0.00", "+₱950.40", "—"],
+    ["Dining Out", "₱950.40", "₱0.00", "+₱950.40", "—"],
     ["Net cashflow", "+₱1,249.60", "+₱867.00", "+₱382.60", "▲ Up 44.1%"],
   ]);
   // Spending less is good news.
@@ -232,13 +232,13 @@ test("Compare to starts on the setting, and a choice stays in the URL", async ()
 test("a period that's over is always compared in full", async () => {
   renderRoute("/reports", {
     ...ANSWERS,
-    get_period: { ...PERIOD, isCurrent: false },
+    get_comparison: { ...COMPARISON, inProgress: false, mode: "full" },
   });
   await comparison();
-  await waitFor(() =>
-    expect(
-      (screen.getByRole("combobox", { name: "Compare to" }) as HTMLInputElement)
-        .disabled,
-    ).toBe(true),
-  );
+  const select = screen.getByRole("combobox", {
+    name: "Compare to",
+  }) as HTMLInputElement;
+  expect(select.disabled).toBe(true);
+  // It shows what was compared, not the setting.
+  expect(select.value).toBe("Full previous period");
 });

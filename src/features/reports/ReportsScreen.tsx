@@ -9,12 +9,11 @@ import { Loading, Skeleton } from "@/components/Loading";
 import { PeriodSwitcher } from "@/components/PeriodSwitcher";
 import { Combobox } from "@/components/ui/combobox";
 import { Segmented } from "@/components/ui/segmented";
-import { COMPARE } from "@/features/settings/GeneralTab";
 import { useCategories } from "@/hooks/useCategories";
-import { usePeriod } from "@/hooks/usePeriod";
 import { useBreakdown, useComparison, useTimeseries } from "@/hooks/useReports";
 import { usePeriodQuery } from "@/hooks/usePeriodQuery";
 import { useSettings } from "@/hooks/useSettings";
+import { COMPARE } from "@/lib/comparison";
 import { cn } from "@/lib/utils";
 import { CategoryBreakdown } from "./CategoryBreakdown";
 import { ComparisonTable } from "./ComparisonTable";
@@ -99,7 +98,9 @@ export function ReportsScreen() {
   const mode =
     COMPARE.find((m) => m.value === params.get("compare"))?.value ?? null;
   const settings = useSettings().data;
-  const period = usePeriod(query).data;
+  const comparison = useComparison(query, mode);
+  // A period that's over is compared in full whatever is chosen: the backend says so (RPT-4a).
+  const over = comparison.data?.inProgress === false;
   const categories = useCategories();
   const byId = new Map(categories.data?.categories.map((c) => [c.id, c]));
   return (
@@ -108,11 +109,8 @@ export function ReportsScreen() {
         <PeriodSwitcher />
         <GlassPanel
           className="flex items-center gap-2.5 rounded-toolbar p-1.5 pl-3.5"
-          // RPT-4a: a period that's over has no "so far".
           title={
-            period && !period.isCurrent
-              ? "A period that's over is always compared in full"
-              : undefined
+            over ? "A period that's over is always compared in full" : undefined
           }
         >
           <label htmlFor="compare-to" className="font-semibold">
@@ -122,8 +120,12 @@ export function ReportsScreen() {
             id="compare-to"
             className="w-52"
             options={COMPARE}
-            value={mode ?? settings?.comparisonMode ?? null}
-            disabled={period ? !period.isCurrent : false}
+            value={
+              over
+                ? (comparison.data?.mode ?? null)
+                : (mode ?? settings?.comparisonMode ?? null)
+            }
+            disabled={over}
             onChange={(next) => setParam("compare", next)}
           />
         </GlassPanel>
@@ -161,7 +163,7 @@ export function ReportsScreen() {
       </Section>
       <Section
         title="Period comparison"
-        query={useComparison(query, mode)}
+        query={comparison}
         also={[categories]}
         skeleton="h-[240px]"
       >

@@ -73,7 +73,7 @@ pub fn get(
 
 /// Where weeks and months start (SET-2).
 pub fn period_settings(conn: &Connection) -> Result<PeriodSettings, AppError> {
-    let s = settings::get(conn)?.settings;
+    let s = settings::stored(conn)?;
     Ok(PeriodSettings {
         week_start: match s.week_start {
             WeekStart::Monday => Weekday::Mon,

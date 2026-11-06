@@ -177,6 +177,8 @@ export const BREAKDOWN: Breakdown = {
 
 /** November 1–5 next to October 1–5: more income, less spent, and Dining Out new this month. */
 export const COMPARISON: Comparison = {
+  inProgress: true,
+  mode: "to_date",
   currentStart: "2026-11-01",
   currentEnd: TODAY,
   compareStart: "2026-10-01",
