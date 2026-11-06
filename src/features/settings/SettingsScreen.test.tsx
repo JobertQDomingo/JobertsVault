@@ -252,7 +252,38 @@ test("a refused update says why, and nothing changes (UPD-4)", async () => {
   );
   fireEvent.click(await screen.findByRole("button", { name: "Update now" }));
   expect(await screen.findByText(message)).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Update now" })).toBeTruthy();
+  // Rust has let go of that update: retrying starts with a new check.
+  expect(screen.queryByRole("button", { name: "Update now" })).toBeNull();
+  expect(screen.queryByText("0.2.0 is out.")).toBeNull();
+});
+
+test("leaving Settings mid-download and coming back can't start a second update", async () => {
+  renderRoute("/settings", {
+    ...ANSWERS,
+    list_accounts: { accounts: [], netBalance: 0 },
+    check_update: "0.2.0",
+    install_update: () => new Promise(() => {}),
+  });
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Check for updates" }),
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Update now" }));
+  fireEvent.click(screen.getByRole("link", { name: /Accounts/ }));
+  fireEvent.click(await screen.findByRole("link", { name: /Settings/ }));
+  const recheck = await screen.findByRole("button", {
+    name: "Check for updates",
+  });
+  expect((recheck as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("a version that can't be read shows Unknown", async () => {
+  renderRoute("/settings", {
+    ...ANSWERS,
+    get_app_version: () => {
+      throw { code: "io", message: "x" };
+    },
+  });
+  expect(await screen.findByText("Unknown")).toBeTruthy();
 });
 
 test("a failed check says why", async () => {

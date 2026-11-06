@@ -71,6 +71,16 @@ function Row({
   );
 }
 
+/** The installed version. Only asked for where it's shown, not on the first-launch form. */
+function AppVersion() {
+  const version = useAppVersion();
+  return (
+    <p className="tabular-nums">
+      {version.data ?? (version.isError ? "Unknown" : "…")}
+    </p>
+  );
+}
+
 /**
  * Settings → General (UI_FLOWS §6, SET-1, SET-2, SET-6, UPD-3). Each change saves at once with a "Saved"
  * toast; the backend checks it, and its message shows beside the setting.
@@ -84,7 +94,6 @@ export function GeneralTab({
   currencyOnly?: boolean;
 }) {
   const update = useUpdateSettings();
-  const version = useAppVersion();
   const [errors, setErrors] = useState<Partial<Record<Key, string>>>({});
   const [symbol, setSymbol] = useState(settings.currencySymbol);
   // The symbol last sent, so Enter and the blur after it (or a second blur) don't send it twice.
@@ -227,7 +236,7 @@ export function GeneralTab({
             />
           </Row>
           <Row id="set-version" label="Version">
-            <p className="tabular-nums">{version.data ?? "…"}</p>
+            <AppVersion />
             <UpdateCheck />
           </Row>
           <Row
