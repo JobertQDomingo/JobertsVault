@@ -30,7 +30,7 @@ export function StatCard({
       <p className="font-semibold text-muted-foreground">{label}</p>
       <MoneyText amount={amount} kind={kind} size="display" />
       <p className="flex items-baseline gap-1.5 text-small">
-        <Change tenths={change} upIsGood={kind !== "expense"} />{" "}
+        <Change tenths={change} upIsGood={kind !== "expense"} />
         <span className="text-muted-foreground">vs {vs}</span>
       </p>
     </GlassPanel>

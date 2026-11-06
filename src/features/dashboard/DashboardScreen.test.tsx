@@ -45,7 +45,7 @@ test("each stat card shows its % change from the comparison (DSH-3)", async () =
     ["Net cashflow", "▲ Up 44.1%"],
   ]) {
     const caption = panel(card).getByText("vs Oct 1–5");
-    expect(caption.parentElement!.textContent).toBe(`${change} vs Oct 1–5`);
+    expect(caption.previousElementSibling!.textContent).toBe(change);
   }
 });
 

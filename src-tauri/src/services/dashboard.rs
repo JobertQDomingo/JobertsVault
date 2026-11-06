@@ -40,19 +40,14 @@ pub fn get(
     today: NaiveDate,
 ) -> Result<Dashboard, AppError> {
     let period = period::get(conn, query, today)?;
-    // The chart's bars cover the period, so they add up to its totals (rows after today count
-    // nowhere, DATA_MODEL §5.2).
     let series = reports::timeseries(conn, query, today)?;
-    let too_large = || AppError::Database {
-        message: "The period's totals are too large".into(),
-    };
-    let (mut income, mut expense) = (Money::ZERO, Money::ZERO);
-    for bar in &series.bars {
-        income = income.checked_add(bar.income).ok_or_else(too_large)?;
-        expense = expense.checked_add(bar.expense).ok_or_else(too_large)?;
-    }
-    let net = income.checked_sub(expense).ok_or_else(too_large)?;
     let comparison = reports::comparison(conn, query, None, today)?;
+    // The cards' totals are the comparison's current side, so each % is of the amount shown.
+    let (income, expense, net) = (
+        comparison.income.current,
+        comparison.expense.current,
+        comparison.net.current,
+    );
     let accounts::AccountList {
         accounts,
         net_balance,
@@ -210,6 +205,10 @@ mod tests {
             dash.series,
             reports::timeseries(&conn, &MONTH, d(2026, 11, 3)).unwrap()
         );
+        // The chart's bars add up to the cards' totals.
+        let income: i64 = dash.series.bars.iter().map(|b| b.income.0).sum();
+        let expense: i64 = dash.series.bars.iter().map(|b| b.expense.0).sum();
+        assert_eq!((Money(income), Money(expense)), (dash.income, dash.expense));
         assert_eq!(dash.today, d(2026, 11, 3));
     }
 
