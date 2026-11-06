@@ -50,6 +50,8 @@ pub fn run() {
     tauri::Builder::default()
         // Only Rust uses it: the frontend gets no updater permissions (ARCHITECTURE §10).
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // The frontend may use only its open and save pickers (capabilities/default.json).
+        .plugin(tauri_plugin_dialog::init())
         .manage(updater::Pending::default())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
