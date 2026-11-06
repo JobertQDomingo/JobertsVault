@@ -29,30 +29,25 @@ pub fn back_up_now(
     data_dir: &Path,
     now: DateTime<Local>,
 ) -> Result<Backup, AppError> {
-    let path = back_up(conn, &folder(data_dir), now)?;
-    Ok(Backup {
-        file_name: path
-            .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_default(),
-    })
+    let file_name = back_up(conn, &folder(data_dir), now)?;
+    Ok(Backup { file_name })
 }
 
-/// Copies the database into `dir` under a name stamped with `now`, local time. A second copy in
-/// the same minute is `-2`, `-3`, … rather than replacing the first.
-fn back_up(conn: &Connection, dir: &Path, now: DateTime<Local>) -> Result<PathBuf, AppError> {
-    let stem = format!("{}-{}", db::NAME, now.format("%Y-%m-%d_%H%M"));
-    let mut path = dir.join(format!("{stem}.db"));
+/// Copies the database into `dir` under a name stamped with `now`, local time, and returns that
+/// name. A second copy in the same minute is `-2`, `-3`, … rather than replacing the first.
+fn back_up(conn: &Connection, dir: &Path, now: DateTime<Local>) -> Result<String, AppError> {
+    let stem = format!("{}-{}", db::NAME, now.format(db::STAMP));
+    let mut name = format!("{stem}.db");
     for n in 2.. {
-        if !path.exists() {
+        if !dir.join(&name).exists() {
             break;
         }
-        path = dir.join(format!("{stem}-{n}.db"));
+        name = format!("{stem}-{n}.db");
     }
-    db::vacuum_into(conn, &path).map_err(|err| AppError::Io {
+    db::vacuum_into(conn, &dir.join(&name)).map_err(|err| AppError::Io {
         message: format!("Couldn't save the backup. {err}"),
     })?;
-    Ok(path)
+    Ok(name)
 }
 
 #[cfg(test)]
