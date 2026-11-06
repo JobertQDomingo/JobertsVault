@@ -8,7 +8,7 @@ pub fn open_folder(dir: &Path) -> Result<(), AppError> {
     // Explorer opens Documents for a missing folder, which would look like success.
     if !dir.is_dir() {
         return Err(AppError::Io {
-            message: format!("The data folder doesn't exist: {}", dir.display()),
+            message: format!("This folder doesn't exist: {}", dir.display()),
         });
     }
     // Not waited on: Explorer exits with 1 even when it opens the folder.

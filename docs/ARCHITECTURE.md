@@ -219,7 +219,7 @@ All commands use `camelCase` parameter names in TypeScript and `snake_case` in R
 | 1 | Dashboard | `get_dashboard(query)` → the period (as `get_period` returns it); income, expense and net for the period, counting only rows dated today or earlier; from Phase 2, the income-vs-expense chart (`series`, as `get_timeseries` returns it) and the cards' % change (`comparison`, as `get_comparison` returns it with no mode, so by the setting, DSH-3); every account (archived included) with its balance and card summary, as `list_accounts` returns them; the net balance; the 5 newest transactions whatever the period; `today` |
 | 1 | Settings | `get_settings` → every Phase 1 key (and from Phase 2, `comparisonMode`) and whether decimals are locked; `update_settings(settings)` saves the whole set and returns it the same way |
 | 2 | Reports | Every report takes `accountId`: none counts every account, an id counts only that account's own rows (RPT-5, DATA_MODEL §5.2). `get_timeseries(query, accountId)` → the chart's `grain` (day, week or month), its `bars` (each one's start, end, income, expense and net, counting only rows dated today or earlier) and `today` (RPT-1, DATA_MODEL §5.9); `get_category_breakdown(query, kind, accountId)` → its `kind` (expense or income), the `total`, every category with an amount as `categories` (id, amount and `share` in tenths of a percent, largest first) and the donut's `slices` (the 8 largest, then Other with no category) (RPT-2, DATA_MODEL §5.10); `get_comparison(query, mode, accountId)` → `inProgress` (whether today is in the period) and the `mode` used (`full` for a period that's over), the dates counted on each side (`currentStart`/`currentEnd`, `compareStart`/`compareEnd`), `income`, `expense` and `net` lines, and `incomeCategories` and `expenseCategories` (each line: current, compare, difference, and `change` in tenths of a percent or none when the comparison is 0), plus `today`. `mode` none means the `comparison_mode` setting (RPT-4, RPT-4a, DATA_MODEL §5.4); `suggest_payees(prefix, kind)` → up to 8 `{ payee, categoryId }` used before on rows of `kind` (expense or income) that start with `prefix`, most recent first, with `categoryId` none when that payee's last category is archived (TXN-6, DATA_MODEL §3.4) |
-| 2 | Backup | `backup_now`, `list_backups`, `restore_backup(path)`, `export_csv(range, path)` |
+| 2 | Backup | `backup_now` → the `fileName` of the copy it wrote into the backup folder (BAK-1, §7); `open_backup_folder` (opens Explorer there, taking no path from the frontend); `list_backups`, `restore_backup(path)`, `export_csv(range, path)` |
 | 3 | Planning | `list/create/update/pause/delete_recurring_rule`, `list_due_occurrences`, `post_occurrence`, `skip_occurrence`, budget CRUD + `get_budget_progress`, goal CRUD + `get_goal_progress` |
 
 **Dashboard data comes from one command.** `get_dashboard` returns everything the dashboard needs in a single response, so the screen loads in one round trip and every number on it is consistent with the others.
@@ -276,10 +276,9 @@ There's no global state library. With TanStack Query plus the URL, none is neede
 | `/` | Dashboard | 1 |
 | `/transactions` | Transaction list and filters | 1 |
 | `/accounts`, `/accounts/:id` | Accounts and account details (card details for a credit card) | 1 |
-| `/settings` (tabs: general, categories, payment methods) | Settings | 1 |
+| `/settings` (tabs: general, categories, payment methods, and from Phase 2 backup, kept in `?tab=`, e.g. `/settings?tab=backup`) | Settings | 1 |
 | `/welcome` | First-launch form, shown while `onboarding_completed` is false | 1 |
 | `/reports` | Reports | 2 |
-| `/settings/backup` | Backup and restore | 2 |
 | `/recurring`, `/budgets`, `/goals` | Planning | 3 |
 
 Quick-add (**Ctrl+N**) is a dialog that can be opened from any route. It isn't a page of its own.
@@ -316,7 +315,7 @@ The frontend calls `get_startup_status` first:
 
 - **Backup:** run `VACUUM INTO '<folder>/jobertsvault-YYYY-MM-DD_HHMM.db.tmp'`, then rename the file to `.db`. Renaming at the end means a half-written file never looks like a real backup. `VACUUM INTO` produces a consistent, compacted copy even while the app has the database open.
   - **Automatic** backups go in `<backup_folder>/auto/`, and the newest 30 are kept.
-  - **Manual** backups go in `<backup_folder>/` and are never deleted automatically.
+  - **Manual** backups go in `<backup_folder>/` and are never deleted automatically. A second one in the same minute is named `…_HHMM-2.db`, then `-3`, so it never replaces the first.
 - **Restore:**
   1. Open the chosen file **read-only** and run `PRAGMA integrity_check`. Check that its `user_version` is no newer than the app's.
   2. Make a safety backup of the current database (`pre-restore-…db`).

@@ -5,6 +5,7 @@ use chrono::{DateTime, Local};
 use crate::error::AppError;
 
 pub mod accounts;
+pub mod backup;
 pub mod categories;
 pub mod dashboard;
 pub mod payment_methods;

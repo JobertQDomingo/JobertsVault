@@ -334,7 +334,7 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **Toolbar** | Level 1 | A small glass bar (16 px radius, 6 px padding) for controls that sit on the canvas: the period bar, the filter bar, report controls. Inside a card it becomes a flat `--wash`. |
 | **Dialog** | Level 2 | 24 px radius, max width 480 px (forms) or 400 px (confirmations). The backdrop is `--overlay` plus a 6 px blur of the app behind. Esc closes it, and focus stays inside. |
 | **Confirm dialog** | Level 2 | A title, one sentence, `secondary` Cancel, and a `primary` or `destructive` button that names the action. |
-| **Toast** | Level 2 | Bottom-right, 16 px radius. Closes after 4 s. Errors stay until closed. |
+| **Toast** | Level 2 | Bottom-right, 16 px radius. Closes after 4 s. One with an action, such as **Open folder**, stays 10 s, and its action is a ghost `sm` button in `--primary` text. Errors stay until closed. |
 | **Banner** | Level 1, tinted | Panel glass mixed with the meaning color at 14%. Has an icon, the message and an optional action. Variants: `warning`, `danger`, `info`. |
 | **Tabs** | Flat | Inside Settings. A 2 px `--primary` underline marks the active tab. |
 | **Skeleton** | Flat | `--wash` blocks with no shimmer, shown only if loading takes more than **150 ms**. |

@@ -293,4 +293,8 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
         },
         0,
     );
+    // Back up now holds the connection while it copies, so every view waits for it (BAK-1).
+    time("back up now (VACUUM INTO)", || {
+        crate::services::backup::back_up_now(&conn, dir.path(), now()).unwrap()
+    });
 }
