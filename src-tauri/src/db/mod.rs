@@ -24,8 +24,6 @@ pub const BACKUPS_DIR: &str = if cfg!(debug_assertions) {
 } else {
     "backups"
 };
-/// The local time in every backup's file name, e.g. `2026-10-26_0930` (DATA_MODEL §8, BAK-1).
-pub const STAMP: &str = "%Y-%m-%d_%H%M";
 
 /// Opens the database and applies the connection settings (ARCHITECTURE §4.3).
 pub fn open(path: &Path) -> Result<Connection, AppError> {
@@ -87,7 +85,7 @@ fn back_up(
     version: i64,
     now: DateTime<Local>,
 ) -> Result<(), AppError> {
-    let stamp = now.format(STAMP);
+    let stamp = now.format(crate::domain::backup::STAMP);
     let path = dir.join(format!("{NAME}-pre-migration-v{version}-{stamp}.db"));
     vacuum_into(conn, &path).map_err(|err| AppError::Io {
         message: format!(

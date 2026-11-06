@@ -292,7 +292,7 @@ Quick-add (**Ctrl+N**) is a dialog that can be opened from any route. It isn't a
 4. If an existing database has pending migrations: back it up first (BAK-5) ── fails? ─▶ error screen, stop
 5. Run migrations
 6. If the database is new: add the seed data (DATA_MODEL §7), inside migration 0001's transaction, so it lands with the schema or not at all
-7. [P2] Daily auto-backup, if not done yet today (BAK-2), then delete old ones (BAK-3)
+7. [P2] Daily auto-backup, if not done yet today (BAK-2), then delete old ones (BAK-3). A failure is logged and doesn't stop startup
 8. [P3] Process recurring rules due up to today (REC-4)
 9. Store AppState, apply the window size (§11) and show the main window
 ```
@@ -314,7 +314,7 @@ The frontend calls `get_startup_status` first:
 **The pre-migration backup (BAK-5) is in Phase 1**, because automatic updates can carry a migration. It uses the same `VACUUM INTO` and rename steps, runs in startup step 4, and is kept as DATA_MODEL §8 describes. Everything else in this section is Phase 2.
 
 - **Backup:** run `VACUUM INTO '<folder>/jobertsvault-YYYY-MM-DD_HHMM.db.tmp'`, then rename the file to `.db`. Renaming at the end means a half-written file never looks like a real backup. `VACUUM INTO` produces a consistent, compacted copy even while the app has the database open.
-  - **Automatic** backups go in `<backup_folder>/auto/`, and the newest 30 are kept.
+  - **Automatic** backups go in `<backup_folder>/auto/`, and the newest 30 are kept. One is made the first time the app starts on each local day (startup step 7, §6), and `last_auto_backup_date` records it. A failed one records nothing, so the next start tries again. "Newest" goes by the time in the file name, never the file's own dates, and only files named exactly like an automatic backup (`<name>-YYYY-MM-DD_HHMM.db`, or `-2`, `-3` …) are ever deleted, so anything else in the folder stays (`domain::backup::to_prune`).
   - **Manual** backups go in `<backup_folder>/` and are never deleted automatically. A second one in the same minute is named `…_HHMM-2.db`, then `-3`, so it never replaces the first.
 - **Restore:**
   1. Open the chosen file **read-only** and run `PRAGMA integrity_check`. Check that its `user_version` is no newer than the app's.
