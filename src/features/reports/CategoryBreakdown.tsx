@@ -12,6 +12,7 @@ import type {
 } from "recharts/types/component/DefaultTooltipContent";
 import type { Breakdown } from "@/bindings/Breakdown";
 import type { Category } from "@/bindings/Category";
+import type { CategoryKind } from "@/bindings/CategoryKind";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
 import { CategoryChip } from "@/components/CategoryChip";
 import { MoneyText } from "@/components/MoneyText";
@@ -20,7 +21,14 @@ import { formatShare } from "@/lib/money";
 
 const SIZE = 216;
 
-type Part = { name: string; fill: string; amount: number; share: number };
+type Part = {
+  key: string;
+  name: string;
+  fill: string;
+  amount: number;
+  share: number;
+  kind: CategoryKind;
+};
 
 /** Flat and solid, like the chart's: it floats inside a blurred panel (DESIGN_SYSTEM §2.3). */
 function SliceTooltip({
@@ -33,7 +41,7 @@ function SliceTooltip({
     <div className="grid gap-0.5 rounded-control border border-edge bg-glass-solid px-3 py-2 text-small shadow-raised">
       <p className="font-semibold">{part.name}</p>
       <p className="text-muted-foreground">
-        <MoneyText amount={part.amount} kind="balance" /> ·{" "}
+        <MoneyText amount={part.amount} kind={part.kind} /> ·{" "}
         {formatShare(part.share)}
       </p>
     </div>
@@ -67,10 +75,13 @@ export function CategoryBreakdown({
     const category =
       s.categoryId === null ? undefined : categories.get(s.categoryId);
     return {
-      name: category?.name ?? "Other",
+      key: String(s.categoryId ?? "other"),
+      // Only the rest is Other; a category the list doesn't have yet is unnamed, not Other.
+      name: s.categoryId === null ? "Other" : (category?.name ?? "…"),
       fill: category ? `var(--${category.color})` : "var(--muted-foreground)",
       amount: s.amount,
       share: s.share,
+      kind,
     };
   });
   const link = (categoryId: number) => {
@@ -97,7 +108,7 @@ export function CategoryBreakdown({
               isAnimationActive={false}
             >
               {parts.map((p) => (
-                <Cell key={p.name} fill={p.fill} />
+                <Cell key={p.key} fill={p.fill} />
               ))}
             </Pie>
             <Tooltip content={SliceTooltip} isAnimationActive={false} />

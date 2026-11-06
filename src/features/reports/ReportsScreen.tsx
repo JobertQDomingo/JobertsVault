@@ -55,6 +55,8 @@ function Section<T>({
       ) : query.data && also.every((q) => q.data) ? (
         <div
           aria-busy={query.isPlaceholderData}
+          // The old figures can't be acted on: a click would open the new period's transactions.
+          inert={query.isPlaceholderData}
           className={cn(
             "transition-opacity duration-150",
             query.isPlaceholderData && "opacity-60 delay-150",

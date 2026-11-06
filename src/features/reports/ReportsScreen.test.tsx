@@ -96,6 +96,35 @@ test("clicking a category opens its transactions for the same period", async () 
   });
 });
 
+test("while the next period loads, the old rows can't be clicked", async () => {
+  let release = () => {};
+  const { router } = renderRoute("/reports?period=month&anchor=2026-11-01", {
+    ...ANSWERS,
+    get_category_breakdown: (args: { query: { anchor: string } }) =>
+      args.query.anchor === "2026-11-01"
+        ? BREAKDOWN
+        : new Promise((resolve) => (release = () => resolve(BREAKDOWN))),
+  });
+  await ranked();
+  fireEvent.click(screen.getByRole("button", { name: "Previous period" }));
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole("list", { name: "Categories by expenses" })
+        .closest("[inert]"),
+    ).toBeTruthy(),
+  );
+  release();
+  await waitFor(() =>
+    expect(
+      screen
+        .getByRole("list", { name: "Categories by expenses" })
+        .closest("[inert]"),
+    ).toBeNull(),
+  );
+  expect(router.state.location.pathname).toBe("/reports");
+});
+
 test("the switch shows income instead, and stays in the URL", async () => {
   const { router } = renderRoute("/reports", {
     ...ANSWERS,

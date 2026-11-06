@@ -144,4 +144,6 @@ test("formatShare writes tenths of a percent with one decimal", () => {
   expect(formatShare(1000)).toBe("100.0%");
   expect(formatShare(5)).toBe("0.5%");
   expect(formatShare(0)).toBe("0.0%");
+  expect(formatShare(-15)).toBe("−1.5%");
+  expect(formatShare(-5)).toBe("−0.5%");
 });

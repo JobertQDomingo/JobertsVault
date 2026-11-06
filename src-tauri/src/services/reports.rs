@@ -4,6 +4,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::domain::money::Money;
+use crate::domain::period::Period;
 use crate::domain::report::{self, Grain};
 use crate::error::AppError;
 use crate::repo::transactions::{self as repo, Filter};
@@ -53,11 +54,7 @@ pub fn timeseries(
             net: Money::ZERO,
         })
         .collect();
-    // Rows dated after today count nowhere (DATA_MODEL §5.2).
-    let (start, end) = (
-        period.start().to_string(),
-        period.end().min(today).to_string(),
-    );
+    let (start, end) = counted(&period, today);
     for (date, income, expense) in repo::daily_totals(conn, &Filter::dates(&start, &end))? {
         let date =
             parse_date(&date).ok_or_else(|| database("A transaction has an invalid date"))?;
@@ -128,11 +125,7 @@ pub fn breakdown(
     today: NaiveDate,
 ) -> Result<Breakdown, AppError> {
     let period = period::resolve(conn, query, today)?;
-    // Rows dated after today count nowhere (DATA_MODEL §5.2).
-    let (start, end) = (
-        period.start().to_string(),
-        period.end().min(today).to_string(),
-    );
+    let (start, end) = counted(&period, today);
     let filter = Filter {
         kind: Some(categories::kind_text(kind)),
         ..Filter::dates(&start, &end)
@@ -166,6 +159,14 @@ pub fn breakdown(
             })
             .collect(),
     })
+}
+
+/// The dates of `period` that count: rows dated after today count nowhere (DATA_MODEL §5.2).
+fn counted(period: &Period, today: NaiveDate) -> (String, String) {
+    (
+        period.start().to_string(),
+        period.end().min(today).to_string(),
+    )
 }
 
 fn database(message: &str) -> AppError {
