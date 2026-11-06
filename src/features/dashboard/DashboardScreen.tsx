@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import type { Category } from "@/bindings/Category";
 import type { Dashboard } from "@/bindings/Dashboard";
 import { AccountRow } from "@/components/AccountRow";
+import { Banner } from "@/components/Banner";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
 import { GlassPanel } from "@/components/GlassPanel";
@@ -14,6 +15,7 @@ import { useQuickAdd } from "@/components/QuickAddProvider";
 import { StatCard } from "@/components/StatCard";
 import { TransactionRow } from "@/components/TransactionRow";
 import { Button } from "@/components/ui/button";
+import { useBackupNow } from "@/hooks/useBackup";
 import { useCategories } from "@/hooks/useCategories";
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePeriodQuery } from "@/hooks/usePeriodQuery";
@@ -114,6 +116,7 @@ function DashboardBody({
   const vs = formatSpan(c.compareStart, c.compareEnd, data.today);
   return (
     <>
+      {data.backupDue && <BackupWarning />}
       <div className="grid grid-cols-3 gap-3">
         <StatCard
           label="Income"
@@ -205,5 +208,25 @@ function DashboardBody({
         </GlassPanel>
       </div>
     </>
+  );
+}
+
+/** No backup for more than 7 days, or none at all (BAK-7, UI_FLOWS F9). */
+function BackupWarning() {
+  const backup = useBackupNow();
+  return (
+    <Banner
+      action={
+        <Button
+          size="sm"
+          onClick={() => backup.mutate()}
+          disabled={backup.isPending}
+        >
+          {backup.isPending ? "Backing up…" : "Back up now"}
+        </Button>
+      }
+    >
+      No backup in the last 7 days.
+    </Banner>
   );
 }

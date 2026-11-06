@@ -242,6 +242,19 @@
   backdrop-filter: none;
 }
 
+/* A warning banner (§9.1): its glass mixed with the warning color at 14%, flat inside a panel. */
+.glass-warning {
+  background: color-mix(in srgb, var(--warning) 14%, var(--glass));
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass-warning {
+    background: color-mix(in srgb, var(--warning) 14%, var(--glass-solid));
+  }
+}
+:is(.glass, .glass-raised) .glass-warning {
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+}
+
 @layer base {
   html,
   body,

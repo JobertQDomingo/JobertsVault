@@ -24,6 +24,8 @@ export const queryKeys = {
   // Period dates follow the week and month start settings, which refresh the ledger.
   period: (query: PeriodQuery) => ["ledger", "period", query] as const,
   dashboard: (query: PeriodQuery) => ["ledger", "dashboard", query] as const,
+  // Every period's: a backup can lift the dashboard's warning (BAK-7).
+  dashboards: ["ledger", "dashboard"],
   timeseries: (query: PeriodQuery, accountId: number | null) =>
     ["ledger", "timeseries", query, accountId] as const,
   breakdown: (
@@ -38,6 +40,8 @@ export const queryKeys = {
     accountId: number | null,
   ) => ["ledger", "comparison", query, mode, accountId] as const,
   settings: ["settings"],
+  // This computer's backups, not the data: a restore keeps them (DATA_MODEL §9).
+  backup: ["backup"],
   startup: ["startup"],
   appVersion: ["appVersion"],
 } as const;

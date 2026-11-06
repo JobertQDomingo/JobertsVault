@@ -57,6 +57,16 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             let now = chrono::Local::now();
             app.manage(AppState::open(data_dir, &db::migrations(now.to_utc()), now));
+            // Setup goes on only once the backup thread holds the connection, so every screen
+            // waits for today's backup rather than reading the state from before it.
+            let handle = app.handle().clone();
+            let (locked, holding) = std::sync::mpsc::channel();
+            std::thread::spawn(move || {
+                handle.state::<AppState>().back_up_daily(now, || {
+                    let _ = locked.send(());
+                });
+            });
+            let _ = holding.recv();
             // The window starts hidden and is shown once startup is done, even if it failed
             // (ARCHITECTURE §6).
             if let Some(window) = app.get_webview_window("main") {
@@ -90,6 +100,9 @@ pub fn run() {
             commands::backup::inspect_backup,
             commands::backup::restore_backup,
             commands::backup::export_csv,
+            commands::backup::get_backup_status,
+            commands::backup::set_backup_folder,
+            commands::backup::set_auto_backup,
             commands::settings::get_settings,
             commands::settings::update_settings,
             commands::accounts::list_accounts,
