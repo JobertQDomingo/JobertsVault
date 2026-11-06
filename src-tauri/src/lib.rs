@@ -57,6 +57,12 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             let now = chrono::Local::now();
             app.manage(AppState::open(data_dir, &db::migrations(now.to_utc()), now));
+            // Started before the window shows, so it holds the connection before any command
+            // asks for it: the first screens wait for today's backup rather than miss it.
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                handle.state::<AppState>().back_up_daily(now);
+            });
             // The window starts hidden and is shown once startup is done, even if it failed
             // (ARCHITECTURE §6).
             if let Some(window) = app.get_webview_window("main") {
@@ -90,6 +96,9 @@ pub fn run() {
             commands::backup::inspect_backup,
             commands::backup::restore_backup,
             commands::backup::export_csv,
+            commands::backup::get_backup_status,
+            commands::backup::set_backup_folder,
+            commands::backup::set_auto_backup,
             commands::settings::get_settings,
             commands::settings::update_settings,
             commands::accounts::list_accounts,

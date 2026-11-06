@@ -74,6 +74,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
 | Accounts | Current balances (as of today), with the credit card summary and the net balance. Clicking an account opens its details. | DSH-4, DSH-5 |
 
 **Added later:**
+- **Phase 2:** a "No backup in the last 7 days." banner at the top with **Back up now** (BAK-7, F9)
 - **Phase 3:**
   - a "Card payment due in 3 days: ₱640.00 owed" banner at the top (CC-7), with a **Pay bill** button
   - budget progress bars (DSH-6)
@@ -287,7 +288,8 @@ Welcome to Jobert's Vault
 - **Back up now:** Settings → Backup → **Back up now** → toast "Backup saved as jobertsvault-2026-10-26_0930.db" with an **Open folder** link, which opens the backup folder in Explorer.
 - **Restore:** **Restore from backup…** → pick a file in the Windows open dialog → the app checks it first, and a file that isn't a Jobert's Vault backup, or one from a newer version, is refused with a toast saying why → confirm "This replaces all current data with the backup from Oct 20, 2026 9:30 AM. A safety copy of your current data will be saved first." (the time the file was last written) with a destructive **Restore** → every screen's data reloads, the app goes to the dashboard, and a "Backup restored" toast appears.
 - **Export to CSV:** Settings → Backup → From and To (this month so far, from `get_period`) → **Export…** → the Windows save dialog, suggesting `jobertsvault-2026-11-01-to-2026-11-07.csv` → toast "Exported 15 transactions to <file name>".
-- **Stale-backup warning:** if the last backup is more than 7 days old, a warning banner appears in Settings and on the dashboard (BAK-7).
+- **Stale-backup warning:** if the last backup (manual or automatic) is more than 7 days old by local date, or there's none, a warning banner appears at the top of Settings → Backup ("Your last backup is more than 7 days old." or "You don't have a backup yet.") and at the top of the dashboard ("No backup in the last 7 days." with **Back up now**) (BAK-7).
+- **Backup folder:** **Change…** opens the Windows folder picker. The app refuses a folder it can't write in, and **Use the default** goes back to `<app data>\backups`. New backups go to the folder; earlier ones stay where they are (SET-3).
 
 ### F10: Confirm recurring transactions (Phase 3)
 1. A banner on the dashboard says "2 recurring transactions are due" → **Review**.

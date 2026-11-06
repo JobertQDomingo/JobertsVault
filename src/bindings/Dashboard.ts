@@ -24,6 +24,10 @@ series: Timeseries,
  */
 comparison: Comparison, 
 /**
+ * The last backup is more than 7 days old, or there's none (BAK-7, UI_FLOWS F9).
+ */
+backupDue: boolean, 
+/**
  * Every account, archived included, with balances and card summaries as of today (DSH-4, DSH-5).
  */
 accounts: Array<Account>, netBalance: Money, 

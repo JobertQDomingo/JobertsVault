@@ -354,6 +354,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-06 | TXN-6's payee suggestions match the form's type, and fill in the category of the latest row of that type with the payee, unless that category is archived now (DATA_MODEL §3.4) |
 | 2026-11-07 | Backups, restore and CSV export live in Settings → Backup (`/settings?tab=backup`). Export to CSV takes its own From and To dates there (UI_FLOWS §6) |
 | 2026-11-07 | A restore keeps this computer's backup settings (the folder, the automatic backup switch and the last backup dates). Every other setting comes from the backup (DATA_MODEL §9) |
+| 2026-11-07 | BAK-7's warning counts manual and automatic backups, compares local dates (more than 7 days before today), and also shows when there's never been a backup. The daily automatic backup runs on its own thread, so a slow backup folder never delays the window |
 
 ---
 

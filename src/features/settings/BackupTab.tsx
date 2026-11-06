@@ -1,20 +1,36 @@
 import { useMutation } from "@tanstack/react-query";
-import { ArchiveRestore, DatabaseBackup, FileSpreadsheet } from "lucide-react";
+import {
+  ArchiveRestore,
+  DatabaseBackup,
+  FileSpreadsheet,
+  FolderOpen,
+} from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
-  backupNow,
   exportCsv,
   inspectBackup,
-  openBackupFolder,
   pickBackupFile,
   pickCsvPath,
+  pickFolder,
   restoreBackup,
+  setAutoBackup,
+  setBackupFolder,
 } from "@/api/backup";
+import type { BackupStatus } from "@/bindings/BackupStatus";
+import { Banner } from "@/components/Banner";
+import { ErrorState } from "@/components/ErrorState";
+import { Loading, Skeleton } from "@/components/Loading";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ConfirmDialog } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { notify } from "@/components/ui/toast";
+import {
+  useBackupNow,
+  useBackupStatus,
+  useSaveBackupSetting,
+} from "@/hooks/useBackup";
 import { useLedgerMutation } from "@/hooks/useLedgerMutation";
 import { usePeriod } from "@/hooks/usePeriod";
 import { useSettings } from "@/hooks/useSettings";
@@ -23,36 +39,115 @@ import { Row } from "./GeneralTab";
 
 const showError = (error: Error) => notify.error(error.message);
 
-/** Settings → Backup (UI_FLOWS §6, F9): Back up now (BAK-1), Restore (BAK-4), Export (BAK-6). */
+/**
+ * Settings → Backup (UI_FLOWS §6, F9): the warning (BAK-7), the folder and the daily backup
+ * (SET-3), the last backup with Back up now (BAK-1), Restore (BAK-4) and Export (BAK-6).
+ */
 export function BackupTab() {
-  const backup = useMutation({
-    mutationFn: backupNow,
-    onSuccess: ({ fileName }) =>
-      notify.success(`Backup saved as ${fileName}`, {
-        label: "Open folder",
-        onClick: () => openBackupFolder().catch(showError),
-      }),
-    onError: showError,
-  });
+  const status = useBackupStatus();
+  const backup = useBackupNow();
+  if (!status.data)
+    return status.isError ? (
+      <ErrorState
+        onRetry={() => status.refetch()}
+        pending={status.isFetching}
+      />
+    ) : (
+      <Loading className="grid gap-3 py-3">
+        {Array.from({ length: 5 }, (_, i) => (
+          <Skeleton key={i} className="h-9" />
+        ))}
+      </Loading>
+    );
+  const s = status.data;
   return (
     <div className="pb-4">
-      <Row
-        id="backup-now"
-        label="Manual backup"
-        help="Saves a copy of all your data in the backup folder, named with the date and time. Manual backups are never deleted automatically."
-      >
-        <Button
-          variant="primary"
-          onClick={() => backup.mutate()}
-          disabled={backup.isPending}
+      {s.due && (
+        <Banner className="mt-1 mb-2">
+          {s.lastBackupAt
+            ? "Your last backup is more than 7 days old."
+            : "You don't have a backup yet."}
+        </Banner>
+      )}
+      <div>
+        <FolderRow status={s} />
+        <AutoBackupRow status={s} />
+        <Row
+          id="backup-now"
+          label="Last backup"
+          help="Manual backups are never deleted automatically."
         >
-          <DatabaseBackup />
-          {backup.isPending ? "Backing up…" : "Back up now"}
-        </Button>
-      </Row>
-      <RestoreRow />
-      <ExportRow />
+          <p className="tabular-nums">
+            {s.lastBackupAt ? formatDateTime(s.lastBackupAt) : "Never"}
+          </p>
+          <Button
+            variant="primary"
+            onClick={() => backup.mutate()}
+            disabled={backup.isPending}
+          >
+            <DatabaseBackup />
+            {backup.isPending ? "Backing up…" : "Back up now"}
+          </Button>
+        </Row>
+        <RestoreRow folder={s.folder} />
+        <ExportRow />
+      </div>
     </div>
+  );
+}
+
+/** Where backups go (SET-3): Change… opens a folder picker, and Rust checks the folder. */
+function FolderRow({ status }: { status: BackupStatus }) {
+  const save = useSaveBackupSetting(setBackupFolder);
+  const change = async () => {
+    try {
+      const path = await pickFolder(status.folder);
+      if (path) save.mutate(path);
+    } catch (error) {
+      showError(error as Error);
+    }
+  };
+  return (
+    <Row
+      id="backup-folder"
+      label="Backup folder"
+      help="New backups go here. Backups already made stay where they are."
+    >
+      <p className="min-w-0 break-all">{status.folder}</p>
+      <Button onClick={change} disabled={save.isPending}>
+        <FolderOpen />
+        Change…
+      </Button>
+      {!status.folderIsDefault && (
+        <Button
+          variant="ghost"
+          onClick={() => save.mutate(null)}
+          disabled={save.isPending}
+        >
+          Use the default
+        </Button>
+      )}
+    </Row>
+  );
+}
+
+/** The daily automatic backup (SET-3, BAK-2, BAK-3). */
+function AutoBackupRow({ status }: { status: BackupStatus }) {
+  const save = useSaveBackupSetting(setAutoBackup);
+  return (
+    <Row
+      id="auto-backup"
+      label="Automatic backup"
+      labelable
+      help="Once a day, the first time the app opens. The newest 30 are kept."
+    >
+      <Switch
+        id="auto-backup"
+        checked={status.autoBackup}
+        onCheckedChange={(on) => save.mutate(on)}
+        disabled={save.isPending}
+      />
+    </Row>
   );
 }
 
@@ -60,7 +155,7 @@ export function BackupTab() {
  * Restore from backup… (F9): pick a file, which Rust checks, then confirm with its date. Once
  * restored, every query reloads and the app goes to the dashboard.
  */
-function RestoreRow() {
+function RestoreRow({ folder }: { folder: string }) {
   const navigate = useNavigate();
   const [chosen, setChosen] = useState<{
     path: string;
@@ -77,7 +172,7 @@ function RestoreRow() {
   });
   const pick = async () => {
     try {
-      const path = await pickBackupFile();
+      const path = await pickBackupFile(folder);
       if (!path) return;
       const { modified } = await inspect.mutateAsync(path);
       setChosen({ path, modified });

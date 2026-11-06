@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager, State};
 
 use crate::error::AppError;
-use crate::services::backup::{Backup, BackupFile};
+use crate::services::backup::{Backup, BackupFile, BackupStatus};
 use crate::services::export::{CsvExport, DateRange};
 use crate::state::AppState;
 use crate::{log, services};
@@ -75,6 +75,37 @@ pub async fn export_csv(
 /// Opens Explorer at the backup folder. The path never comes from the frontend.
 #[tauri::command(async)]
 pub fn open_backup_folder(state: State<'_, AppState>) -> Result<(), AppError> {
-    services::system::open_folder(&services::backup::folder(&state.data_dir))
+    let folder = services::backup::folder(&*state.conn()?, &state.data_dir);
+    folder
+        .and_then(|folder| services::system::open_folder(&folder))
         .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+#[tauri::command(async)]
+pub fn get_backup_status(state: State<'_, AppState>) -> Result<BackupStatus, AppError> {
+    services::backup::status(&*state.conn()?, &state.data_dir, today())
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+/// Chooses the backup folder (SET-3); none goes back to the default one.
+#[tauri::command(async)]
+pub fn set_backup_folder(
+    state: State<'_, AppState>,
+    path: Option<PathBuf>,
+) -> Result<BackupStatus, AppError> {
+    services::backup::set_folder(&*state.conn()?, &state.data_dir, path.as_deref(), today())
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+#[tauri::command(async)]
+pub fn set_auto_backup(
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<BackupStatus, AppError> {
+    services::backup::set_auto_backup(&*state.conn()?, &state.data_dir, enabled, today())
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+fn today() -> chrono::NaiveDate {
+    chrono::Local::now().date_naive()
 }

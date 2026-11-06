@@ -1,12 +1,18 @@
 //! Which automatic backups to delete (BAK-3).
 
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 
 /// The local time in every backup's file name, e.g. `2026-10-26_0930` (DATA_MODEL §8, BAK-1).
 pub const STAMP: &str = "%Y-%m-%d_%H%M";
 
 /// How many automatic backups are kept (BAK-3).
 pub const KEEP: usize = 30;
+
+/// Whether to warn about backups (BAK-7): the last one, on its local date, is more than 7 days
+/// before `today`, or there's never been one. A date after today (a clock set back) isn't due.
+pub fn is_due(last: Option<NaiveDate>, today: NaiveDate) -> bool {
+    last.is_none_or(|last| (today - last).num_days() > 7)
+}
 
 /// The files among `names` to delete so that only the newest `KEEP` backups remain. Only names
 /// a backup gets, `<prefix>-YYYY-MM-DD_HHMM.db` or with `-2`, `-3`, … before `.db`, count:
@@ -65,6 +71,17 @@ mod tests {
                 format!("jv-{}_0905.db", day.format("%Y-%m-%d"))
             })
             .collect()
+    }
+
+    #[test]
+    fn a_backup_is_due_after_more_than_7_days_or_with_none_at_all() {
+        let day = |d| chrono::NaiveDate::from_ymd_opt(2026, 11, d).unwrap();
+        let oct = |d| chrono::NaiveDate::from_ymd_opt(2026, 10, d).unwrap();
+        assert!(is_due(None, day(3)));
+        assert!(!is_due(Some(day(3)), day(3)));
+        assert!(!is_due(Some(oct(27)), day(3)), "7 days");
+        assert!(is_due(Some(oct(26)), day(3)), "8 days");
+        assert!(!is_due(Some(day(10)), day(3)), "a clock set back");
     }
 
     #[test]

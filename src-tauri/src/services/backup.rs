@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Local, NaiveDate};
 use rusqlite::Connection;
 use rusqlite_migration::Migrations;
 use serde::Serialize;
@@ -12,17 +12,15 @@ use crate::db;
 use crate::domain::backup;
 use crate::error::AppError;
 use crate::repo;
-use crate::services::{failed, invalid};
+use crate::services::{failed, invalid, stamp};
 
+const FOLDER: &str = "backup_folder";
+const AUTO: &str = "auto_backup_enabled";
+const LAST: &str = "last_backup_at";
 const LAST_AUTO: &str = "last_auto_backup_date";
 /// Settings about this computer's backups, not the data: a restore keeps the current ones
 /// (DATA_MODEL §9).
-const THIS_COMPUTER: [&str; 4] = [
-    "backup_folder",
-    "auto_backup_enabled",
-    "last_backup_at",
-    LAST_AUTO,
-];
+const THIS_COMPUTER: [&str; 4] = [FOLDER, AUTO, LAST, LAST_AUTO];
 
 /// What `backup_now` returns: the name of the file it wrote, for the "Backup saved as …" toast,
 /// whose Open folder shows where (UI_FLOWS F9).
@@ -33,8 +31,16 @@ pub struct Backup {
     pub file_name: String,
 }
 
-/// Where backups go: `<app data>\backups` (debug builds: `backups-dev`, ARCHITECTURE §6).
-pub fn folder(data_dir: &Path) -> PathBuf {
+/// Where backups go (SET-3): the folder the user chose, else `<app data>\backups` (debug builds:
+/// `backups-dev`, ARCHITECTURE §6). Only a chosen folder is stored, so the default follows the
+/// app data folder of whichever Windows account opens the data.
+pub fn folder(conn: &Connection, data_dir: &Path) -> Result<PathBuf, AppError> {
+    Ok(repo::settings::get(conn, FOLDER)?
+        .map(PathBuf::from)
+        .unwrap_or_else(|| default_folder(data_dir)))
+}
+
+fn default_folder(data_dir: &Path) -> PathBuf {
     data_dir.join(db::BACKUPS_DIR)
 }
 
@@ -45,28 +51,146 @@ pub fn back_up_now(
     data_dir: &Path,
     now: DateTime<Local>,
 ) -> Result<Backup, AppError> {
-    let file_name = back_up(conn, &folder(data_dir), db::NAME, now)
+    let file_name = back_up(conn, &folder(conn, data_dir)?, db::NAME, now)
         .map_err(failed("Couldn't save the backup."))?;
+    record(conn, &[(LAST, &stamp(now))])?;
     Ok(Backup { file_name })
 }
 
-/// The daily automatic backup (BAK-2): the first time the app opens on a local day, it copies the
-/// database into `<backup folder>\auto` and records the date, then keeps only the newest 30
-/// there (BAK-3). A failed copy records nothing, so the next start tries again.
+/// Saves settings rows in one transaction. `unchecked_transaction` lets a caller holding only a
+/// shared `Connection` do so; none of them is already inside one.
+fn record(conn: &Connection, rows: &[(&str, &str)]) -> Result<(), AppError> {
+    let tx = conn.unchecked_transaction()?;
+    for (key, value) in rows {
+        repo::settings::set(&tx, key, value)?;
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+/// What the Backup tab shows (SET-3, BAK-7).
+#[derive(Debug, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct BackupStatus {
+    /// Where new backups go, and whether that's the default folder.
+    pub folder: String,
+    pub folder_is_default: bool,
+    /// The daily automatic backup (BAK-2) is on.
+    pub auto_backup: bool,
+    /// The last manual or automatic backup, local time `YYYY-MM-DDTHH:MM`, or none.
+    pub last_backup_at: Option<String>,
+    /// The warning: the last backup is more than 7 days old, or there's none (BAK-7).
+    pub due: bool,
+}
+
+pub fn status(
+    conn: &Connection,
+    data_dir: &Path,
+    today: NaiveDate,
+) -> Result<BackupStatus, AppError> {
+    let last = last_backup(conn)?;
+    Ok(BackupStatus {
+        folder: folder(conn, data_dir)?.display().to_string(),
+        folder_is_default: repo::settings::get(conn, FOLDER)?.is_none(),
+        auto_backup: auto_backup_on(conn)?,
+        last_backup_at: last.map(|at| at.format("%Y-%m-%dT%H:%M").to_string()),
+        due: backup::is_due(last.map(|at| at.date_naive()), today),
+    })
+}
+
+/// The dashboard's warning (BAK-7, UI_FLOWS F9).
+pub fn is_due(conn: &Connection, today: NaiveDate) -> Result<bool, AppError> {
+    Ok(backup::is_due(
+        last_backup(conn)?.map(|at| at.date_naive()),
+        today,
+    ))
+}
+
+/// `last_backup_at` in local time. A value that isn't a timestamp counts as no backup, so the
+/// warning shows rather than hides.
+fn last_backup(conn: &Connection) -> Result<Option<DateTime<Local>>, AppError> {
+    Ok(repo::settings::get(conn, LAST)?
+        .and_then(|text| DateTime::parse_from_rfc3339(&text).ok())
+        .map(|at| at.with_timezone(&Local)))
+}
+
+fn auto_backup_on(conn: &Connection) -> Result<bool, AppError> {
+    Ok(repo::settings::get(conn, AUTO)?.as_deref() != Some("false"))
+}
+
+/// Chooses where backups go (SET-3), or with `None` goes back to the default folder. The folder
+/// must exist and take a new file. Backups already made stay where they are.
+pub fn set_folder(
+    conn: &Connection,
+    data_dir: &Path,
+    chosen: Option<&Path>,
+    today: NaiveDate,
+) -> Result<BackupStatus, AppError> {
+    let custom = match chosen {
+        None => None,
+        Some(path) => {
+            if !path.is_absolute() || !path.is_dir() {
+                return Err(invalid("folder", "Choose a folder that exists."));
+            }
+            if !can_write_in(path) {
+                return Err(invalid(
+                    "folder",
+                    "Jobert's Vault can't save files in this folder. Choose another one.",
+                ));
+            }
+            let default = fs::canonicalize(default_folder(data_dir)).ok();
+            (fs::canonicalize(path).ok() != default).then(|| path.display().to_string())
+        }
+    };
+    let tx = conn.unchecked_transaction()?;
+    match custom {
+        Some(path) => repo::settings::set(&tx, FOLDER, &path)?,
+        None => repo::settings::delete(&tx, FOLDER)?,
+    }
+    tx.commit()?;
+    status(conn, data_dir, today)
+}
+
+/// Whether a new file can be made in `dir`: makes one and deletes it.
+fn can_write_in(dir: &Path) -> bool {
+    let probe = dir.join(format!(".{}-write-check.tmp", db::NAME));
+    let made = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe)
+        .is_ok();
+    made && fs::remove_file(&probe).is_ok()
+}
+
+/// Turns the daily automatic backup on or off (SET-3, BAK-2).
+pub fn set_auto_backup(
+    conn: &Connection,
+    data_dir: &Path,
+    on: bool,
+    today: NaiveDate,
+) -> Result<BackupStatus, AppError> {
+    record(conn, &[(AUTO, &on.to_string())])?;
+    status(conn, data_dir, today)
+}
+
+/// The daily automatic backup (BAK-2), unless it's turned off: the first time the app opens on a
+/// local day, it copies the database into `<backup folder>\auto` and records it, then keeps only
+/// the newest 30 there (BAK-3). A failed copy records nothing, so the next start tries again.
 pub fn back_up_daily(
-    conn: &mut Connection,
+    conn: &Connection,
     data_dir: &Path,
     now: DateTime<Local>,
 ) -> Result<(), AppError> {
     let today = now.date_naive().to_string();
-    if repo::settings::get(conn, LAST_AUTO)?.as_deref() == Some(today.as_str()) {
+    if !auto_backup_on(conn)?
+        || repo::settings::get(conn, LAST_AUTO)?.as_deref() == Some(today.as_str())
+    {
         return Ok(());
     }
-    let dir = folder(data_dir).join("auto");
+    let dir = folder(conn, data_dir)?.join("auto");
     let made = back_up(conn, &dir, db::NAME, now).map_err(failed("Couldn't save the backup."))?;
-    let tx = conn.transaction()?;
-    repo::settings::set(&tx, LAST_AUTO, &today)?;
-    tx.commit()?;
+    record(conn, &[(LAST_AUTO, &today), (LAST, &stamp(now))])?;
     prune(&dir, &made).map_err(|err| AppError::Io {
         message: format!("Couldn't delete the oldest automatic backups. {err}"),
     })
@@ -182,7 +306,7 @@ fn restore_with(
 
     // 2. A safety copy of the current data, -wal included.
     let prefix = format!("{}-pre-restore", db::NAME);
-    back_up(conn, &folder(data_dir), &prefix, now).map_err(failed(
+    back_up(conn, &folder(conn, data_dir)?, &prefix, now).map_err(failed(
         "Couldn't save a safety copy of your current data, so nothing was changed.",
     ))?;
 
@@ -301,6 +425,11 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
 
     /// A database file in `dir` with every migration applied, as the app opens it.
+    /// The default backup folder in `dir`.
+    fn backups(dir: &TempDir) -> PathBuf {
+        dir.path().join(db::BACKUPS_DIR)
+    }
+
     fn database(dir: &TempDir) -> Connection {
         let mut conn = db::open(&dir.path().join(format!("{}.db", db::NAME))).unwrap();
         let ms = db::migrations(now().to_utc());
@@ -337,12 +466,9 @@ mod tests {
 
         let name = format!("{}-2026-11-03_1405.db", db::NAME);
         assert_eq!(backup.file_name, name);
+        assert_eq!(account_names(&backups(&dir).join(name)), ["Cash", "Bank"]);
         assert_eq!(
-            account_names(&folder(dir.path()).join(name)),
-            ["Cash", "Bank"]
-        );
-        assert_eq!(
-            fs::read_dir(folder(dir.path())).unwrap().count(),
+            fs::read_dir(backups(&dir)).unwrap().count(),
             1,
             "no .tmp left behind"
         );
@@ -363,7 +489,7 @@ mod tests {
         let backup = back_up_now(&conn, dir.path(), now()).unwrap();
 
         assert_eq!(
-            account_names(&folder(dir.path()).join(backup.file_name)),
+            account_names(&backups(&dir).join(backup.file_name)),
             ["Cash", "Only in the wal"]
         );
     }
@@ -382,7 +508,7 @@ mod tests {
         assert_eq!(first.file_name, format!("{stem}.db"));
         assert_eq!(second.file_name, format!("{stem}-2.db"));
         assert_eq!(third.file_name, format!("{stem}-3.db"));
-        let read = |backup: &Backup| account_names(&folder(dir.path()).join(&backup.file_name));
+        let read = |backup: &Backup| account_names(&backups(&dir).join(&backup.file_name));
         assert_eq!(read(&first), ["Cash"]);
         assert_eq!(read(&second), ["Cash", "Bank"]);
     }
@@ -398,7 +524,7 @@ mod tests {
              INSERT INTO filler SELECT randomblob(4000) FROM n;",
         )
         .unwrap();
-        let backups = folder(dir.path());
+        let backups = backups(&dir);
         let target = backups.join(format!("{}-2026-11-03_1405.db", db::NAME));
         let tmp = target.with_extension("db.tmp");
         // Stops the copy once part of it is on disk, as a full disk or a crash would.
@@ -439,7 +565,7 @@ mod tests {
     fn a_backup_that_cannot_start_says_why_and_writes_nothing() {
         let dir = TempDir::new("bak1-failed");
         let conn = database(&dir);
-        fs::write(folder(dir.path()), b"a file where the folder should be").unwrap();
+        fs::write(backups(&dir), b"a file where the folder should be").unwrap();
 
         let result = back_up_now(&conn, dir.path(), now());
 
@@ -447,11 +573,11 @@ mod tests {
             matches!(&result, Err(AppError::Io { message }) if message.starts_with("Couldn't save the backup")),
             "{result:?}"
         );
-        assert!(folder(dir.path()).is_file());
+        assert!(backups(&dir).is_file());
     }
 
     fn auto_files(dir: &TempDir) -> Vec<String> {
-        let mut names: Vec<String> = fs::read_dir(folder(dir.path()).join("auto"))
+        let mut names: Vec<String> = fs::read_dir(backups(dir).join("auto"))
             .unwrap()
             .map(|e| e.unwrap().file_name().into_string().unwrap())
             .collect();
@@ -466,30 +592,26 @@ mod tests {
     #[test]
     fn the_first_start_of_each_day_makes_one_automatic_backup() {
         let dir = TempDir::new("bak2-daily");
-        let mut conn = database(&dir);
+        let conn = database(&dir);
         let stamp = |name: &str| format!("{}-{name}.db", db::NAME);
 
-        back_up_daily(&mut conn, dir.path(), now()).unwrap();
+        back_up_daily(&conn, dir.path(), now()).unwrap();
         assert_eq!(auto_files(&dir), [stamp("2026-11-03_1405")]);
         assert_eq!(last_auto(&conn).as_deref(), Some("2026-11-03"));
 
         let later = now() + chrono::Duration::hours(9); // 23:05, the same day
-        back_up_daily(&mut conn, dir.path(), later).unwrap();
+        back_up_daily(&conn, dir.path(), later).unwrap();
         assert_eq!(auto_files(&dir).len(), 1, "once a day");
 
         let tomorrow = now() + chrono::Duration::hours(11);
-        back_up_daily(&mut conn, dir.path(), tomorrow).unwrap();
+        back_up_daily(&conn, dir.path(), tomorrow).unwrap();
         assert_eq!(
             auto_files(&dir),
             [stamp("2026-11-03_1405"), stamp("2026-11-04_0105")]
         );
         assert_eq!(last_auto(&conn).as_deref(), Some("2026-11-04"));
         assert_eq!(
-            account_names(
-                &folder(dir.path())
-                    .join("auto")
-                    .join(stamp("2026-11-04_0105"))
-            ),
+            account_names(&backups(&dir).join("auto").join(stamp("2026-11-04_0105"))),
             ["Cash"]
         );
     }
@@ -497,8 +619,8 @@ mod tests {
     #[test]
     fn automatic_backups_keep_exactly_the_newest_30() {
         let dir = TempDir::new("bak3-prune");
-        let mut conn = database(&dir);
-        let auto = folder(dir.path()).join("auto");
+        let conn = database(&dir);
+        let auto = backups(&dir).join("auto");
         fs::create_dir_all(&auto).unwrap();
         // 31 older daily backups, Oct 3 to Nov 2.
         let day = |n: u64| {
@@ -517,14 +639,14 @@ mod tests {
         fs::create_dir_all(auto.join(format!("{}-2020-01-01_0000.db", db::NAME))).unwrap();
         let manual = back_up_now(&conn, dir.path(), now() - chrono::Days::new(90)).unwrap();
 
-        back_up_daily(&mut conn, dir.path(), now()).unwrap();
+        back_up_daily(&conn, dir.path(), now()).unwrap();
 
         let files = auto_files(&dir);
-        let backups: Vec<&String> = files
+        let kept: Vec<&String> = files
             .iter()
             .filter(|n| n.ends_with("_0900.db") || n.ends_with("_1405.db"))
             .collect();
-        assert_eq!(backups.len(), 30);
+        assert_eq!(kept.len(), 30);
         assert!(
             files.contains(&format!("{}-2026-11-03_1405.db", db::NAME)),
             "today's is kept"
@@ -542,7 +664,7 @@ mod tests {
             "folders stay"
         );
         assert!(
-            folder(dir.path()).join(manual.file_name).exists(),
+            backups(&dir).join(manual.file_name).exists(),
             "manual backups are never pruned"
         );
     }
@@ -552,8 +674,8 @@ mod tests {
     fn a_locked_old_backup_does_not_stop_the_others_being_deleted() {
         use std::os::windows::fs::OpenOptionsExt;
         let dir = TempDir::new("bak3-locked");
-        let mut conn = database(&dir);
-        let auto = folder(dir.path()).join("auto");
+        let conn = database(&dir);
+        let auto = backups(&dir).join("auto");
         fs::create_dir_all(&auto).unwrap();
         let old = |n: u64| {
             let day = (now() - chrono::Days::new(n)).format("%Y-%m-%d");
@@ -570,7 +692,7 @@ mod tests {
             .open(old(30))
             .unwrap();
 
-        let result = back_up_daily(&mut conn, dir.path(), now());
+        let result = back_up_daily(&conn, dir.path(), now());
 
         assert!(
             matches!(&result, Err(AppError::Io { message }) if message.starts_with("Couldn't delete the oldest")),
@@ -589,12 +711,12 @@ mod tests {
     #[test]
     fn a_failed_automatic_backup_is_tried_again_at_the_next_start() {
         let dir = TempDir::new("bak2-failed");
-        let mut conn = database(&dir);
-        let auto = folder(dir.path()).join("auto");
-        fs::create_dir_all(folder(dir.path())).unwrap();
+        let conn = database(&dir);
+        let auto = backups(&dir).join("auto");
+        fs::create_dir_all(backups(&dir)).unwrap();
         fs::write(&auto, b"a file where the folder should be").unwrap();
 
-        let result = back_up_daily(&mut conn, dir.path(), now());
+        let result = back_up_daily(&conn, dir.path(), now());
 
         assert!(
             matches!(&result, Err(AppError::Io { message }) if message.starts_with("Couldn't save the backup")),
@@ -602,7 +724,7 @@ mod tests {
         );
         assert_eq!(last_auto(&conn), None, "nothing is recorded");
         fs::remove_file(&auto).unwrap();
-        back_up_daily(&mut conn, dir.path(), now()).unwrap();
+        back_up_daily(&conn, dir.path(), now()).unwrap();
         assert_eq!(auto_files(&dir).len(), 1);
     }
 
@@ -629,11 +751,11 @@ mod tests {
         conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")
             .unwrap();
         add_account(&conn, "After the backup");
-        (conn, folder(dir.path()).join(backup.file_name))
+        (conn, backups(dir).join(backup.file_name))
     }
 
     fn pre_restore(dir: &TempDir) -> PathBuf {
-        folder(dir.path()).join(format!("{}-pre-restore-2026-11-03_1405.db", db::NAME))
+        backups(dir).join(format!("{}-pre-restore-2026-11-03_1405.db", db::NAME))
     }
 
     /// Scratch copies left in the data folder.
@@ -788,12 +910,13 @@ mod tests {
         let set = |conn: &Connection, key: &str, value: &str| {
             repo::settings::set(conn, key, value).unwrap()
         };
+        // The backup comes from another computer, whose backups went to its own folder.
+        let old_pc = dir.path().join("Old PC");
+        fs::create_dir_all(&old_pc).unwrap();
         set(&conn, "currency_symbol", "$");
-        set(&conn, "backup_folder", "D:\\Old PC");
-        set(&conn, "last_backup_at", "2026-01-01T00:00:00Z");
+        set(&conn, "backup_folder", &old_pc.display().to_string());
         set(&conn, LAST_AUTO, "2026-01-01");
-        let backup =
-            folder(dir.path()).join(back_up_now(&conn, dir.path(), now()).unwrap().file_name);
+        let backup = old_pc.join(back_up_now(&conn, dir.path(), now()).unwrap().file_name);
         set(&conn, "currency_symbol", "\u{20B1}");
         repo::settings::delete(&conn, "backup_folder").unwrap();
         set(&conn, "auto_backup_enabled", "false");
@@ -823,8 +946,8 @@ mod tests {
         let (mut conn, backup) = backed_up_then_changed(&dir);
         let moved = dir.path().join("chosen.db");
         fs::rename(&backup, &moved).unwrap();
-        fs::remove_dir_all(folder(dir.path())).unwrap();
-        fs::write(folder(dir.path()), b"a file where the folder should be").unwrap();
+        fs::remove_dir_all(backups(&dir)).unwrap();
+        fs::write(backups(&dir), b"a file where the folder should be").unwrap();
 
         let result = restore(&mut conn, dir.path(), &db_path(&dir), &moved, now());
 
@@ -945,5 +1068,133 @@ mod tests {
         assert_eq!(fs::read(&backup).unwrap(), bytes);
         assert_eq!(names_in(&conn), BEFORE);
         assert!(leftovers(&dir).is_empty(), "{:?}", leftovers(&dir));
+    }
+
+    // Backup settings (SET-3, BAK-7)
+
+    fn today() -> NaiveDate {
+        now().date_naive()
+    }
+
+    #[test]
+    fn backups_go_to_the_chosen_folder_until_the_default_is_chosen_again() {
+        let dir = TempDir::new("set3-folder");
+        let conn = database(&dir);
+        let chosen = dir.path().join("D drive");
+        fs::create_dir_all(&chosen).unwrap();
+
+        let shown = set_folder(&conn, dir.path(), Some(&chosen), today()).unwrap();
+        assert_eq!(shown.folder, chosen.display().to_string());
+        assert!(!shown.folder_is_default);
+        let manual = back_up_now(&conn, dir.path(), now()).unwrap();
+        assert!(chosen.join(&manual.file_name).exists());
+        back_up_daily(&conn, dir.path(), now()).unwrap();
+        assert_eq!(fs::read_dir(chosen.join("auto")).unwrap().count(), 1);
+        assert!(
+            !backups(&dir).exists(),
+            "nothing went to the default folder"
+        );
+        assert!(
+            fs::read_dir(&chosen).unwrap().all(|e| !e
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .ends_with(".tmp")),
+            "the write check leaves nothing behind"
+        );
+
+        let back = set_folder(&conn, dir.path(), None, today()).unwrap();
+        assert_eq!(back.folder, backups(&dir).display().to_string());
+        assert!(back.folder_is_default);
+        assert_eq!(repo::settings::get(&conn, FOLDER).unwrap(), None);
+    }
+
+    #[test]
+    fn choosing_the_default_folder_stores_nothing() {
+        let dir = TempDir::new("set3-default");
+        let conn = database(&dir);
+        fs::create_dir_all(backups(&dir)).unwrap();
+        let shown = set_folder(&conn, dir.path(), Some(&backups(&dir)), today()).unwrap();
+        assert!(shown.folder_is_default);
+        assert_eq!(repo::settings::get(&conn, FOLDER).unwrap(), None);
+    }
+
+    #[test]
+    fn a_folder_that_is_missing_relative_or_a_file_is_refused() {
+        let dir = TempDir::new("set3-refused");
+        let conn = database(&dir);
+        let file = dir.path().join("a file");
+        fs::write(&file, b"x").unwrap();
+        for bad in [dir.path().join("missing"), PathBuf::from("relative"), file] {
+            let result = set_folder(&conn, dir.path(), Some(&bad), today());
+            assert!(
+                matches!(&result, Err(AppError::Validation { field, .. }) if field == "folder"),
+                "{bad:?}: {result:?}"
+            );
+        }
+        assert_eq!(repo::settings::get(&conn, FOLDER).unwrap(), None);
+    }
+
+    #[test]
+    fn manual_and_automatic_backups_both_count_as_the_last_backup() {
+        let dir = TempDir::new("bak7-last");
+        let conn = database(&dir);
+        let first = status(&conn, dir.path(), today()).unwrap();
+        assert_eq!(first.last_backup_at, None);
+        assert!(first.due, "never backed up");
+
+        back_up_now(&conn, dir.path(), now()).unwrap();
+        let after = status(&conn, dir.path(), today()).unwrap();
+        assert_eq!(after.last_backup_at.as_deref(), Some("2026-11-03T14:05"));
+        assert!(!after.due);
+        let eight_days_on = today() + chrono::Days::new(8);
+        assert!(status(&conn, dir.path(), eight_days_on).unwrap().due);
+        assert!(is_due(&conn, eight_days_on).unwrap());
+        assert!(!is_due(&conn, today() + chrono::Days::new(7)).unwrap());
+
+        let later = now() + chrono::Duration::days(8);
+        back_up_daily(&conn, dir.path(), later).unwrap();
+        let auto = status(&conn, dir.path(), later.date_naive()).unwrap();
+        assert_eq!(auto.last_backup_at.as_deref(), Some("2026-11-11T14:05"));
+        assert!(!auto.due);
+    }
+
+    #[test]
+    fn automatic_backups_can_be_turned_off() {
+        let dir = TempDir::new("set3-auto-off");
+        let conn = database(&dir);
+        assert!(status(&conn, dir.path(), today()).unwrap().auto_backup);
+
+        let off = set_auto_backup(&conn, dir.path(), false, today()).unwrap();
+        assert!(!off.auto_backup);
+        back_up_daily(&conn, dir.path(), now()).unwrap();
+        assert!(
+            !backups(&dir).exists(),
+            "no automatic backup while it's off"
+        );
+        assert_eq!(last_auto(&conn), None);
+
+        set_auto_backup(&conn, dir.path(), true, today()).unwrap();
+        back_up_daily(&conn, dir.path(), now()).unwrap();
+        assert_eq!(auto_files(&dir).len(), 1);
+    }
+
+    #[test]
+    fn the_restores_safety_copy_goes_to_the_chosen_folder() {
+        let dir = TempDir::new("set3-restore");
+        let (mut conn, backup) = backed_up_then_changed(&dir);
+        let chosen = dir.path().join("chosen");
+        fs::create_dir_all(&chosen).unwrap();
+        set_folder(&conn, dir.path(), Some(&chosen), today()).unwrap();
+
+        restore(&mut conn, dir.path(), &db_path(&dir), &backup, now()).unwrap();
+
+        let safety = chosen.join(format!("{}-pre-restore-2026-11-03_1405.db", db::NAME));
+        assert_eq!(account_names(&safety), BEFORE);
+        assert_eq!(
+            folder(&conn, dir.path()).unwrap(),
+            chosen,
+            "the restored data keeps this computer's folder"
+        );
     }
 }

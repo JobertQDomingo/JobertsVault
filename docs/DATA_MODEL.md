@@ -220,9 +220,9 @@ CREATE TABLE settings (
 | `onboarding_completed` | `true` \| `false` | `false` | 1 | ONB-1 |
 | `auto_update_enabled` | `true` \| `false` | `true` | 1 | UPD-3 |
 | `comparison_mode` | `to_date` \| `full` | `to_date` | 2 | SET-7 |
-| `backup_folder` | absolute path | `<app data>\backups` | 2 | SET-3 |
+| `backup_folder` | absolute path, stored only when the user chose a folder | (none: `<app data>\backups`, or `backups-dev` in debug builds) | 2 | SET-3 |
 | `auto_backup_enabled` | `true` \| `false` | `true` | 2 | SET-3 |
-| `last_backup_at` | ISO timestamp | (none) | 2 | BAK-7 |
+| `last_backup_at` | UTC timestamp of the last successful manual or automatic backup | (none) | 2 | BAK-7 |
 | `last_auto_backup_date` | `YYYY-MM-DD`, the local date of the last successful automatic backup | (none) | 2 | BAK-2 |
 | `theme` | `system` \| `light` \| `dark` | `system` | 4 | SET-5 |
 | `reduce_transparency` | `true` \| `false` | `false` | 4 | SET-8 |

@@ -42,21 +42,28 @@ impl AppState {
     pub fn open(data_dir: PathBuf, ms: &Migrations, now: DateTime<Local>) -> Self {
         let db_path = data_dir.join(format!("{}.db", db::NAME));
         let log_path = data_dir.join(format!("{}.log", db::NAME));
-        let mut db = start(&data_dir, &db_path, ms, now);
-        match &mut db {
-            Err(err) => log::record_startup(&log_path, err),
-            // Step 7 (BAK-2). A failed backup is logged, never a reason not to start.
-            Ok(conn) => {
-                if let Err(err) = services::backup::back_up_daily(conn, &data_dir, now) {
-                    log::record(&log_path, &err);
-                }
-            }
+        let db = start(&data_dir, &db_path, ms, now);
+        if let Err(err) = &db {
+            log::record_startup(&log_path, err);
         }
         Self {
             db: db.map(Mutex::new),
             data_dir,
             db_path,
             log_path,
+        }
+    }
+
+    /// Startup step 7 (BAK-2), run on its own thread so the window never waits for a slow backup
+    /// folder; commands wait for the connection instead. A failure is logged, never a reason not
+    /// to start.
+    pub fn back_up_daily(&self, now: DateTime<Local>) {
+        if self.db.is_ok()
+            && let Err(err) = self
+                .conn()
+                .and_then(|conn| services::backup::back_up_daily(&conn, &self.data_dir, now))
+        {
+            log::record(&self.log_path, &err);
         }
     }
 
@@ -250,6 +257,7 @@ mod tests {
             now(),
         );
         assert_eq!(state.startup_status(), StartupStatus::Ok);
+        state.back_up_daily(now());
         let auto = dir.path().join(db::BACKUPS_DIR).join("auto");
         assert_eq!(fs::read_dir(auto).unwrap().count(), 1);
     }
@@ -268,6 +276,7 @@ mod tests {
             now(),
         );
         assert_eq!(state.startup_status(), StartupStatus::Ok);
+        state.back_up_daily(now());
         assert!(
             fs::read_to_string(&state.log_path)
                 .unwrap()

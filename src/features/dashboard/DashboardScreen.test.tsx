@@ -211,3 +211,29 @@ test("if the categories can't load, the dashboard says so and Retry asks again",
   fireEvent.click(retry);
   expect(await screen.findByText("Food & Groceries · Market")).toBeTruthy();
 });
+
+test("a backup that's due shows a warning with Back up now (BAK-7)", async () => {
+  let backedUp = false;
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: () => ({ ...DASHBOARD, backupDue: !backedUp }),
+    backup_now: () => {
+      backedUp = true;
+      return { fileName: "jobertsvault-2026-11-05_0930.db" };
+    },
+  });
+  expect(await screen.findByText("No backup in the last 7 days.")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Back up now" }));
+  expect(
+    await screen.findByText("Backup saved as jobertsvault-2026-11-05_0930.db"),
+  ).toBeTruthy();
+  await waitFor(() =>
+    expect(screen.queryByText("No backup in the last 7 days.")).toBeNull(),
+  );
+});
+
+test("no warning while backups are recent", async () => {
+  renderRoute("/", ANSWERS);
+  await screen.findByText("Recent transactions");
+  expect(screen.queryByText("No backup in the last 7 days.")).toBeNull();
+});

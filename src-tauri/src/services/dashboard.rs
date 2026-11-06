@@ -26,6 +26,8 @@ pub struct Dashboard {
     /// The cards' % change: the period against the previous one by the comparison setting
     /// (DSH-3, SET-7), as `get_comparison` returns it with no mode.
     pub comparison: Comparison,
+    /// The last backup is more than 7 days old, or there's none (BAK-7, UI_FLOWS F9).
+    pub backup_due: bool,
     /// Every account, archived included, with balances and card summaries as of today (DSH-4, DSH-5).
     pub accounts: Vec<Account>,
     pub net_balance: Money,
@@ -57,6 +59,7 @@ pub fn get(
         .map(transactions::view)
         .collect::<Result<_, _>>()?;
     Ok(Dashboard {
+        backup_due: super::backup::is_due(conn, today)?,
         period,
         income,
         expense,

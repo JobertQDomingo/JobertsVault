@@ -318,7 +318,7 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
     let file = backup::back_up_now(&conn, dir.path(), now())
         .unwrap()
         .file_name;
-    let chosen = backup::folder(dir.path()).join(file);
+    let chosen = backup::folder(&conn, dir.path()).unwrap().join(file);
     time_within(FILE_LIMIT, "inspect a backup", || {
         backup::inspect(dir.path(), &path, &chosen, now()).unwrap()
     });
