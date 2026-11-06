@@ -40,13 +40,20 @@ function Key({ color, line }: { color: string; line?: boolean }) {
 }
 
 const KEYS = [
-  { label: "Income", color: "bg-income" },
-  { label: "Expense", color: "bg-expense" },
-  { label: "Net cashflow", color: "bg-primary", line: true },
-];
+  { field: "income", label: "Income", color: "bg-income" },
+  { field: "expense", label: "Expense", color: "bg-expense" },
+  { field: "net", label: "Net cashflow", color: "bg-primary", line: true },
+] as const;
 
-function Figure({ index, children }: { index: number; children: ReactNode }) {
-  const { label, color, line } = KEYS[index];
+function Figure({
+  label,
+  color,
+  line,
+  children,
+}: Omit<(typeof KEYS)[number], "field"> & {
+  line?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div className="flex items-center justify-between gap-4">
       <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -68,15 +75,11 @@ function BarTooltip({
   return (
     <div className="grid min-w-52 gap-1 rounded-control border border-edge bg-glass-solid px-3 py-2 text-small shadow-raised">
       <p className="font-semibold">{formatBarDates(bar.start, bar.end)}</p>
-      <Figure index={0}>
-        <MoneyText amount={bar.income} kind="income" />
-      </Figure>
-      <Figure index={1}>
-        <MoneyText amount={bar.expense} kind="expense" />
-      </Figure>
-      <Figure index={2}>
-        <MoneyText amount={bar.net} kind="net" />
-      </Figure>
+      {KEYS.map(({ field, ...key }) => (
+        <Figure key={field} {...key}>
+          <MoneyText amount={bar[field]} kind={field} />
+        </Figure>
+      ))}
     </div>
   );
 }
@@ -111,78 +114,86 @@ export function IncomeExpenseChart({
       <div aria-hidden className="flex gap-4 text-small text-muted-foreground">
         {KEYS.map((k) => (
           <span key={k.label} className="flex items-center gap-1.5">
-            <Key color={k.color} line={k.line} />
+            <Key color={k.color} line={"line" in k} />
             {k.label}
           </span>
         ))}
       </div>
-      <div aria-hidden style={{ height }} className="relative">
-        <ResponsiveContainer>
-          <ComposedChart
-            data={rows}
-            stackOffset="sign"
-            accessibilityLayer={false}
-            margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
-          >
-            <CartesianGrid vertical={false} stroke="var(--hairline)" />
-            <XAxis
-              dataKey="start"
-              tickFormatter={(start: string) =>
-                formatBarLabel(start, grain, {
-                  weekdays: bars.length <= 7,
-                  years,
-                })
-              }
-              tick={TICK}
-              tickLine={false}
-              axisLine={false}
-              interval="preserveStartEnd"
-              minTickGap={16}
-            />
-            <YAxis
-              tickFormatter={(minor: number) => formatCompact(minor, settings)}
-              tick={TICK}
-              tickLine={false}
-              axisLine={false}
-              allowDecimals={false}
-              width={64}
-            />
-            <ReferenceLine y={0} stroke="var(--field-edge)" />
-            <Tooltip
-              content={(props) => <BarTooltip {...props} />}
-              cursor={{ fill: "var(--wash)" }}
-              isAnimationActive={false}
-            />
-            <Bar
-              dataKey="income"
-              stackId="flow"
-              fill="var(--income)"
-              maxBarSize={24}
-              radius={[4, 4, 0, 0]}
-              isAnimationActive={false}
-            />
-            <Bar
-              dataKey="below"
-              stackId="flow"
-              fill="var(--expense)"
-              maxBarSize={24}
-              radius={[4, 4, 0, 0]}
-              isAnimationActive={false}
-            />
-            <Line
-              dataKey="line"
-              type="linear"
-              stroke="var(--primary)"
-              strokeWidth={2}
-              // A single point has no line to show it.
-              dot={bars.length === 1 && { r: 4, fill: "var(--primary)" }}
-              activeDot={{ r: 4, stroke: "var(--glass-solid)", strokeWidth: 2 }}
-              isAnimationActive={false}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+      <div style={{ height }} className="relative">
+        <div aria-hidden className="h-full">
+          <ResponsiveContainer>
+            <ComposedChart
+              data={rows}
+              stackOffset="sign"
+              accessibilityLayer={false}
+              margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
+            >
+              <CartesianGrid vertical={false} stroke="var(--hairline)" />
+              <XAxis
+                dataKey="start"
+                tickFormatter={(start: string) =>
+                  formatBarLabel(start, grain, {
+                    weekdays: bars.length <= 7,
+                    years,
+                  })
+                }
+                tick={TICK}
+                tickLine={false}
+                axisLine={false}
+                interval="preserveStartEnd"
+                minTickGap={16}
+              />
+              <YAxis
+                tickFormatter={(minor: number) =>
+                  formatCompact(minor, settings)
+                }
+                tick={TICK}
+                tickLine={false}
+                axisLine={false}
+                allowDecimals={false}
+                width={64}
+              />
+              <ReferenceLine y={0} stroke="var(--field-edge)" />
+              <Tooltip
+                content={BarTooltip}
+                cursor={{ fill: "var(--wash)" }}
+                isAnimationActive={false}
+              />
+              <Bar
+                dataKey="income"
+                stackId="flow"
+                fill="var(--income)"
+                maxBarSize={24}
+                radius={[4, 4, 0, 0]}
+                isAnimationActive={false}
+              />
+              <Bar
+                dataKey="below"
+                stackId="flow"
+                fill="var(--expense)"
+                maxBarSize={24}
+                radius={[4, 4, 0, 0]}
+                isAnimationActive={false}
+              />
+              <Line
+                dataKey="line"
+                type="linear"
+                stroke="var(--primary)"
+                strokeWidth={2}
+                // A single point has no line to show it.
+                dot={bars.length === 1 && { r: 4, fill: "var(--primary)" }}
+                activeDot={{
+                  r: 4,
+                  stroke: "var(--glass-solid)",
+                  strokeWidth: 2,
+                }}
+                isAnimationActive={false}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
         {empty && (
-          <p className="absolute inset-0 grid place-items-center text-muted-foreground">
+          <p className="pointer-events-none absolute inset-0 grid place-items-center text-muted-foreground">
             Nothing recorded in this period.
           </p>
         )}

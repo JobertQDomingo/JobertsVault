@@ -56,31 +56,36 @@ export function formatMoney(
 ): string {
   const amount = formatAmount(Math.abs(minor), settings.currencyDecimals);
   const sign = minor < 0 ? MINUS : options.plus && minor > 0 ? "+" : "";
+  return withSymbol(sign, amount, settings);
+}
+
+function withSymbol(sign: string, amount: string, settings: MoneySettings) {
   return settings.currencyPosition === "before"
     ? `${sign}${settings.currencySymbol}${amount}`
     : `${sign}${amount}\u00A0${settings.currencySymbol}`;
 }
 
 /**
- * A chart axis label (DESIGN_SYSTEM §7): `₱850`, `₱12.5k`, `₱1.2M`, `−₱5k`. One decimal at most,
- * rounded half up, using whole-number maths only.
+ * A chart axis label (DESIGN_SYSTEM §7): `₱850`, `₱12.5k`, `₱1.25k`, `₱1.2M`, `−₱5k`. Two decimals
+ * at most, so evenly spaced ticks read evenly, rounded half up using whole-number maths only.
  */
 export function formatCompact(minor: number, settings: MoneySettings): string {
   const unit = 10 ** settings.currencyDecimals;
   const abs = Math.abs(minor);
-  const [size, suffix] =
-    abs >= unit * 1_000_000
-      ? [unit * 1_000_000, "M"]
-      : abs >= unit * 1_000
-        ? [unit * 1_000, "k"]
-        : [unit, ""];
-  const scaled = abs * 10;
+  // The largest unit the amount rounds to at least 1 of, so ₱999,999 reads "1M", not "1,000k".
+  const [size, suffix] = (
+    [
+      [unit * 1_000_000, "M"],
+      [unit * 1_000, "k"],
+    ] as const
+  ).find(([size]) => 200 * abs >= 199 * size) ?? [unit, ""];
+  const scaled = abs * 100;
   const rest = scaled % size;
-  const tenths = (scaled - rest) / size + (2 * rest >= size ? 1 : 0);
-  const fraction = tenths % 10;
-  const amount = `${formatAmount((tenths - fraction) / 10, 0)}${fraction ? `.${fraction}` : ""}${suffix}`;
-  const sign = minor < 0 ? MINUS : "";
-  return settings.currencyPosition === "before"
-    ? `${sign}${settings.currencySymbol}${amount}`
-    : `${sign}${amount}\u00A0${settings.currencySymbol}`;
+  const hundredths = (scaled - rest) / size + (2 * rest >= size ? 1 : 0);
+  const fraction = hundredths % 100;
+  const decimals = fraction
+    ? `.${String(fraction).padStart(2, "0").replace(/0$/, "")}`
+    : "";
+  const amount = `${formatAmount((hundredths - fraction) / 100, 0)}${decimals}${suffix}`;
+  return withSymbol(minor < 0 ? MINUS : "", amount, settings);
 }

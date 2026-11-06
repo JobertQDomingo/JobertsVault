@@ -37,17 +37,18 @@ pub fn get(
     today: NaiveDate,
 ) -> Result<Dashboard, AppError> {
     let period = period::get(conn, query, today)?;
-    // Rows dated after today count nowhere (DATA_MODEL §5.2).
-    let (start, end) = (period.start.to_string(), period.end.min(today).to_string());
-    let (_, income, expense) =
-        repo::transactions::totals(conn, &repo::transactions::Filter::dates(&start, &end))?;
-    let (income, expense) = (Money(income), Money(expense));
-    let net = income
-        .checked_sub(expense)
-        .ok_or_else(|| AppError::Database {
-            message: "The net cashflow is too large".into(),
-        })?;
+    // The chart's bars cover the period, so they add up to its totals (rows after today count
+    // nowhere, DATA_MODEL §5.2).
     let series = reports::timeseries(conn, query, today)?;
+    let too_large = || AppError::Database {
+        message: "The period's totals are too large".into(),
+    };
+    let (mut income, mut expense) = (Money::ZERO, Money::ZERO);
+    for bar in &series.bars {
+        income = income.checked_add(bar.income).ok_or_else(too_large)?;
+        expense = expense.checked_add(bar.expense).ok_or_else(too_large)?;
+    }
+    let net = income.checked_sub(expense).ok_or_else(too_large)?;
     let accounts::AccountList {
         accounts,
         net_balance,

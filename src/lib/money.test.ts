@@ -110,9 +110,21 @@ describe("formatCompact", () => {
     expect(formatCompact(-500000, peso)).toBe("−₱5k");
   });
 
+  test("keeps two decimals at most, so even ticks read evenly", () => {
+    expect(formatCompact(125000, peso)).toBe("₱1.25k");
+    expect(formatCompact(375000, peso)).toBe("₱3.75k");
+    expect(formatCompact(5, peso)).toBe("₱0.05");
+  });
+
   test("rounds half up, without floating-point maths", () => {
-    expect(formatCompact(1234999, peso)).toBe("₱12.3k");
-    expect(formatCompact(1235000, peso)).toBe("₱12.4k");
+    expect(formatCompact(1234499, peso)).toBe("₱12.34k");
+    expect(formatCompact(1234500, peso)).toBe("₱12.35k");
+  });
+
+  test("moves to the next unit when rounding reaches it", () => {
+    expect(formatCompact(99995000, peso)).toBe("₱1M");
+    expect(formatCompact(99400, peso)).toBe("₱994");
+    expect(formatCompact(99500, peso)).toBe("₱1k");
   });
 
   test("follows the decimals and the symbol's position", () => {
