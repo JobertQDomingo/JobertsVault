@@ -1,5 +1,6 @@
-use std::fs;
-use std::path::Path;
+use std::fs::{self, File, OpenOptions};
+use std::io::{ErrorKind, Write};
+use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -10,7 +11,7 @@ use crate::domain::money::{Decimals, Money};
 use crate::error::AppError;
 use crate::repo;
 use crate::services::transactions::parse_date;
-use crate::services::{invalid, settings};
+use crate::services::{failed, invalid, settings};
 
 /// The dates to export, both included, as `YYYY-MM-DD`.
 #[derive(Debug, Deserialize, TS)]
@@ -41,15 +42,17 @@ const HEADER: [&str; 9] = [
     "note",
 ];
 
+/// A CSV file ready to save: its text and where it goes.
+pub struct CsvFile {
+    path: PathBuf,
+    text: String,
+    rows: usize,
+}
+
 /// Export to CSV (BAK-6, DATA_MODEL §8): every transaction from `range.start` to `range.end`,
-/// oldest first, written to `path`, a `.csv` file the user chose in the save dialog. The file is
-/// written in full beside it first, so a failure never leaves half a file or spoils one it was
-/// to replace.
-pub fn export_csv(
-    conn: &Connection,
-    range: &DateRange,
-    path: &Path,
-) -> Result<CsvExport, AppError> {
+/// oldest first, for `path`, a `.csv` file the user chose in the save dialog. Only this reads the
+/// database; `save` then writes the file without it.
+pub fn prepare(conn: &Connection, range: &DateRange, path: &Path) -> Result<CsvFile, AppError> {
     let start = parse_date(&range.start).ok_or_else(|| invalid("start", "Enter a real date"))?;
     let end = parse_date(&range.end).ok_or_else(|| invalid("end", "Enter a real date"))?;
     if end < start {
@@ -92,16 +95,52 @@ pub fn export_csv(
             ]
         }),
     );
-    let tmp = path.with_extension("csv.tmp");
-    fs::write(&tmp, text)
-        .and_then(|()| fs::rename(&tmp, path))
-        .map_err(|err| {
+    Ok(CsvFile {
+        path: path.to_path_buf(),
+        text,
+        rows: count,
+    })
+}
+
+impl CsvFile {
+    /// Writes the whole file beside `path` under a new name, then renames it into place, so a
+    /// failure never leaves half a file or spoils one the user chose to replace.
+    pub fn save(self) -> Result<CsvExport, AppError> {
+        let saving = failed("Couldn't save the CSV file.");
+        let (tmp, mut file) = new_file_beside(&self.path).map_err(&saving)?;
+        let written = file
+            .write_all(self.text.as_bytes())
+            .and_then(|()| file.sync_all());
+        drop(file);
+        if let Err(err) = written.and_then(|()| fs::rename(&tmp, &self.path)) {
             let _ = fs::remove_file(&tmp);
-            AppError::Io {
-                message: format!("Couldn't save the CSV file. {err}"),
-            }
-        })?;
-    Ok(CsvExport { rows: count })
+            return Err(saving(err));
+        }
+        Ok(CsvExport { rows: self.rows })
+    }
+}
+
+/// A file created next to `path`, `<name>.csv.tmp` or `<name>.csv.2.tmp` and so on, never one
+/// that's already there, such as a file of the user's own.
+fn new_file_beside(path: &Path) -> std::io::Result<(PathBuf, File)> {
+    let mut n = 1;
+    loop {
+        let tmp = path.with_extension(match n {
+            1 => "csv.tmp".to_string(),
+            _ => format!("csv.{n}.tmp"),
+        });
+        match OpenOptions::new().write(true).create_new(true).open(&tmp) {
+            Ok(file) => return Ok((tmp, file)),
+            Err(err) if err.kind() == ErrorKind::AlreadyExists => n += 1,
+            Err(err) => return Err(err),
+        }
+    }
+}
+
+/// Both steps at once, as the tests use them.
+#[cfg(test)]
+fn export_csv(conn: &Connection, range: &DateRange, path: &Path) -> Result<CsvExport, AppError> {
+    prepare(conn, range, path)?.save()
 }
 
 #[cfg(test)]
@@ -292,6 +331,22 @@ mod tests {
         );
         assert!(path.is_dir());
         assert!(!dir.path().join("taken.csv.tmp").exists());
+    }
+
+    #[test]
+    fn a_tmp_file_of_the_users_own_is_never_touched() {
+        let dir = TempDir::new("bak6-tmp");
+        let path = dir.path().join("budget.csv");
+        let theirs = dir.path().join("budget.csv.tmp");
+        fs::write(&theirs, "the user's own file").unwrap();
+        export_csv(&db(), &range("2026-10-01", "2026-10-31"), &path).unwrap();
+        assert_eq!(fs::read_to_string(&theirs).unwrap(), "the user's own file");
+        assert!(
+            fs::read_to_string(&path)
+                .unwrap()
+                .starts_with("\u{FEFF}date,")
+        );
+        assert!(!dir.path().join("budget.csv.2.tmp").exists());
     }
 
     #[test]

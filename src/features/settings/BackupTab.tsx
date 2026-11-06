@@ -18,7 +18,7 @@ import { notify } from "@/components/ui/toast";
 import { useLedgerMutation } from "@/hooks/useLedgerMutation";
 import { usePeriod } from "@/hooks/usePeriod";
 import { useSettings } from "@/hooks/useSettings";
-import { formatDateTime } from "@/lib/dates";
+import { formatDateTime, isIsoDate } from "@/lib/dates";
 import { Row } from "./GeneralTab";
 
 const showError = (error: Error) => notify.error(error.message);
@@ -123,6 +123,10 @@ function ExportRow() {
   const end = picked.end ?? month.data?.today ?? "";
   const exporter = useMutation({
     mutationFn: async () => {
+      // Rust checks them again; this only spares a trip through the save dialog. ISO dates
+      // compare correctly as text.
+      if (!isIsoDate(start) || !isIsoDate(end) || end < start)
+        throw new Error("Enter a From date and a To date on or after it.");
       const path = await pickCsvPath(`jobertsvault-${start}-to-${end}.csv`);
       return path ? { path, ...(await exportCsv({ start, end }, path)) } : null;
     },

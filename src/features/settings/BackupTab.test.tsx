@@ -191,3 +191,19 @@ test("a refused export says why", async () => {
     await screen.findByText("The end date can't be before the start date"),
   ).toBeTruthy();
 });
+
+test("dates out of order are caught before the save dialog", async () => {
+  renderRoute("/settings?tab=backup", ANSWERS);
+  const to = (await screen.findByRole("textbox", {
+    name: "To",
+  })) as HTMLInputElement;
+  await waitFor(() => expect(to.value).toBe("11/05/2026"));
+  fireEvent.change(to, { target: { value: "10/01/2026" } });
+  fireEvent.blur(to);
+  fireEvent.click(screen.getByRole("button", { name: "Export…" }));
+  expect(
+    await screen.findByText("Enter a From date and a To date on or after it."),
+  ).toBeTruthy();
+  expect(save).not.toHaveBeenCalled();
+  expect(called("export_csv")).toBe(0);
+});

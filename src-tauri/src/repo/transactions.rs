@@ -254,7 +254,6 @@ pub fn latest_non_card_source(conn: &Connection) -> rusqlite::Result<Option<i64>
     .optional()
 }
 
-/// The number of rows deleted: 0 when there's no such transaction.
 /// A transaction with the names it shows in a CSV file (BAK-6).
 pub struct Export {
     pub date: String,
@@ -296,6 +295,7 @@ pub fn export(conn: &Connection, start: &str, end: &str) -> rusqlite::Result<Vec
     .collect()
 }
 
+/// The number of rows deleted: 0 when there's no such transaction.
 pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<usize> {
     conn.execute("DELETE FROM transactions WHERE id = ?1", [id])
 }

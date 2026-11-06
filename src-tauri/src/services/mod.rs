@@ -26,6 +26,13 @@ fn invalid(field: &str, message: &str) -> AppError {
     }
 }
 
+/// An `io` error that starts with `what` and ends with the cause.
+fn failed<E: std::fmt::Display>(what: &str) -> impl Fn(E) -> AppError + '_ {
+    move |err| AppError::Io {
+        message: format!("{what} {err}"),
+    }
+}
+
 fn not_found(entity: &str, id: i64) -> AppError {
     AppError::NotFound {
         entity: entity.into(),
