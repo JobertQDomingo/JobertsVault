@@ -312,6 +312,7 @@ Displayed as `▲ 12.3%` or `▼ 4.0%`, or `—` when there's nothing to compare
 | Month period label | month and year, **or** a range when `month_start_day` > 1 | `October 2026` / `Sep 25 – Oct 24, 2026` |
 | Year period label | year | `2026` |
 | Date input | `MM/DD/YYYY` shown, `YYYY-MM-DD` stored | `10/26/2026` |
+| Date and time (backups) | date, year, 12-hour time | `Oct 20, 2026 9:30 AM` |
 
 Dates always use **US order** (`10/26/2026`, `Oct 26`), whatever the Windows region setting.
 

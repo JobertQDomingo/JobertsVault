@@ -1,8 +1,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
 
 use chrono::{DateTime, Local};
 use rusqlite::Connection;
+use rusqlite_migration::Migrations;
 use serde::Serialize;
 use ts_rs::TS;
 
@@ -10,8 +12,17 @@ use crate::db;
 use crate::domain::backup;
 use crate::error::AppError;
 use crate::repo;
+use crate::services::invalid;
 
 const LAST_AUTO: &str = "last_auto_backup_date";
+/// Settings about this computer's backups, not the data: a restore keeps the current ones
+/// (DATA_MODEL §9).
+const THIS_COMPUTER: [&str; 4] = [
+    "backup_folder",
+    "auto_backup_enabled",
+    "last_backup_at",
+    LAST_AUTO,
+];
 
 /// What `backup_now` returns: the name of the file it wrote, for the "Backup saved as …" toast,
 /// whose Open folder shows where (UI_FLOWS F9).
@@ -34,7 +45,8 @@ pub fn back_up_now(
     data_dir: &Path,
     now: DateTime<Local>,
 ) -> Result<Backup, AppError> {
-    let file_name = back_up(conn, &folder(data_dir), now)?;
+    let file_name = back_up(conn, &folder(data_dir), db::NAME, now)
+        .map_err(failed("Couldn't save the backup."))?;
     Ok(Backup { file_name })
 }
 
@@ -51,7 +63,7 @@ pub fn back_up_daily(
         return Ok(());
     }
     let dir = folder(data_dir).join("auto");
-    let made = back_up(conn, &dir, now)?;
+    let made = back_up(conn, &dir, db::NAME, now).map_err(failed("Couldn't save the backup."))?;
     let tx = conn.transaction()?;
     repo::settings::set(&tx, LAST_AUTO, &today)?;
     tx.commit()?;
@@ -75,10 +87,15 @@ fn prune(dir: &Path, just_made: &str) -> std::io::Result<()> {
         .fold(Ok(()), Result::and)
 }
 
-/// Copies the database into `dir` under a name stamped with `now`, local time, and returns that
-/// name. A second copy in the same minute is `-2`, `-3`, … rather than replacing the first.
-fn back_up(conn: &Connection, dir: &Path, now: DateTime<Local>) -> Result<String, AppError> {
-    let stem = format!("{}-{}", db::NAME, now.format(backup::STAMP));
+/// Copies the database into `dir` as `<prefix>-<now, local time>.db` and returns that name. A
+/// second copy in the same minute is `-2`, `-3`, … rather than replacing the first.
+fn back_up(
+    conn: &Connection,
+    dir: &Path,
+    prefix: &str,
+    now: DateTime<Local>,
+) -> Result<String, AppError> {
+    let stem = format!("{prefix}-{}", now.format(backup::STAMP));
     let mut name = format!("{stem}.db");
     for n in 2.. {
         if !dir.join(&name).exists() {
@@ -86,10 +103,201 @@ fn back_up(conn: &Connection, dir: &Path, now: DateTime<Local>) -> Result<String
         }
         name = format!("{stem}-{n}.db");
     }
-    db::vacuum_into(conn, &dir.join(&name)).map_err(|err| AppError::Io {
-        message: format!("Couldn't save the backup. {err}"),
-    })?;
+    db::vacuum_into(conn, &dir.join(&name))?;
     Ok(name)
+}
+
+/// An `io` error that starts with `what` and ends with the cause.
+fn failed(what: &str) -> impl Fn(AppError) -> AppError + '_ {
+    move |err| AppError::Io {
+        message: format!("{what} {err}"),
+    }
+}
+
+/// What `inspect_backup` returns: when the chosen file was last written, in local time as
+/// `YYYY-MM-DDTHH:MM`, for the confirm message (UI_FLOWS F9).
+#[derive(Debug, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct BackupFile {
+    pub modified: String,
+}
+
+/// Checks a file the user picked to restore, without changing anything (BAK-4).
+pub fn inspect(
+    data_dir: &Path,
+    db_path: &Path,
+    chosen: &Path,
+    now: DateTime<Local>,
+) -> Result<BackupFile, AppError> {
+    let scratch = Scratch(data_dir.join(format!("{}-inspect.db.tmp", db::NAME)));
+    drop(open_copy(
+        chosen,
+        db_path,
+        &scratch.0,
+        &db::migrations(now.to_utc()),
+    )?);
+    // A copy made by hand can have a -wal written after the file itself.
+    let wal = fs::metadata(with_suffix(chosen, "-wal")).and_then(|m| m.modified());
+    let modified = fs::metadata(chosen)?
+        .modified()?
+        .max(wal.unwrap_or(UNIX_EPOCH));
+    let modified: DateTime<Local> = modified.into();
+    Ok(BackupFile {
+        modified: modified.format("%Y-%m-%dT%H:%M").to_string(),
+    })
+}
+
+/// Restore (BAK-4, ARCHITECTURE §7): replaces the database at `db_path`, open as `conn`, with the
+/// backup at `chosen`. If anything fails before the swap, nothing changes.
+pub fn restore(
+    conn: &mut Connection,
+    data_dir: &Path,
+    db_path: &Path,
+    chosen: &Path,
+    now: DateTime<Local>,
+) -> Result<(), AppError> {
+    let ms = db::migrations(now.to_utc());
+    restore_with(conn, data_dir, db_path, chosen, &ms, now)
+}
+
+fn restore_with(
+    conn: &mut Connection,
+    data_dir: &Path,
+    db_path: &Path,
+    chosen: &Path,
+    ms: &Migrations,
+    now: DateTime<Local>,
+) -> Result<(), AppError> {
+    // 1. A checked copy of the backup, brought up to date, that keeps this computer's backup
+    // settings. The chosen file itself is never changed, so it already is the copy from before
+    // the migration that BAK-5 asks for.
+    let scratch = Scratch(data_dir.join(format!("{}-restore.db.tmp", db::NAME)));
+    let mut copy = open_copy(chosen, db_path, &scratch.0, ms)?;
+    ms.to_latest(&mut copy)?;
+    let tx = copy.transaction()?;
+    for key in THIS_COMPUTER {
+        match repo::settings::get(conn, key)? {
+            Some(value) => repo::settings::set(&tx, key, &value)?,
+            None => repo::settings::delete(&tx, key)?,
+        }
+    }
+    tx.commit()?;
+    // Closed with its -wal checkpointed, so the file alone holds it all.
+    db::checkpoint(&copy)?;
+    copy.close().map_err(|(_, err)| AppError::from(err))?;
+
+    // 2. A safety copy of the current data, -wal included.
+    let prefix = format!("{}-pre-restore", db::NAME);
+    back_up(conn, &folder(data_dir), &prefix, now).map_err(failed(
+        "Couldn't save a safety copy of your current data, so nothing was changed.",
+    ))?;
+
+    // 3. The swap, then 4. reopening, with nothing left to migrate.
+    swap(conn, db_path, &scratch.0)?;
+    let reopened = db::open(db_path).and_then(|mut reopened| {
+        db::prepare(&mut reopened, ms, &db::pre_migration_dir(data_dir), now)?;
+        Ok(reopened)
+    });
+    *conn = reopened.map_err(failed(
+        "The backup was restored, but it couldn't be opened. Restart Jobert's Vault.",
+    ))?;
+    Ok(())
+}
+
+/// Copies `chosen`, and its `-wal` if it has one, to `scratch` and opens the copy, so the user's
+/// file is never changed. Refused unless it's a sound Jobert's Vault database that this version
+/// can open.
+fn open_copy(
+    chosen: &Path,
+    db_path: &Path,
+    scratch: &Path,
+    ms: &Migrations,
+) -> Result<Connection, AppError> {
+    let refused = |message: &str| invalid("path", message);
+    if !chosen.is_absolute() || !chosen.is_file() {
+        return Err(refused("Choose a backup file."));
+    }
+    if fs::canonicalize(chosen)? == fs::canonicalize(db_path)? {
+        return Err(refused(
+            "That's the database Jobert's Vault is using. Choose a backup file.",
+        ));
+    }
+    for leftover in sidecars(scratch) {
+        db::remove_if_there(&leftover)?;
+    }
+    fs::copy(chosen, scratch)?;
+    // A copy made by hand can hold its latest changes in -wal, which SQLite reads on opening.
+    let wal = with_suffix(chosen, "-wal");
+    if wal.is_file() {
+        fs::copy(&wal, with_suffix(scratch, "-wal"))?;
+    }
+    let not_ours = || refused("This file isn't a Jobert's Vault backup, so nothing was changed.");
+    let copy = db::open(scratch).map_err(|_| not_ours())?;
+    if !db::is_vault(&copy).unwrap_or(false) {
+        return Err(not_ours());
+    }
+    if ms.pending_migrations(&copy).map_err(|_| not_ours())? < 0 {
+        return Err(refused(concat!(
+            "This backup was made by a newer version of Jobert's Vault, so nothing was changed. ",
+            "Install the latest version to restore it."
+        )));
+    }
+    Ok(copy)
+}
+
+/// Closes `conn` and puts `copy` in place of the database file. A `-wal` that still holds
+/// changes is never deleted: unless the checkpoint emptied it, the original is reopened and
+/// nothing changes. On success `conn` is a placeholder until the caller reopens the database.
+fn swap(conn: &mut Connection, db_path: &Path, copy: &Path) -> Result<(), AppError> {
+    let unchanged = failed("Couldn't replace the database, so nothing was changed.");
+    db::checkpoint(conn).map_err(&unchanged)?;
+    let live = std::mem::replace(conn, Connection::open_in_memory()?);
+    if let Err((live, err)) = live.close() {
+        *conn = live;
+        return Err(unchanged(err.into()));
+    }
+    let wal = with_suffix(db_path, "-wal");
+    let replaced = if fs::metadata(&wal).is_ok_and(|m| m.len() > 0) {
+        Err(AppError::Io {
+            message: "Recent changes are still waiting to be written.".into(),
+        })
+    } else {
+        fs::rename(copy, db_path).map_err(AppError::from)
+    };
+    if let Err(err) = replaced {
+        *conn = db::open(db_path)?;
+        return Err(unchanged(err));
+    }
+    // Both are empty now; SQLite makes new ones for the restored file.
+    let _ = fs::remove_file(&wal);
+    let _ = fs::remove_file(with_suffix(db_path, "-shm"));
+    Ok(())
+}
+
+/// A scratch copy in the data folder, removed with its `-wal` and `-shm` when dropped.
+struct Scratch(PathBuf);
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        for file in sidecars(&self.0) {
+            let _ = fs::remove_file(file);
+        }
+    }
+}
+
+fn sidecars(path: &Path) -> [PathBuf; 3] {
+    [
+        path.to_path_buf(),
+        with_suffix(path, "-wal"),
+        with_suffix(path, "-shm"),
+    ]
+}
+
+fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
+    let mut name = path.as_os_str().to_owned();
+    name.push(suffix);
+    name.into()
 }
 
 #[cfg(test)]
@@ -403,5 +611,346 @@ mod tests {
         fs::remove_file(&auto).unwrap();
         back_up_daily(&mut conn, dir.path(), now()).unwrap();
         assert_eq!(auto_files(&dir).len(), 1);
+    }
+
+    // Restore (BAK-4)
+
+    fn db_path(dir: &TempDir) -> PathBuf {
+        dir.path().join(format!("{}.db", db::NAME))
+    }
+
+    fn names_in(conn: &Connection) -> Vec<String> {
+        conn.prepare("SELECT name FROM accounts ORDER BY id")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap()
+    }
+
+    /// A backup holding Cash and Bank, then a change after it that only the `-wal` holds.
+    fn backed_up_then_changed(dir: &TempDir) -> (Connection, PathBuf) {
+        let conn = database(dir);
+        add_account(&conn, "Bank");
+        let backup = back_up_now(&conn, dir.path(), now()).unwrap();
+        conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")
+            .unwrap();
+        add_account(&conn, "After the backup");
+        (conn, folder(dir.path()).join(backup.file_name))
+    }
+
+    fn pre_restore(dir: &TempDir) -> PathBuf {
+        folder(dir.path()).join(format!("{}-pre-restore-2026-11-03_1405.db", db::NAME))
+    }
+
+    /// Scratch copies left in the data folder.
+    fn leftovers(dir: &TempDir) -> Vec<String> {
+        fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .filter(|name| name.contains(".tmp"))
+            .collect()
+    }
+
+    const BEFORE: [&str; 3] = ["Cash", "Bank", "After the backup"];
+
+    #[test]
+    fn restore_swaps_in_the_backup_after_a_safety_copy() {
+        let dir = TempDir::new("bak4-restore");
+        let (mut conn, backup) = backed_up_then_changed(&dir);
+        let plain = dir.path().join("plain-copy");
+        fs::copy(db_path(&dir), &plain).unwrap();
+        assert_eq!(
+            account_names(&plain),
+            ["Cash", "Bank"],
+            "the newest row is only in -wal"
+        );
+        let backup_bytes = fs::read(&backup).unwrap();
+
+        restore(&mut conn, dir.path(), &db_path(&dir), &backup, now()).unwrap();
+
+        assert_eq!(names_in(&conn), ["Cash", "Bank"]);
+        assert_eq!(
+            account_names(&pre_restore(&dir)),
+            BEFORE,
+            "the safety copy has the -wal's rows"
+        );
+        assert_eq!(
+            fs::read(&backup).unwrap(),
+            backup_bytes,
+            "the backup itself is untouched"
+        );
+        assert!(leftovers(&dir).is_empty(), "{:?}", leftovers(&dir));
+        // The reopened connection is the real file again, with the app's connection settings.
+        let foreign_keys: i64 = conn
+            .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(foreign_keys, 1);
+        add_account(&conn, "Added after");
+        drop(conn);
+        assert_eq!(
+            account_names(&db_path(&dir)),
+            ["Cash", "Bank", "Added after"]
+        );
+    }
+
+    #[test]
+    fn a_file_that_is_not_a_vault_backup_is_refused_and_nothing_changes() {
+        let dir = TempDir::new("bak4-refused");
+        let (mut conn, backup) = backed_up_then_changed(&dir);
+        let other = dir.path().join("other");
+        fs::create_dir_all(&other).unwrap();
+        let file = |name: &str| other.join(name);
+        fs::write(file("garbage.db"), vec![0x5a; 8192]).unwrap();
+        fs::write(file("empty.db"), b"").unwrap();
+        Connection::open(file("foreign.db"))
+            .unwrap()
+            .execute_batch("CREATE TABLE notes (x); PRAGMA user_version = 3;")
+            .unwrap();
+        fs::copy(&backup, file("unversioned.db")).unwrap();
+        Connection::open(file("unversioned.db"))
+            .unwrap()
+            .pragma_update(None, "user_version", 0)
+            .unwrap();
+        // Page 1 (the schema) intact, every page after it overwritten.
+        let mut bytes = fs::read(&backup).unwrap();
+        bytes[4096..].fill(0xff);
+        fs::write(file("corrupt.db"), bytes).unwrap();
+        fs::copy(&backup, file("newer.db")).unwrap();
+        Connection::open(file("newer.db"))
+            .unwrap()
+            .pragma_update(None, "user_version", 99)
+            .unwrap();
+
+        let not_ours = "isn't a Jobert's Vault backup, so nothing was changed";
+        let cases: Vec<(PathBuf, &str)> = vec![
+            (file("garbage.db"), not_ours),
+            (file("empty.db"), not_ours),
+            (file("foreign.db"), not_ours),
+            (file("unversioned.db"), not_ours),
+            (file("corrupt.db"), not_ours),
+            (
+                file("newer.db"),
+                "made by a newer version of Jobert's Vault, so nothing was changed",
+            ),
+            (db_path(&dir), "That's the database Jobert's Vault is using"),
+            (PathBuf::from("relative.db"), "Choose a backup file"),
+            (file("missing.db"), "Choose a backup file"),
+            (other.clone(), "Choose a backup file"),
+        ];
+        for (path, why) in cases {
+            let refused = |result: &Result<(), AppError>| {
+                matches!(result, Err(AppError::Validation { field, message })
+                    if field == "path" && message.contains(why))
+            };
+            let inspected = inspect(dir.path(), &db_path(&dir), &path, now()).map(|_| ());
+            assert!(refused(&inspected), "inspect {path:?}: {inspected:?}");
+            let restored = restore(&mut conn, dir.path(), &db_path(&dir), &path, now());
+            assert!(refused(&restored), "restore {path:?}: {restored:?}");
+            assert_eq!(names_in(&conn), BEFORE);
+        }
+        assert!(
+            !pre_restore(&dir).exists(),
+            "no safety copy for a refused file"
+        );
+        assert!(leftovers(&dir).is_empty(), "{:?}", leftovers(&dir));
+    }
+
+    #[test]
+    fn an_older_backup_is_brought_up_to_date_before_the_swap() {
+        use rusqlite_migration::M;
+        let dir = TempDir::new("bak4-older");
+        let (mut conn, backup) = backed_up_then_changed(&dir);
+        let next_version = Migrations::new(vec![
+            M::up(include_str!("../../migrations/0001_initial.sql")),
+            M::up("CREATE TABLE added_later (x);"),
+        ]);
+
+        restore_with(
+            &mut conn,
+            dir.path(),
+            &db_path(&dir),
+            &backup,
+            &next_version,
+            now(),
+        )
+        .unwrap();
+
+        assert_eq!(names_in(&conn), ["Cash", "Bank"]);
+        let version: i64 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 2);
+        assert!(
+            !db::pre_migration_dir(dir.path()).exists(),
+            "the chosen file, unchanged, is the copy from before the migration"
+        );
+        assert_eq!(account_names(&backup), ["Cash", "Bank"]);
+    }
+
+    #[test]
+    fn a_restore_keeps_this_computers_backup_settings() {
+        let dir = TempDir::new("bak4-keys");
+        let mut conn = database(&dir);
+        let set = |conn: &Connection, key: &str, value: &str| {
+            repo::settings::set(conn, key, value).unwrap()
+        };
+        set(&conn, "currency_symbol", "$");
+        set(&conn, "backup_folder", "D:\\Old PC");
+        set(&conn, "last_backup_at", "2026-01-01T00:00:00Z");
+        set(&conn, LAST_AUTO, "2026-01-01");
+        let backup =
+            folder(dir.path()).join(back_up_now(&conn, dir.path(), now()).unwrap().file_name);
+        set(&conn, "currency_symbol", "\u{20B1}");
+        repo::settings::delete(&conn, "backup_folder").unwrap();
+        set(&conn, "auto_backup_enabled", "false");
+        set(&conn, "last_backup_at", "2026-11-03T06:05:00Z");
+        set(&conn, LAST_AUTO, "2026-11-03");
+
+        restore(&mut conn, dir.path(), &db_path(&dir), &backup, now()).unwrap();
+
+        let get = |key: &str| repo::settings::get(&conn, key).unwrap();
+        assert_eq!(
+            get("currency_symbol").as_deref(),
+            Some("$"),
+            "the data's own settings"
+        );
+        assert_eq!(get("backup_folder"), None);
+        assert_eq!(get("auto_backup_enabled").as_deref(), Some("false"));
+        assert_eq!(
+            get("last_backup_at").as_deref(),
+            Some("2026-11-03T06:05:00Z")
+        );
+        assert_eq!(get(LAST_AUTO).as_deref(), Some("2026-11-03"));
+    }
+
+    #[test]
+    fn a_failed_safety_copy_stops_the_restore() {
+        let dir = TempDir::new("bak4-safety");
+        let (mut conn, backup) = backed_up_then_changed(&dir);
+        let moved = dir.path().join("chosen.db");
+        fs::rename(&backup, &moved).unwrap();
+        fs::remove_dir_all(folder(dir.path())).unwrap();
+        fs::write(folder(dir.path()), b"a file where the folder should be").unwrap();
+
+        let result = restore(&mut conn, dir.path(), &db_path(&dir), &moved, now());
+
+        assert!(
+            matches!(&result, Err(AppError::Io { message })
+                if message.starts_with("Couldn't save a safety copy of your current data, so nothing was changed.")),
+            "{result:?}"
+        );
+        assert_eq!(names_in(&conn), BEFORE);
+        assert!(leftovers(&dir).is_empty(), "{:?}", leftovers(&dir));
+    }
+
+    #[test]
+    fn a_copy_made_by_hand_is_restored_with_its_wal() {
+        let dir = TempDir::new("bak4-hand");
+        let mut conn = database(&dir);
+        // Another install's files, copied while it ran: its newest row is only in -wal.
+        let other = TempDir::new("bak4-hand-other");
+        let running = database(&other);
+        running
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")
+            .unwrap();
+        add_account(&running, "Only in the wal");
+        let copied = dir.path().join("copied");
+        fs::create_dir_all(&copied).unwrap();
+        let chosen = copied.join("jobertsvault.db");
+        for suffix in ["", "-wal"] {
+            fs::copy(
+                with_suffix(&db_path(&other), suffix),
+                with_suffix(&chosen, suffix),
+            )
+            .unwrap();
+        }
+        drop(running);
+        // The -wal was written after the file, so the confirm gives its time.
+        let at = |hour| {
+            chrono::NaiveDate::from_ymd_opt(2026, 10, 20)
+                .unwrap()
+                .and_hms_opt(hour, 30, 0)
+                .unwrap()
+                .and_local_timezone(Local)
+                .unwrap()
+        };
+        for (suffix, hour) in [("", 9), ("-wal", 18)] {
+            fs::File::options()
+                .write(true)
+                .open(with_suffix(&chosen, suffix))
+                .unwrap()
+                .set_modified(at(hour).into())
+                .unwrap();
+        }
+        let file = inspect(dir.path(), &db_path(&dir), &chosen, now()).unwrap();
+        assert_eq!(file.modified, "2026-10-20T18:30");
+        let wal_bytes = fs::read(with_suffix(&chosen, "-wal")).unwrap();
+
+        restore(&mut conn, dir.path(), &db_path(&dir), &chosen, now()).unwrap();
+
+        assert_eq!(names_in(&conn), ["Cash", "Only in the wal"]);
+        assert_eq!(
+            fs::read(with_suffix(&chosen, "-wal")).unwrap(),
+            wal_bytes,
+            "left as it was"
+        );
+    }
+
+    #[test]
+    fn a_wal_that_still_holds_changes_is_never_deleted() {
+        let dir = TempDir::new("bak4-busy");
+        let (mut conn, backup) = backed_up_then_changed(&dir);
+        conn.busy_timeout(std::time::Duration::from_millis(50))
+            .unwrap();
+        // A reader part-way through a read keeps the checkpoint from emptying the -wal.
+        let reader = Connection::open(db_path(&dir)).unwrap();
+        reader.execute_batch("BEGIN").unwrap();
+        let _: i64 = reader
+            .query_row("SELECT count(*) FROM accounts", [], |row| row.get(0))
+            .unwrap();
+        let wal = with_suffix(&db_path(&dir), "-wal");
+        assert!(fs::metadata(&wal).unwrap().len() > 0);
+
+        let result = restore(&mut conn, dir.path(), &db_path(&dir), &backup, now());
+
+        assert!(
+            matches!(&result, Err(AppError::Io { message })
+                if message.starts_with("Couldn't replace the database, so nothing was changed.")),
+            "{result:?}"
+        );
+        assert!(
+            fs::metadata(&wal).unwrap().len() > 0,
+            "the -wal is still there"
+        );
+        assert_eq!(names_in(&conn), BEFORE);
+        drop(reader);
+        add_account(&conn, "Still works");
+    }
+
+    #[test]
+    fn inspect_says_when_the_backup_was_written_and_changes_nothing() {
+        let dir = TempDir::new("bak4-inspect");
+        let (conn, backup) = backed_up_then_changed(&dir);
+        let written = chrono::NaiveDate::from_ymd_opt(2026, 10, 20)
+            .unwrap()
+            .and_hms_opt(9, 30, 0)
+            .unwrap()
+            .and_local_timezone(Local)
+            .unwrap();
+        fs::File::options()
+            .write(true)
+            .open(&backup)
+            .unwrap()
+            .set_modified(written.into())
+            .unwrap();
+        let bytes = fs::read(&backup).unwrap();
+
+        let file = inspect(dir.path(), &db_path(&dir), &backup, now()).unwrap();
+
+        assert_eq!(file.modified, "2026-10-20T09:30");
+        assert_eq!(fs::read(&backup).unwrap(), bytes);
+        assert_eq!(names_in(&conn), BEFORE);
+        assert!(leftovers(&dir).is_empty(), "{:?}", leftovers(&dir));
     }
 }

@@ -25,6 +25,25 @@ pub const BACKUPS_DIR: &str = if cfg!(debug_assertions) {
     "backups"
 };
 
+/// Where pre-migration backups go, whatever `backup_folder` says (DATA_MODEL §8).
+pub fn pre_migration_dir(data_dir: &Path) -> std::path::PathBuf {
+    data_dir.join(BACKUPS_DIR).join("pre-migration")
+}
+
+/// Whether `conn` holds a sound Jobert's Vault database: SQLite's own check passes, it has a
+/// schema version, and the first migration's tables are there (BAK-4).
+pub fn is_vault(conn: &Connection) -> Result<bool, AppError> {
+    let check: String = conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+    let version: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
+    let tables: i64 = conn.query_row(
+        "SELECT count(*) FROM sqlite_schema WHERE type = 'table'
+         AND name IN ('accounts', 'categories', 'payment_methods', 'transactions', 'settings')",
+        [],
+        |row| row.get(0),
+    )?;
+    Ok(check == "ok" && version >= 1 && tables == 5)
+}
+
 /// Opens the database and applies the connection settings (ARCHITECTURE §4.3).
 pub fn open(path: &Path) -> Result<Connection, AppError> {
     let conn = Connection::open(path)?;
@@ -94,6 +113,14 @@ fn back_up(
     })
 }
 
+/// Deletes `path`, which may already be gone.
+pub fn remove_if_there(path: &Path) -> std::io::Result<()> {
+    match fs::remove_file(path) {
+        Err(err) if err.kind() != ErrorKind::NotFound => Err(err),
+        _ => Ok(()),
+    }
+}
+
 /// Writes a consistent copy of the database to `path`. It goes to `<path>.tmp` first and is
 /// renamed when complete, so a half-written copy never looks like a backup (ARCHITECTURE §7).
 pub fn vacuum_into(conn: &Connection, path: &Path) -> Result<(), AppError> {
@@ -102,11 +129,7 @@ pub fn vacuum_into(conn: &Connection, path: &Path) -> Result<(), AppError> {
     }
     let tmp = path.with_extension("db.tmp");
     // Left by a copy that was cut short. VACUUM INTO refuses to overwrite a file.
-    if let Err(err) = fs::remove_file(&tmp)
-        && err.kind() != ErrorKind::NotFound
-    {
-        return Err(err.into());
-    }
+    remove_if_there(&tmp)?;
     let written = conn
         .execute("VACUUM INTO ?1", [tmp.to_string_lossy()])
         .map_err(AppError::from)

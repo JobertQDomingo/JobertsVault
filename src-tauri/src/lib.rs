@@ -87,6 +87,8 @@ pub fn run() {
             commands::reports::get_comparison,
             commands::backup::backup_now,
             commands::backup::open_backup_folder,
+            commands::backup::inspect_backup,
+            commands::backup::restore_backup,
             commands::settings::get_settings,
             commands::settings::update_settings,
             commands::accounts::list_accounts,
