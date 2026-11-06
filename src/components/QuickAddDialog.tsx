@@ -16,6 +16,7 @@ import {
   useCreateTransaction,
   useDeleteTransaction,
   usePayBillDefaults,
+  usePayeeSuggestions,
   useTransaction,
   useTransactionDefaults,
   useUpdateTransaction,
@@ -27,6 +28,7 @@ import { AmountInput } from "./AmountInput";
 import { CategoryChip } from "./CategoryChip";
 import { ErrorState } from "./ErrorState";
 import { Loading, Skeleton } from "./Loading";
+import { Autocomplete } from "./ui/autocomplete";
 import { Button } from "./ui/button";
 import { Combobox } from "./ui/combobox";
 import { DatePicker } from "./ui/date-picker";
@@ -303,6 +305,8 @@ function TransactionForm({
   const saving = useRef(false);
   const kind = useWatch({ control, name: "kind" });
   const transfer = kind === "transfer";
+  const payees =
+    usePayeeSuggestions(useWatch({ control, name: "payee" }), kind).data ?? [];
 
   useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange]);
 
@@ -529,19 +533,37 @@ function TransactionForm({
           />
           {!transfer && (
             <>
-              <Field
-                label="Payee"
-                htmlFor="qa-payee"
-                error={errors.payee?.message}
-                className={ROW}
-              >
-                <Input
-                  id="qa-payee"
-                  autoComplete="off"
-                  placeholder="Optional"
-                  {...register("payee")}
-                />
-              </Field>
+              <Controller
+                control={control}
+                name="payee"
+                render={({ field }) => (
+                  <Field
+                    label="Payee"
+                    htmlFor="qa-payee"
+                    error={errors.payee?.message}
+                    className={ROW}
+                  >
+                    <Autocomplete
+                      id="qa-payee"
+                      placeholder="Optional"
+                      value={field.value}
+                      onChange={field.onChange}
+                      suggestions={payees.map((p) => p.payee)}
+                      onPick={(name) => {
+                        field.onChange(name);
+                        // TXN-6: its last category, unless that's archived now.
+                        const id = payees.find(
+                          (p) => p.payee === name,
+                        )?.categoryId;
+                        if (id != null)
+                          setValue("categoryId", String(id), {
+                            shouldDirty: true,
+                          });
+                      }}
+                    />
+                  </Field>
+                )}
+              />
               {showMethod && (
                 <Controller
                   control={control}

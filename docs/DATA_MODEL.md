@@ -195,7 +195,7 @@ CREATE INDEX idx_txn_payee         ON transactions(payee COLLATE NOCASE) WHERE p
 
 **Account filter on the list (TXN-4):** a transaction matches when `account_id = account OR to_account_id = account`, so an account's list includes incoming transfers.
 
-**Payees** don't have their own table. Suggestions (TXN-6, Phase 2) come from the distinct `payee` values, sorted by most recent use. The suggested category is the one on the latest transaction with that payee.
+**Payees** don't have their own table. Suggestions (TXN-6, Phase 2) come from the distinct `payee` values on rows of the form's type (expense or income), sorted by most recent use (`date DESC, id DESC`). Each payee is suggested once, ignoring ASCII case and spelled as it was last used, and only when it starts with what's typed (ASCII case ignored, wildcards taken literally). At most 8 are suggested. The suggested category is the one on the latest row of that type with that payee. If that category is archived now, the payee is still suggested but fills in no category.
 
 ### 3.5 `settings`
 
@@ -622,3 +622,4 @@ Answered on 2026-11-04:
 Answered on 2026-11-06:
 
 15. **Chart bars (RPT-1)** are calendar-aligned: a Day period is one bar, a Year is 12 calendar months even when `month_start_day` > 1, and Custom weeks follow `week_start` and Custom months are calendar months, cut to the range. "Up to 6 months" means ending before the same date 6 months after the start (§5.9).
+16. **Payee suggestions (TXN-6)** match the form's type: an expense suggests only payees used on expenses, with the category of the latest expense to that payee, and the same for income. A payee whose last category is archived is still suggested, but choosing it leaves the category as it is (§3.4).

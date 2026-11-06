@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import type { TransactionFilter } from "@/bindings/TransactionFilter";
+import type { TransactionKind } from "@/bindings/TransactionKind";
 import {
   createTransaction,
   deleteTransaction,
@@ -13,6 +14,7 @@ import {
   getTransaction,
   getTransactionDefaults,
   listTransactions,
+  suggestPayees,
   updateTransaction,
 } from "@/api/transactions";
 import { queryKeys } from "@/lib/queryKeys";
@@ -42,6 +44,23 @@ export const useTransactionDefaults = (enabled = true) =>
     queryKey: queryKeys.transactionDefaults,
     queryFn: enabled ? getTransactionDefaults : skipToken,
   });
+
+/**
+ * Quick-add's payee suggestions (TXN-6): asked for only once something's typed, and never for a
+ * transfer. The last list stays while the next keystroke's loads, so it doesn't flicker, but never
+ * across a type switch: the other type's payees would fill in a category of the wrong kind.
+ */
+export const usePayeeSuggestions = (prefix: string, kind: TransactionKind) => {
+  const text = prefix.trim();
+  const category = kind === "transfer" ? null : kind;
+  const queryKey = queryKeys.payees(text, category ?? "expense");
+  return useQuery({
+    queryKey,
+    queryFn: text && category ? () => suggestPayees(text, category) : skipToken,
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[3] === queryKey[3] ? previous : undefined,
+  });
+};
 
 /** Only loads when given a card. */
 export const usePayBillDefaults = (cardId?: number) =>

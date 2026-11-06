@@ -115,6 +115,7 @@ pub fn run() {
             commands::transactions::delete_transaction,
             commands::transactions::get_transaction_defaults,
             commands::transactions::get_pay_bill_defaults,
+            commands::transactions::suggest_payees,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the app")

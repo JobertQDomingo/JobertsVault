@@ -206,6 +206,33 @@ pub fn category_totals(conn: &Connection, f: &Filter) -> rusqlite::Result<Vec<(i
     .collect()
 }
 
+/// The payees on `kind` rows matching the LIKE `pattern`, one per payee ignoring ASCII case, most
+/// recently used first. Each comes with its latest such row's spelling and category, the category
+/// only while it isn't archived.
+pub fn payees(
+    conn: &Connection,
+    kind: &str,
+    pattern: &str,
+    limit: u32,
+) -> rusqlite::Result<Vec<(String, Option<i64>)>> {
+    conn.prepare(
+        "SELECT t.payee, CASE WHEN c.archived = 0 THEN t.category_id END
+         FROM (SELECT payee, category_id, date, id,
+                      ROW_NUMBER() OVER (PARTITION BY payee COLLATE NOCASE
+                                         ORDER BY date DESC, id DESC) AS n
+               FROM transactions
+               WHERE kind = ?1 AND payee LIKE ?2 ESCAPE '\\') t
+         LEFT JOIN categories c ON c.id = t.category_id
+         WHERE t.n = 1
+         ORDER BY t.date DESC, t.id DESC
+         LIMIT ?3",
+    )?
+    .query_map(params![kind, pattern, limit], |r| {
+        Ok((r.get(0)?, r.get(1)?))
+    })?
+    .collect()
+}
+
 /// The `limit` newest transactions dated `as_of` or earlier, newest first.
 pub fn recent(conn: &Connection, as_of: &str, limit: u32) -> rusqlite::Result<Vec<Row>> {
     conn.prepare(&format!(

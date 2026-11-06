@@ -6,6 +6,7 @@ use ts_rs::TS;
 use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
+use crate::services::categories::{self, CategoryKind};
 use crate::services::period::{self, PeriodQuery};
 use crate::services::{accounts, invalid, not_found, stamp};
 
@@ -157,13 +158,7 @@ pub fn list(
         .as_deref()
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .map(|s| {
-            let escaped = s
-                .replace('\\', r"\\")
-                .replace('%', r"\%")
-                .replace('_', r"\_");
-            format!("%{escaped}%")
-        });
+        .map(|s| format!("%{}%", like_text(s)));
     let f = repo::transactions::Filter {
         start: &start,
         end: &end,
@@ -258,6 +253,47 @@ pub fn pay_bill_defaults(
         amount: (owed > Money::ZERO).then_some(owed),
         today,
     })
+}
+
+/// `text` as plain text in a LIKE pattern with `ESCAPE '\'`: its wildcards and escapes escaped.
+fn like_text(text: &str) -> String {
+    text.replace('\\', r"\\")
+        .replace('%', r"\%")
+        .replace('_', r"\_")
+}
+
+/// A payee used before, and the category choosing it fills in (TXN-6).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PayeeSuggestion {
+    pub payee: String,
+    /// The category of the latest row of this type with this payee; none if it's archived now.
+    #[ts(type = "number | null")]
+    pub category_id: Option<i64>,
+}
+
+/// How many payees the form suggests at once.
+const SUGGESTIONS: u32 = 8;
+
+/// The payees used on `kind` rows that start with `prefix` (ASCII case ignored), most recently used
+/// first (TXN-6, DATA_MODEL §3.4). Nothing typed suggests nothing.
+pub fn suggest_payees(
+    conn: &Connection,
+    prefix: &str,
+    kind: CategoryKind,
+) -> Result<Vec<PayeeSuggestion>, AppError> {
+    let prefix = prefix.trim();
+    if prefix.is_empty() {
+        return Ok(Vec::new());
+    }
+    let pattern = format!("{}%", like_text(prefix));
+    Ok(
+        repo::transactions::payees(conn, categories::kind_text(kind), &pattern, SUGGESTIONS)?
+            .into_iter()
+            .map(|(payee, category_id)| PayeeSuggestion { payee, category_id })
+            .collect(),
+    )
 }
 
 pub fn get(conn: &Connection, id: i64) -> Result<Transaction, AppError> {
@@ -461,7 +497,7 @@ mod tests {
     use super::*;
     use crate::error::AppError;
     use crate::services::accounts::{self, AccountFields, AccountKind, NewAccount};
-    use crate::services::{categories, payment_methods};
+    use crate::services::payment_methods;
     use crate::test_support::{db, now};
     use chrono::Days;
     use rusqlite::Connection;
@@ -1440,6 +1476,136 @@ mod tests {
         assert_eq!(
             (summary.income, summary.expense),
             (Money(2_000), Money(10_000))
+        );
+    }
+
+    /// Saves a row of `kind` with `payee` and `category`, `days` before today.
+    fn paid(conn: &mut Connection, kind: TransactionKind, payee: &str, category: i64, days: u64) {
+        let f = TransactionFields {
+            kind,
+            category_id: Some(category),
+            payee: Some(payee.into()),
+            date: (today() - Days::new(days)).to_string(),
+            ..expense(conn, 100, cash(conn))
+        };
+        create(conn, f, now()).unwrap();
+    }
+
+    fn names(list: &[PayeeSuggestion]) -> Vec<&str> {
+        list.iter().map(|s| s.payee.as_str()).collect()
+    }
+
+    #[test]
+    fn payees_are_suggested_most_recent_first_ignoring_case() {
+        let mut conn = db();
+        let (food, dining) = (food(&conn), id_of(&conn, "categories", "Dining Out"));
+        let expense = TransactionKind::Expense;
+        paid(&mut conn, expense, "Corner Cafe", food, 9);
+        paid(&mut conn, expense, "Market", food, 5);
+        paid(&mut conn, expense, "corner cafe", dining, 2);
+        paid(&mut conn, expense, "Cinema", food, 1);
+
+        let found = suggest_payees(&conn, "co", CategoryKind::Expense).unwrap();
+        // One suggestion per payee, spelled as it was used last, with that row's category.
+        assert_eq!(
+            found,
+            [PayeeSuggestion {
+                payee: "corner cafe".into(),
+                category_id: Some(dining),
+            }]
+        );
+        let found = suggest_payees(&conn, " C ", CategoryKind::Expense).unwrap();
+        assert_eq!(names(&found), ["Cinema", "corner cafe"]);
+        assert!(
+            suggest_payees(&conn, "  ", CategoryKind::Expense)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn payees_come_from_the_forms_type_only() {
+        let mut conn = db();
+        let (food, salary) = (food(&conn), salary(&conn));
+        paid(&mut conn, TransactionKind::Expense, "Acme Store", food, 3);
+        paid(&mut conn, TransactionKind::Income, "Acme Corp", salary, 2);
+
+        let expense = suggest_payees(&conn, "acme", CategoryKind::Expense).unwrap();
+        assert_eq!(names(&expense), ["Acme Store"]);
+        let income = suggest_payees(&conn, "acme", CategoryKind::Income).unwrap();
+        assert_eq!(
+            income,
+            [PayeeSuggestion {
+                payee: "Acme Corp".into(),
+                category_id: Some(salary),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_payee_whose_last_category_is_archived_fills_no_category() {
+        let mut conn = db();
+        let (food, dining) = (food(&conn), id_of(&conn, "categories", "Dining Out"));
+        paid(&mut conn, TransactionKind::Expense, "Corner Cafe", food, 5);
+        paid(
+            &mut conn,
+            TransactionKind::Expense,
+            "Corner Cafe",
+            dining,
+            1,
+        );
+        categories::archive(&mut conn, dining, now()).unwrap();
+
+        let found = suggest_payees(&conn, "Corner", CategoryKind::Expense).unwrap();
+        assert_eq!(
+            found,
+            [PayeeSuggestion {
+                payee: "Corner Cafe".into(),
+                category_id: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn wildcards_in_what_was_typed_are_plain_text() {
+        let mut conn = db();
+        let food = food(&conn);
+        let expense = TransactionKind::Expense;
+        paid(&mut conn, expense, "50% off shop", food, 3);
+        paid(&mut conn, expense, "500 Store", food, 2);
+        paid(&mut conn, expense, "A_B Mart", food, 1);
+        paid(&mut conn, expense, "AxB Mart", food, 1);
+
+        let suggest = |text| {
+            names(&suggest_payees(&conn, text, CategoryKind::Expense).unwrap())
+                .into_iter()
+                .map(String::from)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(suggest("50%"), ["50% off shop"]);
+        assert_eq!(suggest("A_"), ["A_B Mart"]);
+        assert_eq!(suggest("\\"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn at_most_eight_payees_are_suggested() {
+        let mut conn = db();
+        let food = food(&conn);
+        for i in 0..10 {
+            paid(
+                &mut conn,
+                TransactionKind::Expense,
+                &format!("Shop {i}"),
+                food,
+                10 - i,
+            );
+        }
+        let found = suggest_payees(&conn, "shop", CategoryKind::Expense).unwrap();
+        assert_eq!(
+            names(&found),
+            [
+                "Shop 9", "Shop 8", "Shop 7", "Shop 6", "Shop 5", "Shop 4", "Shop 3", "Shop 2"
+            ]
         );
     }
 }

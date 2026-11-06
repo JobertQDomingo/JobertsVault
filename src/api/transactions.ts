@@ -1,4 +1,6 @@
+import type { CategoryKind } from "@/bindings/CategoryKind";
 import type { PayBillDefaults } from "@/bindings/PayBillDefaults";
+import type { PayeeSuggestion } from "@/bindings/PayeeSuggestion";
 import type { Transaction } from "@/bindings/Transaction";
 import type { TransactionDefaults } from "@/bindings/TransactionDefaults";
 import type { TransactionFields } from "@/bindings/TransactionFields";
@@ -14,6 +16,10 @@ export const listTransactions = ({
   filter: TransactionFilter;
   page: number;
 }) => call<TransactionList>("list_transactions", { filter, page });
+
+/** Payees used before on this type that start with `prefix`, most recent first (TXN-6). */
+export const suggestPayees = (prefix: string, kind: CategoryKind) =>
+  call<PayeeSuggestion[]>("suggest_payees", { prefix, kind });
 
 export const getTransaction = (id: number) =>
   call<Transaction>("get_transaction", { id });
