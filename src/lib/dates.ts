@@ -1,6 +1,7 @@
 // Dates cross the Rust boundary as 'YYYY-MM-DD' strings. This file is the only place that turns
 // them into Date objects (for the date picker) or display text (ARCHITECTURE §2, DESIGN_SYSTEM §8).
 import { addDays as addDaysToDate, format, isValid, parse } from "date-fns";
+import type { Grain } from "@/bindings/Grain";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
 
 const ISO = "yyyy-MM-dd";
@@ -77,4 +78,28 @@ export function formatPeriodLabel(
       if (from.getDate() === 1) return format(from, "MMMM yyyy");
   }
   return formatRange(from, toDate(end));
+}
+
+/**
+ * A chart bar's axis label, from its first day: `Mon` (`weekdays`, for a week of days), `Nov 2`
+ * for a day or a week, and `Jan`, or `Jan 2026` when the chart spans `years`.
+ */
+export function formatBarLabel(
+  start: string,
+  grain: Grain,
+  options: { weekdays?: boolean; years?: boolean } = {},
+) {
+  const date = toDate(start);
+  if (grain === "month")
+    return format(date, options.years ? "MMM yyyy" : "MMM");
+  return format(date, grain === "day" && options.weekdays ? "EEE" : "MMM d");
+}
+
+/** A chart bar's dates in its tooltip: a day, a whole calendar month by name, or the range. */
+export function formatBarDates(start: string, end: string) {
+  const wholeMonth =
+    start.endsWith("-01") &&
+    start.slice(0, 7) === end.slice(0, 7) &&
+    addDays(end, 1).endsWith("-01");
+  return formatPeriodLabel(wholeMonth ? "month" : "custom", start, end);
 }

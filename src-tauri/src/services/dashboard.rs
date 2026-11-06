@@ -8,6 +8,7 @@ use crate::error::AppError;
 use crate::repo;
 use crate::services::accounts::{self, Account};
 use crate::services::period::{self, PeriodQuery, PeriodView};
+use crate::services::reports::{self, Timeseries};
 use crate::services::transactions::{self, Transaction};
 
 /// Everything the dashboard shows, from one call so its numbers agree (ARCHITECTURE §4.5).
@@ -20,6 +21,8 @@ pub struct Dashboard {
     pub income: Money,
     pub expense: Money,
     pub net: Money,
+    /// The period's income-vs-expense chart under the stat cards (UI_FLOWS §2, RPT-1).
+    pub series: Timeseries,
     /// Every account, archived included, with balances and card summaries as of today (DSH-4, DSH-5).
     pub accounts: Vec<Account>,
     pub net_balance: Money,
@@ -36,24 +39,15 @@ pub fn get(
     let period = period::get(conn, query, today)?;
     // Rows dated after today count nowhere (DATA_MODEL §5.2).
     let (start, end) = (period.start.to_string(), period.end.min(today).to_string());
-    let (_, income, expense) = repo::transactions::totals(
-        conn,
-        &repo::transactions::Filter {
-            start: &start,
-            end: &end,
-            kind: None,
-            account_id: None,
-            category_id: None,
-            payment_method_id: None,
-            search: None,
-        },
-    )?;
+    let (_, income, expense) =
+        repo::transactions::totals(conn, &repo::transactions::Filter::dates(&start, &end))?;
     let (income, expense) = (Money(income), Money(expense));
     let net = income
         .checked_sub(expense)
         .ok_or_else(|| AppError::Database {
             message: "The net cashflow is too large".into(),
         })?;
+    let series = reports::timeseries(conn, query, today)?;
     let accounts::AccountList {
         accounts,
         net_balance,
@@ -67,6 +61,7 @@ pub fn get(
         income,
         expense,
         net,
+        series,
         accounts,
         net_balance,
         recent,
@@ -202,6 +197,10 @@ mod tests {
         assert_eq!(
             dash.period,
             period::get(&conn, &MONTH, d(2026, 11, 3)).unwrap()
+        );
+        assert_eq!(
+            dash.series,
+            reports::timeseries(&conn, &MONTH, d(2026, 11, 3)).unwrap()
         );
         assert_eq!(dash.today, d(2026, 11, 3));
     }

@@ -5,10 +5,10 @@ import { AccountsScreen } from "./features/accounts/AccountsScreen";
 import { SettingsScreen } from "./features/settings/SettingsScreen";
 import { WelcomeScreen } from "./features/onboarding/WelcomeScreen";
 import { DashboardScreen } from "./features/dashboard/DashboardScreen";
+import { ReportsScreen } from "./features/reports/ReportsScreen";
 import { TransactionsScreen } from "./features/transactions/TransactionsScreen";
 
-// The Phase 1 routes (ARCHITECTURE §5.4). Each screen's `handle.title` is the top bar's title.
-// shortcut: the screens are placeholders, ROADMAP 1.9 builds them.
+// The routes (ARCHITECTURE §5.4). Each screen's `handle.title` is the top bar's title.
 export const routes: RouteObject[] = [
   // The first-launch form fills the window, without the sidebar (ONB-1).
   { path: "welcome", element: <WelcomeScreen /> },
@@ -34,6 +34,11 @@ export const routes: RouteObject[] = [
         path: "accounts/:id",
         element: <AccountDetailsScreen />,
         handle: { title: "Accounts" },
+      },
+      {
+        path: "reports",
+        element: <ReportsScreen />,
+        handle: { title: "Reports" },
       },
       {
         path: "settings",

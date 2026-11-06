@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   formatAmount,
+  formatCompact,
   formatMoney,
   MAX_AMOUNT,
   parseAmount,
@@ -91,5 +92,36 @@ describe("formatMoney", () => {
 
   test("shows no decimals when the currency has none", () => {
     expect(formatMoney(1234, { ...peso, currencyDecimals: 0 })).toBe("₱1,234");
+  });
+});
+
+describe("formatCompact", () => {
+  test("shortens chart axis amounts to one decimal at most (DESIGN_SYSTEM §7)", () => {
+    expect(formatCompact(0, peso)).toBe("₱0");
+    expect(formatCompact(85000, peso)).toBe("₱850");
+    expect(formatCompact(1250, peso)).toBe("₱12.5");
+    expect(formatCompact(1250000, peso)).toBe("₱12.5k");
+    expect(formatCompact(25000000, peso)).toBe("₱250k");
+    expect(formatCompact(120000000, peso)).toBe("₱1.2M");
+    expect(formatCompact(125000000000, peso)).toBe("₱1,250M");
+  });
+
+  test("marks amounts below zero with a true minus sign", () => {
+    expect(formatCompact(-500000, peso)).toBe("−₱5k");
+  });
+
+  test("rounds half up, without floating-point maths", () => {
+    expect(formatCompact(1234999, peso)).toBe("₱12.3k");
+    expect(formatCompact(1235000, peso)).toBe("₱12.4k");
+  });
+
+  test("follows the decimals and the symbol's position", () => {
+    expect(formatCompact(12500, { ...peso, currencyDecimals: 0 })).toBe(
+      "₱12.5k",
+    );
+    expect(formatCompact(7, { ...peso, currencyDecimals: 0 })).toBe("₱7");
+    expect(formatCompact(1250000, { ...peso, currencyPosition: "after" })).toBe(
+      "12.5k\u00A0₱",
+    );
   });
 });

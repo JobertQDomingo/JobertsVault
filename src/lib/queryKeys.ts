@@ -19,6 +19,7 @@ export const queryKeys = {
   // Period dates follow the week and month start settings, which refresh the ledger.
   period: (query: PeriodQuery) => ["ledger", "period", query] as const,
   dashboard: (query: PeriodQuery) => ["ledger", "dashboard", query] as const,
+  timeseries: (query: PeriodQuery) => ["ledger", "timeseries", query] as const,
   settings: ["settings"],
   startup: ["startup"],
   appVersion: ["appVersion"],

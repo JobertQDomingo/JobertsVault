@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Approved v1.1 |
 | **Style** | Glassmorphism 2.0 ([DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)) |
-| **Last updated** | 2026-11-03 |
+| **Last updated** | 2026-11-06 |
 | **Related docs** | [PRD.md](PRD.md), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), [ARCHITECTURE.md](ARCHITECTURE.md) §5.4 (routes) |
 
 The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors, glass levels and components come from DESIGN_SYSTEM.md. [design/ui-flows.html](design/ui-flows.html) shows every screen drawn in the real style, with consistent ₱ sample data. Open it in a browser.
@@ -69,11 +69,11 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
 |---|---|---|
 | Period switcher | Changes every number on the page. The choice is saved in the URL (`?period=month&anchor=2026-10-26`, or `?period=custom&start=…&end=…`). It's a glass toolbar of its own. | DSH-1 |
 | Stat cards | Income, expense and net cashflow for the period. Transfers aren't included. The % change line appears in Phase 2. The net cashflow card is the only one tinted with the accent. | DSH-2, DSH-3 |
+| Income vs expense (Phase 2) | A small version of the Reports chart (§8.1) for the period, under the stat cards. Its bars come with the rest of the dashboard from `get_dashboard`. | RPT-1 |
 | Recent transactions | The 5 newest transactions **regardless of the selected period**. Clicking a row opens it for editing. "View all" goes to `/transactions`. | DSH-8 |
 | Accounts | Current balances (as of today), with the credit card summary and the net balance. Clicking an account opens its details. | DSH-4, DSH-5 |
 
 **Added later:**
-- **Phase 2:** a small income-vs-expense bar chart under the stat cards.
 - **Phase 3:**
   - a "Card payment due in 3 days: ₱640.00 owed" banner at the top (CC-7), with a **Pay bill** button
   - budget progress bars (DSH-6)
@@ -304,7 +304,7 @@ Welcome to Jobert's Vault
 
 ### 8.1 Reports (`/reports`), Phase 2
 - Period switcher plus a "Compare to" dropdown and an account filter (RPT-5).
-- **Section 1: Income vs expense.** A bar chart grouped by day or month (RPT-1), with net cashflow as a line.
+- **Section 1: Income vs expense.** A bar chart grouped by day, week or month (RPT-1, DATA_MODEL §5.9), with net cashflow as a line. Income bars rise above the zero line and expense bars hang below it, so they're told apart by direction as well as color. Hovering a bar shows its dates and the three figures. A hidden table gives screen readers the same figures.
 - **Section 2: Category breakdown.** A donut chart showing the largest 8 categories plus "Other", next to a ranked list showing each category's amount and %. Switch between Expense and Income. Clicking a category opens the filtered transaction list (RPT-2, RPT-3).
 - **Section 3: Comparison table.** Rows for income, expense, net and each category, with columns for this period, the comparison period, the difference and the % change (RPT-4).
 
@@ -370,3 +370,7 @@ Answered on 2026-11-01:
 8. **Reordering:** drag or arrow keys, using `@dnd-kit` (§5.1).
 9. **Last active records and unused records:** see F6 and F7.
 10. **First launch:** closing the form early shows it again (F5).
+
+Answered on 2026-11-06:
+
+11. **Dashboard chart:** the small income-vs-expense chart under the stat cards is built in Phase 2 with RPT-1, and its data comes from `get_dashboard`, so the dashboard stays one call (§2).

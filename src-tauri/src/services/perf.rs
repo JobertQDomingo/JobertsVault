@@ -6,9 +6,9 @@ use std::time::{Duration, Instant};
 use chrono::NaiveDate;
 use rusqlite::{Connection, params};
 
-use crate::services::dashboard;
 use crate::services::period::PeriodQuery;
 use crate::services::transactions::{self, TransactionFilter, TransactionKind};
+use crate::services::{dashboard, reports};
 use crate::test_support::{TempDir, now};
 
 const ROWS: i64 = 50_000;
@@ -131,7 +131,7 @@ fn filter(period: PeriodQuery) -> TransactionFilter {
 
 #[test]
 #[ignore = "slow; run on demand in release mode"]
-fn perf_50k_dashboard_and_list_under_300_ms() {
+fn perf_50k_dashboard_list_and_reports_under_300_ms() {
     let dir = TempDir::new("perf");
     let path = dir.path().join("perf.db");
     let mut conn = crate::db::open(&path).unwrap();
@@ -171,6 +171,15 @@ fn perf_50k_dashboard_and_list_under_300_ms() {
         ("dashboard: all time", all()),
     ] {
         time(label, || dashboard::get(&conn, &query, today()).unwrap());
+    }
+    for (label, query) in [
+        ("chart: month", month()),
+        ("chart: year", PeriodQuery::Year { anchor: None }),
+        ("chart: all time", all()),
+    ] {
+        time(label, || {
+            reports::timeseries(&conn, &query, today()).unwrap()
+        });
     }
     let list = |label: &str, f: TransactionFilter, page: u32| {
         time(label, || {

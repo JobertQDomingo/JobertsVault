@@ -71,7 +71,8 @@ pub fn get(
     })
 }
 
-fn period_settings(conn: &Connection) -> Result<PeriodSettings, AppError> {
+/// Where weeks and months start (SET-2).
+pub fn period_settings(conn: &Connection) -> Result<PeriodSettings, AppError> {
     let s = settings::get(conn)?.settings;
     Ok(PeriodSettings {
         week_start: match s.week_start {

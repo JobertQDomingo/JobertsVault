@@ -5,6 +5,7 @@ import type { CategoryList } from "@/bindings/CategoryList";
 import type { Dashboard } from "@/bindings/Dashboard";
 import type { PaymentMethod } from "@/bindings/PaymentMethod";
 import type { PeriodView } from "@/bindings/PeriodView";
+import type { Timeseries } from "@/bindings/Timeseries";
 import type { Transaction } from "@/bindings/Transaction";
 import type { TransactionList } from "@/bindings/TransactionList";
 
@@ -144,11 +145,24 @@ export const PERIOD: PeriodView = {
   today: TODAY,
 };
 
+/** November by day, with the dashboard's totals on the 4th and 5th. */
+export const SERIES: Timeseries = {
+  grain: "day",
+  bars: Array.from({ length: 30 }, (_, i) => {
+    const date = `2026-11-${String(i + 1).padStart(2, "0")}`;
+    const [income, expense] =
+      i === 3 ? [420000, 285270] : i === 4 ? [0, 9770] : [0, 0];
+    return { start: date, end: date, income, expense, net: income - expense };
+  }),
+  today: TODAY,
+};
+
 export const DASHBOARD: Dashboard = {
   period: PERIOD,
   income: 420000,
   expense: 295040,
   net: 124960,
+  series: SERIES,
   accounts: ACCOUNTS,
   // Archived accounts count too (ACC-5): 8,240.75 + Old Wallet's 45.00.
   netBalance: 828575,

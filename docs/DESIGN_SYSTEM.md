@@ -147,7 +147,7 @@ Categories store a palette key, not a hex code (DATA_MODEL §3.2), so they switc
 
 - The **color picker** in category settings offers only these 12 swatches.
 - The breakdown chart (Phase 2) shows the 8 largest categories plus one **Other** slice in `--muted-foreground`.
-- Income-vs-expense charts always use `--income` and `--expense`, never category colors.
+- Income-vs-expense charts always use `--income` and `--expense`, never category colors. Green and red are hard to tell apart with red-green color blindness, so **income bars rise above the zero line and expense bars hang below it**: direction carries the meaning as well as color. Net cashflow is a 2 px `--primary` line. Bars are at most 24 px wide with 4 px rounded ends, gridlines are `--hairline`, and the tooltip is flat `--glass-solid` (it sits inside a blurred panel, §2.3).
 - **Income and expense colors are numbered separately** (DATA_MODEL §7), because the breakdown chart never shows both together. The 12 most common expense categories each have their own color. Only 5 rarely used ones share (Education, Gifts & Donations, Travel, Fees & Charges, Other expense).
 - A category the user adds defaults to the least-used color of its kind.
 
@@ -406,3 +406,4 @@ Glass costs graphics power, so these rules keep the app smooth:
 | 2026-11-01 | The 1280 × 800 fallback zooms the same layout to 88.9% |
 | 2026-11-01 | The date picker follows `week_start`, and category icons come from a curated list |
 | 2026-11-01 | Sora has no ₱ sign, so ₱ comes from the Segoe UI fallback |
+| 2026-11-06 | Income-vs-expense bars go up for income and down for expense, so the chart never relies on green versus red alone |

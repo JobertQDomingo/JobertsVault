@@ -1,6 +1,8 @@
 import { expect, test } from "vitest";
 import {
   addDays,
+  formatBarDates,
+  formatBarLabel,
   formatInputDate,
   formatDayHeader,
   formatPeriodLabel,
@@ -83,4 +85,28 @@ test("day headers: Today, Yesterday, else the weekday and date, with the year if
   expect(formatDayHeader("2025-12-31", "2026-01-01")).toBe("Yesterday");
   expect(formatDayHeader("2026-10-26", "2026-11-05")).toBe("Mon, Oct 26");
   expect(formatDayHeader("2025-10-26", "2026-11-05")).toBe("Sun, Oct 26, 2025");
+});
+
+test("a chart bar's axis label fits its grain", () => {
+  expect(formatBarLabel("2026-11-02", "day", { weekdays: true })).toBe("Mon");
+  expect(formatBarLabel("2026-11-02", "day")).toBe("Nov 2");
+  expect(formatBarLabel("2026-10-26", "week")).toBe("Oct 26");
+  expect(formatBarLabel("2026-01-01", "month")).toBe("Jan");
+  expect(formatBarLabel("2026-01-01", "month", { years: true })).toBe(
+    "Jan 2026",
+  );
+});
+
+test("a chart bar's dates name a whole month, or show the range", () => {
+  expect(formatBarDates("2026-11-02", "2026-11-02")).toBe("Mon, Nov 2, 2026");
+  expect(formatBarDates("2028-02-01", "2028-02-29")).toBe("February 2028");
+  expect(formatBarDates("2026-06-01", "2026-06-10")).toBe(
+    "Jun 1 – Jun 10, 2026",
+  );
+  expect(formatBarDates("2026-01-01", "2026-03-31")).toBe(
+    "Jan 1 – Mar 31, 2026",
+  );
+  expect(formatBarDates("2025-12-29", "2026-01-04")).toBe(
+    "Dec 29, 2025 – Jan 4, 2026",
+  );
 });

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.1 |
-| **Last updated** | 2026-11-04 |
+| **Last updated** | 2026-11-06 |
 | **Database** | SQLite (bundled with the app through `rusqlite`) |
 | **Related docs** | [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 
@@ -453,6 +453,23 @@ monthly_needed = (target_amount − progress) ÷ months left until target_date  
 | **Pay bill's From account (CC-9)** | The active non-card account on the latest transaction (`date DESC, id DESC`), going by each transaction's source `account_id`. If there is none, the first active non-card account by `sort_order`. If there's no such account, the field starts empty. |
 | **Pay bill's amount (CC-9)** | The card's `amount_owed`. If that's 0, the field starts empty. |
 
+### 5.9 Income-vs-expense chart bars (RPT-1)
+
+The chart has one bar per day, week or month, covering the whole period with no gaps. Each bar holds the income, expense and net (§5.2) of its own dates.
+
+| Period | Bars |
+|---|---|
+| Day | One bar, the day itself |
+| Week, Month | One bar per day, so a month that starts on the 25th runs from the 25th to the 24th |
+| Year | 12 calendar months, Jan to Dec, whatever `month_start_day` is |
+| Custom, up to 31 days (counting both ends) | One bar per day |
+| Custom, ending before the same date 6 months after its start | One bar per week, following `week_start` |
+| Custom, longer | One bar per calendar month |
+
+- On a Custom range, the first and last week or month are cut to the range, e.g. Oct 1 (a Thursday) – Nov 1 gives Oct 1–4, then Monday weeks, ending Oct 26 – Nov 1.
+- "6 months after" uses calendar months, with the day clamped to the end of the month: Jan 1 – Jun 30 is by week and Jan 1 – Jul 1 by month. Six months after Aug 31 is Feb 28 (or 29).
+- Bars after today hold 0 (§5.2), and the chart's net line stops at today.
+
 ---
 
 ## 6. Validation rules (checked in Rust)
@@ -585,3 +602,7 @@ Answered on 2026-11-04:
 12. **The decimals lock** covers every stored amount, not only transactions: an account's opening balance other than 0, or a credit limit, locks `currency_decimals` too, because changing it would reinterpret those amounts (§1). The seeded Cash account holds 0, so a new database starts unlocked. ADR 0002's rule still holds, since a transaction still locks it.
 13. **Pay bill's From account** goes by each transaction's source `account_id`: the latest transaction whose source is an active non-card account. A transfer's destination doesn't count as using that account (§5.8).
 14. **Today on a Custom period** jumps to the range in the same sequence that contains today, which is where ▶ stops (§5.3).
+
+Answered on 2026-11-06:
+
+15. **Chart bars (RPT-1)** are calendar-aligned: a Day period is one bar, a Year is 12 calendar months even when `month_start_day` > 1, and Custom weeks follow `week_start` and Custom months are calendar months, cut to the range. "Up to 6 months" means ending before the same date 6 months after the start (§5.9).

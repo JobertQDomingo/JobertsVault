@@ -60,3 +60,27 @@ export function formatMoney(
     ? `${sign}${settings.currencySymbol}${amount}`
     : `${sign}${amount}\u00A0${settings.currencySymbol}`;
 }
+
+/**
+ * A chart axis label (DESIGN_SYSTEM §7): `₱850`, `₱12.5k`, `₱1.2M`, `−₱5k`. One decimal at most,
+ * rounded half up, using whole-number maths only.
+ */
+export function formatCompact(minor: number, settings: MoneySettings): string {
+  const unit = 10 ** settings.currencyDecimals;
+  const abs = Math.abs(minor);
+  const [size, suffix] =
+    abs >= unit * 1_000_000
+      ? [unit * 1_000_000, "M"]
+      : abs >= unit * 1_000
+        ? [unit * 1_000, "k"]
+        : [unit, ""];
+  const scaled = abs * 10;
+  const rest = scaled % size;
+  const tenths = (scaled - rest) / size + (2 * rest >= size ? 1 : 0);
+  const fraction = tenths % 10;
+  const amount = `${formatAmount((tenths - fraction) / 10, 0)}${fraction ? `.${fraction}` : ""}${suffix}`;
+  const sign = minor < 0 ? MINUS : "";
+  return settings.currencyPosition === "before"
+    ? `${sign}${settings.currencySymbol}${amount}`
+    : `${sign}${amount}\u00A0${settings.currencySymbol}`;
+}

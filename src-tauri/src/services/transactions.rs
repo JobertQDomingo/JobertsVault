@@ -219,7 +219,7 @@ pub fn list(
 }
 
 /// A stored `YYYY-MM-DD` date.
-fn parse_date(text: &str) -> Option<NaiveDate> {
+pub(crate) fn parse_date(text: &str) -> Option<NaiveDate> {
     NaiveDate::parse_from_str(text, "%Y-%m-%d").ok()
 }
 
