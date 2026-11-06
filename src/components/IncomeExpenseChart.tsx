@@ -103,11 +103,11 @@ export function IncomeExpenseChart({
   const years =
     bars[0]?.start.slice(0, 4) !== bars[bars.length - 1]?.end.slice(0, 4);
   // Expense is drawn below zero: a direction on the chart, not a new figure. The net line stops at
-  // today, so days still to come don't read as a net of 0.
+  // today, so days still to come don't read as a net of 0; with nothing recorded it isn't drawn.
   const rows = bars.map((b) => ({
     ...b,
     below: -b.expense,
-    line: b.start > series.today ? null : b.net,
+    line: empty || b.start > series.today ? null : b.net,
   }));
   return (
     <div className="grid gap-2">
@@ -151,6 +151,8 @@ export function IncomeExpenseChart({
                 tickLine={false}
                 axisLine={false}
                 allowDecimals={false}
+                // With nothing to scale, Recharts would label ₱0.01–₱0.04.
+                ticks={empty ? [0] : undefined}
                 width={64}
               />
               <ReferenceLine y={0} stroke="var(--field-edge)" />
