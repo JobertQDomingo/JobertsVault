@@ -576,7 +576,7 @@ Income and expense colors are **numbered separately**, because the breakdown cha
 
 ### CSV export format (BAK-6, Phase 2)
 
-UTF-8 **with a byte order mark (BOM)** so Excel shows non-ASCII text correctly. Commas separate the columns, and the first row is a header.
+UTF-8 **with a byte order mark (BOM)** so Excel shows non-ASCII text correctly. Commas separate the columns, every line ends in CRLF, and the first row is a header. A field that holds a comma, a double quote or a line break is put in double quotes, with its own quotes doubled (RFC 4180, `domain::csv`). Rows are every transaction dated from the chosen start to the chosen end, both included, oldest first (then by id), with the names of archived accounts, categories and payment methods as they are. Dates are `YYYY-MM-DD`.
 
 ```
 date,type,amount,account,to_account,category,payee,payment_method,note
@@ -584,7 +584,7 @@ date,type,amount,account,to_account,category,payee,payment_method,note
 2026-10-25,transfer,5000.00,Bank Savings,Credit Card,,,,October bill
 ```
 
-The amount is written as a positive number with `currency_decimals` decimal places and no currency symbol.
+The amount is written as a positive number with `currency_decimals` decimal places and no currency symbol, built from the stored integer (`Money::to_plain`), never through a float. A transfer leaves category, payee and payment method empty, and an income or expense leaves to_account empty.
 
 ---
 

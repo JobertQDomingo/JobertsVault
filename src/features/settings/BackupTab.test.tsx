@@ -1,15 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
+import { PERIOD } from "@/test/fixtures";
 import { renderRoute, type Answers } from "@/test/render";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
+vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(), save: vi.fn() }));
 
 beforeEach(() => {
   vi.mocked(invoke).mockReset();
   vi.mocked(open).mockReset();
+  vi.mocked(save).mockReset();
 });
 
 const ANSWERS: Answers = {
@@ -17,6 +19,8 @@ const ANSWERS: Answers = {
   open_backup_folder: null,
   inspect_backup: { modified: "2026-10-20T09:30" },
   restore_backup: null,
+  get_period: PERIOD,
+  export_csv: { rows: 12 },
 };
 const CHOSEN = String.raw`D:\Backups\jobertsvault-2026-10-20_0930.db`;
 const called = (command: string) =>
@@ -121,4 +125,85 @@ test("Cancel restores nothing", async () => {
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(called("restore_backup")).toBe(0);
   expect(router.state.location.pathname).toBe("/settings");
+});
+
+test("Export saves this month so far where the user chooses (BAK-6)", async () => {
+  vi.mocked(save).mockResolvedValue(
+    String.raw`C:\Users\me\Documents\november.csv`,
+  );
+  renderRoute("/settings?tab=backup", ANSWERS);
+  const value = (name: string) =>
+    (screen.getByRole("textbox", { name }) as HTMLInputElement).value;
+  // From get_period: the month's first day, and today.
+  await waitFor(() => expect(value("From")).toBe("11/01/2026"));
+  expect(value("To")).toBe("11/05/2026");
+
+  fireEvent.click(screen.getByRole("button", { name: "Export…" }));
+  expect(
+    await screen.findByText("Exported 12 transactions to november.csv"),
+  ).toBeTruthy();
+  expect(save).toHaveBeenCalledWith(
+    expect.objectContaining({
+      defaultPath: "jobertsvault-2026-11-01-to-2026-11-05.csv",
+    }),
+  );
+  expect(vi.mocked(invoke)).toHaveBeenCalledWith("export_csv", {
+    range: { start: "2026-11-01", end: "2026-11-05" },
+    path: String.raw`C:\Users\me\Documents\november.csv`,
+  });
+});
+
+test("closing the save dialog exports nothing", async () => {
+  vi.mocked(save).mockResolvedValue(null);
+  renderRoute("/settings?tab=backup", ANSWERS);
+  await screen.findByRole("textbox", { name: "From" });
+  await waitFor(() =>
+    expect(
+      (screen.getByRole("button", { name: "Export…" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Export…" }));
+  await waitFor(() => expect(save).toHaveBeenCalled());
+  expect(called("export_csv")).toBe(0);
+});
+
+test("a refused export says why", async () => {
+  vi.mocked(save).mockResolvedValue(String.raw`C:\out.csv`);
+  renderRoute("/settings?tab=backup", {
+    ...ANSWERS,
+    export_csv: () => {
+      throw {
+        code: "validation",
+        field: "end",
+        message: "The end date can't be before the start date",
+      };
+    },
+  });
+  await waitFor(() =>
+    expect(
+      (screen.getByRole("button", { name: "Export…" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Export…" }));
+  expect(
+    await screen.findByText("The end date can't be before the start date"),
+  ).toBeTruthy();
+});
+
+test("dates out of order are caught before the save dialog", async () => {
+  renderRoute("/settings?tab=backup", ANSWERS);
+  const to = (await screen.findByRole("textbox", {
+    name: "To",
+  })) as HTMLInputElement;
+  await waitFor(() => expect(to.value).toBe("11/05/2026"));
+  fireEvent.change(to, { target: { value: "10/01/2026" } });
+  fireEvent.blur(to);
+  fireEvent.click(screen.getByRole("button", { name: "Export…" }));
+  expect(
+    await screen.findByText("Enter a From date and a To date on or after it."),
+  ).toBeTruthy();
+  expect(save).not.toHaveBeenCalled();
+  expect(called("export_csv")).toBe(0);
 });

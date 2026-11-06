@@ -303,6 +303,16 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
     time_within(FILE_LIMIT, "back up now (VACUUM INTO)", || {
         crate::services::backup::back_up_now(&conn, dir.path(), now()).unwrap()
     });
+    // Export to CSV holds it while it reads every row and writes the file (BAK-6).
+    let csv = dir.path().join("all.csv");
+    let everything = crate::services::export::DateRange {
+        start: "2022-01-01".into(),
+        end: today().to_string(),
+    };
+    time_within(FILE_LIMIT, "export all time to CSV", || {
+        let file = crate::services::export::prepare(&conn, &everything, &csv).unwrap();
+        file.save().unwrap()
+    });
     // Restore holds it from the first check to the reopen (BAK-4).
     use crate::services::backup;
     let file = backup::back_up_now(&conn, dir.path(), now())

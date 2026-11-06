@@ -8,6 +8,7 @@ pub mod accounts;
 pub mod backup;
 pub mod categories;
 pub mod dashboard;
+pub mod export;
 pub mod payment_methods;
 #[cfg(test)]
 mod perf;
@@ -22,6 +23,13 @@ fn invalid(field: &str, message: &str) -> AppError {
     AppError::Validation {
         field: field.into(),
         message: message.into(),
+    }
+}
+
+/// An `io` error that starts with `what` and ends with the cause.
+fn failed<E: std::fmt::Display>(what: &str) -> impl Fn(E) -> AppError + '_ {
+    move |err| AppError::Io {
+        message: format!("{what} {err}"),
     }
 }
 

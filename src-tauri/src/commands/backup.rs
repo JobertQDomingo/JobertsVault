@@ -4,10 +4,12 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::error::AppError;
 use crate::services::backup::{Backup, BackupFile};
+use crate::services::export::{CsvExport, DateRange};
 use crate::state::AppState;
 use crate::{log, services};
 
-/// Runs `job` on a blocking thread: a backup can take seconds (ARCHITECTURE §4.3).
+/// Runs `job` on a blocking thread: a backup, a restore or an export can take seconds
+/// (ARCHITECTURE §4.3).
 async fn blocking<T: Send + 'static>(
     app: AppHandle,
     job: impl FnOnce(&AppState) -> Result<T, AppError> + Send + 'static,
@@ -18,7 +20,7 @@ async fn blocking<T: Send + 'static>(
     })
     .await
     .map_err(|err| AppError::Io {
-        message: format!("The backup stopped unexpectedly. {err}"),
+        message: format!("It stopped unexpectedly, so it may not have finished. {err}"),
     })?
 }
 
@@ -51,6 +53,21 @@ pub async fn restore_backup(app: AppHandle, path: PathBuf) -> Result<(), AppErro
             &path,
             chrono::Local::now(),
         )
+    })
+    .await
+}
+
+/// Writes the transactions from `range` to the CSV file at `path` (BAK-6).
+#[tauri::command(async)]
+pub async fn export_csv(
+    app: AppHandle,
+    range: DateRange,
+    path: PathBuf,
+) -> Result<CsvExport, AppError> {
+    blocking(app, move |state| {
+        // The connection is locked only while the rows are read, not while the file is written.
+        let file = services::export::prepare(&*state.conn()?, &range, &path)?;
+        file.save()
     })
     .await
 }

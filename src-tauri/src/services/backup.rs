@@ -12,7 +12,7 @@ use crate::db;
 use crate::domain::backup;
 use crate::error::AppError;
 use crate::repo;
-use crate::services::invalid;
+use crate::services::{failed, invalid};
 
 const LAST_AUTO: &str = "last_auto_backup_date";
 /// Settings about this computer's backups, not the data: a restore keeps the current ones
@@ -105,13 +105,6 @@ fn back_up(
     }
     db::vacuum_into(conn, &dir.join(&name))?;
     Ok(name)
-}
-
-/// An `io` error that starts with `what` and ends with the cause.
-fn failed(what: &str) -> impl Fn(AppError) -> AppError + '_ {
-    move |err| AppError::Io {
-        message: format!("{what} {err}"),
-    }
 }
 
 /// What `inspect_backup` returns: when the chosen file was last written, in local time as
