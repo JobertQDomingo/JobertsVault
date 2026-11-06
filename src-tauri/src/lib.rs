@@ -113,6 +113,11 @@ pub fn run() {
             commands::transactions::get_transaction_defaults,
             commands::transactions::get_pay_bill_defaults,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running the app");
+        .build(tauri::generate_context!())
+        .expect("error while building the app")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                app.state::<AppState>().close();
+            }
+        });
 }

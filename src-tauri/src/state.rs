@@ -64,6 +64,17 @@ impl AppState {
         }
     }
 
+    /// Runs when the app quits. WAL mode keeps recent changes in the `-wal` file, and the
+    /// process exits without closing the connection, so this moves them into the database
+    /// file: a copy of that file alone is then a complete backup (PRD §11).
+    pub fn close(&self) {
+        if self.db.is_ok()
+            && let Err(err) = self.conn().and_then(|conn| db::checkpoint(&conn))
+        {
+            log::record(&self.log_path, &err);
+        }
+    }
+
     pub fn conn(&self) -> Result<MutexGuard<'_, Connection>, AppError> {
         match &self.db {
             Ok(db) => db.lock().map_err(|_| AppError::Database {
@@ -101,6 +112,29 @@ mod tests {
         let state = AppState::open(dir.path().to_path_buf(), &Migrations::new(vec![]), now());
         assert!(state.db_path.ends_with("jobertsvault-dev.db"));
         assert!(state.log_path.ends_with("jobertsvault-dev.log"));
+    }
+
+    #[test]
+    fn after_close_the_database_file_alone_holds_everything() {
+        let dir = TempDir::new("state-close");
+        let state = AppState::open(
+            dir.path().to_path_buf(),
+            &db::migrations(now().to_utc()),
+            now(),
+        );
+        let copy_has_accounts = || {
+            let copy = dir.path().join("copy.db");
+            let _ = fs::remove_file(&copy);
+            fs::copy(&state.db_path, &copy).unwrap();
+            Connection::open(&copy)
+                .unwrap()
+                .query_row("SELECT COUNT(*) FROM accounts", [], |r| r.get::<_, i64>(0))
+                .is_ok_and(|n| n > 0)
+        };
+        // While it runs, the changes sit in the -wal file.
+        assert!(!copy_has_accounts());
+        state.close();
+        assert!(copy_has_accounts());
     }
 
     #[test]
