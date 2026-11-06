@@ -446,6 +446,8 @@ A failed release stays a hidden draft, so no installed copy ever sees it.
 | Smooth glass UI | Blur only on panels and raised elements (about 12 or fewer on screen), never on list rows. Lists scroll inside one panel, and nothing is blurred when Windows transparency is off (DESIGN_SYSTEM §11). |
 | Each view loads in < 300 ms with 50,000 transactions | Date and account indexes; totals calculated with SQL `SUM` (never adding up rows in JS); one IPC call for the dashboard; the transaction list loads in pages of 100 |
 
+**Checking the 300 ms target:** `cargo test --manifest-path src-tauri/Cargo.toml --release perf -- --ignored --nocapture` seeds 50,000 transactions into a database file and fails if a dashboard or transaction list query takes 300 ms or more.
+
 ## 13. Coding conventions
 
 - **Rust:** `rustfmt`, `clippy -D warnings`. No `unwrap()` outside tests. Money is always `Money` or `i64`, never `f64`.
