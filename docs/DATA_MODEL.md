@@ -223,7 +223,7 @@ CREATE TABLE settings (
 | `backup_folder` | absolute path | `<app data>\backups` | 2 | SET-3 |
 | `auto_backup_enabled` | `true` \| `false` | `true` | 2 | SET-3 |
 | `last_backup_at` | ISO timestamp | (none) | 2 | BAK-7 |
-| `last_auto_backup_date` | `YYYY-MM-DD` | (none) | 2 | BAK-2 |
+| `last_auto_backup_date` | `YYYY-MM-DD`, the local date of the last successful automatic backup | (none) | 2 | BAK-2 |
 | `theme` | `system` \| `light` \| `dark` | `system` | 4 | SET-5 |
 | `reduce_transparency` | `true` \| `false` | `false` | 4 | SET-8 |
 

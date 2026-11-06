@@ -9,7 +9,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::error::AppError;
-use crate::{db, log};
+use crate::{db, log, services};
 
 /// What the frontend checks before anything else (ARCHITECTURE §6).
 #[derive(Debug, PartialEq, Serialize, TS)]
@@ -42,9 +42,15 @@ impl AppState {
     pub fn open(data_dir: PathBuf, ms: &Migrations, now: DateTime<Local>) -> Self {
         let db_path = data_dir.join(format!("{}.db", db::NAME));
         let log_path = data_dir.join(format!("{}.log", db::NAME));
-        let db = start(&data_dir, &db_path, ms, now);
-        if let Err(err) = &db {
-            log::record_startup(&log_path, err);
+        let mut db = start(&data_dir, &db_path, ms, now);
+        match &mut db {
+            Err(err) => log::record_startup(&log_path, err),
+            // Step 7 (BAK-2). A failed backup is logged, never a reason not to start.
+            Ok(conn) => {
+                if let Err(err) = services::backup::back_up_daily(conn, &data_dir, now) {
+                    log::record(&log_path, &err);
+                }
+            }
         }
         Self {
             db: db.map(Mutex::new),
@@ -234,6 +240,40 @@ mod tests {
                 .unwrap();
             assert_eq!(version, 1);
         }
+    }
+
+    #[test]
+    fn startup_makes_the_daily_backup() {
+        let dir = TempDir::new("state-daily");
+        let state = AppState::open(
+            dir.path().to_path_buf(),
+            &db::migrations(now().to_utc()),
+            now(),
+        );
+        assert_eq!(state.startup_status(), StartupStatus::Ok);
+        let auto = dir.path().join(db::BACKUPS_DIR).join("auto");
+        assert_eq!(fs::read_dir(auto).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn a_failed_daily_backup_does_not_stop_startup() {
+        let dir = TempDir::new("state-daily-failed");
+        fs::write(
+            dir.path().join(db::BACKUPS_DIR),
+            b"a file where the folder should be",
+        )
+        .unwrap();
+        let state = AppState::open(
+            dir.path().to_path_buf(),
+            &db::migrations(now().to_utc()),
+            now(),
+        );
+        assert_eq!(state.startup_status(), StartupStatus::Ok);
+        assert!(
+            fs::read_to_string(&state.log_path)
+                .unwrap()
+                .contains("io: Couldn't save the backup")
+        );
     }
 
     #[test]

@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Local};
@@ -6,7 +7,11 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db;
+use crate::domain::backup;
 use crate::error::AppError;
+use crate::repo;
+
+const LAST_AUTO: &str = "last_auto_backup_date";
 
 /// What `backup_now` returns: the name of the file it wrote, for the "Backup saved as …" toast,
 /// whose Open folder shows where (UI_FLOWS F9).
@@ -33,10 +38,45 @@ pub fn back_up_now(
     Ok(Backup { file_name })
 }
 
+/// The daily automatic backup (BAK-2): the first time the app opens on a local day, it copies the
+/// database into `<backup folder>uto` and records the date, then keeps only the newest 30
+/// there (BAK-3). A failed copy records nothing, so the next start tries again.
+pub fn back_up_daily(
+    conn: &mut Connection,
+    data_dir: &Path,
+    now: DateTime<Local>,
+) -> Result<(), AppError> {
+    let today = now.date_naive().to_string();
+    if repo::settings::get(conn, LAST_AUTO)?.as_deref() == Some(today.as_str()) {
+        return Ok(());
+    }
+    let dir = folder(data_dir).join("auto");
+    back_up(conn, &dir, now)?;
+    let tx = conn.transaction()?;
+    repo::settings::set(&tx, LAST_AUTO, &today)?;
+    tx.commit()?;
+    prune(&dir).map_err(|err| AppError::Io {
+        message: format!("Couldn't delete the oldest automatic backups. {err}"),
+    })
+}
+
+/// Deletes all but the newest 30 automatic backups in `dir`. Other files there are left alone.
+fn prune(dir: &Path) -> std::io::Result<()> {
+    let names: Vec<String> = fs::read_dir(dir)?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|t| t.is_file()))
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .collect();
+    for name in backup::to_prune(db::NAME, &names) {
+        fs::remove_file(dir.join(name))?;
+    }
+    Ok(())
+}
+
 /// Copies the database into `dir` under a name stamped with `now`, local time, and returns that
 /// name. A second copy in the same minute is `-2`, `-3`, … rather than replacing the first.
 fn back_up(conn: &Connection, dir: &Path, now: DateTime<Local>) -> Result<String, AppError> {
-    let stem = format!("{}-{}", db::NAME, now.format(db::STAMP));
+    let stem = format!("{}-{}", db::NAME, now.format(backup::STAMP));
     let mut name = format!("{stem}.db");
     for n in 2.. {
         if !dir.join(&name).exists() {
@@ -54,7 +94,6 @@ fn back_up(conn: &Connection, dir: &Path, now: DateTime<Local>) -> Result<String
 mod tests {
     use super::*;
     use crate::test_support::{TempDir, now};
-    use std::fs;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -206,5 +245,122 @@ mod tests {
             "{result:?}"
         );
         assert!(folder(dir.path()).is_file());
+    }
+
+    fn auto_files(dir: &TempDir) -> Vec<String> {
+        let mut names: Vec<String> = fs::read_dir(folder(dir.path()).join("auto"))
+            .unwrap()
+            .map(|e| e.unwrap().file_name().into_string().unwrap())
+            .collect();
+        names.sort();
+        names
+    }
+
+    fn last_auto(conn: &Connection) -> Option<String> {
+        repo::settings::get(conn, LAST_AUTO).unwrap()
+    }
+
+    #[test]
+    fn the_first_start_of_each_day_makes_one_automatic_backup() {
+        let dir = TempDir::new("bak2-daily");
+        let mut conn = database(&dir);
+        let stamp = |name: &str| format!("{}-{name}.db", db::NAME);
+
+        back_up_daily(&mut conn, dir.path(), now()).unwrap();
+        assert_eq!(auto_files(&dir), [stamp("2026-11-03_1405")]);
+        assert_eq!(last_auto(&conn).as_deref(), Some("2026-11-03"));
+
+        let later = now() + chrono::Duration::hours(9); // 23:05, the same day
+        back_up_daily(&mut conn, dir.path(), later).unwrap();
+        assert_eq!(auto_files(&dir).len(), 1, "once a day");
+
+        let tomorrow = now() + chrono::Duration::hours(11);
+        back_up_daily(&mut conn, dir.path(), tomorrow).unwrap();
+        assert_eq!(
+            auto_files(&dir),
+            [stamp("2026-11-03_1405"), stamp("2026-11-04_0105")]
+        );
+        assert_eq!(last_auto(&conn).as_deref(), Some("2026-11-04"));
+        assert_eq!(
+            account_names(
+                &folder(dir.path())
+                    .join("auto")
+                    .join(stamp("2026-11-04_0105"))
+            ),
+            ["Cash"]
+        );
+    }
+
+    #[test]
+    fn automatic_backups_keep_exactly_the_newest_30() {
+        let dir = TempDir::new("bak3-prune");
+        let mut conn = database(&dir);
+        let auto = folder(dir.path()).join("auto");
+        fs::create_dir_all(&auto).unwrap();
+        // 31 older daily backups, Oct 3 to Nov 2.
+        let day = |n: u64| {
+            (now() - chrono::Days::new(n))
+                .format("%Y-%m-%d")
+                .to_string()
+        };
+        for n in 1..=31 {
+            fs::write(
+                auto.join(format!("{}-{}_0900.db", db::NAME, day(n))),
+                b"old",
+            )
+            .unwrap();
+        }
+        fs::write(auto.join("notes.txt"), b"mine").unwrap();
+        fs::create_dir_all(auto.join(format!("{}-2020-01-01_0000.db", db::NAME))).unwrap();
+        let manual = back_up_now(&conn, dir.path(), now() - chrono::Days::new(90)).unwrap();
+
+        back_up_daily(&mut conn, dir.path(), now()).unwrap();
+
+        let files = auto_files(&dir);
+        let backups: Vec<&String> = files
+            .iter()
+            .filter(|n| n.ends_with("_0900.db") || n.ends_with("_1405.db"))
+            .collect();
+        assert_eq!(backups.len(), 30);
+        assert!(
+            files.contains(&format!("{}-2026-11-03_1405.db", db::NAME)),
+            "today's is kept"
+        );
+        assert!(files.contains(&format!("{}-{}_0900.db", db::NAME, day(29))));
+        assert!(
+            !files.contains(&format!("{}-{}_0900.db", db::NAME, day(30))),
+            "the two oldest go"
+        );
+        assert!(!files.contains(&format!("{}-{}_0900.db", db::NAME, day(31))));
+        assert!(files.contains(&"notes.txt".to_string()), "other files stay");
+        assert!(
+            auto.join(format!("{}-2020-01-01_0000.db", db::NAME))
+                .is_dir(),
+            "folders stay"
+        );
+        assert!(
+            folder(dir.path()).join(manual.file_name).exists(),
+            "manual backups are never pruned"
+        );
+    }
+
+    #[test]
+    fn a_failed_automatic_backup_is_tried_again_at_the_next_start() {
+        let dir = TempDir::new("bak2-failed");
+        let mut conn = database(&dir);
+        let auto = folder(dir.path()).join("auto");
+        fs::create_dir_all(folder(dir.path())).unwrap();
+        fs::write(&auto, b"a file where the folder should be").unwrap();
+
+        let result = back_up_daily(&mut conn, dir.path(), now());
+
+        assert!(
+            matches!(&result, Err(AppError::Io { message }) if message.starts_with("Couldn't save the backup")),
+            "{result:?}"
+        );
+        assert_eq!(last_auto(&conn), None, "nothing is recorded");
+        fs::remove_file(&auto).unwrap();
+        back_up_daily(&mut conn, dir.path(), now()).unwrap();
+        assert_eq!(auto_files(&dir).len(), 1);
     }
 }
