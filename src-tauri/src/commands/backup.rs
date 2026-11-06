@@ -1,7 +1,9 @@
+use std::path::PathBuf;
+
 use tauri::{AppHandle, Manager, State};
 
 use crate::error::AppError;
-use crate::services::backup::Backup;
+use crate::services::backup::{Backup, BackupFile};
 use crate::state::AppState;
 use crate::{log, services};
 
@@ -24,6 +26,31 @@ async fn blocking<T: Send + 'static>(
 pub async fn backup_now(app: AppHandle) -> Result<Backup, AppError> {
     blocking(app, |state| {
         services::backup::back_up_now(&*state.conn()?, &state.data_dir, chrono::Local::now())
+    })
+    .await
+}
+
+/// Checks a file picked to restore and says when it was written, changing nothing (BAK-4).
+#[tauri::command(async)]
+pub async fn inspect_backup(app: AppHandle, path: PathBuf) -> Result<BackupFile, AppError> {
+    blocking(app, move |state| {
+        services::backup::inspect(&state.data_dir, &state.db_path, &path, chrono::Local::now())
+    })
+    .await
+}
+
+/// Replaces all the data with the backup at `path` (BAK-4). The connection stays locked
+/// throughout, so no other command reads or writes in between.
+#[tauri::command(async)]
+pub async fn restore_backup(app: AppHandle, path: PathBuf) -> Result<(), AppError> {
+    blocking(app, move |state| {
+        services::backup::restore(
+            &mut *state.conn()?,
+            &state.data_dir,
+            &state.db_path,
+            &path,
+            chrono::Local::now(),
+        )
     })
     .await
 }

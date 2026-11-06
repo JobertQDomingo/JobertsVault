@@ -25,6 +25,25 @@ pub const BACKUPS_DIR: &str = if cfg!(debug_assertions) {
     "backups"
 };
 
+/// Where pre-migration backups go, whatever `backup_folder` says (DATA_MODEL §8).
+pub fn pre_migration_dir(data_dir: &Path) -> std::path::PathBuf {
+    data_dir.join(BACKUPS_DIR).join("pre-migration")
+}
+
+/// Whether `conn` holds a sound Jobert's Vault database: SQLite's own check passes, it has a
+/// schema version, and the first migration's tables are there (BAK-4).
+pub fn is_vault(conn: &Connection) -> Result<bool, AppError> {
+    let check: String = conn.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+    let version: i64 = conn.pragma_query_value(None, "user_version", |row| row.get(0))?;
+    let tables: i64 = conn.query_row(
+        "SELECT count(*) FROM sqlite_schema WHERE type = 'table'
+         AND name IN ('accounts', 'categories', 'payment_methods', 'transactions', 'settings')",
+        [],
+        |row| row.get(0),
+    )?;
+    Ok(check == "ok" && version >= 1 && tables == 5)
+}
+
 /// Opens the database and applies the connection settings (ARCHITECTURE §4.3).
 pub fn open(path: &Path) -> Result<Connection, AppError> {
     let conn = Connection::open(path)?;

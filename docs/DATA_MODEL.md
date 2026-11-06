@@ -229,6 +229,8 @@ CREATE TABLE settings (
 
 `month_start_day` is capped at 28 so that every month contains that day.
 
+`backup_folder`, `auto_backup_enabled`, `last_backup_at` and `last_auto_backup_date` describe this computer's backups rather than the data, so a restore keeps the current values (§9).
+
 `onboarding_completed` becomes `true` when the user chooses **Start using the app** or **Set up later**. Closing the app before that shows the form again on the next launch.
 
 ---
@@ -623,3 +625,7 @@ Answered on 2026-11-06:
 
 15. **Chart bars (RPT-1)** are calendar-aligned: a Day period is one bar, a Year is 12 calendar months even when `month_start_day` > 1, and Custom weeks follow `week_start` and Custom months are calendar months, cut to the range. "Up to 6 months" means ending before the same date 6 months after the start (§5.9).
 16. **Payee suggestions (TXN-6)** match the form's type: an expense suggests only payees used on expenses, with the category of the latest expense to that payee, and the same for income. A payee whose last category is archived is still suggested, but choosing it leaves the category as it is (§3.4).
+
+Answered on 2026-11-07:
+
+17. **A restore keeps this computer's backup settings** (BAK-4): `backup_folder`, `auto_backup_enabled`, `last_backup_at` and `last_auto_backup_date` keep their current values, and are deleted where the current data has none, while every other setting comes from the backup. Restoring on a second Windows account then doesn't point its backups at the first account's folder, and the last backup date doesn't go back in time (§3.5, ARCHITECTURE §7).

@@ -3,6 +3,7 @@ import {
   addDays,
   formatBarDates,
   formatBarLabel,
+  formatDateTime,
   formatInputDate,
   formatSpan,
   formatDayHeader,
@@ -123,4 +124,10 @@ test("a comparison's dates drop the year when it's this year's", () => {
   expect(formatSpan("2025-12-29", "2026-01-04", today)).toBe(
     "Dec 29, 2025 – Jan 4, 2026",
   );
+});
+
+test("a backup's time reads in US order with a 12-hour clock", () => {
+  expect(formatDateTime("2026-10-20T09:30")).toBe("Oct 20, 2026 9:30 AM");
+  expect(formatDateTime("2026-01-05T00:05")).toBe("Jan 5, 2026 12:05 AM");
+  expect(formatDateTime("2026-12-31T23:59")).toBe("Dec 31, 2026 11:59 PM");
 });

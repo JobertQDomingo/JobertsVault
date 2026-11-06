@@ -285,7 +285,7 @@ Welcome to Jobert's Vault
 
 ### F9: Back up and restore (Phase 2)
 - **Back up now:** Settings → Backup → **Back up now** → toast "Backup saved as jobertsvault-2026-10-26_0930.db" with an **Open folder** link, which opens the backup folder in Explorer.
-- **Restore:** **Restore from backup…** → pick a file → confirm "This replaces all current data with the backup from Oct 20, 2026 09:30. A safety copy of your current data will be saved first." → the app reloads.
+- **Restore:** **Restore from backup…** → pick a file in the Windows open dialog → the app checks it first, and a file that isn't a Jobert's Vault backup, or one from a newer version, is refused with a toast saying why → confirm "This replaces all current data with the backup from Oct 20, 2026 9:30 AM. A safety copy of your current data will be saved first." (the time the file was last written) with a destructive **Restore** → every screen's data reloads, the app goes to the dashboard, and a "Backup restored" toast appears.
 - **Stale-backup warning:** if the last backup is more than 7 days old, a warning banner appears in Settings and on the dashboard (BAK-7).
 
 ### F10: Confirm recurring transactions (Phase 3)

@@ -99,8 +99,7 @@ fn start(
 ) -> Result<Connection, AppError> {
     fs::create_dir_all(data_dir)?;
     let mut conn = db::open(db_path)?;
-    let backup_dir = data_dir.join(db::BACKUPS_DIR).join("pre-migration");
-    db::prepare(&mut conn, ms, &backup_dir, now)?;
+    db::prepare(&mut conn, ms, &db::pre_migration_dir(data_dir), now)?;
     Ok(conn)
 }
 

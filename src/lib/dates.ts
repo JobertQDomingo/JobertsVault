@@ -30,6 +30,10 @@ export function parseInputDate(text: string): string | null {
 export const addDays = (iso: string, days: number) =>
   toIso(addDaysToDate(toDate(iso), days));
 
+/** A local date and time from Rust (`YYYY-MM-DDTHH:MM`), e.g. `Oct 20, 2026 9:30 AM` (DESIGN_SYSTEM §8). */
+export const formatDateTime = (local: string) =>
+  format(parse(local, "yyyy-MM-dd'T'HH:mm", new Date()), "MMM d, yyyy h:mm a");
+
 /** A date without its year, e.g. `Nov 5` (a card's due date). */
 export const formatShortDate = (iso: string) => format(toDate(iso), "MMM d");
 

@@ -14,6 +14,11 @@ pub fn get(conn: &Connection, key: &str) -> rusqlite::Result<Option<String>> {
     .optional()
 }
 
+pub fn delete(conn: &Connection, key: &str) -> rusqlite::Result<()> {
+    conn.execute("DELETE FROM settings WHERE key = ?1", [key])?;
+    Ok(())
+}
+
 pub fn set(conn: &Connection, key: &str, value: &str) -> rusqlite::Result<()> {
     conn.execute(
         "INSERT INTO settings (key, value) VALUES (?1, ?2)
