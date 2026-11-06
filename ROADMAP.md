@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-06 |
-| **Current focus** | **Phase 1, 1.11: Release `v0.1.0`** |
+| **Current focus** | **Phase 2, 2.1: Reports** |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -18,7 +18,7 @@ This file is the progress tracker.
 | Phase | Goal | Version | Exit criteria | Progress |
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
-| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 51 / 53 |
+| **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 53 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 0 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
@@ -118,8 +118,8 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] Go through PRD §10 by hand on Windows 11, on both monitors
 - [x] Check performance: cold start under 2 s, and the dashboard and transaction list under 300 ms with 50,000 test transactions. The glass must scroll smoothly.
 - [x] `/release 0.1.0`, install it from the GitHub release, and confirm the data is in `%APPDATA%\com.jobertsvault.app\`
-- [ ] Prove the real path: `/release 0.1.1` with a small fix, and confirm the installed `v0.1.0` updates itself with all its data
-- [ ] Reminder until Phase 2: copy `jobertsvault.db` somewhere safe by hand
+- [x] Prove the real path: `/release 0.1.1` with a small fix, and confirm the installed `v0.1.0` updates itself with all its data
+- [x] Reminder until Phase 2: now and then, close the app and copy `jobertsvault.db`, `jobertsvault.db-wal` and `jobertsvault.db-shm` somewhere safe by hand
 
 ---
 

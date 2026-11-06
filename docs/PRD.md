@@ -271,7 +271,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 - [x] Cold start takes under 2 s, and the dashboard and transaction list load in under 300 ms with 50,000 test transactions.
 - [x] The dashboard and transaction list scroll smoothly on both monitors.
 - [x] The app runs fully offline on Windows 11, and starts normally with no internet.
-- [ ] An installed copy updates itself to a newer published version at its next start, and all my data is still there afterward.
+- [x] An installed copy updates itself to a newer published version at its next start, and all my data is still there afterward.
 - [x] With automatic updates off, the app doesn't connect by itself, and **Check for updates** in Settings still works.
 - [x] A tampered update is refused, and nothing changes.
 - [x] An update with a migration makes a backup of the database first, and a failed backup stops the migration.
