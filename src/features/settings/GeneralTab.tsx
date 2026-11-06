@@ -1,11 +1,13 @@
 import { useRef, useState, type ReactNode } from "react";
 import type { Settings } from "@/bindings/Settings";
 import type { SettingsView } from "@/bindings/SettingsView";
+import { UpdateCheck } from "@/components/UpdateCheck";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import { Switch } from "@/components/ui/switch";
 import { notify } from "@/components/ui/toast";
+import { useAppVersion } from "@/hooks/useAppVersion";
 import { useUpdateSettings } from "@/hooks/useSettings";
 import { formatMoney } from "@/lib/money";
 import { showSaveError } from "@/lib/saveError";
@@ -18,6 +20,7 @@ const SHOWN: Key[] = [
   "weekStart",
   "monthStartDay",
   "showPaymentMethod",
+  "autoUpdateEnabled",
 ];
 const DAYS = Array.from({ length: 28 }, (_, i) => ({
   value: String(i + 1),
@@ -69,7 +72,7 @@ function Row({
 }
 
 /**
- * Settings → General (UI_FLOWS §6, SET-1, SET-2, SET-6). Each change saves at once with a "Saved"
+ * Settings → General (UI_FLOWS §6, SET-1, SET-2, SET-6, UPD-3). Each change saves at once with a "Saved"
  * toast; the backend checks it, and its message shows beside the setting.
  */
 export function GeneralTab({
@@ -81,6 +84,7 @@ export function GeneralTab({
   currencyOnly?: boolean;
 }) {
   const update = useUpdateSettings();
+  const version = useAppVersion();
   const [errors, setErrors] = useState<Partial<Record<Key, string>>>({});
   const [symbol, setSymbol] = useState(settings.currencySymbol);
   // The symbol last sent, so Enter and the blur after it (or a second blur) don't send it twice.
@@ -219,6 +223,25 @@ export function GeneralTab({
               checked={settings.showPaymentMethod}
               onCheckedChange={(showPaymentMethod) =>
                 save({ showPaymentMethod })
+              }
+            />
+          </Row>
+          <Row id="set-version" label="Version">
+            <p className="tabular-nums">{version.data ?? "…"}</p>
+            <UpdateCheck />
+          </Row>
+          <Row
+            id="set-auto-update"
+            label="Automatic updates"
+            labelable
+            error={errors.autoUpdateEnabled}
+            help="Install updates automatically when the app starts. When off, the app only connects when you click Check for updates."
+          >
+            <Switch
+              id="set-auto-update"
+              checked={settings.autoUpdateEnabled}
+              onCheckedChange={(autoUpdateEnabled) =>
+                save({ autoUpdateEnabled })
               }
             />
           </Row>

@@ -12,6 +12,7 @@ beforeEach(() => {
 });
 
 const ANSWERS: Answers = {
+  get_app_version: "0.1.0",
   list_categories: CATEGORIES,
   list_payment_methods: PAYMENT_METHODS,
   update_settings: ({ settings }: { settings: Settings }) => ({
@@ -209,4 +210,72 @@ test("the symbol shows as saved (trimmed), and Enter then leaving saves once", a
   fireEvent.blur(symbol);
   await new Promise((r) => setTimeout(r, 20));
   expect(saves()).toEqual([{ ...STORED, currencySymbol: "$ " }]);
+});
+
+test("General shows the version, and Check for updates says when it's up to date (UPD-3)", async () => {
+  renderRoute("/settings", { ...ANSWERS, check_update: null });
+  expect(await screen.findByText("0.1.0")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+  expect(await screen.findByText("You're up to date.")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Update now" })).toBeNull();
+});
+
+test("a newer version is named, and Update now installs it (UPD-3)", async () => {
+  renderRoute("/settings", {
+    ...ANSWERS,
+    check_update: "0.2.0",
+    install_update: () => new Promise(() => {}),
+  });
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Check for updates" }),
+  );
+  expect(await screen.findByText("0.2.0 is out.")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Update now" }));
+  expect(
+    await screen.findByRole("button", { name: "Updating to 0.2.0…" }),
+  ).toBeTruthy();
+  expect(invoke).toHaveBeenCalledWith("install_update", undefined);
+});
+
+test("a refused update says why, and nothing changes (UPD-4)", async () => {
+  const message =
+    "Couldn't install the update: signature verification failed. Nothing was changed.";
+  renderRoute("/settings", {
+    ...ANSWERS,
+    check_update: "0.2.0",
+    install_update: () => {
+      throw { code: "update", message };
+    },
+  });
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Check for updates" }),
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Update now" }));
+  expect(await screen.findByText(message)).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Update now" })).toBeTruthy();
+});
+
+test("a failed check says why", async () => {
+  renderRoute("/settings", {
+    ...ANSWERS,
+    check_update: () => {
+      throw { code: "update", message: "Couldn't check for updates: offline." };
+    },
+  });
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Check for updates" }),
+  );
+  expect(
+    await screen.findByText("Couldn't check for updates: offline."),
+  ).toBeTruthy();
+});
+
+test("the automatic updates switch saves at once (UPD-3)", async () => {
+  renderRoute("/settings", ANSWERS);
+  fireEvent.click(
+    await screen.findByRole("switch", { name: "Automatic updates" }),
+  );
+  await waitFor(() =>
+    expect(saves()).toEqual([{ ...STORED, autoUpdateEnabled: false }]),
+  );
 });

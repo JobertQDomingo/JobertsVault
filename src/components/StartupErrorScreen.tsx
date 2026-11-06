@@ -3,12 +3,14 @@ import { FolderOpen } from "lucide-react";
 import logo from "../../assets/brand/logo.svg";
 import { openDataFolder } from "@/api/system";
 import { GlassPanel } from "./GlassPanel";
+import { UpdateCheck } from "./UpdateCheck";
 import { Button } from "./ui/button";
 import { notify } from "./ui/toast";
 
 /**
  * The whole window when the database couldn't be opened (ARCHITECTURE §6, UI_FLOWS §9): what went
- * wrong, where the database is, and a way to open its folder. ROADMAP 1.10 adds Check for updates.
+ * wrong, where the database is, a way to open its folder, and Check for updates, since a newer
+ * version may fix it (UPD-6).
  */
 export function StartupErrorScreen({
   message,
@@ -40,12 +42,9 @@ export function StartupErrorScreen({
             </p>
           </div>
         )}
-        <div className="flex justify-end">
-          <Button
-            variant="primary"
-            onClick={() => open.mutate()}
-            disabled={open.isPending}
-          >
+        <div className="flex items-start justify-between gap-3">
+          <UpdateCheck />
+          <Button onClick={() => open.mutate()} disabled={open.isPending}>
             <FolderOpen />
             Open data folder
           </Button>

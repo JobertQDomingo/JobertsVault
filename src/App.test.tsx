@@ -207,3 +207,12 @@ test("turning automatic updates on later doesn't start an update mid-session", a
   expect(screen.getByRole("heading", { name: "Dashboard" })).toBeTruthy();
   expect(invoke).not.toHaveBeenCalledWith("check_update", undefined);
 });
+
+test("the startup error screen can check for a newer version that fixes it (UPD-6)", async () => {
+  renderApp(FAILED, { check_update: () => "0.2.0" });
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Check for updates" }),
+  );
+  expect(await screen.findByText("0.2.0 is out.")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Update now" })).toBeTruthy();
+});
