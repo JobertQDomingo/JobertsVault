@@ -10,7 +10,7 @@ const MAX_BYTES: u64 = 1_048_576;
 // Commands run on several threads, and two of them rotating at once would lose the older copy.
 static WRITING: Mutex<()> = Mutex::new(());
 
-/// Appends a `Database` or `Io` error to the error log. Other kinds are the user's to fix and
+/// Appends a `Database`, `Io` or `Update` error to the error log. Other kinds are the user's to fix and
 /// aren't logged.
 pub fn record(path: &Path, err: &AppError) {
     if let (code, Some(message)) = describe(err) {
@@ -35,6 +35,8 @@ fn describe(err: &AppError) -> (&'static str, Option<String>) {
         AppError::Conflict { .. } => ("conflict", None),
         AppError::Database { .. } => ("database", Some(err.to_string())),
         AppError::Io { .. } => ("io", Some(err.to_string())),
+        // The updater's own text: URLs, versions and signature failures, never user data.
+        AppError::Update { .. } => ("update", Some(err.to_string())),
     }
 }
 
