@@ -51,8 +51,16 @@ fn seed(conn: &mut Connection) {
             .unwrap();
         for i in 0..ROWS {
             let date = (start + chrono::Days::new((i * days / ROWS) as u64)).to_string();
-            let pick = |list: &[i64], salt: i64| list[((i * 7 + salt) as usize) % list.len()];
-            let account = pick(&accounts, 0);
+            // Mixed so the account, category and method don't follow the kind (i % 10).
+            let mix = |salt: u64| {
+                let x = (i as u64 ^ salt).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+                (x ^ (x >> 31)) as usize
+            };
+            let pick = |list: &[i64], salt: u64| list[mix(salt) % list.len()];
+            let a = mix(1) % accounts.len();
+            let account = accounts[a];
+            // Any account but the one it leaves.
+            let to = accounts[(a + 1 + mix(2) % (accounts.len() - 1)) % accounts.len()];
             let amount = 100 + (i * 7919) % 500_000;
             let note = (i % 5 == 0).then(|| format!("note {}", i % 97));
             match i % 10 {
@@ -61,7 +69,7 @@ fn seed(conn: &mut Connection) {
                     amount,
                     date,
                     account,
-                    pick(&accounts, 1),
+                    to,
                     None::<i64>,
                     None::<String>,
                     None::<i64>,
@@ -131,7 +139,8 @@ fn perf_50k_dashboard_and_list_under_300_ms() {
     crate::db::prepare(&mut conn, &ms, dir.path(), now()).unwrap();
     seed(&mut conn);
     drop(conn);
-    // A fresh connection, as at startup, with nothing in SQLite's page cache yet.
+    // A fresh connection, as at startup: SQLite's cache is empty, though Windows may still hold
+    // the file in memory, so this times the queries, not reading the disk.
     let conn = crate::db::open(&path).unwrap();
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0))
@@ -142,7 +151,20 @@ fn perf_50k_dashboard_and_list_under_300_ms() {
         start: NaiveDate::from_ymd_opt(2022, 1, 1).unwrap(),
         end: today(),
     };
-    let month = || PeriodQuery::Month { anchor: None };
+    // October 2026: a whole month, where the current one has only 3 days so far.
+    let month = || PeriodQuery::Month {
+        anchor: NaiveDate::from_ymd_opt(2026, 10, 1),
+    };
+    let busiest = |column: &str| -> i64 {
+        conn.query_row(
+            &format!("SELECT {column} FROM transactions WHERE {column} IS NOT NULL GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 1"),
+            [],
+            |r| r.get(0),
+        )
+        .unwrap()
+    };
+    let (account, category) = (busiest("account_id"), busiest("category_id"));
+    let last_page = ((ROWS - 1) / i64::from(transactions::PAGE_SIZE)) as u32;
     for (label, query) in [
         ("dashboard: month", month()),
         ("dashboard: year", PeriodQuery::Year { anchor: None }),
@@ -150,17 +172,17 @@ fn perf_50k_dashboard_and_list_under_300_ms() {
     ] {
         time(label, || dashboard::get(&conn, &query, today()).unwrap());
     }
-    let list = |label: &str, f: &dyn Fn() -> TransactionFilter, page: u32| {
+    let list = |label: &str, f: TransactionFilter, page: u32| {
         time(label, || {
-            transactions::list(&conn, f(), page, today()).unwrap()
+            transactions::list(&conn, f.clone(), page, today()).unwrap()
         });
     };
-    list("list: month", &|| filter(month()), 0);
-    list("list: all time", &|| filter(all()), 0);
-    list("list: all time, page 100", &|| filter(all()), 100);
+    list("list: month", filter(month()), 0);
+    list("list: all time", filter(all()), 0);
+    list("list: all time, last page", filter(all()), last_page);
     list(
         "list: all time, expenses",
-        &|| TransactionFilter {
+        TransactionFilter {
             kind: Some(TransactionKind::Expense),
             ..filter(all())
         },
@@ -168,23 +190,23 @@ fn perf_50k_dashboard_and_list_under_300_ms() {
     );
     list(
         "list: all time, one account",
-        &|| TransactionFilter {
-            account_id: Some(2),
+        TransactionFilter {
+            account_id: Some(account),
             ..filter(all())
         },
         0,
     );
     list(
         "list: all time, one category",
-        &|| TransactionFilter {
-            category_id: Some(1),
+        TransactionFilter {
+            category_id: Some(category),
             ..filter(all())
         },
         0,
     );
     list(
         "list: all time, search \"store 12\"",
-        &|| TransactionFilter {
+        TransactionFilter {
             search: Some("store 12".into()),
             ..filter(all())
         },
@@ -192,7 +214,7 @@ fn perf_50k_dashboard_and_list_under_300_ms() {
     );
     list(
         "list: all time, search no match",
-        &|| TransactionFilter {
+        TransactionFilter {
             search: Some("zzz".into()),
             ..filter(all())
         },
