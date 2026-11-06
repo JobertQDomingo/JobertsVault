@@ -116,6 +116,8 @@ export function ReportsScreen() {
         <GlassPanel className="rounded-toolbar p-1.5">
           <Combobox
             aria-label="Account"
+            // Shown only if the URL names an account the list doesn't have.
+            placeholder="Account"
             className="w-48"
             options={accountOptions(accounts, accountId)}
             value={accountId === null ? "" : String(accountId)}
