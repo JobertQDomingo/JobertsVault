@@ -196,6 +196,16 @@ pub fn daily_totals(conn: &Connection, f: &Filter) -> rusqlite::Result<Vec<(Stri
     .collect()
 }
 
+/// Each category's total over the matching rows, largest first, then by category id.
+pub fn category_totals(conn: &Connection, f: &Filter) -> rusqlite::Result<Vec<(i64, i64)>> {
+    conn.prepare(&format!(
+        "SELECT category_id, SUM(amount) FROM transactions {WHERE} AND category_id IS NOT NULL
+         GROUP BY category_id ORDER BY 2 DESC, 1"
+    ))?
+    .query_map(&f.values()[..], |r| Ok((r.get(0)?, r.get(1)?)))?
+    .collect()
+}
+
 /// The `limit` newest transactions dated `as_of` or earlier, newest first.
 pub fn recent(conn: &Connection, as_of: &str, limit: u32) -> rusqlite::Result<Vec<Row>> {
     conn.prepare(&format!(

@@ -305,7 +305,7 @@ Welcome to Jobert's Vault
 ### 8.1 Reports (`/reports`), Phase 2
 - Period switcher plus a "Compare to" dropdown and an account filter (RPT-5).
 - **Section 1: Income vs expense.** A bar chart grouped by day, week or month (RPT-1, DATA_MODEL §5.9), with net cashflow as a line. Income bars rise above the zero line and expense bars hang below it, so they're told apart by direction as well as color. Hovering a bar shows its dates and the three figures. A hidden table gives screen readers the same figures.
-- **Section 2: Category breakdown.** A donut chart showing the largest 8 categories plus "Other", next to a ranked list showing each category's amount and %. Switch between Expense and Income. Clicking a category opens the filtered transaction list (RPT-2, RPT-3).
+- **Section 2: Category breakdown.** A donut chart showing the largest 8 categories plus "Other", with the total in its middle, next to a ranked list showing each category's chip, % and amount (DATA_MODEL §5.10). Hovering a slice shows its name, amount and %. An **Expense / Income** switch in the section's header picks the kind, kept in the URL (`breakdown=income`) so Back returns to it. Clicking a category in the list opens `/transactions` filtered to that category and the same period (RPT-2, RPT-3). Archived categories with spending in the period still appear.
 - **Section 3: Comparison table.** Rows for income, expense, net and each category, with columns for this period, the comparison period, the difference and the % change (RPT-4).
 
 ### 8.2 Recurring (`/recurring`), Phase 3

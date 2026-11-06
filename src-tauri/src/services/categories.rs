@@ -289,7 +289,7 @@ fn view(row: repo::categories::Row) -> Result<Category, AppError> {
     })
 }
 
-fn kind_text(kind: CategoryKind) -> &'static str {
+pub(crate) fn kind_text(kind: CategoryKind) -> &'static str {
     match kind {
         CategoryKind::Income => "income",
         CategoryKind::Expense => "expense",

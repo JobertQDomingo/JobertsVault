@@ -65,6 +65,12 @@ function withSymbol(sign: string, amount: string, settings: MoneySettings) {
     : `${sign}${amount}\u00A0${settings.currencySymbol}`;
 }
 
+/** A share in tenths of a percent, as the backend sends it: 333 → `33.3%`, −15 → `−1.5%`. */
+export function formatShare(tenths: number) {
+  const abs = Math.abs(tenths);
+  return `${tenths < 0 ? MINUS : ""}${(abs - (abs % 10)) / 10}.${abs % 10}%`;
+}
+
 /**
  * A chart axis label (DESIGN_SYSTEM §7): `₱850`, `₱12.5k`, `₱1.25k`, `₱1.2M`, `−₱5k`. Two decimals
  * at most, so evenly spaced ticks read evenly, rounded half up using whole-number maths only.

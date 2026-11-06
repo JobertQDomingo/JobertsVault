@@ -25,6 +25,17 @@ function readPeriod(params: URLSearchParams): PeriodQuery {
   return { kind: "month", anchor: null };
 }
 
+/** Writes `query` into `params` the way the URL keeps it, replacing any period already there. */
+export function writePeriod(params: URLSearchParams, query: PeriodQuery) {
+  for (const key of KEYS) params.delete(key);
+  params.set("period", query.kind);
+  if (query.kind === "custom") {
+    params.set("start", query.start);
+    params.set("end", query.end);
+  } else if (query.anchor) params.set("anchor", query.anchor);
+  return params;
+}
+
 /**
  * The selected period, saved in the URL so the back button and reloads keep it (ARCHITECTURE
  * §5.1): `?period=month&anchor=2026-10-26` or `?period=custom&start=…&end=…`. Other parameters,
@@ -35,16 +46,7 @@ export function usePeriodQuery() {
   const query = useMemo(() => readPeriod(params), [params]);
   const setQuery = useCallback(
     (next: PeriodQuery) =>
-      setParams((current) => {
-        const updated = new URLSearchParams(current);
-        for (const key of KEYS) updated.delete(key);
-        updated.set("period", next.kind);
-        if (next.kind === "custom") {
-          updated.set("start", next.start);
-          updated.set("end", next.end);
-        } else if (next.anchor) updated.set("anchor", next.anchor);
-        return updated;
-      }),
+      setParams((current) => writePeriod(new URLSearchParams(current), next)),
     [setParams],
   );
   return [query, setQuery] as const;

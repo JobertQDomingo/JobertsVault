@@ -2,6 +2,7 @@ use chrono::{Datelike, Months, NaiveDate};
 use serde::Serialize;
 use ts_rs::TS;
 
+use crate::domain::money::Money;
 use crate::domain::period::{Period, PeriodKind, PeriodSettings};
 
 /// How much time each bar of the income-vs-expense chart covers (RPT-1).
@@ -45,6 +46,38 @@ pub fn bars(
         }
         from = to.succ_opt()?;
     }
+}
+
+/// How many categories the breakdown's donut shows before the rest become one Other slice
+/// (DESIGN_SYSTEM §3.4).
+pub const SLICES: usize = 8;
+
+/// `part` as tenths of a percent of `total`, rounded half up: 1 of 3 is 333 (33.3%). 0 when `total`
+/// is 0, so there's never a division by zero.
+pub fn share(part: Money, total: Money) -> i64 {
+    if total == Money::ZERO {
+        return 0;
+    }
+    // i128, so part × 2000 can't overflow.
+    let (part, total) = (i128::from(part.0), i128::from(total.0));
+    i64::try_from((part * 2000 + total) / (2 * total)).unwrap_or(i64::MAX)
+}
+
+/// The donut's slices from categories ranked largest first: the first `SLICES`, then the rest
+/// added up as one slice with no category. `None` if the rest is too large to add up.
+pub fn slices(ranked: &[(i64, Money)]) -> Option<Vec<(Option<i64>, Money)>> {
+    let (largest, rest) = ranked.split_at(ranked.len().min(SLICES));
+    let mut slices: Vec<_> = largest
+        .iter()
+        .map(|&(id, amount)| (Some(id), amount))
+        .collect();
+    if !rest.is_empty() {
+        let other = rest
+            .iter()
+            .try_fold(Money::ZERO, |sum, &(_, amount)| sum.checked_add(amount))?;
+        slices.push((None, other));
+    }
+    Some(slices)
 }
 
 #[cfg(test)]
@@ -204,6 +237,55 @@ mod tests {
         assert_eq!(bars[3], (d(2028, 1, 1), d(2028, 1, 31)));
         assert_eq!(bars[4], (d(2028, 2, 1), d(2028, 2, 29)));
         assert_eq!(bars[8], (d(2028, 6, 1), d(2028, 6, 10)));
+    }
+
+    #[test]
+    fn a_share_is_in_tenths_of_a_percent_rounded_half_up() {
+        assert_eq!(share(Money(1), Money(3)), 333);
+        assert_eq!(share(Money(2), Money(3)), 667);
+        assert_eq!(share(Money(1), Money(2000)), 1);
+        assert_eq!(share(Money(1), Money(2001)), 0);
+        assert_eq!(share(Money(5), Money(5)), 1000);
+    }
+
+    #[test]
+    fn a_share_of_nothing_is_0() {
+        assert_eq!(share(Money(0), Money(0)), 0);
+        assert_eq!(share(Money(0), Money(7)), 0);
+    }
+
+    #[test]
+    fn a_share_of_the_largest_amounts_does_not_overflow() {
+        let total = Money(i64::MAX);
+        assert_eq!(share(Money(i64::MAX / 2), total), 500);
+    }
+
+    fn ranked(n: i64) -> Vec<(i64, Money)> {
+        (1..=n).map(|id| (id, Money(100 - id))).collect()
+    }
+
+    #[test]
+    fn eight_categories_or_fewer_are_each_a_slice() {
+        let eight = ranked(8);
+        let slices = slices(&eight).unwrap();
+        assert_eq!(slices.len(), 8);
+        assert!(
+            slices
+                .iter()
+                .zip(&eight)
+                .all(|(s, r)| *s == (Some(r.0), r.1))
+        );
+        assert_eq!(super::slices(&[]).unwrap(), []);
+    }
+
+    #[test]
+    fn past_eight_the_rest_add_up_to_one_other_slice() {
+        let slices = slices(&ranked(11)).unwrap();
+        assert_eq!(slices.len(), 9);
+        assert_eq!(slices[7], (Some(8), Money(92)));
+        // Categories 9, 10 and 11: 91 + 90 + 89.
+        assert_eq!(slices[8], (None, Money(270)));
+        assert_eq!(super::slices(&ranked(9)).unwrap()[8], (None, Money(91)));
     }
 
     #[test]
