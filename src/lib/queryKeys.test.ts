@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { queryKeys } from "./queryKeys";
 
-test("every key except settings and the startup ones starts with ledger", () => {
+test("every key except settings and startup starts with ledger", () => {
   const outside = Object.entries(queryKeys)
     .map(([name, key]) => {
       // The first element never depends on the argument.
@@ -11,14 +11,8 @@ test("every key except settings and the startup ones starts with ledger", () => 
     })
     .filter(([, first]) => first !== "ledger")
     .map(([name]) => name);
-  // Only these may sit outside the ledger refresh (ARCHITECTURE §5.2). A save must never run the
-  // startup update check again.
-  expect(outside).toEqual([
-    "settings",
-    "startup",
-    "startupUpdateCheck",
-    "startupUpdateInstall",
-  ]);
+  // Only these two may sit outside the ledger refresh (ARCHITECTURE §5.2).
+  expect(outside).toEqual(["settings", "startup"]);
 });
 
 // Every source file except tests, as text.

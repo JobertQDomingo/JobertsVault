@@ -21,7 +21,4 @@ export const queryKeys = {
   dashboard: (query: PeriodQuery) => ["ledger", "dashboard", query] as const,
   settings: ["settings"],
   startup: ["startup"],
-  // The startup update check and install, each run once per start (UPD-1).
-  startupUpdateCheck: ["startupUpdate", "check"],
-  startupUpdateInstall: ["startupUpdate", "install"],
 } as const;

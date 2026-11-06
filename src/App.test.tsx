@@ -4,10 +4,17 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import { createQueryClient } from "./lib/queryClient";
+import { queryKeys } from "./lib/queryKeys";
 import { SETTINGS } from "./test/render";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -23,6 +30,7 @@ const FAILED = {
 function renderApp(
   status: object,
   answers: Record<string, () => unknown> = {},
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
 ) {
   vi.mocked(invoke).mockImplementation((command: string) =>
     command in answers
@@ -30,11 +38,7 @@ function renderApp(
       : Promise.resolve(command === "get_startup_status" ? status : null),
   );
   render(
-    <QueryClientProvider
-      client={
-        new QueryClient({ defaultOptions: { queries: { retry: false } } })
-      }
-    >
+    <QueryClientProvider client={client}>
       <App />
     </QueryClientProvider>,
   );
@@ -164,11 +168,42 @@ test("a failed install says why, then opens the app (UPD-4)", async () => {
   ).toBeTruthy();
 });
 
-test("Checking for updates… appears only once the check takes longer than 150 ms", async () => {
-  renderApp(OK, { get_settings: autoUpdate(true), check_update: never });
-  await waitFor(() =>
-    expect(invoke).toHaveBeenCalledWith("check_update", undefined),
+test("a check that answers within 150 ms never shows Checking for updates…", async () => {
+  // Both delays start together, so the 100 ms answer always comes before the 150 ms notice.
+  const later = (ms: number, value: unknown) => () =>
+    new Promise((resolve) => setTimeout(() => resolve(value), ms));
+  const seen: string[] = [];
+  const watcher = new MutationObserver(() =>
+    seen.push(document.body.textContent ?? ""),
   );
-  expect(screen.queryByText("Checking for updates…")).toBeNull();
+  watcher.observe(document.body, { childList: true, subtree: true });
+  renderApp(OK, {
+    get_settings: autoUpdate(true),
+    check_update: later(100, null),
+  });
+  expect(
+    await screen.findByRole("heading", { name: "Dashboard" }),
+  ).toBeTruthy();
+  watcher.disconnect();
+  expect(seen.some((text) => text.includes("Checking for updates…"))).toBe(
+    false,
+  );
+});
+
+test("a check that takes longer than 150 ms shows Checking for updates…", async () => {
+  renderApp(OK, { get_settings: autoUpdate(true), check_update: never });
   expect(await screen.findByText("Checking for updates…")).toBeTruthy();
+});
+
+test("turning automatic updates on later doesn't start an update mid-session", async () => {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  renderApp(OK, { get_settings: autoUpdate(false) }, client);
+  expect(
+    await screen.findByRole("heading", { name: "Dashboard" }),
+  ).toBeTruthy();
+  act(() => client.setQueryData(queryKeys.settings, autoUpdate(true)()));
+  expect(screen.getByRole("heading", { name: "Dashboard" })).toBeTruthy();
+  expect(invoke).not.toHaveBeenCalledWith("check_update", undefined);
 });
