@@ -14,6 +14,9 @@ export const queryKeys = {
   transactions: (filter: TransactionFilter) =>
     ["ledger", "transactions", filter] as const,
   transaction: (id: number) => ["ledger", "transaction", id] as const,
+  // A save can add a payee or change its last category.
+  payees: (prefix: string, kind: CategoryKind) =>
+    ["ledger", "payees", prefix, kind] as const,
   // The last account used and the amount owed change with every write.
   transactionDefaults: ["ledger", "transactionDefaults"],
   payBillDefaults: (cardId: number) =>

@@ -39,6 +39,16 @@ const ANSWERS: Answers = {
   get_dashboard: DASHBOARD,
   get_period: PERIOD,
   list_transactions: LIST,
+  suggest_payees: [],
+};
+
+// Corner Cafe last went to Dining Out; Cinema's category is archived now (TXN-6).
+const PAYEES: Answers = {
+  ...ANSWERS,
+  suggest_payees: [
+    { payee: "Corner Cafe", categoryId: 2 },
+    { payee: "Cinema", categoryId: null },
+  ],
 };
 
 const calls = (command: string) =>
@@ -48,10 +58,7 @@ const calls = (command: string) =>
     .map(([, args]) => args);
 const dialog = () => within(screen.getByRole("dialog"));
 const field = (name: string) =>
-  dialog().getByRole(
-    name === "Payee" || name === "Note" ? "textbox" : "combobox",
-    { name },
-  );
+  dialog().getByRole(name === "Note" ? "textbox" : "combobox", { name });
 const amount = () =>
   dialog().getByRole("textbox", { name: "Amount" }) as HTMLInputElement;
 const key = (k: string, mods: Partial<KeyboardEventInit> = {}) =>
@@ -111,6 +118,75 @@ test("the keyboard path: 250, Tab, din, Enter, Enter saves the expense", async (
   expect(await screen.findByText("Saved")).toBeTruthy();
 });
 
+test("the payee suggests payees used before; choosing one fills its category (TXN-6)", async () => {
+  await openQuickAdd(PAYEES);
+  type(amount(), "250");
+  type(field("Payee"), "C");
+  const options = await screen.findAllByRole("option");
+  expect(options.map((o) => o.textContent)).toEqual(["Corner Cafe", "Cinema"]);
+  expect(calls("suggest_payees")).toContainEqual({
+    prefix: "C",
+    kind: "expense",
+  });
+  key("ArrowDown");
+  key("Enter"); // picks Corner Cafe
+  expect((field("Payee") as HTMLInputElement).value).toBe("Corner Cafe");
+  expect((field("Category") as HTMLInputElement).value).toBe("Dining Out");
+  expect(screen.queryByRole("option")).toBeNull();
+  key("Enter"); // saves
+  await waitFor(() =>
+    expect(calls("create_transaction")).toEqual([
+      {
+        transaction: expect.objectContaining({
+          payee: "Corner Cafe",
+          categoryId: 2,
+        }),
+      },
+    ]),
+  );
+});
+
+test("with no suggestion chosen, Enter saves the payee as typed", async () => {
+  await openQuickAdd(PAYEES);
+  type(amount(), "250");
+  type(field("Category"), "food");
+  key("Enter");
+  type(field("Payee"), "Co");
+  await screen.findAllByRole("option");
+  key("Enter");
+  await waitFor(() =>
+    expect(calls("create_transaction")).toEqual([
+      {
+        transaction: expect.objectContaining({ payee: "Co", categoryId: 1 }),
+      },
+    ]),
+  );
+});
+
+test("a payee whose category is archived keeps the category already chosen", async () => {
+  await openQuickAdd(PAYEES);
+  type(field("Category"), "food");
+  key("Enter");
+  type(field("Payee"), "Ci");
+  fireEvent.click(await screen.findByRole("option", { name: "Cinema" }));
+  expect((field("Payee") as HTMLInputElement).value).toBe("Cinema");
+  expect((field("Category") as HTMLInputElement).value).toBe(
+    "Food & Groceries",
+  );
+});
+
+test("an income asks for the payees used on income", async () => {
+  await openQuickAdd(PAYEES);
+  key("i", { altKey: true });
+  type(field("Payee"), "Em");
+  await waitFor(() =>
+    expect(calls("suggest_payees")).toContainEqual({
+      prefix: "Em",
+      kind: "income",
+    }),
+  );
+});
+
 test("a second Enter while saving doesn't save twice", async () => {
   await openQuickAdd({
     ...ANSWERS,
@@ -150,7 +226,7 @@ test("a transfer has From and To, and sends no category, payee or method", async
   type(field("Payee"), "Shop");
   key("t", { altKey: true });
   expect(dialog().queryByRole("combobox", { name: "Category" })).toBeNull();
-  expect(dialog().queryByRole("textbox", { name: "Payee" })).toBeNull();
+  expect(dialog().queryByRole("combobox", { name: "Payee" })).toBeNull();
   expect(dialog().queryByRole("combobox", { name: "Method" })).toBeNull();
   expect((field("From") as HTMLInputElement).value).toBe("Credit card");
   type(amount(), "500");

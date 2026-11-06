@@ -291,6 +291,7 @@ const READS = [
   "useTransaction",
   "useTransactionDefaults",
   "usePayBillDefaults",
+  "usePayeeSuggestions",
   "useSettings",
 ];
 

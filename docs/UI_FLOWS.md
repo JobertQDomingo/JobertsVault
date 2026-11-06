@@ -138,7 +138,8 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 | Category | empty | Type to filter. Only categories of the selected type are listed. |
 | Account | **the account used most recently** (TXN-1) | Archived accounts are hidden. |
 | Date | **today** | ↑/↓ change it by one day. Until Phase 3, a future date shows "Date can't be in the future". |
-| Payee, Method, Note | empty | All optional. Payee suggestions start in Phase 2 (TXN-6). |
+| Payee | empty | Optional. From Phase 2, typing suggests up to 8 payees used before on this type, most recent first (TXN-6). ↓ / ↑ highlight one, and Enter or a click picks it and fills in its last category, unless that's archived now. Nothing is highlighted until ↓, so Enter still saves the payee as typed. |
+| Method, Note | empty | Optional. |
 
 **For a transfer** the fields become: Amount → **From** account → **To** account → Date → Note. There's no category, payee or method. "To" can't be the same as "From".
 

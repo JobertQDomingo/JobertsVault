@@ -1,9 +1,10 @@
 use tauri::State;
 
 use crate::error::AppError;
+use crate::services::categories::CategoryKind;
 use crate::services::transactions::{
-    PayBillDefaults, Transaction, TransactionDefaults, TransactionFields, TransactionFilter,
-    TransactionList,
+    PayBillDefaults, PayeeSuggestion, Transaction, TransactionDefaults, TransactionFields,
+    TransactionFilter, TransactionList,
 };
 use crate::state::AppState;
 use crate::{log, services};
@@ -21,6 +22,17 @@ pub fn list_transactions(
         chrono::Local::now().date_naive(),
     )
     .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+/// The payees used before on `kind` that start with `prefix` (TXN-6).
+#[tauri::command(async)]
+pub fn suggest_payees(
+    state: State<'_, AppState>,
+    prefix: String,
+    kind: CategoryKind,
+) -> Result<Vec<PayeeSuggestion>, AppError> {
+    services::transactions::suggest_payees(&*state.conn()?, &prefix, kind)
+        .inspect_err(|err| log::record(&state.log_path, err))
 }
 
 #[tauri::command(async)]

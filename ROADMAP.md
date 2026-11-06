@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-06 |
-| **Current focus** | **Phase 2, 2.1: Reports** |
+| **Current focus** | **Phase 2, 2.2: Backups and export** |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -19,7 +19,7 @@ This file is the progress tracker.
 |---|---|---|---|---|
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
 | **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 53 / 53 |
-| **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 6 / 14 |
+| **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 7 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 0 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
 
@@ -132,7 +132,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] % change on the dashboard stat cards [DSH-3]
 - [x] Account filter on reports [RPT-5]
 - [x] Reports screen ([UI_FLOWS §8.1](docs/UI_FLOWS.md)), its sidebar item and the `Ctrl+4` shortcut
-- [ ] Payee suggestions that fill in the last category used [TXN-6]
+- [x] Payee suggestions that fill in the last category used [TXN-6]
 
 ### 2.2 Backups and export
 - [ ] Add `tauri-plugin-dialog`, scoped to folder and file pickers only

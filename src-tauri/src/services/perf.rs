@@ -239,6 +239,12 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
             reports::comparison(&conn, &query, Some(mode), account, today()).unwrap()
         });
     }
+    // TXN-6: one letter matches all 300 payees; "store 12" narrows to 11.
+    for (label, prefix) in [("payees: \"s\"", "s"), ("payees: \"store 12\"", "store 12")] {
+        time(label, || {
+            transactions::suggest_payees(&conn, prefix, CategoryKind::Expense).unwrap()
+        });
+    }
     let list = |label: &str, f: TransactionFilter, page: u32| {
         time(label, || {
             transactions::list(&conn, f.clone(), page, today()).unwrap()
