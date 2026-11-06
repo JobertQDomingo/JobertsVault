@@ -266,16 +266,16 @@ python -m http.server 8765 --bind 127.0.0.1 --directory "$HOME\jv-rehearsal"
 
 ### Results
 
-The latest rehearsal is recorded here.
+Each rehearsal is added here, newest first, so earlier results stay next to the procedure.
 
 **2026-11-06, ROADMAP 1.10.7: all six passed** on Windows 11, at commit `384bed3`. Both builds were made by following the steps above, with a throwaway key whose signatures carry `version:0.9.0` and `version:0.9.1` in their trusted comment. The owner installed and clicked through each test. Claude switched the server and `latest.json` between tests, and checked the log and both databases (read-only) after each one.
 
 | Test | Result | What was checked |
 |---|---|---|
-| A. Offline | Passed | It started normally with no error. The log has `update: Couldn't check for updates: … tcp connect error … (os error 10061)`, so the failure was silent and logged, with its cause. |
-| D1. Swapped installer | Passed | Refused: "Couldn't install the update: The signature verification failed. Nothing was changed." Still schema v1, data unchanged. A retry ran a fresh check first. |
+| A. Offline | Passed | It started normally with no error. Automatic updates were then off (`auto_update_enabled = false` in the database), so later tests took the manual and error-screen paths. The log has `update: Couldn't check for updates: … tcp connect error … (os error 10061)`, so the failure was silent and logged, with its cause. |
+| D1. Swapped installer | Passed | "0.9.1 is out.", then refused: "Couldn't install the update: The signature verification failed. Nothing was changed." Still schema v1, data unchanged. A retry ran a fresh check first. |
 | D2. Relabelled old release | Passed | Refused: "Couldn't install the update: The update was signed for version 0.9.0 but the update endpoint announced version 0.9.1. … Nothing was changed." |
-| B. Update now, with a migration | Passed | It reopened on 0.9.1 by itself. The live database is at schema v2 with `rehearsal_marker`, and the transaction is intact. `backups\pre-migration\jobertsvault-pre-migration-v1-2026-11-06_0910.db` holds schema v1 with the transaction and passes `integrity_check`. |
+| B. Update now, with a migration | Passed | It reopened on 0.9.1 by itself, and Settings showed 0.9.1. The live database is at schema v2 with `rehearsal_marker`, and the transaction is intact. `backups\pre-migration\jobertsvault-pre-migration-v1-2026-11-06_0910.db` holds schema v1 with the transaction and passes `integrity_check`. |
 | F. Error screen (UPD-6) | Passed | 0.9.0 refused the newer database ("This database was made by a newer version…", logged as a startup failure). **Check for updates** → **Update now** reopened it on 0.9.1. Data unchanged, and no extra backup, because nothing was pending. |
 | C. Automatic | Passed | On a fresh 0.9.0 with one transaction, opening it showed "Updating Jobert's Vault to 0.9.1…" and it reopened on 0.9.1 with nothing clicked. Schema v2, transaction intact, and a new `…-v1-2026-11-06_0914.db` backup that passes `integrity_check`. |
 
