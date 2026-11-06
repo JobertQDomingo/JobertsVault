@@ -47,15 +47,18 @@ export const useTransactionDefaults = (enabled = true) =>
 
 /**
  * Quick-add's payee suggestions (TXN-6): asked for only once something's typed, and never for a
- * transfer. The last list stays while the next keystroke's loads, so it doesn't flicker.
+ * transfer. The last list stays while the next keystroke's loads, so it doesn't flicker, but never
+ * across a type switch: the other type's payees would fill in a category of the wrong kind.
  */
 export const usePayeeSuggestions = (prefix: string, kind: TransactionKind) => {
   const text = prefix.trim();
   const category = kind === "transfer" ? null : kind;
+  const queryKey = queryKeys.payees(text, category ?? "expense");
   return useQuery({
-    queryKey: queryKeys.payees(text, category ?? "expense"),
+    queryKey,
     queryFn: text && category ? () => suggestPayees(text, category) : skipToken,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, previousQuery) =>
+      previousQuery?.queryKey[3] === queryKey[3] ? previous : undefined,
   });
 };
 

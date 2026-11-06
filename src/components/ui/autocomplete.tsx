@@ -86,9 +86,11 @@ export function Autocomplete({
           }}
           onBlur={close}
           onKeyDown={(e) => {
-            if (!open) return;
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              if (!value.trim() || suggestions.length === 0) return;
+              // As in the select, ↓ / ↑ also bring back a list closed by Esc or a pick.
               e.preventDefault();
+              setTyping(true);
               move(e.key === "ArrowDown" ? 1 : -1);
             } else if (e.key === "Enter" && chosen) {
               // Only a highlighted suggestion keeps Enter from saving.

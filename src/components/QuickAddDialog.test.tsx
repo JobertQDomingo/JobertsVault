@@ -175,6 +175,40 @@ test("a payee whose category is archived keeps the category already chosen", asy
   );
 });
 
+test("switching the type never offers the other type's payees", async () => {
+  await openQuickAdd({
+    ...PAYEES,
+    // The income list never arrives, so only a carried-over list could show.
+    suggest_payees: ({ kind }: { kind: string }) =>
+      kind === "expense"
+        ? [{ payee: "Corner Cafe", categoryId: 2 }]
+        : new Promise(() => {}),
+  });
+  type(field("Payee"), "Co");
+  await screen.findByRole("option", { name: "Corner Cafe" });
+  key("i", { altKey: true });
+  await waitFor(() =>
+    expect(calls("suggest_payees")).toContainEqual({
+      prefix: "Co",
+      kind: "income",
+    }),
+  );
+  expect(screen.queryByRole("option")).toBeNull();
+});
+
+test("↓ brings the list back after Esc", async () => {
+  await openQuickAdd(PAYEES);
+  type(field("Payee"), "C");
+  await screen.findAllByRole("option");
+  key("Escape");
+  await waitFor(() => expect(screen.queryByRole("option")).toBeNull());
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  key("ArrowDown");
+  expect(await screen.findAllByRole("option")).toHaveLength(2);
+  key("Enter");
+  expect((field("Payee") as HTMLInputElement).value).toBe("Corner Cafe");
+});
+
 test("an income asks for the payees used on income", async () => {
   await openQuickAdd(PAYEES);
   key("i", { altKey: true });
