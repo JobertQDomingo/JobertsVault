@@ -9,6 +9,7 @@ use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 use crate::error::AppError;
+use crate::state::AppState;
 
 /// How long the check waits before the app starts without it (UPD-2).
 const CHECK_TIMEOUT: Duration = Duration::from_secs(3);
@@ -58,8 +59,17 @@ pub async fn install<R: Runtime>(app: &AppHandle<R>) -> Result<(), AppError> {
     // The 3-second limit is for the check. The builder's timeout also covers the download,
     // which would make every install on a slow connection fail.
     update.timeout = None;
+    let handle = app.clone();
     update
-        .download_and_install(|_, _| {}, || {})
+        // On Windows the plugin then exits without RunEvent::Exit, so the checkpoint runs here.
+        .download_and_install(
+            |_, _| {},
+            move || {
+                if let Some(state) = handle.try_state::<AppState>() {
+                    state.close();
+                }
+            },
+        )
         .await
         .map_err(|err| {
             update_error(&format!(

@@ -37,6 +37,18 @@ pub fn open(path: &Path) -> Result<Connection, AppError> {
     Ok(conn)
 }
 
+/// Moves every change in the `-wal` file into the database file and empties the `-wal` file.
+pub fn checkpoint(conn: &Connection) -> Result<(), AppError> {
+    // Gives (busy, wal pages, pages moved); busy is 1 when another connection blocked it.
+    let busy: i64 = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))?;
+    if busy != 0 {
+        return Err(AppError::Database {
+            message: "Couldn't write recent changes into the database file".into(),
+        });
+    }
+    Ok(())
+}
+
 /// Refuses a database made by a newer version of the app, then runs any pending migrations,
 /// backing up an existing database into `backup_dir` first (BAK-5).
 pub fn prepare(

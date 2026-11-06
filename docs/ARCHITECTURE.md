@@ -298,6 +298,8 @@ Quick-add (**Ctrl+N**) is a dialog that can be opened from any route. It isn't a
 
 The window starts hidden and is shown in step 9, even if an earlier step failed. A failure is logged (§4.4) and stored in `AppState` in place of the connection, and every data command then returns an error.
 
+**On exit**, the app runs `PRAGMA wal_checkpoint(TRUNCATE)` (`AppState::close`). WAL mode keeps recent changes in `jobertsvault.db-wal`, and the process exits without closing the connection, so without this step `jobertsvault.db` on its own can be missing everything. It runs on `RunEvent::Exit` (closing the window) and once an update has downloaded, because on Windows the updater then ends the process without that event. A shutdown, logoff, crash or killed process skips it, and a write that lands after it goes back into `-wal`. Nothing is lost either way, since SQLite reads `-wal` at the next start, but `jobertsvault.db` alone isn't guaranteed complete: a hand-made copy takes all three files, and code must never delete a `-wal` file it hasn't checkpointed. A failed checkpoint is logged.
+
 The frontend calls `get_startup_status` first:
 - **On failure:** it shows an error screen with the database path and the error message, plus "Open data folder" and "Check for updates" buttons (UPD-6). It never shows a blank window.
 - **On success:** it reads the settings. If `auto_update_enabled` is true, it runs the update check (§11.1) before anything else. Then it goes to `/welcome` if `onboarding_completed` is false.
