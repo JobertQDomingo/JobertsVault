@@ -40,8 +40,8 @@ pub fn get(
     today: NaiveDate,
 ) -> Result<Dashboard, AppError> {
     let period = period::get(conn, query, today)?;
-    let series = reports::timeseries(conn, query, today)?;
-    let comparison = reports::comparison(conn, query, None, today)?;
+    let series = reports::timeseries(conn, query, None, today)?;
+    let comparison = reports::comparison(conn, query, None, None, today)?;
     // The cards' totals are the comparison's current side, so each % is of the amount shown.
     let (income, expense, net) = (
         comparison.income.current,
@@ -203,7 +203,7 @@ mod tests {
         );
         assert_eq!(
             dash.series,
-            reports::timeseries(&conn, &MONTH, d(2026, 11, 3)).unwrap()
+            reports::timeseries(&conn, &MONTH, None, d(2026, 11, 3)).unwrap()
         );
         // The chart's bars add up to the cards' totals.
         let income: i64 = dash.series.bars.iter().map(|b| b.income.0).sum();
@@ -237,7 +237,7 @@ mod tests {
         let c = &dash.comparison;
         assert_eq!(
             *c,
-            reports::comparison(&conn, &MONTH, None, d(2026, 11, 3)).unwrap()
+            reports::comparison(&conn, &MONTH, None, None, d(2026, 11, 3)).unwrap()
         );
         assert_eq!(
             (c.compare_start, c.compare_end),

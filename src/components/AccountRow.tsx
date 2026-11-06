@@ -9,8 +9,10 @@ import type { ReactNode } from "react";
 import type { Account } from "@/bindings/Account";
 import type { AccountKind } from "@/bindings/AccountKind";
 import { formatShortDate } from "@/lib/dates";
+import { named, offered } from "@/lib/records";
 import { cn } from "@/lib/utils";
 import { MoneyText } from "./MoneyText";
+import type { ComboboxOption } from "./ui/combobox";
 
 /** DESIGN_SYSTEM §6 fixed icons. */
 export const ACCOUNT_ICONS: Record<AccountKind, LucideIcon> = {
@@ -19,6 +21,25 @@ export const ACCOUNT_ICONS: Record<AccountKind, LucideIcon> = {
   ewallet: Smartphone,
   credit_card: CreditCard,
 };
+
+/**
+ * An account filter's choices (Transactions, Reports): All accounts, then each account with its
+ * icon. Archived ones are left out unless `selected` (DESIGN_SYSTEM §9.1).
+ */
+export const accountOptions = (
+  accounts: Account[] | undefined,
+  selected: number | null,
+): ComboboxOption[] => [
+  { value: "", label: "All accounts" },
+  ...offered(accounts, selected).map((a) => {
+    const Icon = ACCOUNT_ICONS[a.kind];
+    return {
+      value: String(a.id),
+      label: named(a),
+      icon: <Icon aria-hidden className="size-4 text-muted-foreground" />,
+    };
+  }),
+];
 
 export const ACCOUNT_KINDS: Record<AccountKind, string> = {
   cash: "Cash",

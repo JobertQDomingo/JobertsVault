@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router";
 import type { TransactionFilter } from "@/bindings/TransactionFilter";
 import type { TransactionKind } from "@/bindings/TransactionKind";
+import { idParam } from "@/lib/records";
 import { usePeriodQuery } from "./usePeriodQuery";
 import { useSettings } from "./useSettings";
 
@@ -23,10 +24,6 @@ export const isFiltered = (filter: TransactionFilter) =>
     (key) => filter[key] !== null,
   );
 
-/** A positive whole id, or null. */
-const id = (text: string | null) =>
-  text && /^\d+$/.test(text) && Number(text) > 0 ? Number(text) : null;
-
 /**
  * The Transactions filters in the URL (TXN-4), with the period from `usePeriodQuery`. Anything
  * missing or malformed means "any", and so does a method while SET-6 hides that field. `change`
@@ -43,10 +40,10 @@ export function useTransactionFilter() {
     return {
       period,
       kind: KINDS.find((k) => k === kind) ?? null,
-      accountId: id(params.get(PARAMS.accountId)),
-      categoryId: id(params.get(PARAMS.categoryId)),
+      accountId: idParam(params.get(PARAMS.accountId)),
+      categoryId: idParam(params.get(PARAMS.categoryId)),
       paymentMethodId: methodShown
-        ? id(params.get(PARAMS.paymentMethodId))
+        ? idParam(params.get(PARAMS.paymentMethodId))
         : null,
       // The backend ignores spaces around it, so they don't make a new search.
       search: params.get(PARAMS.search)?.trim() || null,

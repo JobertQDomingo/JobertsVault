@@ -8,3 +8,12 @@ export const offered = <T extends { id: number; archived: boolean }>(
 
 export const named = (item: { name: string; archived: boolean }) =>
   item.archived ? `${item.name} (archived)` : item.name;
+
+/**
+ * A URL parameter's positive whole id, or null when it's missing, malformed or too big to be exact
+ * (so it never reaches Rust as a number no `i64` holds).
+ */
+export const idParam = (text: string | null) => {
+  const id = text && /^\d+$/.test(text) ? Number(text) : 0;
+  return id > 0 && Number.isSafeInteger(id) ? id : null;
+};

@@ -12,9 +12,15 @@ use crate::{log, services};
 pub fn get_timeseries(
     state: State<'_, AppState>,
     query: PeriodQuery,
+    account_id: Option<i64>,
 ) -> Result<Timeseries, AppError> {
-    services::reports::timeseries(&*state.conn()?, &query, chrono::Local::now().date_naive())
-        .inspect_err(|err| log::record(&state.log_path, err))
+    services::reports::timeseries(
+        &*state.conn()?,
+        &query,
+        account_id,
+        chrono::Local::now().date_naive(),
+    )
+    .inspect_err(|err| log::record(&state.log_path, err))
 }
 
 #[tauri::command(async)]
@@ -22,27 +28,31 @@ pub fn get_category_breakdown(
     state: State<'_, AppState>,
     query: PeriodQuery,
     kind: CategoryKind,
+    account_id: Option<i64>,
 ) -> Result<Breakdown, AppError> {
     services::reports::breakdown(
         &*state.conn()?,
         &query,
         kind,
+        account_id,
         chrono::Local::now().date_naive(),
     )
     .inspect_err(|err| log::record(&state.log_path, err))
 }
 
-/// `mode` none means the comparison setting (SET-7).
+/// `mode` none means the comparison setting (SET-7). `account_id` none means every account.
 #[tauri::command(async)]
 pub fn get_comparison(
     state: State<'_, AppState>,
     query: PeriodQuery,
     mode: Option<ComparisonMode>,
+    account_id: Option<i64>,
 ) -> Result<Comparison, AppError> {
     services::reports::comparison(
         &*state.conn()?,
         &query,
         mode,
+        account_id,
         chrono::Local::now().date_naive(),
     )
     .inspect_err(|err| log::record(&state.log_path, err))

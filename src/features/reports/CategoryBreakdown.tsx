@@ -57,10 +57,13 @@ export function CategoryBreakdown({
   breakdown,
   categories,
   query,
+  accountId,
 }: {
   breakdown: Breakdown;
   categories: Map<number, Category>;
   query: PeriodQuery;
+  /** The report's account filter, kept on the category's transactions (RPT-5). */
+  accountId: number | null;
 }) {
   // The data's own kind: while the other kind loads, these figures stay on screen.
   const { kind } = breakdown;
@@ -87,6 +90,7 @@ export function CategoryBreakdown({
   const link = (categoryId: number) => {
     const params = writePeriod(new URLSearchParams(), query);
     params.set("category", String(categoryId));
+    if (accountId !== null) params.set("account", String(accountId));
     return `/transactions?${params}`;
   };
   return (

@@ -21,12 +21,19 @@ export const queryKeys = {
   // Period dates follow the week and month start settings, which refresh the ledger.
   period: (query: PeriodQuery) => ["ledger", "period", query] as const,
   dashboard: (query: PeriodQuery) => ["ledger", "dashboard", query] as const,
-  timeseries: (query: PeriodQuery) => ["ledger", "timeseries", query] as const,
-  breakdown: (query: PeriodQuery, kind: CategoryKind) =>
-    ["ledger", "breakdown", query, kind] as const,
+  timeseries: (query: PeriodQuery, accountId: number | null) =>
+    ["ledger", "timeseries", query, accountId] as const,
+  breakdown: (
+    query: PeriodQuery,
+    kind: CategoryKind,
+    accountId: number | null,
+  ) => ["ledger", "breakdown", query, kind, accountId] as const,
   // A null mode follows the setting, which refreshes the ledger when it changes.
-  comparison: (query: PeriodQuery, mode: ComparisonMode | null) =>
-    ["ledger", "comparison", query, mode] as const,
+  comparison: (
+    query: PeriodQuery,
+    mode: ComparisonMode | null,
+    accountId: number | null,
+  ) => ["ledger", "comparison", query, mode, accountId] as const,
   settings: ["settings"],
   startup: ["startup"],
   appVersion: ["appVersion"],

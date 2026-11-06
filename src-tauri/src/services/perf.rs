@@ -174,35 +174,69 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
     ] {
         time(label, || dashboard::get(&conn, &query, today()).unwrap());
     }
-    for (label, query) in [
-        ("chart: month", month()),
-        ("chart: year", PeriodQuery::Year { anchor: None }),
-        ("chart: all time", all()),
+    for (label, query, account) in [
+        ("chart: month", month(), None),
+        ("chart: year", PeriodQuery::Year { anchor: None }, None),
+        ("chart: all time", all(), None),
+        ("chart: all time, one account", all(), Some(account)),
     ] {
         time(label, || {
-            reports::timeseries(&conn, &query, today()).unwrap()
+            reports::timeseries(&conn, &query, account, today()).unwrap()
         });
     }
-    for (label, query, kind) in [
-        ("breakdown: month, expense", month(), CategoryKind::Expense),
-        ("breakdown: all time, expense", all(), CategoryKind::Expense),
-        ("breakdown: all time, income", all(), CategoryKind::Income),
+    for (label, query, kind, account) in [
+        (
+            "breakdown: month, expense",
+            month(),
+            CategoryKind::Expense,
+            None,
+        ),
+        (
+            "breakdown: all time, expense",
+            all(),
+            CategoryKind::Expense,
+            None,
+        ),
+        (
+            "breakdown: all time, income",
+            all(),
+            CategoryKind::Income,
+            None,
+        ),
+        (
+            "breakdown: all time, one account",
+            all(),
+            CategoryKind::Expense,
+            Some(account),
+        ),
     ] {
         time(label, || {
-            reports::breakdown(&conn, &query, kind, today()).unwrap()
+            reports::breakdown(&conn, &query, kind, account, today()).unwrap()
         });
     }
-    for (label, query, mode) in [
+    for (label, query, mode, account) in [
         (
             "comparison: month so far",
             PeriodQuery::Month { anchor: None },
             ComparisonMode::ToDate,
+            None,
         ),
-        ("comparison: October, full", month(), ComparisonMode::Full),
-        ("comparison: all time", all(), ComparisonMode::Full),
+        (
+            "comparison: October, full",
+            month(),
+            ComparisonMode::Full,
+            None,
+        ),
+        ("comparison: all time", all(), ComparisonMode::Full, None),
+        (
+            "comparison: all time, one account",
+            all(),
+            ComparisonMode::Full,
+            Some(account),
+        ),
     ] {
         time(label, || {
-            reports::comparison(&conn, &query, Some(mode), today()).unwrap()
+            reports::comparison(&conn, &query, Some(mode), account, today()).unwrap()
         });
     }
     let list = |label: &str, f: TransactionFilter, page: u32| {
