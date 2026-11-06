@@ -390,7 +390,7 @@ a release:  release/vX.Y.Z → PR → CI ✓ → merge → Release workflow → 
 - The `/release` command runs a release, and always asks before the merge that publishes it.
 
 **The Release workflow** (`.github/workflows/release.yml`) runs when `package.json` changes on `main`, or by hand after a failed run:
-1. **`version`** reads `package.json`. If that version's tag already exists, it stops, which is why ordinary merges release nothing.
+1. **`version`** reads `package.json`. If that version's tag already exists, it stops, which is why ordinary merges release nothing. It also stops at `0.0.0` (nothing has been released yet) and when run by hand from any branch but `main`.
 2. **`release`**, on Windows:
    - Runs every check from §9.
    - Removes any draft left by a failed run.
