@@ -1,24 +1,29 @@
 import { useMutation } from "@tanstack/react-query";
-import { ArchiveRestore, DatabaseBackup } from "lucide-react";
+import { ArchiveRestore, DatabaseBackup, FileSpreadsheet } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
   backupNow,
+  exportCsv,
   inspectBackup,
   openBackupFolder,
   pickBackupFile,
+  pickCsvPath,
   restoreBackup,
 } from "@/api/backup";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { notify } from "@/components/ui/toast";
 import { useLedgerMutation } from "@/hooks/useLedgerMutation";
+import { usePeriod } from "@/hooks/usePeriod";
+import { useSettings } from "@/hooks/useSettings";
 import { formatDateTime } from "@/lib/dates";
 import { Row } from "./GeneralTab";
 
 const showError = (error: Error) => notify.error(error.message);
 
-/** Settings → Backup (UI_FLOWS §6, F9): Back up now (BAK-1) and Restore (BAK-4). */
+/** Settings → Backup (UI_FLOWS §6, F9): Back up now (BAK-1), Restore (BAK-4), Export (BAK-6). */
 export function BackupTab() {
   const backup = useMutation({
     mutationFn: backupNow,
@@ -46,6 +51,7 @@ export function BackupTab() {
         </Button>
       </Row>
       <RestoreRow />
+      <ExportRow />
     </div>
   );
 }
@@ -99,6 +105,65 @@ function RestoreRow() {
         destructive
         onConfirm={() => chosen && restore.mutate(chosen.path)}
       />
+    </Row>
+  );
+}
+
+const THIS_MONTH = { kind: "month", anchor: null } as const;
+
+/**
+ * Export to CSV (BAK-6): From and To start at this month so far, from `get_period`, so the
+ * frontend works out no dates. Export… asks where to save, then Rust writes the file.
+ */
+function ExportRow() {
+  const settings = useSettings();
+  const month = usePeriod(THIS_MONTH);
+  const [picked, setPicked] = useState<{ start?: string; end?: string }>({});
+  const start = picked.start ?? month.data?.start ?? "";
+  const end = picked.end ?? month.data?.today ?? "";
+  const exporter = useMutation({
+    mutationFn: async () => {
+      const path = await pickCsvPath(`jobertsvault-${start}-to-${end}.csv`);
+      return path ? { path, ...(await exportCsv({ start, end }, path)) } : null;
+    },
+    onSuccess: (done) =>
+      done &&
+      notify.success(
+        `Exported ${done.rows} ${done.rows === 1 ? "transaction" : "transactions"} to ${done.path.split(/[\\/]/).pop()}`,
+      ),
+    onError: showError,
+  });
+  const weekStart = settings.data?.weekStart ?? "monday";
+  return (
+    <Row
+      id="export"
+      label="Export to CSV"
+      help="Every transaction dated from and to these days, for Excel or another app"
+    >
+      <DatePicker
+        aria-label="From"
+        value={start}
+        onChange={(next) => setPicked((p) => ({ ...p, start: next }))}
+        weekStart={weekStart}
+        max={month.data?.today}
+        className="w-40"
+      />
+      <span className="text-muted-foreground">to</span>
+      <DatePicker
+        aria-label="To"
+        value={end}
+        onChange={(next) => setPicked((p) => ({ ...p, end: next }))}
+        weekStart={weekStart}
+        max={month.data?.today}
+        className="w-40"
+      />
+      <Button
+        onClick={() => exporter.mutate()}
+        disabled={exporter.isPending || !month.data}
+      >
+        <FileSpreadsheet />
+        {exporter.isPending ? "Exporting…" : "Export…"}
+      </Button>
     </Row>
   );
 }

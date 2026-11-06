@@ -8,6 +8,7 @@ pub mod accounts;
 pub mod backup;
 pub mod categories;
 pub mod dashboard;
+pub mod export;
 pub mod payment_methods;
 #[cfg(test)]
 mod perf;

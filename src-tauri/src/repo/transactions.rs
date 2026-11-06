@@ -255,6 +255,47 @@ pub fn latest_non_card_source(conn: &Connection) -> rusqlite::Result<Option<i64>
 }
 
 /// The number of rows deleted: 0 when there's no such transaction.
+/// A transaction with the names it shows in a CSV file (BAK-6).
+pub struct Export {
+    pub date: String,
+    pub kind: String,
+    pub amount: i64,
+    pub account: String,
+    pub to_account: Option<String>,
+    pub category: Option<String>,
+    pub payee: Option<String>,
+    pub payment_method: Option<String>,
+    pub note: Option<String>,
+}
+
+/// Every transaction dated from `start` to `end`, oldest first, archived names included.
+pub fn export(conn: &Connection, start: &str, end: &str) -> rusqlite::Result<Vec<Export>> {
+    conn.prepare(
+        "SELECT t.date, t.kind, t.amount, a.name, ta.name, c.name, t.payee, pm.name, t.note
+         FROM transactions t
+         JOIN accounts a ON a.id = t.account_id
+         LEFT JOIN accounts ta ON ta.id = t.to_account_id
+         LEFT JOIN categories c ON c.id = t.category_id
+         LEFT JOIN payment_methods pm ON pm.id = t.payment_method_id
+         WHERE t.date BETWEEN ?1 AND ?2
+         ORDER BY t.date, t.id",
+    )?
+    .query_map([start, end], |r| {
+        Ok(Export {
+            date: r.get(0)?,
+            kind: r.get(1)?,
+            amount: r.get(2)?,
+            account: r.get(3)?,
+            to_account: r.get(4)?,
+            category: r.get(5)?,
+            payee: r.get(6)?,
+            payment_method: r.get(7)?,
+            note: r.get(8)?,
+        })
+    })?
+    .collect()
+}
+
 pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<usize> {
     conn.execute("DELETE FROM transactions WHERE id = ?1", [id])
 }

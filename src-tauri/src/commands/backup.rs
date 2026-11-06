@@ -4,6 +4,7 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::error::AppError;
 use crate::services::backup::{Backup, BackupFile};
+use crate::services::export::{CsvExport, DateRange};
 use crate::state::AppState;
 use crate::{log, services};
 
@@ -51,6 +52,19 @@ pub async fn restore_backup(app: AppHandle, path: PathBuf) -> Result<(), AppErro
             &path,
             chrono::Local::now(),
         )
+    })
+    .await
+}
+
+/// Writes the transactions from `range` to the CSV file at `path` (BAK-6).
+#[tauri::command(async)]
+pub async fn export_csv(
+    app: AppHandle,
+    range: DateRange,
+    path: PathBuf,
+) -> Result<CsvExport, AppError> {
+    blocking(app, move |state| {
+        services::export::export_csv(&*state.conn()?, &range, &path)
     })
     .await
 }
