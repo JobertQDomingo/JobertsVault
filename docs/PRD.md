@@ -278,7 +278,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 
 ## 11. Release plan
 
-> **Data safety before Phase 2:** the MVP only backs up the database before a migration (BAK-5). It has no regular backups and no Restore. Until Phase 2 ships, close the app now and then and copy `jobertsvault.db`, `jobertsvault.db-wal` and `jobertsvault.db-shm` from the app data folder by hand, all three together: recent changes can be kept only in the `-wal` file.
+> **Data safety before Phase 2:** the MVP only backs up the database before a migration (BAK-5). It has no regular backups and no Restore. Until Phase 2 ships, close the app now and then and copy `jobertsvault.db`, `jobertsvault.db-wal` and `jobertsvault.db-shm` from the app data folder by hand, all three together: recent changes can be kept only in the `-wal` file. Phase 2 shipped in `v0.2.0` on 2026-11-07, so this is no longer needed: the app now makes these backups itself (§7.10).
 
 | Phase | Scope |
 |---|---|

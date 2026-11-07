@@ -64,9 +64,9 @@ The first `tauri dev` compiles every Rust dependency, which takes several minute
 | Database | `%APPDATA%\com.jobertsvault.app\jobertsvault.db` |
 | Error log | `%APPDATA%\com.jobertsvault.app\jobertsvault.log` (no amounts, payees or notes) |
 | Pre-migration backups | `%APPDATA%\com.jobertsvault.app\backups\pre-migration\`, made automatically before an update changes the database |
-| Backups (Phase 2) | `%APPDATA%\com.jobertsvault.app\backups\` by default (you can change this in Settings) |
+| Backups | `%APPDATA%\com.jobertsvault.app\backups\` by default, with the daily automatic ones (the newest 30) in `auto\`. You can choose another folder in **Settings → Backup**, where **Back up now**, **Restore from backup…** and **Export to CSV** also live. |
 
-> ⚠️ **Phase 1 has no regular backups and no Restore.** Until Phase 2, close the app now and then and copy `jobertsvault.db` somewhere safe yourself. A OneDrive or Google Drive folder works well.
+> Since `v0.2.0`, the app backs itself up the first time it opens each day, so you no longer need to copy the database by hand. A backup folder in OneDrive or Google Drive also keeps a copy off this PC.
 
 `npm run tauri dev` uses `jobertsvault-dev.db`, `jobertsvault-dev.log` and `backups-dev\pre-migration\` in the same folder, so development never touches your real data.
 
