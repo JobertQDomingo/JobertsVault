@@ -64,11 +64,11 @@ The first `tauri dev` compiles every Rust dependency, which takes several minute
 | Database | `%APPDATA%\com.jobertsvault.app\jobertsvault.db` |
 | Error log | `%APPDATA%\com.jobertsvault.app\jobertsvault.log` (no amounts, payees or notes) |
 | Pre-migration backups | `%APPDATA%\com.jobertsvault.app\backups\pre-migration\`, made automatically before an update changes the database |
-| Backups (Phase 2) | `%APPDATA%\com.jobertsvault.app\backups\` by default (you can change this in Settings) |
+| Backups | `%APPDATA%\com.jobertsvault.app\backups\` by default, with the daily automatic ones (the newest 30) in `auto\`. You can choose another folder in **Settings → Backup**, where **Back up now**, **Restore from backup…** and the CSV export (**Export…**) also live. |
 
-> ⚠️ **Phase 1 has no regular backups and no Restore.** Until Phase 2, close the app now and then and copy `jobertsvault.db` somewhere safe yourself. A OneDrive or Google Drive folder works well.
+> Since `v0.2.0`, the app backs itself up the first time it opens each day (unless you turn that off in Settings → Backup), so you no longer need to copy the database by hand. ⚠️ The default backup folder is on the same disk as the database, so a failed disk, or uninstalling with the app data deleted, loses both. Choose a backup folder in OneDrive, Google Drive or on another drive, or copy a backup somewhere else now and then.
 
-`npm run tauri dev` uses `jobertsvault-dev.db`, `jobertsvault-dev.log` and `backups-dev\pre-migration\` in the same folder, so development never touches your real data.
+`npm run tauri dev` uses `jobertsvault-dev.db`, `jobertsvault-dev.log` and `backups-dev\` (with its own `auto\` and `pre-migration\`) in the same folder, so development never touches your real data.
 
 Updates keep your data, because it isn't in the install folder. Uninstalling keeps it too, unless you tick **Delete the application data** in the uninstaller, which removes the folder above, including the database and any backups in it. To start fresh, delete that folder.
 
