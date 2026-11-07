@@ -147,7 +147,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 
 ## Phase 3 · Planning (`v0.3.0`)
 
-- [ ] Migration `0003_planning.sql` (DATA_MODEL §4)
+- [ ] Migration `0002_planning.sql` (DATA_MODEL §4)
 - [ ] Domain: recurrence dates calculated from `start_date`, with the end-of-month and Feb 29 tests (DATA_MODEL §4.1)
 - [ ] Recurring rules: create, edit, pause, delete, with auto or confirm mode [REC-1] [REC-2] [REC-3] [REC-5]
 - [ ] Process recurring rules at startup and when the date changes, never creating a date twice [REC-4]

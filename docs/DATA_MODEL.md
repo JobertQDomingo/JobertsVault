@@ -235,7 +235,7 @@ CREATE TABLE settings (
 
 ---
 
-## 4. Tables: Phase 3 (migration `0003_planning.sql`)
+## 4. Tables: Phase 3 (migration `0002_planning.sql`)
 
 ### 4.1 `recurring_rules`
 
@@ -571,8 +571,8 @@ Income and expense colors are **numbered separately**, because the breakdown cha
 | File | Phase | Contents |
 |---|---|---|
 | `0001_initial.sql` | 1 | accounts, categories, payment_methods, transactions, settings, indexes |
-| `0002_*.sql` | 2 | (only if Phase 2 needs schema changes; backups mostly need settings keys) |
-| `0003_planning.sql` | 3 | recurring_rules, recurring_occurrences, budgets, goals |
+| — | 2 | Phase 2 needed no schema change: its new data is settings keys (§3.5) |
+| `0002_planning.sql` | 3 | recurring_rules, recurring_occurrences, budgets, goals |
 
 ### CSV export format (BAK-6, Phase 2)
 
@@ -629,3 +629,4 @@ Answered on 2026-11-06:
 Answered on 2026-11-07:
 
 17. **A restore keeps this computer's backup settings** (BAK-4): `backup_folder`, `auto_backup_enabled`, `last_backup_at` and `last_auto_backup_date` keep their current values, and are deleted where the current data has none, while every other setting comes from the backup. Restoring on a second Windows account then doesn't point its backups at the first account's folder, and the last backup date doesn't go back in time (§3.5, ARCHITECTURE §7).
+18. **Phase 3's migration is `0002_planning.sql`**, not `0003`: Phase 2 needed no schema change, and keeping each file's number equal to the schema version it creates keeps the pre-migration backups' `v<schema version>` names easy to match to a file (§8).
