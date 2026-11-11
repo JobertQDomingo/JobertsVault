@@ -37,7 +37,7 @@ Build **only the current phase**. Don't build features from a later phase, or ou
 - **Transfers are never counted as income or expense**, and that includes paying the credit card bill. They have no category, payee or payment method.
 - **Balances are signed.** Credit card debt is a negative balance, and `amount_owed = max(0, −balance)`. In forms, the user types the amount owed as a positive number. Limits aren't enforced: a card can go past its limit, and an account can go below 0.
 - **Opening balances are not income**, and forms accept only 0 or more.
-- **Future dates are rejected until Phase 3** (TXN-8). From then on, future-dated transactions don't count toward the current balance or any total until their date arrives.
+- **Future-dated transactions are allowed** (TXN-8, Phase 3), but they don't count toward any balance, total, report or budget until their date arrives: every figure counts only `date ≤ today`. They're listed only under Upcoming at the top of the transaction list.
 - **Refunds are income** (in the "Refund" category). They offset net cashflow but don't reduce expense totals or budgets.
 - **Archived accounts still count toward the net balance.** Archiving an account whose balance isn't 0 requires confirming a warning.
 - **Weeks start on Monday** by default. A month can start on any day from 1 to 28 (`month_start_day`). **Years are always calendar years.**

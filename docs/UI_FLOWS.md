@@ -106,7 +106,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
 - **Filters** (TXN-4) sit in a glass toolbar under the period bar: period, type, account, category and payment method. The payment method filter is hidden when the field is turned off (SET-6). Search looks in the payee and note. **All filters are saved in the URL.** A summary line shows the number of matches and their totals.
 - **Clicking a row** opens the edit dialog. **Hover buttons:** ✎ edit, ⧉ duplicate (TXN-2). **Delete** is inside the edit dialog.
 - Rows load in **pages of 100** as you scroll (ARCHITECTURE §12).
-- **Future-dated** transactions (Phase 3) appear above "Today" under an **Upcoming** header, in muted text.
+- **Future-dated** transactions (Phase 3, TXN-8) appear above "Today" under an **Upcoming** header, in muted text, grouped by day with no day net. While the period hasn't ended, Upcoming holds every later row that matches the other filters, even past the period's end, so a row dated next month can still be opened. The summary line leaves them out (DATA_MODEL §5.2).
 
 ---
 
@@ -138,7 +138,7 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 | Amount | empty, **focused when the dialog opens** | Must be > 0. |
 | Category | empty | Type to filter. Only categories of the selected type are listed. |
 | Account | **the account used most recently** (TXN-1) | Archived accounts are hidden. |
-| Date | **today** | ↑/↓ change it by one day. Until Phase 3, a future date shows "Date can't be in the future". |
+| Date | **today** | ↑/↓ change it by one day. From Phase 3 it may be in the future, and the row waits under Upcoming until its date (TXN-8). |
 | Payee | empty | Optional. From Phase 2, typing suggests up to 8 payees used before on this type, most recent first (TXN-6). ↓ / ↑ highlight one, and Enter or a click picks it and fills in its last category, unless that's archived now. Nothing is highlighted until ↓, so Enter still saves the payee as typed. |
 | Method, Note | empty | Optional. |
 

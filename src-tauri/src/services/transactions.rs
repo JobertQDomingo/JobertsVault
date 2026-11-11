@@ -143,7 +143,9 @@ pub struct DayNet {
 
 pub const PAGE_SIZE: u32 = 100;
 
-/// Page `page` (from 0) of the matching transactions, newest first (TXN-3, TXN-4).
+/// Page `page` (from 0) of the matching transactions, newest first (TXN-3, TXN-4). A period that
+/// hasn't ended also lists every later row, for Upcoming, but its figures count only rows dated
+/// today or earlier (TXN-8, DATA_MODEL §5.2).
 pub fn list(
     conn: &Connection,
     filter: TransactionFilter,
@@ -151,7 +153,14 @@ pub fn list(
     today: NaiveDate,
 ) -> Result<TransactionList, AppError> {
     let period = period::resolve(conn, &filter.period, today)?;
-    let (start, end) = (period.start().to_string(), period.end().to_string());
+    let start = period.start().to_string();
+    // The stored dates are YYYY-MM-DD text, so this is after every one of them.
+    let end = if period.end() < today {
+        period.end().to_string()
+    } else {
+        "9999-12-31".into()
+    };
+    let counted_end = period.end().min(today).to_string();
     // shortcut: SQLite's LIKE ignores case for ASCII letters only, so "Ñ" doesn't match "ñ".
     let search = filter
         .search
@@ -177,11 +186,15 @@ pub fn list(
     let has_more = rows.len() > PAGE_SIZE as usize;
     rows.truncate(PAGE_SIZE as usize);
     let items = rows.into_iter().map(view).collect::<Result<Vec<_>, _>>()?;
-    let (count, income, expense) = repo::transactions::totals(conn, &f)?;
+    let counted = repo::transactions::Filter {
+        end: &counted_end,
+        ..f
+    };
+    let (count, income, expense) = repo::transactions::totals(conn, &counted)?;
     let day_nets = match (items.last(), items.first()) {
         (Some(oldest), Some(newest)) => {
             // Every matching row between the page's oldest and newest dates is on a page date.
-            let (start, end) = (oldest.date.to_string(), newest.date.to_string());
+            let (start, end) = (oldest.date.to_string(), newest.date.min(today).to_string());
             let page_dates = repo::transactions::Filter {
                 start: &start,
                 end: &end,
@@ -307,7 +320,7 @@ pub fn create(
     now: DateTime<Local>,
 ) -> Result<Transaction, AppError> {
     let tx = conn.transaction()?;
-    validate(&tx, &mut fields, None, now.date_naive(), false)?;
+    validate(&tx, &mut fields, None, now.date_naive())?;
     let id = repo::transactions::insert(&tx, &values(&fields), &stamp(now))?;
     repo::settings::set(&tx, LAST_USED_ACCOUNT, &fields.account_id.to_string())?;
     let saved = get(&tx, id)?;
@@ -323,7 +336,7 @@ pub fn update(
 ) -> Result<Transaction, AppError> {
     let tx = conn.transaction()?;
     let stored = get(&tx, id)?;
-    validate(&tx, &mut fields, Some(&stored), now.date_naive(), false)?;
+    validate(&tx, &mut fields, Some(&stored), now.date_naive())?;
     repo::transactions::update(&tx, id, &values(&fields), &stamp(now))?;
     let saved = get(&tx, id)?;
     tx.commit()?;
@@ -340,14 +353,13 @@ pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
 }
 
 /// Every rule in DATA_MODEL §6, after trimming the text. `stored` is the row being edited: it may
-/// keep an archived record it already uses, but a new one can't pick one. A recurring rule's
-/// template passes `allow_future`, since its date is the start date (DATA_MODEL §4.1).
+/// keep an archived record it already uses, but a new one can't pick one. The date may be in the
+/// future (TXN-8): it then counts in no balance or total until it arrives (DATA_MODEL §5.2).
 pub(crate) fn validate(
     conn: &Connection,
     f: &mut TransactionFields,
     stored: Option<&Transaction>,
     today: NaiveDate,
-    allow_future: bool,
 ) -> Result<(), AppError> {
     if f.amount <= Money::ZERO {
         return Err(invalid("amount", "Enter an amount above 0"));
@@ -355,11 +367,7 @@ pub(crate) fn validate(
     if f.amount > Money::MAX {
         return Err(invalid("amount", "That amount is too large"));
     }
-    let date = real_date(&f.date).ok_or_else(|| invalid("date", "Enter a real date"))?;
-    // Phases 1–2 only: Phase 3 allows future dates (TXN-8).
-    if date > today && !allow_future {
-        return Err(invalid("date", "Date can't be in the future"));
-    }
+    real_date(&f.date).ok_or_else(|| invalid("date", "Enter a real date"))?;
     f.payee = clean(f.payee.take());
     f.note = clean(f.note.take());
     if f.payee.as_ref().is_some_and(|p| p.chars().count() > 100) {
@@ -711,7 +719,7 @@ mod tests {
     }
 
     #[test]
-    fn the_date_must_be_real_and_not_in_the_future() {
+    fn the_date_must_be_real_and_may_be_in_the_future() {
         let mut conn = db();
         let cash = cash(&conn);
         for bad in ["2026-02-30", "2026-1-5", "x", "", "-0001-01-01"] {
@@ -721,19 +729,17 @@ mod tests {
             };
             assert_eq!(field_of(create(&mut conn, fields, now())), "date", "{bad}");
         }
-        let tomorrow = TransactionFields {
-            date: today().checked_add_days(Days::new(1)).unwrap().to_string(),
+        // TXN-8: a future date saves, on create and on edit, and waits to count.
+        let tomorrow = today().checked_add_days(Days::new(1)).unwrap();
+        let saved = spend(&mut conn, 100, cash, tomorrow);
+        assert_eq!(saved.date, tomorrow);
+        let next_year = TransactionFields {
+            date: "2027-11-03".into(),
             ..expense(&conn, 100, cash)
         };
-        match create(&mut conn, tomorrow, now()) {
-            Err(AppError::Validation { field, message }) => {
-                assert_eq!(
-                    (field.as_str(), message.as_str()),
-                    ("date", "Date can't be in the future")
-                );
-            }
-            other => panic!("expected a validation error, got {other:?}"),
-        }
+        let edited = update(&mut conn, saved.id, next_year, now()).unwrap();
+        assert_eq!(edited.date, d(2027, 11, 3));
+        assert_eq!(balance(&conn, cash), 0);
         let leap = TransactionFields {
             date: "2024-02-29".into(),
             ..expense(&conn, 100, cash)
@@ -1420,6 +1426,57 @@ mod tests {
             ..this_month()
         };
         assert_eq!(page(&conn, custom, 0).summary.count, 1);
+    }
+
+    #[test]
+    fn rows_after_today_are_listed_first_but_counted_in_no_total() {
+        // TXN-8: today is Nov 3. Upcoming rows lead the list, even past the period's end, so a
+        // row dated next month can still be opened.
+        let mut conn = db();
+        let cash = cash(&conn);
+        let past = spend(&mut conn, 100, cash, d(2026, 11, 2)).id;
+        let on_today = spend(&mut conn, 200, cash, today()).id;
+        let later = spend(&mut conn, 300, cash, d(2026, 11, 20)).id;
+        let pay = TransactionFields {
+            date: "2026-12-01".into(),
+            ..income(&conn, 5_000, cash)
+        };
+        let pay = create(&mut conn, pay, now()).unwrap().id;
+        let next_year = spend(&mut conn, 400, cash, d(2027, 1, 15)).id;
+
+        let november = page(&conn, this_month(), 0);
+        assert_eq!(ids(&november), [next_year, pay, later, on_today, past]);
+        assert_eq!(
+            november.summary,
+            TransactionSummary {
+                count: 2,
+                income: Money(0),
+                expense: Money(300)
+            }
+        );
+        let nets: Vec<_> = november.day_nets.iter().map(|n| (n.date, n.net)).collect();
+        assert_eq!(
+            nets,
+            [(today(), Money(-200)), (d(2026, 11, 2), Money(-100))]
+        );
+
+        // The other filters still apply, and a page of upcoming rows alone has no day nets.
+        let incomes = TransactionFilter {
+            kind: Some(TransactionKind::Income),
+            ..this_month()
+        };
+        let incomes = page(&conn, incomes, 0);
+        assert_eq!(ids(&incomes), [pay]);
+        assert_eq!((incomes.summary.count, incomes.day_nets.len()), (0, 0));
+
+        // A period that's over has no upcoming rows.
+        let october = TransactionFilter {
+            period: PeriodQuery::Month {
+                anchor: Some(d(2026, 10, 15)),
+            },
+            ..this_month()
+        };
+        assert!(page(&conn, october, 0).items.is_empty());
     }
 
     fn card_now(conn: &Connection, card: i64) -> accounts::CardSummary {

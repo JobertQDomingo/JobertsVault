@@ -336,6 +336,24 @@ test("a typed date that isn't committed yet is the one saved", async () => {
   );
 });
 
+test("a day after today can be picked and saved (TXN-8)", async () => {
+  await openQuickAdd();
+  type(amount(), "250");
+  type(field("Category"), "din");
+  key("Enter");
+  fireEvent.click(dialog().getByRole("button", { name: "Choose date" }));
+  const later = screen.getByRole("button", { name: /November 20(th)?,/ });
+  expect((later as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.click(later);
+  fireEvent.click(dialog().getByRole("button", { name: "Save" }));
+  await waitFor(() =>
+    expect(
+      (calls("create_transaction")[0] as { transaction: TransactionFields })
+        .transaction.date,
+    ).toBe("2026-11-20"),
+  );
+});
+
 test("any other error is a toast, and the dialog stays open", async () => {
   await openQuickAdd({
     ...ANSWERS,

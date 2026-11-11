@@ -392,7 +392,7 @@ net(period)     = income − expense
 ```
 
 - **Transfers are never included** (RPT-6). This is why paying the card bill doesn't count the purchases twice.
-- **Future-dated transactions are never included** (TXN-8, Phase 3). Every total, budget and "recent" list counts only `date ≤ today`, matching balances, so the numbers on a screen always agree. Future-dated rows appear only under Upcoming.
+- **Future-dated transactions are never included** (TXN-8, Phase 3). Every total, budget and "recent" list counts only `date ≤ today`, matching balances, so the numbers on a screen always agree. Future-dated rows appear only under Upcoming: the transaction list of a period that hasn't ended shows every later row that matches its other filters there, whatever its date, while its summary and day nets still count only `date ≤ today`.
 - If the report is filtered by account (RPT-5), only transactions with `account_id = account` are counted.
 - **Refunds** (CC-5) use an income category, so a refund increases *income*, not lowers *expense*. This is intentional: refunds offset net cashflow, not the expense total or the category breakdown (decided 2026-10-26).
 
@@ -506,7 +506,6 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 |---|---|
 | Amount is > 0 and ≤ 999,999,999,999 minor units | amount |
 | The date is a real calendar date | date |
-| The date isn't in the future: "Date can't be in the future" (Phases 1–2 only; Phase 3 removes this rule for TXN-8) | date |
 | An opening balance is 0 or more and ≤ 999,999,999,999 minor units, and a credit limit is > 0 and ≤ the same maximum | that field |
 | A transfer has no payee or payment method | payee / payment method |
 | The last active account, or the last active category of a kind, can't be archived or deleted (`Conflict`: "Keep at least one active account") | shown as a toast |
@@ -519,7 +518,7 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | Credit card fields are present if and only if the account is a credit card | the card fields |
 | `currency_decimals` can't change once any amount is stored: a transaction, a recurring rule, or an account's non-zero opening balance or credit limit (§1) | settings |
 | A budget's category is an expense category, and a goal's account isn't a credit card | category / account |
-| A recurring rule's template follows the transaction rules above, except the date: its start date may be in the future (§4.1) | that field |
+| A recurring rule's template follows the transaction rules above: its date is the start date (§4.1) | that field |
 | A rule's interval is 1–999, its number of times is 1–9,999, and its end date is a real date on or after the start date. A rule ends on a date or after a number of times, not both. | interval / maxOccurrences / endDate |
 | A rule's new start date, when its schedule changes, is after the last date it already processed, and not before today or its current next date, whichever is earlier (§4.1) | date |
 
@@ -619,6 +618,7 @@ Answered on 2026-11-11:
 16. **A rule's start date** may be in the past; processing fills in the dates since then (§4.1).
 19. **Saving a rule processes it** (REC-4): creating, editing or resuming a rule posts or queues its dates up to today in the same database transaction, so a rule that starts today shows up at once rather than the next day or launch (ARCHITECTURE §8).
 20. **An archived account, category or payment method** that a rule's template uses doesn't stop its dates: they post with it, the same way an edit of the rule may keep it (§4.2, §6).
+21. **Upcoming (TXN-8)** lists every future-dated row that matches the list's other filters, whatever its date, whenever the selected period hasn't ended, since ▶ stops at the current period and a row dated later would otherwise never be seen. Phase 3 drops the "Date can't be in the future" rule (§5.2, §6).
 
 Answered on 2026-11-01:
 

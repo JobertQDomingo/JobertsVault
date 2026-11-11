@@ -118,14 +118,14 @@ Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3**
 
 | ID | Requirement | Priority |
 |---|---|---|
-| TXN-1 | The user can add a transaction with these fields: **type**, **amount** (must be > 0), **date** (date only, defaults to today, can't be in the future until TXN-8 arrives), **account** (defaults to the account used most recently), **category** (Income/Expense only), **to-account** (Transfer only), and optionally **payee/source** and **payment method** (Income/Expense only) and **note**. Spending past a card's limit or below 0 in an account is allowed, because the app records what really happened. | P1 |
+| TXN-1 | The user can add a transaction with these fields: **type**, **amount** (must be > 0), **date** (date only, defaults to today, may be in the future from Phase 3: TXN-8), **account** (defaults to the account used most recently), **category** (Income/Expense only), **to-account** (Transfer only), and optionally **payee/source** and **payment method** (Income/Expense only) and **note**. Spending past a card's limit or below 0 in an account is allowed, because the app records what really happened. | P1 |
 | TXN-2 | The user can edit, delete (after confirming) and duplicate a transaction. A duplicate opens the form pre-filled with **today's date**. | P1 |
 | TXN-3 | The transaction list is grouped by date, newest first, with a total for each day. | P1 |
 | TXN-4 | The list can be filtered by period, account, category, type and payment method, and searched by text (payee or note). | P1 |
 | TXN-5 | A quick-add form opens with **Ctrl+N** from anywhere in the app. The form can be completed using only the keyboard. | P1 |
 | TXN-6 | The payee field suggests previously used payees as the user types. Choosing one fills in the category last used with that payee. | P2 |
 | TXN-7 | Payment method is optional. Its values come from an editable list (preset: Cash, Debit Card, Credit Card, Bank Transfer, E-wallet, Other), and the field can be hidden in Settings (SET-6). Methods can be reordered, archived and unarchived, and unused ones can be deleted. | P1 |
-| TXN-8 | Future-dated transactions are allowed, appear as "upcoming", and do not count toward the current balance or any total until their date arrives. Before Phase 3, a future date is rejected. | P3 |
+| TXN-8 | Future-dated transactions are allowed, appear as "upcoming", and do not count toward the current balance or any total until their date arrives. Before Phase 3, a future date was rejected. | P3 |
 
 ### 7.5 Dashboard
 
@@ -355,6 +355,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-07 | Backups, restore and CSV export live in Settings → Backup (`/settings?tab=backup`). Export to CSV takes its own From and To dates there (UI_FLOWS §6) |
 | 2026-11-07 | A restore keeps this computer's backup settings (the folder, the automatic backup switch and the last backup dates). Every other setting comes from the backup (DATA_MODEL §9) |
 | 2026-11-07 | BAK-7's warning counts manual and automatic backups, compares local dates (more than 7 days before today), and also shows when there's never been a backup. The daily automatic backup runs on its own thread, so a slow backup folder never delays the window |
+| 2026-11-11 | TXN-8: the transaction list's Upcoming section shows every future-dated row that matches the other filters, whatever its date, whenever the selected period hasn't ended, because ▶ stops at the current period. The summary line and day nets leave Upcoming out, and its days show no net (UI_FLOWS §3) |
 
 ---
 
