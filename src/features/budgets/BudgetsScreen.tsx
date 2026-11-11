@@ -17,7 +17,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { formatMoney, type MoneySettings } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { BudgetDialog } from "./BudgetDialog";
-import { BudgetName, budgetName, PERIODS } from "./BudgetName";
+import { BudgetName, budgetTitle, periodLabel } from "./BudgetName";
 
 /**
  * `/budgets` (UI_FLOWS §8.3): each budget's current period as a tile with its progress (BUD-2,
@@ -135,7 +135,7 @@ function Tile({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const title = `${budgetName(budget.categoryId, categories)}, ${budget.period}`;
+  const title = budgetTitle(budget, categories);
   return (
     // The name's button stretches over the whole tile, so the progress bar stays outside it.
     <li className="relative grid gap-2.5 rounded-control bg-wash p-4 pt-3 transition-colors duration-150 hover:bg-glass-hover">
@@ -149,7 +149,7 @@ function Tile({
           <BudgetName categoryId={budget.categoryId} categories={categories} />
         </button>
         <span className="text-small text-muted-foreground">
-          {PERIODS[budget.period]}
+          {periodLabel(budget.period)}
         </span>
         <Menu>
           <MenuTrigger asChild>

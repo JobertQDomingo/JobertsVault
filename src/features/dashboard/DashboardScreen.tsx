@@ -18,7 +18,11 @@ import { useQuickAdd } from "@/components/QuickAddProvider";
 import { StatCard } from "@/components/StatCard";
 import { TransactionRow } from "@/components/TransactionRow";
 import { Button } from "@/components/ui/button";
-import { BudgetName, budgetName, PERIODS } from "@/features/budgets/BudgetName";
+import {
+  BudgetName,
+  budgetTitle,
+  periodLabel,
+} from "@/features/budgets/BudgetName";
 import { DueDialog } from "@/features/recurring/DueDialog";
 import { useBackupNow } from "@/hooks/useBackup";
 import { useCategories } from "@/hooks/useCategories";
@@ -246,11 +250,11 @@ function Budgets({
             >
               <BudgetName categoryId={b.categoryId} categories={categories} />
               <span className="text-small text-muted-foreground">
-                {PERIODS[b.period]}
+                {periodLabel(b.period)}
               </span>
               <ProgressBar
                 percent={b.percent}
-                aria-label={`${budgetName(b.categoryId, categories)}, ${b.period} used`}
+                aria-label={`${budgetTitle(b, categories)} used`}
               />
             </li>
           ))}

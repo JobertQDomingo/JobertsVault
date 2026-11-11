@@ -635,7 +635,6 @@ Answered on 2026-11-11:
 24. **Deleting or merging a category deletes its budgets** in the same database transaction, and the confirm dialogs say so. A budget doesn't make a category in use, and a merge doesn't move budgets to the target (§3.2, §4.3).
 25. **A budget's amount locks `currency_decimals`** like every other stored amount (§1).
 26. **Budgets always show their own current period** (BUD-2, DSH-6): the dashboard's budgets don't follow the period switcher, the same way its account balances don't (§5.6).
-27. **A budget's % used rounds down** to a whole percent, so amber and red appear only once 80% and 100% are really reached (BUD-3, §5.6).
 
 Answered on 2026-11-01:
 

@@ -19,7 +19,7 @@ import { notify } from "@/components/ui/toast";
 import { useCreateBudget, useUpdateBudget } from "@/hooks/useBudgets";
 import { named, offered } from "@/lib/records";
 import { showSaveError } from "@/lib/saveError";
-import { PERIODS } from "./BudgetName";
+import { periodLabel } from "./BudgetName";
 
 type Values = {
   /** A category's id, or ALL for all spending. */
@@ -33,8 +33,8 @@ const SHOWN = ["categoryId", "period", "amount"] as const;
 // The quick-add form's rows: a 96 px label, the field beside it, its message under the field.
 const ROW =
   "grid-cols-[96px_minmax(0,1fr)] items-center gap-x-3 [&>p]:col-start-2";
-const PERIOD_OPTIONS = (Object.keys(PERIODS) as BudgetPeriod[]).map(
-  (value) => ({ value, label: PERIODS[value] }),
+const PERIOD_OPTIONS = (["weekly", "monthly", "yearly"] as const).map(
+  (value) => ({ value, label: periodLabel(value) }),
 );
 
 /**
