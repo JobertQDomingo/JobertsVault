@@ -7,5 +7,6 @@ pub mod category;
 pub mod csv;
 pub mod money;
 pub mod period;
+pub mod recurrence;
 pub mod report;
 pub mod window;

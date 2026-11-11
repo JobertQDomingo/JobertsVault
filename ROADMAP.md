@@ -20,7 +20,7 @@ This file is the progress tracker.
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
 | **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 53 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
-| **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 1 / 16 |
+| **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 2 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
 
 ---
@@ -148,7 +148,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 ## Phase 3 · Planning (`v0.3.0`)
 
 - [x] Migration `0002_planning.sql` (DATA_MODEL §4)
-- [ ] Domain: recurrence dates calculated from `start_date`, with the end-of-month and Feb 29 tests (DATA_MODEL §4.1)
+- [x] Domain: recurrence dates calculated from `start_date`, with the end-of-month and Feb 29 tests (DATA_MODEL §4.1)
 - [ ] Recurring rules: create, edit, pause, delete, with auto or confirm mode [REC-1] [REC-2] [REC-3] [REC-5]
 - [ ] Process recurring rules at startup and when the date changes, never creating a date twice [REC-4]
 - [ ] Review due items: Post, Edit & post, Skip (UI_FLOWS F10)
