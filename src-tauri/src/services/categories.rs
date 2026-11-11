@@ -171,7 +171,7 @@ pub fn unarchive(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result
 }
 
 /// Only a category no transaction or recurring rule uses can go; any other is archived or merged
-/// (CAT-4).
+/// (CAT-4). Its budgets go with it (DATA_MODEL §4.3).
 pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     let tx = conn.transaction()?;
     let row = stored(&tx, id)?;
@@ -189,14 +189,15 @@ pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     if !row.archived {
         check_not_last_active(&tx, &row.kind)?;
     }
+    repo::budgets::delete_for_category(&tx, id)?;
     repo::categories::delete(&tx, id)?;
     tx.commit()?;
     Ok(())
 }
 
 /// Moves every transaction and recurring rule of `from_id` to the active category `into_id` of
-/// the same kind, then
-/// deletes `from_id`, as one change (DATA_MODEL §3.2, UI_FLOWS F7).
+/// the same kind, then deletes `from_id` and its budgets, as one change (DATA_MODEL §3.2, §4.3,
+/// UI_FLOWS F7).
 pub fn merge(
     conn: &mut Connection,
     from_id: i64,
@@ -219,6 +220,7 @@ pub fn merge(
         return Err(invalid("intoId", "Choose an active category"));
     }
     repo::categories::move_uses(&tx, from_id, into_id, &stamp(now))?;
+    repo::budgets::delete_for_category(&tx, from_id)?;
     repo::categories::delete(&tx, from_id)?;
     tx.commit()?;
     Ok(())

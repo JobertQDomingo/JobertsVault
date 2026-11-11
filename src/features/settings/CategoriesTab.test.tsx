@@ -212,7 +212,7 @@ test("Merge offers only other active categories of the same kind, then confirms 
     name: "Merge categories?",
   });
   expect(confirm.textContent).toContain(
-    "Move 1 transaction from 'Dining Out' to 'Food & Groceries' and delete 'Dining Out'?",
+    "Move 1 transaction from 'Dining Out' to 'Food & Groceries' and delete 'Dining Out' and any budget for it?",
   );
   fireEvent.click(within(confirm).getByRole("button", { name: "Merge" }));
   await waitFor(() =>

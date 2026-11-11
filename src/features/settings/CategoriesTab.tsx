@@ -139,7 +139,7 @@ export function CategoriesTab() {
         open={open !== null && "delete" in open}
         onOpenChange={(o) => !o && setOpen(null)}
         title={`Delete ${open && "delete" in open ? open.delete.name : ""}?`}
-        message="This can't be undone."
+        message="Any budget for it is deleted too. This can't be undone."
         confirmLabel="Delete"
         destructive
         onConfirm={() =>
@@ -216,7 +216,7 @@ function MergeDialog({
         open={confirming}
         onOpenChange={(o) => !o && onClose()}
         title="Merge categories?"
-        message={`Move ${count(from.transactionCount)} from '${from.name}' to '${target?.name}' and delete '${from.name}'?`}
+        message={`Move ${count(from.transactionCount)} from '${from.name}' to '${target?.name}' and delete '${from.name}' and any budget for it?`}
         confirmLabel="Merge"
         destructive
         // A promise, not mutate()'s callbacks: closing the confirm unmounts this dialog, and an

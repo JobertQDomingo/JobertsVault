@@ -146,6 +146,10 @@ pub fn run() {
             commands::recurring::list_due_occurrences,
             commands::recurring::post_occurrence,
             commands::recurring::skip_occurrence,
+            commands::budgets::list_budgets,
+            commands::budgets::create_budget,
+            commands::budgets::update_budget,
+            commands::budgets::delete_budget,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the app")

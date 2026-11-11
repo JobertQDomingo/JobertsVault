@@ -20,7 +20,7 @@ This file is the progress tracker.
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
 | **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 53 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
-| **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 7 / 16 |
+| **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 8 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
 
 ---
@@ -154,7 +154,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] Review due items: Post, Edit & post, Skip (UI_FLOWS F10)
 - [x] Recurring screen
 - [x] Future-dated transactions and the Upcoming section: lift the Phase 1 date rule, and keep them out of every total until their date arrives ([DATA_MODEL §5.2](docs/DATA_MODEL.md)) [TXN-8]
-- [ ] Budgets for a category or all spending, weekly, monthly or yearly [BUD-1] [BUD-4]
+- [x] Budgets for a category or all spending, weekly, monthly or yearly [BUD-1] [BUD-4]
 - [ ] Budget progress with amber and red thresholds, the Budgets screen, and budgets on the dashboard [BUD-2] [BUD-3] [DSH-6]
 - [ ] Goals linked to an account, with progress and the monthly amount needed [GOL-1] [GOL-2] [GOL-3]
 - [ ] Mark goals achieved and archive them, plus the Goals screen [GOL-4]

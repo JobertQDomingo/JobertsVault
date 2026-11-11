@@ -8,6 +8,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, expect, test, vi } from "vitest";
 import type { AccountFields } from "@/bindings/AccountFields";
+import type { BudgetFields } from "@/bindings/BudgetFields";
 import type { CategoryFields } from "@/bindings/CategoryFields";
 import type { NewAccount } from "@/bindings/NewAccount";
 import type { NewCategory } from "@/bindings/NewCategory";
@@ -53,6 +54,12 @@ import {
   useSkipOccurrence,
   useUpdateRecurringRule,
 } from "./useRecurring";
+import * as budgetHooks from "./useBudgets";
+import {
+  useCreateBudget,
+  useDeleteBudget,
+  useUpdateBudget,
+} from "./useBudgets";
 import * as transactionHooks from "./useTransactions";
 import {
   useCreateTransaction,
@@ -98,6 +105,11 @@ const rule: RecurringRuleFields = {
   endDate: null,
   maxOccurrences: null,
   mode: "auto",
+};
+const budget: BudgetFields = {
+  categoryId: 8,
+  period: "monthly",
+  amount: 40000,
 };
 const settings: Settings = {
   currencySymbol: "₱",
@@ -285,6 +297,15 @@ const WRITES = [
     { id: 4, transaction: null },
   ],
   ["useSkipOccurrence", useSkipOccurrence, 4, "skip_occurrence", { id: 4 }],
+  ["useCreateBudget", useCreateBudget, budget, "create_budget", { budget }],
+  [
+    "useUpdateBudget",
+    useUpdateBudget,
+    { id: 3, budget },
+    "update_budget",
+    { id: 3, budget },
+  ],
+  ["useDeleteBudget", useDeleteBudget, 3, "delete_budget", { id: 3 }],
   [
     "useUpdateSettings",
     useUpdateSettings,
@@ -348,6 +369,7 @@ const READS = [
   "usePayeeSuggestions",
   "useRecurringRules",
   "useDueOccurrences",
+  "useBudgets",
   "useSettings",
 ];
 
@@ -358,6 +380,7 @@ test("the table lists every write hook", () => {
     paymentMethodHooks,
     transactionHooks,
     recurringHooks,
+    budgetHooks,
     settingsHooks,
   ].flatMap((module) => Object.keys(module));
   expect(hooks.filter((name) => !READS.includes(name)).sort()).toEqual(
