@@ -391,9 +391,16 @@ mod tests {
                 (Some(DINING), BudgetPeriod::Monthly),
             ]
         );
-        // Into a category with no budget: the merged one's budgets go, they don't move.
+        // The merged one's budgets go, they don't move, and the target keeps its own.
+        add(&mut conn, Some(10), BudgetPeriod::Monthly);
         categories::merge(&mut conn, DINING, 10, now()).unwrap();
-        assert_eq!(shown(&conn), [(None, BudgetPeriod::Monthly)]);
+        assert_eq!(
+            shown(&conn),
+            [
+                (None, BudgetPeriod::Monthly),
+                (Some(10), BudgetPeriod::Monthly)
+            ]
+        );
     }
 
     #[test]

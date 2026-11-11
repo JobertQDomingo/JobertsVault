@@ -170,7 +170,7 @@ test("Delete is only offered when nothing uses it, and asks first", async () => 
   const unused: CategoryList = {
     ...CATEGORIES,
     categories: CATEGORIES.categories.map((c) =>
-      c.id === 4
+      c.id === 4 || c.name === "Salary"
         ? { ...c, transactionCount: 0, inUse: false }
         : // Only a recurring rule uses Dining Out.
           c.name === "Dining Out"
@@ -188,8 +188,15 @@ test("Delete is only offered when nothing uses it, and asks first", async () => 
   const confirm = within(
     await screen.findByRole("dialog", { name: "Delete Transportation?" }),
   );
+  confirm.getByText("Any budget for it is deleted too. This can't be undone.");
   fireEvent.click(confirm.getByRole("button", { name: "Delete" }));
   await waitFor(() => expect(calls("delete_category")).toEqual([{ id: 4 }]));
+  // An income category never has a budget (BUD-1).
+  await menu("Salary");
+  fireEvent.click(await item("Delete"));
+  within(
+    await screen.findByRole("dialog", { name: "Delete Salary?" }),
+  ).getByText("This can't be undone.");
 });
 
 test("Merge offers only other active categories of the same kind, then confirms (F7)", async () => {
