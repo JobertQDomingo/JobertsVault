@@ -39,6 +39,13 @@ pub fn pause_recurring_rule(
         .inspect_err(|err| log::record(&state.log_path, err))
 }
 
+/// The frontend calls it when the window regains focus, for a date that changed meanwhile (REC-4).
+#[tauri::command(async)]
+pub fn process_recurring(state: State<'_, AppState>) -> Result<u32, AppError> {
+    services::recurring::process_due(&mut *state.conn()?, chrono::Local::now())
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
 #[tauri::command(async)]
 pub fn delete_recurring_rule(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
     services::recurring::delete(&mut *state.conn()?, id)

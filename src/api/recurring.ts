@@ -31,3 +31,6 @@ export const pauseRecurringRule = ({
 /** Keeps the transactions it created. */
 export const deleteRecurringRule = (id: number) =>
   call<null>("delete_recurring_rule", { id });
+
+/** Posts or queues every rule's dates due up to today; how many (REC-4). */
+export const processRecurring = () => call<number>("process_recurring");

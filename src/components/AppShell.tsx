@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useNavigate } from "react-router";
+import { useProcessOnFocus } from "@/hooks/useProcessOnFocus";
 import { useSettings } from "@/hooks/useSettings";
 import { useShortcuts } from "@/hooks/useShortcuts";
 import { QuickAddProvider, useQuickAdd } from "./QuickAddProvider";
@@ -27,6 +28,7 @@ export function AppShell() {
 function Layout() {
   const navigate = useNavigate();
   const { add } = useQuickAdd();
+  useProcessOnFocus();
   // The shortcuts that work everywhere (UI_FLOWS §10). The period ones live in PeriodSwitcher.
   useShortcuts({
     "Ctrl+N": add,

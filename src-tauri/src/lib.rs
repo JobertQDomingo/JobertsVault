@@ -58,11 +58,12 @@ pub fn run() {
             let now = chrono::Local::now();
             app.manage(AppState::open(data_dir, &db::migrations(now.to_utc()), now));
             // Setup goes on only once the backup thread holds the connection, so every screen
-            // waits for today's backup rather than reading the state from before it.
+            // waits for today's backup and recurring dates rather than reading the state from
+            // before them.
             let handle = app.handle().clone();
             let (locked, holding) = std::sync::mpsc::channel();
             std::thread::spawn(move || {
-                handle.state::<AppState>().back_up_daily(now, || {
+                handle.state::<AppState>().back_up_and_process(now, || {
                     let _ = locked.send(());
                 });
             });
@@ -141,6 +142,7 @@ pub fn run() {
             commands::recurring::update_recurring_rule,
             commands::recurring::pause_recurring_rule,
             commands::recurring::delete_recurring_rule,
+            commands::recurring::process_recurring,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the app")
