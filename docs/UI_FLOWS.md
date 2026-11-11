@@ -77,7 +77,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
 - **Phase 2:** a "No backup in the last 7 days." banner at the top with **Back up now** (BAK-7, F9)
 - **Phase 3:**
   - a "Card payment due in 3 days: ₱640.00 owed" banner at the top (CC-7), with a **Pay bill** button
-  - budget progress bars (DSH-6)
+  - a **Budgets** panel under Recent transactions, with **Manage** (to `/budgets`) in its header: one row per budget, with its chip and name, its period and a `ProgressBar` with the % used. Each bar is for that budget's own current week, month or year, whatever the period switcher shows, like the account balances (DSH-6). With no budgets, it says "No budgets yet."; the panel's second column is for DSH-7
   - recurring transactions coming up in the next 7 days (DSH-7), plus the "2 recurring transactions are due." banner (F10)
 
 ---
@@ -337,7 +337,16 @@ The rule form has no Save & add another. Saving a rule posts or queues its dates
 **Editing** a rule ("Edit rule") keeps its start date, so changing the amount, category, mode or end keeps the rule's place. Changing **Repeats** or **Every** starts it again, so the form offers the rule's next date as the new start, unless another start was already chosen (DATA_MODEL §4.1).
 
 ### 8.3 Budgets (`/budgets`), Phase 3
-Budget cards, each with the category chip (or "All spending"), the period, a `ProgressBar`, and "₱320 of ₱400 · ₱80 left".
+One panel, with **+ New budget** in its header, holding a grid of flat budget cards (three across), all spending first, then in the categories' order. Each card has the category chip (or "All spending"), the period, a `ProgressBar` and "₱320.00 of ₱400.00 · ₱80.00 left". Past its limit, the card says "₱180.00 of ₱150.00 · ₱30.00 over" in `--danger`. The bar turns amber at 80% and red at 100% (BUD-3). The cards are flat tints inside the one panel, so any number of budgets stays within the blur budget (DESIGN_SYSTEM §2.3).
+
+Clicking a card edits it. Its ⋯ menu has **Edit** and **Delete**, which asks first: "Delete this budget? Its transactions stay. This can't be undone." With no budgets, an empty state offers **New budget**.
+
+**+ New budget** opens a small dialog, "New budget" (or "Edit budget"):
+- **Category:** All spending (to start with), or an active expense category. An edit keeps its own category even if it's been archived.
+- **Period:** Weekly, Monthly or Yearly. Monthly to start with.
+- **Amount:** the limit for each period. A note under it says each period starts again from the full amount (BUD-4).
+
+A category, or all spending, has one budget per period. A second one shows the backend's message under the field it names.
 
 ### 8.4 Goals (`/goals`), Phase 3
 Goal cards showing the name, the linked account, a progress bar, "₱2,400 of ₱5,000", the target date and "Save ₱433/month to reach it". A goal that's been reached gets an "Achieved" badge.

@@ -1,6 +1,7 @@
 // Sample data matching UI_FLOWS' examples, for screen tests.
 import type { Account } from "@/bindings/Account";
 import type { Breakdown } from "@/bindings/Breakdown";
+import type { BudgetProgress } from "@/bindings/BudgetProgress";
 import type { Category } from "@/bindings/Category";
 import type { CategoryList } from "@/bindings/CategoryList";
 import type { Comparison } from "@/bindings/Comparison";
@@ -220,6 +221,43 @@ export const COMPARISON: Comparison = {
   today: TODAY,
 };
 
+/** `list_budgets` on Nov 5: the mockup's budgets, one of them past its limit (UI_FLOWS §8.3). */
+export const BUDGETS: BudgetProgress[] = [
+  {
+    id: 3,
+    categoryId: null,
+    period: "monthly",
+    amount: 350000,
+    start: "2026-11-01",
+    end: "2026-11-30",
+    spent: 295040,
+    remaining: 54960,
+    percent: 84,
+  },
+  {
+    id: 1,
+    categoryId: 1,
+    period: "monthly",
+    amount: 60000,
+    start: "2026-11-01",
+    end: "2026-11-30",
+    spent: 52040,
+    remaining: 7960,
+    percent: 86,
+  },
+  {
+    id: 2,
+    categoryId: 2,
+    period: "weekly",
+    amount: 15000,
+    start: "2026-11-02",
+    end: "2026-11-08",
+    spent: 18000,
+    remaining: -3000,
+    percent: 120,
+  },
+];
+
 export const DASHBOARD: Dashboard = {
   period: PERIOD,
   income: 420000,
@@ -233,6 +271,7 @@ export const DASHBOARD: Dashboard = {
   // Archived accounts count too (ACC-5): 8,240.75 + Old Wallet's 45.00.
   netBalance: 828575,
   recent: RECENT,
+  budgets: BUDGETS,
   today: TODAY,
 };
 

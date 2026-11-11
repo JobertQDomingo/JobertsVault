@@ -9,7 +9,7 @@ const UNITS: Record<Frequency, [string, string]> = {
   yearly: ["year", "years"],
 };
 
-const EVERY_ONE: Record<Frequency, string> = {
+export const EVERY_ONE: Record<Frequency, string> = {
   daily: "Daily",
   weekly: "Weekly",
   monthly: "Monthly",

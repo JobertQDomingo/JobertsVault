@@ -7,6 +7,7 @@ use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
 use crate::services::accounts::{self, Account};
+use crate::services::budgets::{self, BudgetProgress};
 use crate::services::period::{self, PeriodQuery, PeriodView};
 use crate::services::reports::{self, Comparison, Timeseries};
 use crate::services::transactions::{self, Transaction};
@@ -35,6 +36,9 @@ pub struct Dashboard {
     pub net_balance: Money,
     /// The 5 newest transactions, whatever the period (DSH-8).
     pub recent: Vec<Transaction>,
+    /// Every budget's own current period, whatever the period shown, as `list_budgets` returns
+    /// them (DSH-6).
+    pub budgets: Vec<BudgetProgress>,
     pub today: NaiveDate,
 }
 
@@ -63,6 +67,7 @@ pub fn get(
     Ok(Dashboard {
         backup_due: super::backup::is_due(conn, today)?,
         recurring_due: repo::recurring::pending(conn)?.len(),
+        budgets: budgets::list(conn, today)?,
         period,
         income,
         expense,
@@ -418,5 +423,30 @@ mod tests {
         // now() is Nov 3, 2026: Oct 24 and 31 are due.
         recurring::create(&mut conn, rule, now()).unwrap();
         assert_eq!(get(&conn, &MONTH, d(2026, 11, 3)).unwrap().recurring_due, 2);
+    }
+
+    #[test]
+    fn budgets_show_their_current_period_whatever_the_period_shown() {
+        use crate::services::budgets::{BudgetFields, BudgetPeriod};
+        let mut conn = db();
+        let cash = id_of(&conn, "accounts", "Cash");
+        let food = id_of(&conn, "categories", "Food & Groceries");
+        let limit = BudgetFields {
+            category_id: Some(food),
+            period: BudgetPeriod::Monthly,
+            amount: Money(60_000),
+        };
+        budgets::create(&mut conn, limit, now()).unwrap();
+        spend(&mut conn, 52_040, d(2026, 11, 2), cash);
+        let last_year = PeriodQuery::Year {
+            anchor: Some(d(2025, 6, 1)),
+        };
+        let today = d(2026, 11, 3);
+        let dash = get(&conn, &last_year, today).unwrap();
+        assert_eq!(dash.budgets, budgets::list(&conn, today).unwrap());
+        assert_eq!(
+            (dash.budgets[0].start, dash.budgets[0].spent),
+            (d(2026, 11, 1), Money(52_040))
+        );
     }
 }

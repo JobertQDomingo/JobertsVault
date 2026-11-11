@@ -91,7 +91,8 @@ test("View all goes to Transactions, Manage to Accounts", async () => {
     expect(router.state.location.pathname).toBe("/transactions"),
   );
   await router.navigate("/");
-  fireEvent.click(await screen.findByRole("link", { name: "Manage" }));
+  await screen.findByText("Accounts", { selector: "h2" });
+  fireEvent.click(panel("Accounts").getByRole("link", { name: "Manage" }));
   await waitFor(() => expect(router.state.location.pathname).toBe("/accounts"));
 });
 
@@ -236,4 +237,35 @@ test("no warning while backups are recent", async () => {
   renderRoute("/", ANSWERS);
   await screen.findByText("Recent transactions");
   expect(screen.queryByText("No backup in the last 7 days.")).toBeNull();
+});
+
+test("budgets show each one's progress in its own current period (DSH-6)", async () => {
+  renderRoute("/", ANSWERS);
+  await screen.findByText("Budgets", { selector: "h2" });
+  const budgets = panel("Budgets");
+  const rows = budgets.getAllByRole("listitem");
+  expect(rows.map((row) => row.textContent)).toEqual([
+    "All spendingMonthly84%",
+    "Food & GroceriesMonthly86%",
+    "Dining OutWeekly120%",
+  ]);
+  expect(
+    within(rows[2]).getByRole("progressbar", {
+      name: "Dining Out, weekly used",
+    }),
+  ).toBeTruthy();
+  expect(
+    budgets.getByRole("link", { name: "Manage" }).getAttribute("href"),
+  ).toBe("/budgets");
+});
+
+test("with no budgets, the panel says so and still links to Budgets", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: { ...DASHBOARD, budgets: [] },
+  });
+  await screen.findByText("Budgets", { selector: "h2" });
+  const budgets = panel("Budgets");
+  expect(budgets.getByText("No budgets yet.")).toBeTruthy();
+  expect(budgets.getByRole("link", { name: "Manage" })).toBeTruthy();
 });

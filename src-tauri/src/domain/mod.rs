@@ -2,6 +2,7 @@
 
 pub mod account;
 pub mod backup;
+pub mod budget;
 pub mod card_cycle;
 pub mod category;
 pub mod csv;

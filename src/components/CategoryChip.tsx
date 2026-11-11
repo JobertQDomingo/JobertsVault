@@ -1,4 +1,9 @@
-import { ArrowLeftRight, Ellipsis, type LucideIcon } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Ellipsis,
+  Layers,
+  type LucideIcon,
+} from "lucide-react";
 import type { CSSProperties } from "react";
 import { categoryIcons, type CategoryIconName } from "@/lib/categoryIcons";
 import { cn } from "@/lib/utils";
@@ -62,4 +67,9 @@ export function CategoryChip({
 /** Transfers have no category: a neutral chip with the transfer icon. */
 export function TransferChip({ size = "md" }: { size?: Size }) {
   return <Chip color="transfer" Icon={ArrowLeftRight} size={size} />;
+}
+
+/** An overall budget has no category: a neutral chip with the layers icon (UI_FLOWS §8.3). */
+export function AllSpendingChip({ size = "md" }: { size?: Size }) {
+  return <Chip color="muted-foreground" Icon={Layers} size={size} />;
 }

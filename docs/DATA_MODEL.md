@@ -449,9 +449,15 @@ The statement closing date in a given month is `min(statement_day, last day of t
 ### 5.6 Budget progress (Phase 3)
 
 ```
-spent = Σ expense amounts in the budget's current period (in its category, or in all categories for an overall budget)
-used% = spent ÷ amount        →  amber when ≥ 80%, red when ≥ 100%
+spent     = Σ expense amounts in the budget's current period (in its category, or in all categories for an overall budget)
+remaining = amount − spent    (below 0 once the budget is over)
+used%     = ⌊spent × 100 ÷ amount⌋   →  amber when ≥ 80%, red when ≥ 100%
 ```
+
+- **The current period** is the week, month or year that contains today, by `week_start` and `month_start_day` (§5.3). Years are calendar years. It never follows the period a screen shows, so the dashboard's budgets match the Budgets screen whatever the period switcher says (DSH-6).
+- Only rows dated today or earlier count (§5.2), and transfers never do.
+- **No rollover (BUD-4):** each period starts again from the full `amount`. What a period leaves unspent, or spends over, never moves to the next.
+- `used%` is a whole percent **rounded down**, so the color changes only once the threshold is really reached: 79.9% shows 79% in the normal color, and 99.9% shows 99% in amber, never red while something is left.
 
 Refunds don't reduce `spent`, because they're income (§5.2).
 
@@ -628,6 +634,7 @@ Answered on 2026-11-11:
 23. **Budgets are never archived** (BUD-1): they're edited or deleted, because nothing refers to one and a budget keeps no history. The `archived` column stays 0 (§4.3).
 24. **Deleting or merging a category deletes its budgets** in the same database transaction, and the confirm dialogs say so. A budget doesn't make a category in use, and a merge doesn't move budgets to the target (§3.2, §4.3).
 25. **A budget's amount locks `currency_decimals`** like every other stored amount (§1).
+26. **Budgets always show their own current period** (BUD-2, DSH-6): the dashboard's budgets don't follow the period switcher, the same way its account balances don't (§5.6).
 
 Answered on 2026-11-01:
 

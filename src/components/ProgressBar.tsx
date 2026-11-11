@@ -39,7 +39,8 @@ export function ProgressBar({
       </div>
       <span
         id={labelId}
-        className="text-small whitespace-nowrap text-muted-foreground tabular-nums"
+        // A fixed minimum, so bars in a list end level whatever their percent.
+        className="min-w-10 text-right text-small whitespace-nowrap text-muted-foreground tabular-nums"
       >
         {label ?? `${percent}%`}
       </span>
