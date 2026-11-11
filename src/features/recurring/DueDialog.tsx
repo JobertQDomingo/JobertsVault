@@ -38,24 +38,24 @@ export function DueDialog({
   // One at a time, so a second click can't settle a date twice.
   const busy = post.isPending || skip.isPending;
   const { post: editAndPost } = useQuickAdd();
-  const done = (message: string) => ({
-    onSuccess: () => notify.success(message),
-    onError: (error: Error) => notify.error(error.message),
-  });
+  // Awaited rather than mutate's callbacks: settling the last date closes this dialog first.
+  const settle = (action: Promise<unknown>, message: string) =>
+    void action.then(
+      () => notify.success(message),
+      (error: Error) => notify.error(error.message),
+    );
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent
-        title="Recurring transactions due"
-        className="max-w-[640px]"
-      >
+      <DialogContent title="Recurring transactions due" size="list">
         {failed.length ? (
           <ErrorState
             onRetry={() => failed.forEach((q) => q.refetch())}
             pending={failed.some((q) => q.isFetching)}
           />
         ) : due.data && accounts.data && categories.data ? (
-          <ul className="pt-1 pb-3">
+          // A long list scrolls inside the dialog, which stays on screen.
+          <ul className="max-h-[60vh] overflow-y-auto pt-1 pb-3">
             {due.data.map((o) => (
               <DueRow
                 key={o.id}
@@ -65,10 +65,13 @@ export function DueDialog({
                 categories={categories.data.categories}
                 busy={busy}
                 onPost={() =>
-                  post.mutate({ id: o.id, transaction: null }, done("Posted"))
+                  settle(
+                    post.mutateAsync({ id: o.id, transaction: null }),
+                    "Posted",
+                  )
                 }
                 onEdit={() => editAndPost(o)}
-                onSkip={() => skip.mutate(o.id, done("Skipped"))}
+                onSkip={() => settle(skip.mutateAsync(o.id), "Skipped")}
               />
             ))}
           </ul>
@@ -126,21 +129,31 @@ function DueRow({
           icon={category?.icon ?? "ellipsis"}
         />
       )}
-      <div className="min-w-0">
+      {/* The buttons repeat on every row, so each one points here for which date it settles. */}
+      <div id={`due-${due.id}`} className="min-w-0">
         <p className="truncate font-semibold">{title}</p>
         <p className="truncate text-small text-muted-foreground">{caption}</p>
       </div>
       <MoneyText amount={t.amount} kind={t.kind} className="justify-self-end" />
       <div className="flex gap-1">
-        <Button variant="primary" size="sm" disabled={busy} onClick={onPost}>
-          Post
-        </Button>
-        <Button variant="ghost" size="sm" disabled={busy} onClick={onEdit}>
-          Edit &amp; post
-        </Button>
-        <Button variant="ghost" size="sm" disabled={busy} onClick={onSkip}>
-          Skip
-        </Button>
+        {(
+          [
+            ["Post", "primary", onPost],
+            ["Edit & post", "ghost", onEdit],
+            ["Skip", "ghost", onSkip],
+          ] as const
+        ).map(([label, variant, onClick]) => (
+          <Button
+            key={label}
+            variant={variant}
+            size="sm"
+            disabled={busy}
+            onClick={onClick}
+            aria-describedby={`due-${due.id}`}
+          >
+            {label}
+          </Button>
+        ))}
       </div>
     </li>
   );

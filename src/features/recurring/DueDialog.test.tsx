@@ -94,6 +94,13 @@ test("the banner counts the dates due, and Review lists each one oldest first (F
     "Food & Groceries · MarketDue Sat, Oct 24 · Bank−₱32.40PostEdit & postSkip",
     "Bank → Credit cardDue today₱640.00PostEdit & postSkip",
   ]);
+  // Every row has the same buttons, so each says which date it settles.
+  for (const button of within(rows[0]).getAllByRole("button")) {
+    const id = button.getAttribute("aria-describedby")!;
+    expect(document.getElementById(id)!.textContent).toBe(
+      "Food & Groceries · MarketDue Sat, Oct 24 · Bank",
+    );
+  }
 });
 
 test("one date due reads in the singular", async () => {
