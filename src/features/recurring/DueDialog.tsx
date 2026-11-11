@@ -17,6 +17,7 @@ import {
   useSkipOccurrence,
 } from "@/hooks/useRecurring";
 import { formatDayHeader } from "@/lib/dates";
+import { rowTitle } from "@/lib/records";
 
 /**
  * Review due items (UI_FLOWS F10): every date a Confirm rule queued, oldest first, each with
@@ -107,18 +108,15 @@ function DueRow({
   onSkip: () => void;
 }) {
   const t = due.transaction;
-  const name = (id: number | null) => accounts.find((a) => a.id === id)?.name;
   const category = categories.find((c) => c.id === t.categoryId);
   const transfer = t.kind === "transfer";
-  const title = transfer
-    ? `${name(t.accountId) ?? ""} → ${name(t.toAccountId) ?? ""}`
-    : [category?.name, t.payee].filter(Boolean).join(" · ");
+  const title = rowTitle(t, accounts, categories);
   const day = formatDayHeader(t.date, today);
   // "Due today", but "Due Sat, Oct 24".
   const when = day === "Today" || day === "Yesterday" ? day.toLowerCase() : day;
   const caption = transfer
     ? `Due ${when}`
-    : `Due ${when} · ${name(t.accountId) ?? ""}`;
+    : `Due ${when} · ${accounts.find((a) => a.id === t.accountId)?.name ?? ""}`;
   return (
     <li className="grid grid-cols-[32px_minmax(0,1fr)_110px_auto] items-center gap-3 border-t border-hairline px-[22px] py-2.5 first:border-t-0">
       {transfer ? (

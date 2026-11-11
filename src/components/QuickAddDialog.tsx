@@ -112,6 +112,12 @@ const ENDS: { value: Values["ends"]; label: string }[] = [
   { value: "on", label: "On a date" },
   { value: "after", label: "Number of times" },
 ];
+/** The end field each choice shows, so an error for one that's hidden is a toast. */
+const END_FIELDS = {
+  never: [],
+  on: ["endDate"],
+  after: ["maxOccurrences"],
+} as const;
 const MODES: { value: RecurringMode; label: string }[] = [
   { value: "auto", label: "Auto-post" },
   { value: "confirm", label: "Confirm" },
@@ -455,9 +461,17 @@ function TransactionForm({
 
   // Editing a rule's frequency or interval starts it again (DATA_MODEL §4.1): from its next
   // date, unless another start date was already chosen, so the dates already done stay done.
+  // Put back as it was, the schedule keeps its stored start, so nothing restarts.
   const offerRestart = () => {
-    if (schedule?.ruleId !== undefined && getValues("date") === initial.date)
+    if (schedule?.ruleId === undefined) return;
+    const changed =
+      getValues("frequency") !== initial.frequency ||
+      getValues("interval").trim() !== initial.interval;
+    const date = getValues("date");
+    if (changed && date === initial.date)
       setValue("date", schedule.restart, { shouldDirty: true });
+    else if (!changed && date === schedule.restart)
+      setValue("date", initial.date, { shouldDirty: true });
   };
 
   useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange]);
@@ -486,8 +500,7 @@ function TransactionForm({
           "payee",
           ...(showMethod ? (["paymentMethodId"] as const) : []),
         ] as const)),
-    // A hidden end field is sent as none, so it never has an error.
-    ...(schedule ? (["interval", "endDate", "maxOccurrences"] as const) : []),
+    ...(schedule ? (["interval", ...END_FIELDS[ends]] as const) : []),
   ];
 
   const save = (another: boolean) => {

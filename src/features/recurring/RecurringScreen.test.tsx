@@ -84,6 +84,7 @@ const RULES: RecurringRule[] = [
   rule({
     id: 5,
     transaction: { ...BUS.transaction, payee: "Old gym" },
+    paused: true,
     nextDate: null,
     maxOccurrences: 3,
   }),
@@ -146,7 +147,7 @@ test("each rule shows its schedule, next date, amount and mode, or Paused (§8.2
     "Transportation · Bus passMonthly on the 31st · next Nov 30−₱120.00Confirm",
     "TransportationWeekly on Mondays−₱120.00Paused",
     "Bank → E-walletEvery 2 years on Mar 15 · next Mar 15, 2028₱500.00Confirm",
-    "Transportation · Old gymMonthly on the 31st · ended−₱120.00Confirm",
+    "Transportation · Old gymMonthly on the 31st · ended−₱120.00Paused",
   ]);
 });
 
@@ -266,6 +267,14 @@ test("a new interval starts the rule again from its next date (DATA_MODEL §4.1)
   await waitFor(() => expect(text("Starts").value).toBe("01/31/2026"));
   type(text("Every"), "2");
   expect(text("Starts").value).toBe("11/30/2026");
+  // Put back, the schedule keeps its start, so nothing restarts.
+  type(text("Every"), "1");
+  expect(text("Starts").value).toBe("01/31/2026");
+  fireEvent.click(form().getByRole("radio", { name: "Weekly" }));
+  expect(text("Starts").value).toBe("11/30/2026");
+  fireEvent.click(form().getByRole("radio", { name: "Monthly" }));
+  expect(text("Starts").value).toBe("01/31/2026");
+  type(text("Every"), "2");
   fireEvent.click(form().getByRole("button", { name: "Save" }));
   await waitFor(() =>
     expect(calls("update_recurring_rule")).toMatchObject([

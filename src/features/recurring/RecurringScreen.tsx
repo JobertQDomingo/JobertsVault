@@ -1,6 +1,5 @@
 import { Ellipsis, Plus, Repeat } from "lucide-react";
 import { useState } from "react";
-import type { Account } from "@/bindings/Account";
 import type { Category } from "@/bindings/Category";
 import type { RecurringRule } from "@/bindings/RecurringRule";
 import { CategoryChip, TransferChip } from "@/components/CategoryChip";
@@ -23,6 +22,7 @@ import {
 } from "@/hooks/useRecurring";
 import { useTransactionDefaults } from "@/hooks/useTransactions";
 import { formatSpan } from "@/lib/dates";
+import { rowTitle } from "@/lib/records";
 import { describeSchedule } from "@/lib/recurrence";
 import { cn } from "@/lib/utils";
 
@@ -93,7 +93,7 @@ export function RecurringScreen() {
     const accountList = accounts.data.accounts;
     const categoryList = categories.data.categories;
     body = rules.data.map((rule) => {
-      const title = titleOf(rule, accountList, categoryList);
+      const title = rowTitle(rule.transaction, accountList, categoryList);
       return (
         <div
           key={rule.id}
@@ -170,21 +170,6 @@ export function RecurringScreen() {
   );
 }
 
-/** "Category · Payee", or "Bank → Card" for a transfer, as the other lists name a row. */
-function titleOf(
-  rule: RecurringRule,
-  accounts: Account[],
-  categories: Category[],
-) {
-  const t = rule.transaction;
-  const name = (id: number | null) => accounts.find((a) => a.id === id)?.name;
-  return t.kind === "transfer"
-    ? `${name(t.accountId) ?? ""} → ${name(t.toAccountId) ?? ""}`
-    : [categories.find((c) => c.id === t.categoryId)?.name, t.payee]
-        .filter(Boolean)
-        .join(" · ");
-}
-
 function RuleRow({
   rule,
   title,
@@ -202,11 +187,11 @@ function RuleRow({
   const category = categories.find((c) => c.id === t.categoryId);
   const transfer = t.kind === "transfer";
   // A paused rule's next date moves when it's resumed, so it isn't shown (UI_FLOWS §8.2).
-  const when = rule.paused
-    ? ""
-    : rule.nextDate
-      ? ` · next ${formatSpan(rule.nextDate, rule.nextDate, today)}`
-      : " · ended";
+  const when = !rule.nextDate
+    ? " · ended"
+    : rule.paused
+      ? ""
+      : ` · next ${formatSpan(rule.nextDate, rule.nextDate, today)}`;
   const badge = BADGES[rule.paused ? "paused" : rule.mode];
   return (
     <button
