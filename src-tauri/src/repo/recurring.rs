@@ -168,6 +168,48 @@ pub fn set_paused(
     Ok(())
 }
 
+/// Where processing has got to (DATA_MODEL §4.1).
+pub fn set_next_index(conn: &Connection, id: i64, next_index: i64) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE recurring_rules SET next_index = ?2 WHERE id = ?1",
+        params![id, next_index],
+    )?;
+    Ok(())
+}
+
+/// Records `date` as processed, unless it already is: the UNIQUE key never lets a date be
+/// created twice (REC-4). The new row's id, or `None` when the date was already there.
+pub fn insert_occurrence(
+    conn: &Connection,
+    rule_id: i64,
+    date: &str,
+    status: &str,
+    now: &str,
+) -> rusqlite::Result<Option<i64>> {
+    let added = conn.execute(
+        "INSERT INTO recurring_occurrences (rule_id, occurrence_date, status, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?4)
+         ON CONFLICT (rule_id, occurrence_date) DO NOTHING",
+        params![rule_id, date, status, now],
+    )?;
+    Ok((added == 1).then(|| conn.last_insert_rowid()))
+}
+
+pub fn settle_occurrence(
+    conn: &Connection,
+    id: i64,
+    status: &str,
+    transaction_id: Option<i64>,
+    now: &str,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE recurring_occurrences SET status = ?2, transaction_id = ?3, updated_at = ?4
+         WHERE id = ?1",
+        params![id, status, transaction_id, now],
+    )?;
+    Ok(())
+}
+
 /// Its occurrences go with it (`ON DELETE CASCADE`); the transactions they created stay.
 pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<usize> {
     conn.execute("DELETE FROM recurring_rules WHERE id = ?1", [id])

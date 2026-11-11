@@ -73,6 +73,7 @@ pub fn create(
     let tx = conn.transaction()?;
     validate(&tx, &mut fields, None, now.date_naive())?;
     let id = repo::recurring::insert(&tx, &values(&fields), &stamp(now))?;
+    catch_up(&tx, self::stored(&tx, id)?, now)?;
     let saved = get(&tx, id)?;
     tx.commit()?;
     Ok(saved)
@@ -92,8 +93,7 @@ pub fn update(
     let rescheduled = frequency_text(fields.frequency) != stored.frequency
         || fields.interval != stored.interval
         || fields.transaction.date != stored.start_date;
-    let mut next_index = stored.next_index;
-    if rescheduled {
+    let next_index = if rescheduled {
         let start = transactions::real_date(&fields.transaction.date)
             .ok_or_else(|| invalid("date", "Enter a real date"))?;
         if start < earliest_restart(&stored, now.date_naive())? {
@@ -102,9 +102,19 @@ pub fn update(
                 "Choose a later start date. This rule already created or passed over the dates before it.",
             ));
         }
-        next_index = 0;
-    }
+        0
+    } else {
+        // An edit never fills in the past: a rule that had ended and is given a later end date or
+        // more times carries on from today (DATA_MODEL §4.1).
+        let unbounded = Schedule {
+            end: None,
+            ..schedule(&stored)?
+        };
+        let from = index(&stored, stored.next_index)?;
+        unbounded.first_on_or_after(from, now.date_naive()).into()
+    };
     repo::recurring::update(&tx, id, &values(&fields), next_index, &stamp(now))?;
+    catch_up(&tx, self::stored(&tx, id)?, now)?;
     let saved = get(&tx, id)?;
     tx.commit()?;
     Ok(saved)
@@ -130,6 +140,7 @@ pub fn pause(
         }
         repo::recurring::set_paused(&tx, id, paused, next_index, &stamp(now))?;
     }
+    catch_up(&tx, self::stored(&tx, id)?, now)?;
     let saved = get(&tx, id)?;
     tx.commit()?;
     Ok(saved)
@@ -143,6 +154,77 @@ pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     }
     tx.commit()?;
     Ok(())
+}
+
+/// Startup step 8, and whenever the window regains focus (ARCHITECTURE §6, §8): posts or queues
+/// every rule's dates due up to today. Each rule is one database transaction, so one that fails
+/// doesn't hold back the rest. How many dates it posted or queued, or the first failure.
+pub fn process_due(conn: &mut Connection, now: DateTime<Local>) -> Result<u32, AppError> {
+    let mut processed = 0;
+    let mut failed = None;
+    for row in repo::recurring::all(conn)? {
+        // A failure drops `tx`, which rolls back this rule only.
+        let one = conn.transaction().map_err(AppError::from).and_then(|tx| {
+            let n = catch_up(&tx, row, now)?;
+            tx.commit()?;
+            Ok(n)
+        });
+        match one {
+            Ok(n) => processed += n,
+            Err(err) => {
+                failed.get_or_insert(err);
+            }
+        }
+    }
+    failed.map_or(Ok(processed), Err)
+}
+
+/// Posts (auto) or queues (confirm) the rule's dates up to today that it hasn't processed yet
+/// (ARCHITECTURE §8). A date already recorded is passed over, so none is created twice (REC-4).
+/// The transaction keeps the template's account, category and payment method even once they're
+/// archived, as an edit of the rule may (DATA_MODEL §4.2). How many dates it processed.
+fn catch_up(
+    conn: &Connection,
+    row: repo::recurring::Row,
+    now: DateTime<Local>,
+) -> Result<u32, AppError> {
+    if row.paused {
+        return Ok(0);
+    }
+    let id = row.id;
+    let schedule = schedule(&row)?;
+    let first = index(&row, row.next_index)?;
+    let mut done = index(&row, row.done)?;
+    let rule = view(row)?;
+    let (status, auto) = match rule.mode {
+        RecurringMode::Auto => ("posted", true),
+        RecurringMode::Confirm => ("pending", false),
+    };
+    let stamp = stamp(now);
+    let mut next = first;
+    let mut processed = 0;
+    while let Some(date) = schedule
+        .next(next, done)
+        .filter(|date| *date <= now.date_naive())
+    {
+        let mut posted = rule.transaction.clone();
+        posted.date = date.to_string();
+        if let Some(occurrence) =
+            repo::recurring::insert_occurrence(conn, id, &posted.date, status, &stamp)?
+        {
+            if auto {
+                let txn = repo::transactions::insert(conn, &transactions::values(&posted), &stamp)?;
+                repo::recurring::settle_occurrence(conn, occurrence, status, Some(txn), &stamp)?;
+            }
+            done += 1;
+            processed += 1;
+        }
+        next += 1;
+    }
+    if next != first {
+        repo::recurring::set_next_index(conn, id, next.into())?;
+    }
+    Ok(processed)
 }
 
 /// The earliest start date a schedule edit may take (DATA_MODEL §4.1): after the last date
@@ -356,20 +438,48 @@ mod tests {
         }
     }
 
-    /// Stands in for processing (REC-4, a later task): records `dates` as posted and moves on.
-    fn process(conn: &Connection, id: i64, dates: &[&str]) {
-        for date in dates {
-            conn.execute(
-                "INSERT INTO recurring_occurrences (rule_id, occurrence_date, status, created_at, updated_at) VALUES (?1, ?2, 'posted', 'x', 'x')",
-                rusqlite::params![id, date],
-            )
-            .unwrap();
-        }
-        conn.execute(
-            "UPDATE recurring_rules SET next_index = next_index + ?2 WHERE id = ?1",
-            rusqlite::params![id, dates.len() as i64],
+    /// `date` at the tests' time of day: the `now` a save or a run of processing gets.
+    fn on(date: &str) -> DateTime<Local> {
+        d(date)
+            .and_time(now().time())
+            .and_local_timezone(Local)
+            .unwrap()
+    }
+
+    /// The rule's processed dates, oldest first: date, status and transaction.
+    fn occurrences(conn: &Connection, id: i64) -> Vec<(String, String, Option<i64>)> {
+        conn.prepare(
+            "SELECT occurrence_date, status, transaction_id FROM recurring_occurrences
+             WHERE rule_id = ?1 ORDER BY occurrence_date",
         )
-        .unwrap();
+        .unwrap()
+        .query_map([id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+        .unwrap()
+        .map(Result::unwrap)
+        .collect()
+    }
+
+    fn dates(conn: &Connection, id: i64) -> Vec<String> {
+        occurrences(conn, id).into_iter().map(|o| o.0).collect()
+    }
+
+    fn transaction_count(conn: &Connection) -> i64 {
+        conn.query_row("SELECT count(*) FROM transactions", [], |r| r.get(0))
+            .unwrap()
+    }
+
+    fn bank(conn: &mut Connection, name: &str) -> i64 {
+        let fields = accounts::AccountFields {
+            name: name.into(),
+            opening_balance: Money(0),
+            credit_limit: None,
+            statement_day: None,
+            due_day: None,
+        };
+        let kind = accounts::AccountKind::Bank;
+        accounts::create(conn, accounts::NewAccount { kind, fields }, now())
+            .unwrap()
+            .id
     }
 
     fn rule(conn: &Connection, id: i64) -> RecurringRule {
@@ -379,10 +489,10 @@ mod tests {
     #[test]
     fn a_new_rule_is_saved_trimmed_and_starts_on_its_start_date() {
         let mut conn = db();
-        let saved = create(&mut conn, rent("2026-01-31"), now()).unwrap();
+        let saved = create(&mut conn, rent("2026-11-30"), now()).unwrap();
         assert_eq!(saved.transaction.payee.as_deref(), Some("Landlord"));
         assert_eq!(saved.transaction.note, None);
-        assert_eq!(saved.next_date, Some(d("2026-01-31")));
+        assert_eq!(saved.next_date, Some(d("2026-11-30")));
         assert!(!saved.paused);
         assert_eq!(saved.mode, RecurringMode::Auto);
         assert_eq!(list(&conn).unwrap(), [saved]);
@@ -391,12 +501,13 @@ mod tests {
     #[test]
     fn a_start_date_may_be_in_the_past_or_the_future() {
         let mut conn = db();
-        for start in ["2025-06-01", "2027-03-15"] {
-            assert_eq!(
-                create(&mut conn, rent(start), now()).unwrap().next_date,
-                Some(d(start))
-            );
-        }
+        let later = create(&mut conn, rent("2027-03-15"), now()).unwrap();
+        assert_eq!(later.next_date, Some(d("2027-03-15")));
+        // now() is Nov 3, 2026: Jun 1, 2025 to Nov 1, 2026 are filled in on save.
+        let past = create(&mut conn, rent("2025-06-01"), now()).unwrap();
+        assert_eq!(past.next_date, Some(d("2026-12-01")));
+        assert_eq!(dates(&conn, past.id).len(), 18);
+        assert_eq!(transaction_count(&conn), 18);
     }
 
     #[test]
@@ -472,62 +583,90 @@ mod tests {
     #[test]
     fn a_template_edit_changes_future_dates_only() {
         let mut conn = db();
-        let id = create(&mut conn, rent("2026-01-31"), now()).unwrap().id;
-        process(&conn, id, &["2026-01-31", "2026-02-28"]);
+        let feb_28 = on("2026-02-28");
+        let id = create(&mut conn, rent("2026-01-31"), feb_28).unwrap().id;
         let mut edit = rent("2026-01-31");
         edit.transaction.amount = Money(1_600_000);
         edit.mode = RecurringMode::Confirm;
         edit.max_occurrences = Some(5);
-        let saved = update(&mut conn, id, edit, now()).unwrap();
+        let saved = update(&mut conn, id, edit, feb_28).unwrap();
         assert_eq!(saved.next_date, Some(d("2026-03-31")), "the place is kept");
         assert_eq!(saved.mode, RecurringMode::Confirm);
+        assert_eq!(occurrences(&conn, id)[1].1, "posted", "Feb 28 stays posted");
     }
 
     #[test]
     fn a_schedule_edit_starts_again_after_the_dates_already_processed() {
         let mut conn = db();
+        let feb_28 = on("2026-02-28");
         let mut fields = rent("2026-01-31");
         fields.max_occurrences = Some(4);
-        let id = create(&mut conn, fields, now()).unwrap().id;
-        process(&conn, id, &["2026-01-31", "2026-02-28"]);
+        let id = create(&mut conn, fields, feb_28).unwrap().id;
+        assert_eq!(dates(&conn, id), ["2026-01-31", "2026-02-28"]);
 
         let mut too_early = rent("2026-02-28");
         too_early.max_occurrences = Some(4);
-        assert_eq!(field(update(&mut conn, id, too_early, now())), "date");
+        assert_eq!(field(update(&mut conn, id, too_early, feb_28)), "date");
 
         // A 31st whose next date was Mar 31 moves to every 2 months from Mar 31, not the 28th.
         let mut every_2 = rent("2026-03-31");
         every_2.interval = 2;
         every_2.max_occurrences = Some(4);
-        let saved = update(&mut conn, id, every_2, now()).unwrap();
+        let saved = update(&mut conn, id, every_2, feb_28).unwrap();
         assert_eq!(saved.next_date, Some(d("2026-03-31")));
-        process(&conn, id, &["2026-03-31"]);
+        process_due(&mut conn, on("2026-03-31")).unwrap();
         assert_eq!(rule(&conn, id).next_date, Some(d("2026-05-31")));
-        process(&conn, id, &["2026-05-31"]);
+        process_due(&mut conn, on("2026-05-31")).unwrap();
         assert_eq!(
             rule(&conn, id).next_date,
             None,
             "4 times in all, the 2 before the edit included"
         );
+        assert_eq!(dates(&conn, id).len(), 4);
     }
 
     #[test]
     fn a_schedule_edit_never_brings_back_dates_passed_over_while_paused() {
         let mut conn = db();
-        let id = create(&mut conn, rent("2026-01-31"), now()).unwrap().id;
-        process(&conn, id, &["2026-01-31"]);
+        let id = create(&mut conn, rent("2026-01-31"), on("2026-01-31"))
+            .unwrap()
+            .id;
         pause(&mut conn, id, true, now()).unwrap();
         pause(&mut conn, id, false, now()).unwrap();
         let mut back_in_march = rent("2026-03-31");
         back_in_march.interval = 2;
         assert_eq!(field(update(&mut conn, id, back_in_march, now())), "date");
-        // now() is Nov 3, 2026.
+        // now() is Nov 3, 2026: starting again today posts today on save.
         let mut from_today = rent("2026-11-03");
         from_today.interval = 2;
         assert_eq!(
             update(&mut conn, id, from_today, now()).unwrap().next_date,
-            Some(d("2026-11-03"))
+            Some(d("2027-01-03"))
         );
+        assert_eq!(dates(&conn, id), ["2026-01-31", "2026-11-03"]);
+    }
+
+    #[test]
+    fn extending_a_rule_that_ended_carries_on_from_today() {
+        let mut conn = db();
+        // now() is Nov 3, 2026: both end after Feb 28.
+        let mut twice = rent("2026-01-31");
+        twice.max_occurrences = Some(2);
+        let twice = create(&mut conn, twice, now()).unwrap().id;
+        let mut until = rent("2026-01-31");
+        until.end_date = Some("2026-03-15".into());
+        let until = create(&mut conn, until, now()).unwrap().id;
+        assert_eq!(rule(&conn, twice).next_date, None);
+
+        let mut more = rent("2026-01-31");
+        more.max_occurrences = Some(12);
+        let mut later = rent("2026-01-31");
+        later.end_date = Some("2026-12-31".into());
+        for (id, edit) in [(twice, more), (until, later)] {
+            let saved = update(&mut conn, id, edit, now()).unwrap();
+            assert_eq!(saved.next_date, Some(d("2026-11-30")), "Mar–Oct never come");
+            assert_eq!(dates(&conn, id), ["2026-01-31", "2026-02-28"]);
+        }
     }
 
     #[test]
@@ -549,8 +688,9 @@ mod tests {
     #[test]
     fn resuming_skips_the_dates_it_was_paused_for() {
         let mut conn = db();
-        let id = create(&mut conn, rent("2026-01-31"), now()).unwrap().id;
-        process(&conn, id, &["2026-01-31"]);
+        let id = create(&mut conn, rent("2026-01-31"), on("2026-01-31"))
+            .unwrap()
+            .id;
         let paused = pause(&mut conn, id, true, now()).unwrap();
         assert!(paused.paused);
         assert_eq!(
@@ -569,6 +709,7 @@ mod tests {
             resumed,
             "resuming twice moves nothing"
         );
+        assert_eq!(dates(&conn, id), ["2026-01-31"]);
     }
 
     #[test]
@@ -576,8 +717,7 @@ mod tests {
         let mut conn = db();
         let mut fields = rent("2026-01-31");
         fields.max_occurrences = Some(2);
-        let id = create(&mut conn, fields, now()).unwrap().id;
-        process(&conn, id, &["2026-01-31"]);
+        let id = create(&mut conn, fields, on("2026-01-31")).unwrap().id;
         pause(&mut conn, id, true, now()).unwrap();
         let resumed = pause(&mut conn, id, false, now()).unwrap();
         assert_eq!(resumed.next_date, Some(d("2026-11-30")), "one time left");
@@ -586,15 +726,10 @@ mod tests {
     #[test]
     fn deleting_a_rule_keeps_its_transactions() {
         let mut conn = db();
-        let id = create(&mut conn, rent("2026-01-31"), now()).unwrap().id;
-        let mut posted = rent("2026-01-31").transaction;
-        posted.date = "2026-01-31".into();
-        let txn = transactions::create(&mut conn, posted, now()).unwrap().id;
-        conn.execute(
-            "INSERT INTO recurring_occurrences (rule_id, occurrence_date, status, transaction_id, created_at, updated_at) VALUES (?1, '2026-01-31', 'posted', ?2, 'x', 'x')",
-            [id, txn],
-        )
-        .unwrap();
+        let id = create(&mut conn, rent("2026-01-31"), on("2026-01-31"))
+            .unwrap()
+            .id;
+        let txn = occurrences(&conn, id)[0].2.unwrap();
         delete(&mut conn, id).unwrap();
         assert!(list(&conn).unwrap().is_empty());
         assert!(transactions::get(&conn, txn).is_ok());
@@ -612,23 +747,9 @@ mod tests {
     fn what_a_rule_uses_is_in_use() {
         let mut conn = db();
         let today = now().date_naive();
-        let bank = accounts::create(
-            &mut conn,
-            accounts::NewAccount {
-                kind: accounts::AccountKind::Bank,
-                fields: accounts::AccountFields {
-                    name: "Bank".into(),
-                    opening_balance: Money(0),
-                    credit_limit: None,
-                    statement_day: None,
-                    due_day: None,
-                },
-            },
-            now(),
-        )
-        .unwrap()
-        .id;
-        let mut fields = rent("2026-01-31");
+        let bank = bank(&mut conn, "Bank");
+        // Not due yet, so only the rule uses them.
+        let mut fields = rent("2026-12-31");
         fields.transaction.account_id = bank;
         create(&mut conn, fields, now()).unwrap();
         assert!(accounts::get(&conn, bank, today).unwrap().in_use);
@@ -657,23 +778,8 @@ mod tests {
     fn a_transfer_rule_puts_its_destination_in_use() {
         let mut conn = db();
         let today = now().date_naive();
-        let savings = accounts::create(
-            &mut conn,
-            accounts::NewAccount {
-                kind: accounts::AccountKind::Bank,
-                fields: accounts::AccountFields {
-                    name: "Savings".into(),
-                    opening_balance: Money(0),
-                    credit_limit: None,
-                    statement_day: None,
-                    due_day: None,
-                },
-            },
-            now(),
-        )
-        .unwrap()
-        .id;
-        let mut fields = rent("2026-01-31");
+        let savings = bank(&mut conn, "Savings");
+        let mut fields = rent("2026-12-31");
         fields.transaction.kind = TransactionKind::Transfer;
         fields.transaction.to_account_id = Some(savings);
         fields.transaction.category_id = None;
@@ -689,5 +795,183 @@ mod tests {
         let id = create(&mut conn, rent("2026-01-31"), now()).unwrap().id;
         categories::merge(&mut conn, FOOD, DINING, now()).unwrap();
         assert_eq!(rule(&conn, id).transaction.category_id, Some(DINING));
+    }
+
+    #[test]
+    fn processing_posts_each_date_due_up_to_today_once() {
+        let mut conn = db();
+        let id = create(&mut conn, rent("2026-01-31"), on("2026-01-01"))
+            .unwrap()
+            .id;
+        assert!(dates(&conn, id).is_empty(), "not due yet");
+
+        assert_eq!(process_due(&mut conn, on("2026-04-30")).unwrap(), 4);
+        assert_eq!(
+            process_due(&mut conn, on("2026-04-30")).unwrap(),
+            0,
+            "a second run creates nothing"
+        );
+        assert_eq!(process_due(&mut conn, on("2026-05-30")).unwrap(), 0);
+        assert_eq!(process_due(&mut conn, on("2026-05-31")).unwrap(), 1);
+
+        let done = occurrences(&conn, id);
+        let expected = [
+            "2026-01-31",
+            "2026-02-28",
+            "2026-03-31",
+            "2026-04-30",
+            "2026-05-31",
+        ];
+        assert_eq!(dates(&conn, id), expected);
+        for (date, status, txn) in done {
+            assert_eq!(status, "posted");
+            let txn = transactions::get(&conn, txn.unwrap()).unwrap();
+            assert_eq!(txn.date, d(&date));
+            assert_eq!(
+                (txn.kind, txn.amount, txn.account_id, txn.category_id),
+                (TransactionKind::Expense, Money(1_500_000), CASH, Some(FOOD))
+            );
+            assert_eq!(txn.payee.as_deref(), Some("Landlord"));
+            assert_eq!((txn.payment_method_id, txn.note), (Some(CASH_METHOD), None));
+        }
+        assert_eq!(transaction_count(&conn), 5);
+        let cash = accounts::get(&conn, CASH, d("2026-05-31")).unwrap();
+        assert_eq!(cash.balance, Money(-7_500_000));
+        assert_eq!(rule(&conn, id).next_date, Some(d("2026-06-30")));
+    }
+
+    #[test]
+    fn a_confirm_rule_queues_its_dates_without_posting() {
+        let mut conn = db();
+        let mut fields = rent("2026-10-31");
+        fields.mode = RecurringMode::Confirm;
+        let id = create(&mut conn, fields, now()).unwrap().id;
+        assert_eq!(
+            occurrences(&conn, id),
+            [("2026-10-31".into(), "pending".into(), None)]
+        );
+        assert_eq!(transaction_count(&conn), 0);
+        assert_eq!(rule(&conn, id).next_date, Some(d("2026-11-30")));
+    }
+
+    #[test]
+    fn a_date_already_recorded_is_never_created_again() {
+        let mut conn = db();
+        let id = create(&mut conn, rent("2026-01-31"), on("2026-01-31"))
+            .unwrap()
+            .id;
+        // Deleting a posted transaction keeps its date recorded (DATA_MODEL §4.2).
+        let first = occurrences(&conn, id)[0].2.unwrap();
+        transactions::delete(&mut conn, first).unwrap();
+        // A date ahead that's already recorded: the UNIQUE key passes it over.
+        conn.execute(
+            "INSERT INTO recurring_occurrences (rule_id, occurrence_date, status, created_at, updated_at) VALUES (?1, '2026-02-28', 'skipped', 'x', 'x')",
+            [id],
+        )
+        .unwrap();
+
+        assert_eq!(process_due(&mut conn, on("2026-03-31")).unwrap(), 1);
+        let done: Vec<_> = occurrences(&conn, id)
+            .into_iter()
+            .map(|(date, status, txn)| (date, status, txn.is_some()))
+            .collect();
+        assert_eq!(
+            done,
+            [
+                ("2026-01-31".into(), "posted".into(), false),
+                ("2026-02-28".into(), "skipped".into(), false),
+                ("2026-03-31".into(), "posted".into(), true),
+            ]
+        );
+        assert_eq!(transaction_count(&conn), 1);
+        assert_eq!(rule(&conn, id).next_date, Some(d("2026-04-30")));
+    }
+
+    #[test]
+    fn a_paused_rule_is_not_processed() {
+        let mut conn = db();
+        let id = create(&mut conn, rent("2026-01-31"), on("2026-01-01"))
+            .unwrap()
+            .id;
+        pause(&mut conn, id, true, on("2026-01-01")).unwrap();
+        assert_eq!(process_due(&mut conn, on("2026-03-31")).unwrap(), 0);
+        assert!(dates(&conn, id).is_empty());
+    }
+
+    #[test]
+    fn processing_stops_where_the_rule_ends() {
+        let mut conn = db();
+        let mut until = rent("2026-01-31");
+        until.end_date = Some("2026-03-15".into());
+        let until = create(&mut conn, until, on("2026-01-01")).unwrap().id;
+        let mut times = rent("2026-01-31");
+        times.max_occurrences = Some(3);
+        let times = create(&mut conn, times, on("2026-01-01")).unwrap().id;
+
+        assert_eq!(process_due(&mut conn, on("2026-12-31")).unwrap(), 5);
+        assert_eq!(dates(&conn, until), ["2026-01-31", "2026-02-28"]);
+        assert_eq!(dates(&conn, times).len(), 3);
+        assert_eq!(rule(&conn, until).next_date, None);
+        assert_eq!(rule(&conn, times).next_date, None);
+    }
+
+    #[test]
+    fn saving_or_resuming_a_rule_processes_it_at_once() {
+        let mut conn = db();
+        let id = create(&mut conn, rent("2026-12-01"), now()).unwrap().id;
+        assert!(dates(&conn, id).is_empty());
+        // now() is Nov 3, 2026.
+        let saved = update(&mut conn, id, rent("2026-11-03"), now()).unwrap();
+        assert_eq!(
+            saved.next_date,
+            Some(d("2026-12-03")),
+            "Nov 3 posted on save"
+        );
+        pause(&mut conn, id, true, now()).unwrap();
+        let resumed = pause(&mut conn, id, false, on("2026-12-03")).unwrap();
+        assert_eq!(
+            resumed.next_date,
+            Some(d("2027-01-03")),
+            "Dec 3 posted on resume"
+        );
+        assert_eq!(dates(&conn, id), ["2026-11-03", "2026-12-03"]);
+        assert_eq!(transaction_count(&conn), 2);
+    }
+
+    #[test]
+    fn a_rule_still_posts_with_what_it_uses_archived() {
+        let mut conn = db();
+        let bank = bank(&mut conn, "Bank");
+        let mut fields = rent("2026-01-31");
+        fields.transaction.account_id = bank;
+        let id = create(&mut conn, fields, on("2026-01-01")).unwrap().id;
+        accounts::archive(&mut conn, bank, false, now()).unwrap();
+        categories::archive(&mut conn, FOOD, now()).unwrap();
+        payment_methods::archive(&mut conn, CASH_METHOD, now()).unwrap();
+
+        assert_eq!(process_due(&mut conn, on("2026-02-28")).unwrap(), 2);
+        let txn = transactions::get(&conn, occurrences(&conn, id)[1].2.unwrap()).unwrap();
+        assert_eq!(
+            (txn.account_id, txn.category_id, txn.payment_method_id),
+            (bank, Some(FOOD), Some(CASH_METHOD))
+        );
+    }
+
+    #[test]
+    fn a_broken_rule_does_not_hold_back_the_others() {
+        let mut conn = db();
+        let jan = on("2026-01-01");
+        let broken = create(&mut conn, rent("2026-01-31"), jan).unwrap().id;
+        let fine = create(&mut conn, rent("2026-01-31"), jan).unwrap().id;
+        conn.execute(
+            "UPDATE recurring_rules SET start_date = 'soon' WHERE id = ?1",
+            [broken],
+        )
+        .unwrap();
+        assert!(matches!(
+            process_due(&mut conn, on("2026-02-28")),
+            Err(AppError::Database { .. })
+        ));
+        assert_eq!(dates(&conn, fine).len(), 2);
     }
 }

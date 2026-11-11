@@ -54,16 +54,23 @@ impl AppState {
         }
     }
 
-    /// Startup step 7 (BAK-2), run on its own thread so the window never waits for a slow backup
-    /// folder; commands wait for the connection instead. `locked` runs once this holds the
-    /// connection (or found none). A failure is logged, never a reason not to start.
-    pub fn back_up_daily(&self, now: DateTime<Local>, locked: impl FnOnce()) {
+    /// Startup steps 7 and 8 (BAK-2, REC-4), run on their own thread so the window never waits
+    /// for a slow backup folder; commands wait for the connection instead, so no screen reads the
+    /// data from before them. `locked` runs once this holds the connection (or found none). A
+    /// failure is logged, never a reason not to start.
+    pub fn back_up_and_process(&self, now: DateTime<Local>, locked: impl FnOnce()) {
         let conn = self.conn();
         locked();
-        if self.db.is_ok()
-            && let Err(err) =
-                conn.and_then(|conn| services::backup::back_up_daily(&conn, &self.data_dir, now))
-        {
+        if self.db.is_err() {
+            return;
+        }
+        let result = conn.and_then(|mut conn| {
+            if let Err(err) = services::backup::back_up_daily(&conn, &self.data_dir, now) {
+                log::record(&self.log_path, &err);
+            }
+            services::recurring::process_due(&mut conn, now).map(|_| ())
+        });
+        if let Err(err) = result {
             log::record(&self.log_path, &err);
         }
     }
@@ -249,8 +256,29 @@ mod tests {
         }
     }
 
+    /// A monthly rule from Oct 3 that the app hasn't processed yet, as after a month closed.
+    fn add_rule(state: &AppState) {
+        state
+            .conn()
+            .unwrap()
+            .execute_batch(
+                "INSERT INTO recurring_rules (kind, amount, account_id, category_id, frequency,
+                                              start_date, mode, created_at, updated_at)
+                 VALUES ('expense', 100, 1, 8, 'monthly', '2026-10-03', 'auto', 'x', 'x')",
+            )
+            .unwrap();
+    }
+
+    fn posted(state: &AppState) -> i64 {
+        state
+            .conn()
+            .unwrap()
+            .query_row("SELECT count(*) FROM transactions", [], |r| r.get(0))
+            .unwrap()
+    }
+
     #[test]
-    fn startup_makes_the_daily_backup() {
+    fn startup_makes_the_daily_backup_and_processes_recurring_rules() {
         let dir = TempDir::new("state-daily");
         let state = AppState::open(
             dir.path().to_path_buf(),
@@ -258,9 +286,11 @@ mod tests {
             now(),
         );
         assert_eq!(state.startup_status(), StartupStatus::Ok);
-        state.back_up_daily(now(), || {});
+        add_rule(&state);
+        state.back_up_and_process(now(), || {});
         let auto = dir.path().join(db::BACKUPS_DIR).join("auto");
         assert_eq!(fs::read_dir(auto).unwrap().count(), 1);
+        assert_eq!(posted(&state), 2, "Oct 3 and Nov 3");
     }
 
     #[test]
@@ -277,12 +307,14 @@ mod tests {
             now(),
         );
         assert_eq!(state.startup_status(), StartupStatus::Ok);
-        state.back_up_daily(now(), || {});
+        add_rule(&state);
+        state.back_up_and_process(now(), || {});
         assert!(
             fs::read_to_string(&state.log_path)
                 .unwrap()
                 .contains("io: Couldn't save the backup")
         );
+        assert_eq!(posted(&state), 2, "the rules are still processed");
     }
 
     #[test]

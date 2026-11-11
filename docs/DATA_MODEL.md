@@ -286,7 +286,7 @@ CREATE TABLE recurring_rules (
 **Start date:** any real date, past or future. Processing (ARCHITECTURE §8) posts or queues every date from `start_date` up to today, so a past start fills in the dates already gone by.
 
 **Editing a rule (REC-5):**
-- Template fields (amount, category, mode, `end_date`, `max_occurrences`, and so on) affect future occurrences only.
+- Template fields (amount, category, mode, `end_date`, `max_occurrences`, and so on) affect future occurrences only. So a rule that had ended and is given a later end date or more times carries on from its first date on or after today: the dates in between are never created.
 - The schedule changes when `frequency`, `interval` or `start_date` changes. The new `start_date` comes from the form, which offers the rule's next date. It must be after the last date already processed, and not before today or the rule's current next date, whichever is earlier, so the dates passed over while paused are never created and an edit never fills in the past. `next_index` is reset to 0. Because the user picks the date, a rule on the 31st whose next date is Feb 28 can be started again on Mar 31, so it doesn't drift to the 28th.
 
 **Pausing (REC-5):** a paused rule isn't processed. When it's resumed, `next_index` moves to the first date on or after the day it's resumed. The dates it would have had while paused are never created.
@@ -308,7 +308,7 @@ CREATE TABLE recurring_occurrences (
 ) STRICT;
 ```
 
-- **Auto mode:** a transaction is created and the row is inserted with status `posted`, both in one database transaction.
+- **Auto mode:** a transaction is created and the row is inserted with status `posted`, both in one database transaction. The transaction is the template with the occurrence's date, and it keeps the template's account, category and payment method even if they've since been archived, the same way an edit of the rule may keep them (§9).
 - **Confirm mode:** the row is inserted as `pending`. When the user approves it, it becomes `posted` and gets a transaction. When the user skips it, it becomes `skipped`.
 - Deleting a posted transaction keeps the occurrence row, so the app doesn't create it again.
 - Deleting a rule deletes its occurrence rows but **keeps** the transactions it created.
@@ -511,7 +511,7 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | A category's color is a palette key and its icon is on the curated list (DESIGN_SYSTEM §3.4, §6) | color / icon |
 | A transaction's category kind matches the transaction kind | category |
 | A transfer's destination differs from its source | to_account |
-| A **new** transaction can't use an archived account, category or payment method. Existing transactions keep theirs. | account / category |
+| A **new** transaction can't use an archived account, category or payment method. Existing transactions keep theirs, and a recurring rule's dates keep its template's (§4.2). | account / category |
 | Name lengths (account ≤ 50, category ≤ 40, payment method ≤ 40, payee ≤ 100, note ≤ 500) | that field |
 | Names are unique within their scope | name |
 | Credit card fields are present if and only if the account is a credit card | the card fields |
@@ -615,6 +615,8 @@ Answered on 2026-11-11:
 14. **Resuming a paused rule** skips the dates it would have had while paused (§4.1).
 15. **A rule's amount locks `currency_decimals`** like any other stored amount (§1). A rule's account, category or payment method counts as in use, so it's archived instead of deleted, and merging categories moves rules along with transactions.
 16. **A rule's start date** may be in the past; processing fills in the dates since then (§4.1).
+19. **Saving a rule processes it** (REC-4): creating, editing or resuming a rule posts or queues its dates up to today in the same database transaction, so a rule that starts today shows up at once rather than the next day or launch (ARCHITECTURE §8).
+20. **An archived account, category or payment method** that a rule's template uses doesn't stop its dates: they post with it, the same way an edit of the rule may keep it (§4.2, §6).
 
 Answered on 2026-11-01:
 

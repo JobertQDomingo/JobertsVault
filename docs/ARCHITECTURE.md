@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.1 |
-| **Last updated** | 2026-11-04 |
+| **Last updated** | 2026-11-11 |
 | **Related docs** | [PRD.md](PRD.md), [DATA_MODEL.md](DATA_MODEL.md) |
 
 ---
@@ -220,7 +220,7 @@ All commands use `camelCase` parameter names in TypeScript and `snake_case` in R
 | 1 | Settings | `get_settings` → every Phase 1 key (and from Phase 2, `comparisonMode`) and whether decimals are locked; `update_settings(settings)` saves the whole set and returns it the same way |
 | 2 | Reports | Every report takes `accountId`: none counts every account, an id counts only that account's own rows (RPT-5, DATA_MODEL §5.2). `get_timeseries(query, accountId)` → the chart's `grain` (day, week or month), its `bars` (each one's start, end, income, expense and net, counting only rows dated today or earlier) and `today` (RPT-1, DATA_MODEL §5.9); `get_category_breakdown(query, kind, accountId)` → its `kind` (expense or income), the `total`, every category with an amount as `categories` (id, amount and `share` in tenths of a percent, largest first) and the donut's `slices` (the 8 largest, then Other with no category) (RPT-2, DATA_MODEL §5.10); `get_comparison(query, mode, accountId)` → `inProgress` (whether today is in the period) and the `mode` used (`full` for a period that's over), the dates counted on each side (`currentStart`/`currentEnd`, `compareStart`/`compareEnd`), `income`, `expense` and `net` lines, and `incomeCategories` and `expenseCategories` (each line: current, compare, difference, and `change` in tenths of a percent or none when the comparison is 0), plus `today`. `mode` none means the `comparison_mode` setting (RPT-4, RPT-4a, DATA_MODEL §5.4); `suggest_payees(prefix, kind)` → up to 8 `{ payee, categoryId }` used before on rows of `kind` (expense or income) that start with `prefix`, most recent first, with `categoryId` none when that payee's last category is archived (TXN-6, DATA_MODEL §3.4) |
 | 2 | Backup | `backup_now` → the `fileName` of the copy it wrote into the backup folder (BAK-1, §7); `open_backup_folder` (opens Explorer there, taking no path from the frontend); `inspect_backup(path)` → the file's last-written local time as `modified` (`YYYY-MM-DDTHH:MM`), after the same checks a restore makes, changing nothing; `restore_backup(path)` (BAK-4, §7); `export_csv(range, path)` → `rows`, the number written (BAK-6, DATA_MODEL §8), where `range` is `{ start, end }` as `YYYY-MM-DD` and `path` the absolute `.csv` path the save dialog chose; `get_backup_status` → the backup `folder` and `folderIsDefault`, `autoBackup`, `lastBackupAt` (local `YYYY-MM-DDTHH:MM`, or none) and `due` (BAK-7); `set_backup_folder(path)` (an existing folder the app can write in, or none for the default) and `set_auto_backup(enabled)`, each returning the status (SET-3) |
-| 3 | Recurring | `list_recurring_rules` → every rule, each with its template (a transaction's fields, whose `date` is the start date), schedule, mode, `paused` and `nextDate` (none once it has ended); `create_recurring_rule(rule)`; `update_recurring_rule(id, rule)` (a schedule change starts again from the given start date, DATA_MODEL §4.1); `pause_recurring_rule(id, paused)` (resuming skips the dates it was paused for); `delete_recurring_rule(id)` (keeps the transactions it created) |
+| 3 | Recurring | `list_recurring_rules` → every rule, each with its template (a transaction's fields, whose `date` is the start date), schedule, mode, `paused` and `nextDate` (none once it has ended); `create_recurring_rule(rule)`; `update_recurring_rule(id, rule)` (a schedule change starts again from the given start date, DATA_MODEL §4.1); `pause_recurring_rule(id, paused)` (resuming skips the dates it was paused for); `delete_recurring_rule(id)` (keeps the transactions it created). Creating, editing and resuming a rule also process it (§8). `process_recurring` → how many dates it posted or queued (§8), which the frontend calls when the window regains focus, refreshing every `['ledger']` query when it's more than 0 |
 | 3 | Planning | `list_due_occurrences`, `post_occurrence`, `skip_occurrence`, budget CRUD + `get_budget_progress`, goal CRUD + `get_goal_progress` |
 
 **Dashboard data comes from one command.** `get_dashboard` returns everything the dashboard needs in a single response, so the screen loads in one round trip and every number on it is consistent with the others.
@@ -295,7 +295,7 @@ Quick-add (**Ctrl+N**) is a dialog that can be opened from any route. It isn't a
 5. Run migrations
 6. If the database is new: add the seed data (DATA_MODEL §7), inside migration 0001's transaction, so it lands with the schema or not at all
 7. [P2] Start the daily auto-backup, if it's on and not done yet today (BAK-2), then delete old ones (BAK-3). It runs on its own thread, started before the window shows so it takes the connection's lock before any command, and the window doesn't wait for it: a slow or unreachable backup folder delays the data, never the window. A failure is logged and doesn't stop startup
-8. [P3] Process recurring rules due up to today (REC-4)
+8. [P3] Process recurring rules due up to today (REC-4, §8), on step 7's thread right after the backup, still holding the connection's lock, so no screen reads the data from before it. A failure is logged and doesn't stop startup
 9. Store AppState, apply the window size (§11) and show the main window
 ```
 
@@ -330,17 +330,21 @@ The frontend calls `get_startup_status` first:
 
 ## 8. Recurring transactions (Phase 3)
 
-For each rule that isn't paused, in one database transaction per rule:
+For each rule that isn't paused, in one database transaction per rule (`services::recurring::process_due`):
 
 ```
 while occurrence(rule, next_index) ≤ today and the rule hasn't ended (end_date / max_occurrences):
     INSERT a recurring_occurrences row (rule_id, date)   -- the UNIQUE key blocks duplicates
-    if mode = auto:    create the transaction, status = 'posted'
-    else:              status = 'pending'
+    if the row was added:
+        if mode = auto:    create the transaction, status = 'posted'
+        else:              status = 'pending'
     next_index += 1
 ```
 
-This runs at startup and again whenever the date changes while the app is open (checked when the window regains focus).
+- **When it runs:** at startup (§6 step 8), and when the window regains focus, so a date that changed while the app was open is caught (`process_recurring`). Creating, editing or resuming a rule also processes that rule, in the same database transaction as the save, so a rule that starts today posts or queues today's date at once (DATA_MODEL §9). A focus on the same day therefore finds nothing.
+- **A date already recorded** (the insert hits the UNIQUE key) is passed over: no transaction is created and it isn't counted again.
+- **The transaction** is the template with the occurrence's date. It keeps the template's account, category and payment method even if they've since been archived (DATA_MODEL §4.2), and it doesn't change `last_used_account_id`.
+- **A rule that fails** (a bad stored value, say) rolls back on its own and is logged. The other rules are still processed, and the next run tries it again.
 
 ## 9. Testing strategy
 
