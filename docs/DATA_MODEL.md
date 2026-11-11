@@ -309,7 +309,9 @@ CREATE TABLE recurring_occurrences (
 ```
 
 - **Auto mode:** a transaction is created and the row is inserted with status `posted`, both in one database transaction. The transaction is the template with the occurrence's date, and it keeps the template's account, category and payment method even if they've since been archived, the same way an edit of the rule may keep them (§9).
-- **Confirm mode:** the row is inserted as `pending`. When the user approves it, it becomes `posted` and gets a transaction. When the user skips it, it becomes `skipped`.
+- **Confirm mode:** the row is inserted as `pending`. When the user approves it (Post, or Edit & post, UI_FLOWS F10), it becomes `posted` and gets a transaction, in one database transaction. When the user skips it, it becomes `skipped`. Only a `pending` row can be posted or skipped.
+  - **Post** creates the rule's template as it is when posted, dated the day it fell due: no copy of the template is kept per date, so a template edit also changes the dates still waiting.
+  - **Edit & post** creates the edited fields instead, checked like any new transaction (§6), except that it may keep the template's archived account, category or payment method. It changes only that date, never the rule. The row keeps its `occurrence_date` even when the transaction gets another date.
 - Deleting a posted transaction keeps the occurrence row, so the app doesn't create it again.
 - Deleting a rule deletes its occurrence rows but **keeps** the transactions it created.
 

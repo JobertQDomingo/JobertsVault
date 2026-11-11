@@ -156,6 +156,92 @@ pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     Ok(())
 }
 
+/// A date a Confirm rule queued, waiting for Post, Edit & post or Skip (REC-3, UI_FLOWS F10).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DueOccurrence {
+    #[ts(type = "number")]
+    pub id: i64,
+    /// What Post creates: the rule's template as it is now, dated the day it fell due.
+    pub transaction: TransactionFields,
+}
+
+/// The Due list (F10), oldest first.
+pub fn list_due(conn: &Connection) -> Result<Vec<DueOccurrence>, AppError> {
+    repo::recurring::pending(conn)?
+        .into_iter()
+        .map(|o| {
+            let transaction = TransactionFields {
+                date: o.date,
+                ..fields_of(&stored(conn, o.rule_id)?)?
+            };
+            Ok(DueOccurrence {
+                id: o.id,
+                transaction,
+            })
+        })
+        .collect()
+}
+
+/// Post and Edit & post (F10): the date's transaction from the edited `fields`, or from the
+/// rule's template dated the day it fell due. Either way it follows the transaction rules and may
+/// keep the template's archived records (DATA_MODEL §4.2). The rule itself doesn't change.
+pub fn post(
+    conn: &mut Connection,
+    id: i64,
+    fields: Option<TransactionFields>,
+    now: DateTime<Local>,
+) -> Result<Transaction, AppError> {
+    let tx = conn.transaction()?;
+    let (occurrence, rule) = due(&tx, id)?;
+    let mut posted = match fields {
+        Some(fields) => fields,
+        None => TransactionFields {
+            date: occurrence.date,
+            ..fields_of(&rule)?
+        },
+    };
+    transactions::validate(
+        &tx,
+        &mut posted,
+        Some(&template(&rule)?),
+        now.date_naive(),
+        false,
+    )?;
+    let stamp = stamp(now);
+    let txn = repo::transactions::insert(&tx, &transactions::values(&posted), &stamp)?;
+    repo::recurring::settle_occurrence(&tx, id, "posted", Some(txn), &stamp)?;
+    let saved = transactions::get(&tx, txn)?;
+    tx.commit()?;
+    Ok(saved)
+}
+
+/// Skip (F10): the date is settled with no transaction, so processing never brings it back.
+pub fn skip(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result<(), AppError> {
+    let tx = conn.transaction()?;
+    due(&tx, id)?;
+    repo::recurring::settle_occurrence(&tx, id, "skipped", None, &stamp(now))?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// A date still in the Due list, and its rule. One already posted or skipped is a `Conflict`.
+fn due(
+    conn: &Connection,
+    id: i64,
+) -> Result<(repo::recurring::Occurrence, repo::recurring::Row), AppError> {
+    let occurrence = repo::recurring::find_occurrence(conn, id)?
+        .ok_or_else(|| not_found("recurring date", id))?;
+    if occurrence.status != "pending" {
+        return Err(AppError::Conflict {
+            message: "This date was already posted or skipped".into(),
+        });
+    }
+    let rule = stored(conn, occurrence.rule_id)?;
+    Ok((occurrence, rule))
+}
+
 /// Startup step 8, and whenever the window regains focus (ARCHITECTURE §6, §8): posts or queues
 /// every rule's dates due up to today. Each rule is one database transaction, so one that fails
 /// doesn't hold back the rest. How many dates it posted or queued, or the first failure.
@@ -431,7 +517,7 @@ mod tests {
         transactions::real_date(text).unwrap()
     }
 
-    fn field(result: Result<RecurringRule, AppError>) -> String {
+    fn field<T: std::fmt::Debug>(result: Result<T, AppError>) -> String {
         match result {
             Err(AppError::Validation { field, .. }) => field,
             other => panic!("expected a validation error, got {other:?}"),
@@ -973,5 +1059,161 @@ mod tests {
             Err(AppError::Database { .. })
         ));
         assert_eq!(dates(&conn, fine).len(), 2);
+    }
+
+    /// A Confirm rule that queued Jan 31 and Feb 28.
+    fn queued(conn: &mut Connection) -> i64 {
+        let mut fields = rent("2026-01-31");
+        fields.mode = RecurringMode::Confirm;
+        create(conn, fields, on("2026-02-28")).unwrap().id
+    }
+
+    fn conflict<T: std::fmt::Debug>(result: Result<T, AppError>) {
+        assert!(
+            matches!(result, Err(AppError::Conflict { .. })),
+            "{result:?}"
+        );
+    }
+
+    #[test]
+    fn the_due_list_holds_each_queued_date_oldest_first() {
+        let mut conn = db();
+        let rent_id = queued(&mut conn);
+        let mut water = rent("2026-02-10");
+        water.mode = RecurringMode::Confirm;
+        water.transaction.amount = Money(3_240);
+        create(&mut conn, water, on("2026-02-28")).unwrap();
+        create(&mut conn, rent("2026-02-01"), on("2026-02-28")).unwrap(); // auto: never due
+
+        let due = list_due(&conn).unwrap();
+        let dated: Vec<_> = due
+            .iter()
+            .map(|o| (o.transaction.date.as_str(), o.transaction.amount))
+            .collect();
+        assert_eq!(
+            dated,
+            [
+                ("2026-01-31", Money(1_500_000)),
+                ("2026-02-10", Money(3_240)),
+                ("2026-02-28", Money(1_500_000)),
+            ]
+        );
+        assert_eq!(
+            due[0].transaction,
+            TransactionFields {
+                date: "2026-01-31".into(),
+                ..rule(&conn, rent_id).transaction
+            },
+            "the template, dated the day it fell due"
+        );
+    }
+
+    #[test]
+    fn post_creates_the_template_on_its_due_date() {
+        let mut conn = db();
+        let id = queued(&mut conn);
+        let first = list_due(&conn).unwrap()[0].id;
+        let posted = post(&mut conn, first, None, now()).unwrap();
+        assert_eq!(posted.date, d("2026-01-31"));
+        assert_eq!(
+            (posted.amount, posted.category_id, posted.payee.as_deref()),
+            (Money(1_500_000), Some(FOOD), Some("Landlord"))
+        );
+        assert_eq!(
+            occurrences(&conn, id)[0],
+            ("2026-01-31".into(), "posted".into(), Some(posted.id))
+        );
+        assert_eq!(list_due(&conn).unwrap().len(), 1);
+        let cash = accounts::get(&conn, CASH, now().date_naive()).unwrap();
+        assert_eq!(cash.balance, Money(-1_500_000));
+    }
+
+    #[test]
+    fn edit_and_post_saves_the_edited_fields_for_that_date_only() {
+        let mut conn = db();
+        let id = queued(&mut conn);
+        let first = list_due(&conn).unwrap()[0].clone();
+        let mut edited = first.transaction.clone();
+        edited.amount = Money(0);
+        assert_eq!(
+            field(post(&mut conn, first.id, Some(edited.clone()), now())),
+            "amount"
+        );
+        edited.amount = Money(1_450_000);
+        edited.date = "2026-11-04".into();
+        assert_eq!(
+            field(post(&mut conn, first.id, Some(edited.clone()), now())),
+            "date",
+            "not in the future until Phase 3's TXN-8"
+        );
+        assert_eq!(transaction_count(&conn), 0, "a refused edit posts nothing");
+
+        edited.date = "2026-02-02".into();
+        edited.note = Some("  paid late ".into());
+        let posted = post(&mut conn, first.id, Some(edited), now()).unwrap();
+        assert_eq!(posted.date, d("2026-02-02"));
+        assert_eq!(posted.amount, Money(1_450_000));
+        assert_eq!(posted.note.as_deref(), Some("paid late"));
+        assert_eq!(
+            occurrences(&conn, id)[0].0,
+            "2026-01-31",
+            "still its due date"
+        );
+        assert_eq!(
+            rule(&conn, id).transaction.amount,
+            Money(1_500_000),
+            "the rule is unchanged"
+        );
+    }
+
+    #[test]
+    fn a_due_date_may_keep_the_rule_s_archived_records_but_not_pick_others() {
+        let mut conn = db();
+        queued(&mut conn);
+        categories::archive(&mut conn, FOOD, now()).unwrap();
+        categories::archive(&mut conn, DINING, now()).unwrap();
+        let [first, second] = list_due(&conn).unwrap().try_into().unwrap();
+        assert_eq!(
+            post(&mut conn, first.id, None, now()).unwrap().category_id,
+            Some(FOOD)
+        );
+        let mut dining = second.transaction.clone();
+        dining.category_id = Some(DINING);
+        assert!(matches!(
+            post(&mut conn, second.id, Some(dining), now()),
+            Err(AppError::Validation { field, .. }) if field == "categoryId"
+        ));
+    }
+
+    #[test]
+    fn skip_settles_a_date_without_a_transaction_and_it_never_comes_back() {
+        let mut conn = db();
+        let id = queued(&mut conn);
+        let first = list_due(&conn).unwrap()[0].id;
+        skip(&mut conn, first, now()).unwrap();
+        assert_eq!(
+            occurrences(&conn, id)[0],
+            ("2026-01-31".into(), "skipped".into(), None)
+        );
+        process_due(&mut conn, on("2026-02-28")).unwrap();
+        assert_eq!(list_due(&conn).unwrap().len(), 1, "only Feb 28 is left");
+        assert_eq!(transaction_count(&conn), 0);
+    }
+
+    #[test]
+    fn only_a_date_still_due_can_be_posted_or_skipped() {
+        let mut conn = db();
+        queued(&mut conn);
+        let [first, second] = list_due(&conn).unwrap().try_into().unwrap();
+        post(&mut conn, first.id, None, now()).unwrap();
+        conflict(post(&mut conn, first.id, None, now()));
+        conflict(skip(&mut conn, first.id, now()));
+        skip(&mut conn, second.id, now()).unwrap();
+        conflict(post(&mut conn, second.id, None, now()));
+        assert_eq!(transaction_count(&conn), 1);
+        assert!(matches!(
+            skip(&mut conn, 999, now()),
+            Err(AppError::NotFound { .. })
+        ));
     }
 }

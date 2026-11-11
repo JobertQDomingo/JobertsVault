@@ -3,14 +3,15 @@ import { useEffect, useRef, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { Account } from "@/bindings/Account";
 import type { Category } from "@/bindings/Category";
+import type { DueOccurrence } from "@/bindings/DueOccurrence";
 import type { PaymentMethod } from "@/bindings/PaymentMethod";
-import type { Transaction } from "@/bindings/Transaction";
 import type { TransactionFields } from "@/bindings/TransactionFields";
 import type { TransactionKind } from "@/bindings/TransactionKind";
 import type { WeekStart } from "@/bindings/WeekStart";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useCategories } from "@/hooks/useCategories";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
+import { usePostOccurrence } from "@/hooks/useRecurring";
 import { useSettings } from "@/hooks/useSettings";
 import {
   useCreateTransaction,
@@ -44,13 +45,14 @@ import { Segmented } from "./ui/segmented";
 import { notify } from "./ui/toast";
 
 /**
- * What quick-add was opened for: nothing (add), a row to edit or duplicate, or a credit card to
- * pay (CC-9).
+ * What quick-add was opened for: nothing (add), a row to edit or duplicate, a credit card to
+ * pay (CC-9), or a due recurring date to Edit & post (UI_FLOWS F10).
  */
 export type QuickAddRequest = {
   edit?: number;
   duplicate?: number;
   payBill?: number;
+  post?: DueOccurrence;
 };
 
 type Values = {
@@ -155,16 +157,18 @@ export function QuickAddDialog({
       values: source.data
         ? // A duplicate is dated today (TXN-2).
           fromRow(source.data, request.duplicate !== undefined ? today : null)
-        : paying && payBill.data
-          ? // A transfer to the card for what's owed, from the backend's account (UI_FLOWS F2).
-            {
-              ...blank(payBill.data.fromAccountId, today),
-              kind: "transfer",
-              amount: payBill.data.amount,
-              toAccountId: text(request.payBill ?? null),
-              note: "Credit card payment",
-            }
-          : blank(defaults.data?.accountId ?? null, today),
+        : request.post
+          ? fromRow(request.post.transaction, null)
+          : paying && payBill.data
+            ? // A transfer to the card for what's owed, from the backend's account (UI_FLOWS F2).
+              {
+                ...blank(payBill.data.fromAccountId, today),
+                kind: "transfer",
+                amount: payBill.data.amount,
+                toAccountId: text(request.payBill ?? null),
+                note: "Credit card payment",
+              }
+            : blank(defaults.data?.accountId ?? null, today),
       today,
     });
 
@@ -177,7 +181,9 @@ export function QuickAddDialog({
               ? "Edit transaction"
               : request.payBill !== undefined
                 ? "Pay credit card"
-                : "Add transaction"
+                : request.post
+                  ? "Edit & post"
+                  : "Add transaction"
           }
           // The form puts the cursor in Amount itself.
           onOpenAutoFocus={(e) => e.preventDefault()}
@@ -190,6 +196,7 @@ export function QuickAddDialog({
           ) : start && settings ? (
             <TransactionForm
               editId={request.edit}
+              postId={request.post?.id}
               payment={paying}
               initial={start.values}
               today={start.today}
@@ -236,8 +243,8 @@ const blank = (accountId: number | null, today: string): Values => ({
   note: "",
 });
 
-/** The row's fields, dated `today` when given. */
-const fromRow = (t: Transaction, today: string | null): Values => ({
+/** The row's (or a due date's) fields, dated `today` when given. */
+const fromRow = (t: TransactionFields, today: string | null): Values => ({
   kind: t.kind,
   amount: t.amount,
   categoryId: text(t.categoryId),
@@ -255,6 +262,7 @@ const ROW =
 
 function TransactionForm({
   editId,
+  postId,
   payment,
   initial,
   today,
@@ -268,6 +276,8 @@ function TransactionForm({
   onDone,
 }: {
   editId?: number;
+  /** Edit & post: saving posts this due recurring date, and changes only it (F10). */
+  postId?: number;
   /** Pay bill: always a transfer, saved once (the mockup has no type switch or Save & add another). */
   payment: boolean;
   initial: Values;
@@ -295,9 +305,10 @@ function TransactionForm({
   const create = useCreateTransaction();
   const update = useUpdateTransaction();
   const remove = useDeleteTransaction();
+  const post = usePostOccurrence();
   const [deleting, setDeleting] = useState(false);
-  // An edit and a payment are saved once; a payment's type is fixed too.
-  const addAnother = editId === undefined && !payment;
+  // An edit, a payment and a post are saved once; a payment's type is fixed too.
+  const addAnother = editId === undefined && postId === undefined && !payment;
   // The ids an archived record may still be offered for: the row being edited or copied. Save &
   // add another starts a new row, which keeps none.
   const [kept, setKept] = useState(initial);
@@ -344,8 +355,10 @@ function TransactionForm({
         const transaction = toFields(values);
         if (editId !== undefined)
           await update.mutateAsync({ id: editId, transaction });
+        else if (postId !== undefined)
+          await post.mutateAsync({ id: postId, transaction });
         else await create.mutateAsync(transaction);
-        notify.success("Saved");
+        notify.success(postId !== undefined ? "Posted" : "Saved");
         if (another) {
           // Keeps the type, account and date; clears the rest (UI_FLOWS §4).
           const next = {

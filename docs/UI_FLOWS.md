@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Approved v1.1 |
 | **Style** | Glassmorphism 2.0 ([DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)) |
-| **Last updated** | 2026-11-06 |
+| **Last updated** | 2026-11-11 |
 | **Related docs** | [PRD.md](PRD.md), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), [ARCHITECTURE.md](ARCHITECTURE.md) §5.4 (routes) |
 
 The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors, glass levels and components come from DESIGN_SYSTEM.md. [design/ui-flows.html](design/ui-flows.html) shows every screen drawn in the real style, with consistent ₱ sample data. Open it in a browser.
@@ -78,7 +78,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
 - **Phase 3:**
   - a "Card payment due in 3 days: ₱640.00 owed" banner at the top (CC-7), with a **Pay bill** button
   - budget progress bars (DSH-6)
-  - recurring transactions coming up in the next 7 days (DSH-7), plus a "2 recurring transactions need confirming" banner
+  - recurring transactions coming up in the next 7 days (DSH-7), plus the "2 recurring transactions are due." banner (F10)
 
 ---
 
@@ -292,8 +292,12 @@ Welcome to Jobert's Vault
 - **Backup folder:** **Change…** opens the Windows folder picker. The app refuses a folder it can't write in, and **Use the default** goes back to `<app data>\backups`. New backups go to the folder; earlier ones stay where they are (SET-3).
 
 ### F10: Confirm recurring transactions (Phase 3)
-1. A banner on the dashboard says "2 recurring transactions are due" → **Review**.
-2. Each one shows **Post**, **Edit & post** or **Skip** (REC-3).
+1. An info banner on the dashboard says "2 recurring transactions are due." ("1 recurring transaction is due." for one) → **Review**. It shows while any date a Confirm rule queued is waiting (`recurringDue` from `get_dashboard`).
+2. **Review** opens the "Recurring transactions due" dialog: one row per date, oldest first, with the category chip, "Category · Payee" (a transfer: "Bank → Card"), "Due Sat, Oct 24 · Bank" and the amount. Each row has **Post**, **Edit & post** and **Skip** (REC-3). One is settled at a time.
+   - **Post** posts the rule's template on that date, with a "Posted" toast.
+   - **Edit & post** opens the transaction form (§4) over the dialog, titled "Edit & post", filled in from the template with the due date. **Save** posts what's in it and closes it, with a "Posted" toast. It has no Save & add another, and it changes only that date, never the rule.
+   - **Skip** settles the date with no transaction, with a "Skipped" toast. It never comes back.
+3. The dialog closes by itself once nothing is left, and the banner goes with it. A failure is a toast, and the date stays on the list.
 
 ### F11: Update the app (Phase 1)
 - **Automatic (the default):** at startup, the app checks for a newer version. "Checking for updates…" appears only if the check takes more than 150 ms. If there's a newer version, "Updating Jobert's Vault to 0.2.0…" appears, and the app closes and reopens on it. There's nothing to click (UPD-1).
@@ -386,3 +390,7 @@ Answered on 2026-11-07:
 
 14. **The Backup tab** lives at `/settings?tab=backup`, like the other Settings tabs, rather than a route of its own (§6, ARCHITECTURE §5.4).
 15. **Export to CSV** sits in the Backup tab, with its own From and To dates, rather than on the Transactions screen (§6, BAK-6).
+
+Answered on 2026-11-11:
+
+16. **Review due items** (F10) opens a dialog over the dashboard, rather than a Due section on the Recurring screen, so it works from the banner on its own. Edit & post opens the transaction form over it.

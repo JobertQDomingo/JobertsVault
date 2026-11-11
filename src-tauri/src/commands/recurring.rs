@@ -1,7 +1,8 @@
 use tauri::State;
 
 use crate::error::AppError;
-use crate::services::recurring::{RecurringRule, RecurringRuleFields};
+use crate::services::recurring::{DueOccurrence, RecurringRule, RecurringRuleFields};
+use crate::services::transactions::{Transaction, TransactionFields};
 use crate::state::AppState;
 use crate::{log, services};
 
@@ -36,6 +37,30 @@ pub fn pause_recurring_rule(
     paused: bool,
 ) -> Result<RecurringRule, AppError> {
     services::recurring::pause(&mut *state.conn()?, id, paused, chrono::Local::now())
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+/// The Due list (UI_FLOWS F10), oldest first.
+#[tauri::command(async)]
+pub fn list_due_occurrences(state: State<'_, AppState>) -> Result<Vec<DueOccurrence>, AppError> {
+    services::recurring::list_due(&*state.conn()?)
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+/// Post (no `transaction`) or Edit & post (the edited fields).
+#[tauri::command(async)]
+pub fn post_occurrence(
+    state: State<'_, AppState>,
+    id: i64,
+    transaction: Option<TransactionFields>,
+) -> Result<Transaction, AppError> {
+    services::recurring::post(&mut *state.conn()?, id, transaction, chrono::Local::now())
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+#[tauri::command(async)]
+pub fn skip_occurrence(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
+    services::recurring::skip(&mut *state.conn()?, id, chrono::Local::now())
         .inspect_err(|err| log::record(&state.log_path, err))
 }
 

@@ -7,7 +7,9 @@ import { useProcessOnFocus } from "./useProcessOnFocus";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
-beforeEach(() => vi.mocked(invoke).mockReset());
+beforeEach(() => {
+  vi.mocked(invoke).mockReset();
+});
 
 function setup() {
   const client = new QueryClient();

@@ -28,6 +28,8 @@ pub struct Dashboard {
     pub comparison: Comparison,
     /// The last backup is more than 7 days old, or there's none (BAK-7, UI_FLOWS F9).
     pub backup_due: bool,
+    /// How many recurring dates wait in the Due list, for the dashboard's banner (UI_FLOWS F10).
+    pub recurring_due: usize,
     /// Every account, archived included, with balances and card summaries as of today (DSH-4, DSH-5).
     pub accounts: Vec<Account>,
     pub net_balance: Money,
@@ -60,6 +62,7 @@ pub fn get(
         .collect::<Result<_, _>>()?;
     Ok(Dashboard {
         backup_due: super::backup::is_due(conn, today)?,
+        recurring_due: repo::recurring::pending(conn)?.len(),
         period,
         income,
         expense,
@@ -316,5 +319,34 @@ mod tests {
             .card
             .as_ref();
         assert_eq!(summary.unwrap().amount_owed, Money(64_000));
+    }
+
+    #[test]
+    fn it_counts_the_recurring_dates_due() {
+        use crate::domain::recurrence::Frequency;
+        use crate::services::recurring::{self, RecurringMode, RecurringRuleFields};
+        let mut conn = db();
+        assert_eq!(get(&conn, &MONTH, d(2026, 11, 3)).unwrap().recurring_due, 0);
+        let rule = RecurringRuleFields {
+            transaction: TransactionFields {
+                kind: TransactionKind::Expense,
+                amount: Money(3_240),
+                date: "2026-10-24".into(),
+                account_id: 1,
+                to_account_id: None,
+                category_id: Some(id_of(&conn, "categories", "Utilities")),
+                payee: None,
+                payment_method_id: None,
+                note: None,
+            },
+            frequency: Frequency::Weekly,
+            interval: 1,
+            end_date: None,
+            max_occurrences: None,
+            mode: RecurringMode::Confirm,
+        };
+        // now() is Nov 3, 2026: Oct 24 and 31 are due.
+        recurring::create(&mut conn, rule, now()).unwrap();
+        assert_eq!(get(&conn, &MONTH, d(2026, 11, 3)).unwrap().recurring_due, 2);
     }
 }

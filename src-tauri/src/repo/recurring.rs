@@ -195,6 +195,39 @@ pub fn insert_occurrence(
     Ok((added == 1).then(|| conn.last_insert_rowid()))
 }
 
+/// One `recurring_occurrences` row (DATA_MODEL §4.2).
+pub struct Occurrence {
+    pub id: i64,
+    pub rule_id: i64,
+    pub date: String,
+    pub status: String,
+}
+
+const OCCURRENCE: &str = "SELECT id, rule_id, occurrence_date, status FROM recurring_occurrences";
+
+fn occurrence(r: &rusqlite::Row) -> rusqlite::Result<Occurrence> {
+    Ok(Occurrence {
+        id: r.get(0)?,
+        rule_id: r.get(1)?,
+        date: r.get(2)?,
+        status: r.get(3)?,
+    })
+}
+
+/// The dates waiting in the Due list, oldest first.
+pub fn pending(conn: &Connection) -> rusqlite::Result<Vec<Occurrence>> {
+    conn.prepare(&format!(
+        "{OCCURRENCE} WHERE status = 'pending' ORDER BY occurrence_date, id"
+    ))?
+    .query_map([], occurrence)?
+    .collect()
+}
+
+pub fn find_occurrence(conn: &Connection, id: i64) -> rusqlite::Result<Option<Occurrence>> {
+    conn.query_row(&format!("{OCCURRENCE} WHERE id = ?1"), [id], occurrence)
+        .optional()
+}
+
 pub fn settle_occurrence(
     conn: &Connection,
     id: i64,

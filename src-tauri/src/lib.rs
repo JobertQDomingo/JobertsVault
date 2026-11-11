@@ -143,6 +143,9 @@ pub fn run() {
             commands::recurring::pause_recurring_rule,
             commands::recurring::delete_recurring_rule,
             commands::recurring::process_recurring,
+            commands::recurring::list_due_occurrences,
+            commands::recurring::post_occurrence,
+            commands::recurring::skip_occurrence,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the app")

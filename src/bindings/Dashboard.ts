@@ -28,6 +28,10 @@ comparison: Comparison,
  */
 backupDue: boolean, 
 /**
+ * How many recurring dates wait in the Due list, for the dashboard's banner (UI_FLOWS F10).
+ */
+recurringDue: number, 
+/**
  * Every account, archived included, with balances and card summaries as of today (DSH-4, DSH-5).
  */
 accounts: Array<Account>, netBalance: Money, 
