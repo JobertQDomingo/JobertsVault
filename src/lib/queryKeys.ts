@@ -18,6 +18,8 @@ export const queryKeys = {
   recurringRules: ["ledger", "recurring"],
   // A due date shows its rule's template, and processing adds dates.
   dueOccurrences: ["ledger", "due"],
+  // Deleting or merging a category deletes its budgets.
+  budgets: ["ledger", "budgets"],
   // A save can add a payee or change its last category.
   payees: (prefix: string, kind: CategoryKind) =>
     ["ledger", "payees", prefix, kind] as const,

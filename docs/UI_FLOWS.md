@@ -276,8 +276,8 @@ Welcome to Jobert's Vault
 
 ### F7: Archive or merge a category (Phase 1)
 1. Settings → Categories → ⋯ on the category → **Archive** or **Merge into…**.
-2. **Merge:** pick a category of the same kind → confirm: "Move 23 transactions from 'Snacks' to 'Dining Out' and delete 'Snacks'?" (CAT-4)
-3. A category with no transactions can simply be **deleted**.
+2. **Merge:** pick a category of the same kind → confirm: "Move 23 transactions from 'Snacks' to 'Dining Out' and delete 'Snacks' and any budget for it?" (CAT-4)
+3. A category with no transactions can simply be **deleted**. The confirm says "Any budget for it is deleted too." (Phase 3)
 4. Archived categories can be restored with **Unarchive**. The last active category of each kind can't be archived or deleted.
 
 ### F8: Look at a different period (Phase 1)

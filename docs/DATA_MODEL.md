@@ -17,7 +17,7 @@ This document describes every table and field, plus the rules for calculating ba
 |---|---|
 | **Money** | Stored as `INTEGER` in **minor units** (e.g. cents), as an `i64` in Rust. Floating-point numbers are never used for money, anywhere. |
 | **Amount sign** | `transactions.amount` is always **positive**. The transaction's `kind` decides whether money goes in or out. |
-| **Decimal places** | `currency_decimals` (0 or 2) decides how minor units are displayed. It **can only be changed while no amount is stored**: no transactions, no recurring rules, and no account with an opening balance other than 0 or a credit limit. Changing it afterwards would change the meaning of every stored amount. |
+| **Decimal places** | `currency_decimals` (0 or 2) decides how minor units are displayed. It **can only be changed while no amount is stored**: no transactions, no recurring rules, no budgets, and no account with an opening balance other than 0 or a credit limit. Changing it afterwards would change the meaning of every stored amount. |
 | **Dates** | `TEXT` in `YYYY-MM-DD` format (ISO 8601), using the user's local calendar. This format sorts correctly as plain text. No time of day is stored. |
 | **Timestamps** | `created_at` / `updated_at` are `TEXT` in ISO 8601 UTC (`2026-10-26T09:30:00Z`). They're for record-keeping only and are never used in calculations. Services receive the current time as a `now` value, the same way they receive `today`. |
 | **IDs** | `INTEGER PRIMARY KEY`, assigned by SQLite. |
@@ -127,7 +127,7 @@ CREATE TABLE categories (
 ) STRICT;
 ```
 
-**Merging (CAT-4):** in one database transaction, move every transaction from category A to active category B (both must be the same kind), then delete A.
+**Merging (CAT-4):** in one database transaction, move every transaction from category A to active category B (both must be the same kind), then delete A. A's budgets are deleted with it (§4.3).
 
 ### 3.3 `payment_methods`
 
@@ -333,6 +333,10 @@ CREATE UNIQUE INDEX uq_budget_overall  ON budgets(period)              WHERE cat
 ```
 
 - The category must be an expense category. This is checked in Rust.
+- One budget per category and period, and one per period for all spending. Every field can be edited, including the category and the period.
+- **Budgets are edited or deleted, never archived.** Nothing refers to a budget, so it can always be deleted, and `archived` stays 0.
+- **Deleting or merging a category deletes its budgets**, in the same database transaction. They don't move to the merge target, whose own limit is what the user set for it. A budget doesn't count as using a category, so it doesn't stop the category being deleted.
+- A budget's amount locks `currency_decimals` (§1).
 - A budget has no history of past amounts: if its amount changes, past periods are also measured against the new amount. That's acceptable because budgets never roll over (BUD-4).
 
 ### 4.4 `goals`
@@ -516,8 +520,9 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | Name lengths (account ≤ 50, category ≤ 40, payment method ≤ 40, payee ≤ 100, note ≤ 500) | that field |
 | Names are unique within their scope | name |
 | Credit card fields are present if and only if the account is a credit card | the card fields |
-| `currency_decimals` can't change once any amount is stored: a transaction, a recurring rule, or an account's non-zero opening balance or credit limit (§1) | settings |
+| `currency_decimals` can't change once any amount is stored: a transaction, a recurring rule, a budget, or an account's non-zero opening balance or credit limit (§1) | settings |
 | A budget's category is an expense category, and a goal's account isn't a credit card | category / account |
+| A new budget can't use an archived category, but an edit may keep the one it has. A category, or all spending, has at most one budget per period. | categoryId / period |
 | A recurring rule's template follows the transaction rules above: its date is the start date (§4.1) | that field |
 | A rule's interval is 1–999, its number of times is 1–9,999, and its end date is a real date on or after the start date. A rule ends on a date or after a number of times, not both. | interval / maxOccurrences / endDate |
 | A rule's new start date, when its schedule changes, is after the last date it already processed, and not before today or its current next date, whichever is earlier (§4.1) | date |
@@ -620,6 +625,9 @@ Answered on 2026-11-11:
 20. **An archived account, category or payment method** that a rule's template uses doesn't stop its dates: they post with it, the same way an edit of the rule may keep it (§4.2, §6).
 21. **Upcoming (TXN-8)** lists every future-dated row that matches the list's other filters, whatever its date, whenever the selected period hasn't ended, since ▶ stops at the current period and a row dated later would otherwise never be seen. Phase 3 drops the "Date can't be in the future" rule (§5.2, §6).
 22. **"Most recent" lookups skip future-dated rows** (TXN-8): payee suggestions and Pay bill's From account count only rows dated today or earlier, so one row dated months ahead can't hold the suggestion or the default until its date (§3.4, §5.8).
+23. **Budgets are never archived** (BUD-1): they're edited or deleted, because nothing refers to one and a budget keeps no history. The `archived` column stays 0 (§4.3).
+24. **Deleting or merging a category deletes its budgets** in the same database transaction, and the confirm dialogs say so. A budget doesn't make a category in use, and a merge doesn't move budgets to the target (§3.2, §4.3).
+25. **A budget's amount locks `currency_decimals`** like every other stored amount (§1).
 
 Answered on 2026-11-01:
 
