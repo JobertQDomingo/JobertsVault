@@ -1,6 +1,7 @@
-import { Plus, ReceiptText, Repeat } from "lucide-react";
+import { Plus, ReceiptText, Repeat, Target } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
+import type { BudgetProgress } from "@/bindings/BudgetProgress";
 import type { Category } from "@/bindings/Category";
 import type { Dashboard } from "@/bindings/Dashboard";
 import { AccountRow } from "@/components/AccountRow";
@@ -12,10 +13,12 @@ import { IncomeExpenseChart } from "@/components/IncomeExpenseChart";
 import { Loading, Skeleton } from "@/components/Loading";
 import { MoneyText } from "@/components/MoneyText";
 import { PeriodSwitcher } from "@/components/PeriodSwitcher";
+import { ProgressBar } from "@/components/ProgressBar";
 import { useQuickAdd } from "@/components/QuickAddProvider";
 import { StatCard } from "@/components/StatCard";
 import { TransactionRow } from "@/components/TransactionRow";
 import { Button } from "@/components/ui/button";
+import { BudgetName, budgetName, PERIODS } from "@/features/budgets/BudgetName";
 import { DueDialog } from "@/features/recurring/DueDialog";
 import { useBackupNow } from "@/hooks/useBackup";
 import { useCategories } from "@/hooks/useCategories";
@@ -210,7 +213,50 @@ function DashboardBody({
           </div>
         </GlassPanel>
       </div>
+      {/* The mockup's second column, "Coming up", is DSH-7. */}
+      <div className="grid grid-cols-2 items-start gap-3">
+        <Budgets budgets={data.budgets} categories={categoryList} />
+      </div>
     </>
+  );
+}
+
+/**
+ * Each budget's bar for its own current period, whatever the period shown, like the accounts'
+ * balances (DSH-6, DATA_MODEL §9).
+ */
+function Budgets({
+  budgets,
+  categories,
+}: {
+  budgets: BudgetProgress[];
+  categories: Category[];
+}) {
+  return (
+    <GlassPanel className="overflow-hidden pb-2">
+      <CardHeader title="Budgets" to="/budgets" link="Manage" />
+      {budgets.length === 0 ? (
+        <EmptyState icon={Target} message="No budgets yet." />
+      ) : (
+        <ul>
+          {budgets.map((b) => (
+            <li
+              key={b.id}
+              className="grid grid-cols-[minmax(0,1fr)_64px_minmax(0,1.25fr)] items-center gap-3 px-[18px] py-2"
+            >
+              <BudgetName categoryId={b.categoryId} categories={categories} />
+              <span className="text-small text-muted-foreground">
+                {PERIODS[b.period]}
+              </span>
+              <ProgressBar
+                percent={b.percent}
+                aria-label={`${budgetName(b.categoryId, categories)}, ${b.period} used`}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </GlassPanel>
   );
 }
 

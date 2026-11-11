@@ -1,11 +1,14 @@
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Local, NaiveDate};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::domain::budget::used_percent;
 use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
+use crate::repo::transactions::Filter;
+use crate::services::period::{self, PeriodQuery};
 use crate::services::{invalid, not_found, stamp};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -41,10 +44,63 @@ pub struct Budget {
     pub fields: BudgetFields,
 }
 
-/// Every budget: all spending first, then in the categories' order, weekly before monthly
-/// before yearly.
-pub fn list(conn: &Connection) -> Result<Vec<Budget>, AppError> {
-    repo::budgets::all(conn)?.into_iter().map(view).collect()
+/// A budget and how its current period is going (BUD-2): the week, month or year containing
+/// today, by the week and month start settings. Each period starts from nothing (BUD-4).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct BudgetProgress {
+    #[serde(flatten)]
+    pub budget: Budget,
+    pub start: NaiveDate,
+    pub end: NaiveDate,
+    /// The period's expenses dated today or earlier, in the category or in all of them.
+    pub spent: Money,
+    /// Below 0 once the limit is passed: the screens say how much over.
+    pub remaining: Money,
+    /// Whole percent rounded down, so amber means at least 80% and red at least 100% (BUD-3).
+    #[ts(type = "number")]
+    pub percent: i64,
+}
+
+/// Every budget with its progress: all spending first, then in the categories' order, weekly
+/// before monthly before yearly.
+pub fn list(conn: &Connection, today: NaiveDate) -> Result<Vec<BudgetProgress>, AppError> {
+    repo::budgets::all(conn)?
+        .into_iter()
+        .map(|row| progress(conn, view(row)?, today))
+        .collect()
+}
+
+/// DATA_MODEL §5.6. Refunds are income, so they never lower `spent`.
+fn progress(
+    conn: &Connection,
+    budget: Budget,
+    today: NaiveDate,
+) -> Result<BudgetProgress, AppError> {
+    let query = match budget.fields.period {
+        BudgetPeriod::Weekly => PeriodQuery::Week { anchor: None },
+        BudgetPeriod::Monthly => PeriodQuery::Month { anchor: None },
+        BudgetPeriod::Yearly => PeriodQuery::Year { anchor: None },
+    };
+    let current = period::resolve(conn, &query, today)?;
+    // The period contains today, and later rows don't count yet (DATA_MODEL §5.2).
+    let (from, to) = (current.start().to_string(), today.to_string());
+    let filter = Filter {
+        kind: Some("expense"),
+        category_id: budget.fields.category_id,
+        ..Filter::dates(&from, &to)
+    };
+    let spent = Money(repo::transactions::totals(conn, &filter)?.2);
+    let amount = budget.fields.amount;
+    Ok(BudgetProgress {
+        start: current.start(),
+        end: current.end(),
+        spent,
+        remaining: Money(amount.0.saturating_sub(spent.0)),
+        percent: used_percent(spent, amount),
+        budget,
+    })
 }
 
 pub fn create(
@@ -166,6 +222,8 @@ fn period_text(period: BudgetPeriod) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::accounts::{self, AccountFields, AccountKind, NewAccount};
+    use crate::services::transactions::{self, TransactionFields, TransactionKind};
     use crate::services::{categories, settings};
     use crate::test_support::{db, now};
     use std::fmt::Debug;
@@ -196,10 +254,17 @@ mod tests {
     }
 
     fn shown(conn: &Connection) -> Vec<(Option<i64>, BudgetPeriod)> {
-        list(conn)
-            .unwrap()
+        listed(conn)
             .into_iter()
             .map(|b| (b.fields.category_id, b.fields.period))
+            .collect()
+    }
+
+    fn listed(conn: &Connection) -> Vec<Budget> {
+        list(conn, now().date_naive())
+            .unwrap()
+            .into_iter()
+            .map(|p| p.budget)
             .collect()
     }
 
@@ -218,7 +283,7 @@ mod tests {
         );
         let all = add(&mut conn, None, BudgetPeriod::Yearly);
         assert_eq!(all.fields.category_id, None);
-        assert_eq!(list(&conn).unwrap(), [all, food]);
+        assert_eq!(listed(&conn), [all, food]);
     }
 
     #[test]
@@ -409,5 +474,181 @@ mod tests {
         assert!(!settings::get(&conn).unwrap().decimals_locked);
         add(&mut conn, None, BudgetPeriod::Monthly);
         assert!(settings::get(&conn).unwrap().decimals_locked);
+    }
+
+    fn d(y: i32, m: u32, day: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, day).expect("a real test date")
+    }
+
+    /// Saves a transaction in the seeded category `category`, from Cash, or a transfer to
+    /// `to_account` when it's given.
+    fn save(
+        conn: &mut Connection,
+        kind: TransactionKind,
+        category: Option<i64>,
+        to_account: Option<i64>,
+        amount: i64,
+        date: NaiveDate,
+    ) {
+        let fields = TransactionFields {
+            kind,
+            amount: Money(amount),
+            date: date.to_string(),
+            account_id: 1,
+            to_account_id: to_account,
+            category_id: category,
+            payee: None,
+            payment_method_id: None,
+            note: None,
+        };
+        transactions::create(conn, fields, now()).unwrap();
+    }
+
+    fn spend(conn: &mut Connection, category: i64, amount: i64, date: NaiveDate) {
+        save(
+            conn,
+            TransactionKind::Expense,
+            Some(category),
+            None,
+            amount,
+            date,
+        );
+    }
+
+    /// (start, end, spent, remaining, percent) of each budget, as of `today`.
+    fn figures(conn: &Connection, today: NaiveDate) -> Vec<(NaiveDate, NaiveDate, i64, i64, i64)> {
+        list(conn, today)
+            .unwrap()
+            .into_iter()
+            .map(|p| (p.start, p.end, p.spent.0, p.remaining.0, p.percent))
+            .collect()
+    }
+
+    #[test]
+    fn progress_counts_the_current_periods_expenses_up_to_today() {
+        let mut conn = db();
+        let food = fields(Some(FOOD), BudgetPeriod::Monthly, 60_000);
+        create(&mut conn, food, now()).unwrap();
+        spend(&mut conn, FOOD, 52_040, d(2026, 11, 1));
+        // Another category, last month, and a future-dated row don't count (TXN-8).
+        spend(&mut conn, DINING, 1_000, d(2026, 11, 5));
+        spend(&mut conn, FOOD, 9_999, d(2026, 10, 31));
+        spend(&mut conn, FOOD, 9_999, d(2026, 11, 12));
+        assert_eq!(
+            figures(&conn, d(2026, 11, 11)),
+            [(d(2026, 11, 1), d(2026, 11, 30), 52_040, 7_960, 86)]
+        );
+    }
+
+    #[test]
+    fn all_spending_counts_every_category_but_no_income_or_transfer() {
+        let mut conn = db();
+        create(
+            &mut conn,
+            fields(None, BudgetPeriod::Monthly, 350_000),
+            now(),
+        )
+        .unwrap();
+        spend(&mut conn, FOOD, 200_000, d(2026, 11, 2));
+        spend(&mut conn, DINING, 95_040, d(2026, 11, 3));
+        // A refund is income: it never lowers what was spent (DATA_MODEL §5.6).
+        let refund = Some(SALARY);
+        save(
+            &mut conn,
+            TransactionKind::Income,
+            refund,
+            None,
+            50_000,
+            d(2026, 11, 4),
+        );
+        let bank = NewAccount {
+            kind: AccountKind::Bank,
+            fields: AccountFields {
+                name: "Bank".into(),
+                opening_balance: Money(0),
+                credit_limit: None,
+                statement_day: None,
+                due_day: None,
+            },
+        };
+        let bank = accounts::create(&mut conn, bank, now()).unwrap().id;
+        save(
+            &mut conn,
+            TransactionKind::Transfer,
+            None,
+            Some(bank),
+            10_000,
+            d(2026, 11, 4),
+        );
+        assert_eq!(
+            figures(&conn, d(2026, 11, 11)),
+            [(d(2026, 11, 1), d(2026, 11, 30), 295_040, 54_960, 84)]
+        );
+    }
+
+    #[test]
+    fn past_the_limit_remaining_goes_below_0() {
+        let mut conn = db();
+        create(
+            &mut conn,
+            fields(Some(FOOD), BudgetPeriod::Weekly, 15_000),
+            now(),
+        )
+        .unwrap();
+        spend(&mut conn, FOOD, 18_000, d(2026, 11, 9));
+        // Wednesday Nov 11's week starts on Monday Nov 9.
+        assert_eq!(
+            figures(&conn, d(2026, 11, 11)),
+            [(d(2026, 11, 9), d(2026, 11, 15), 18_000, -3_000, 120)]
+        );
+    }
+
+    #[test]
+    fn nothing_carries_over_to_the_next_period() {
+        let mut conn = db();
+        create(
+            &mut conn,
+            fields(Some(FOOD), BudgetPeriod::Weekly, 15_000),
+            now(),
+        )
+        .unwrap();
+        spend(&mut conn, FOOD, 5_000, d(2026, 11, 10));
+        assert_eq!(
+            figures(&conn, d(2026, 11, 11)),
+            [(d(2026, 11, 9), d(2026, 11, 15), 5_000, 10_000, 33)]
+        );
+        // Next week gets its own 15,000, not the 10,000 left over too (BUD-4).
+        assert_eq!(
+            figures(&conn, d(2026, 11, 16)),
+            [(d(2026, 11, 16), d(2026, 11, 22), 0, 15_000, 0)]
+        );
+    }
+
+    #[test]
+    fn periods_follow_the_week_and_month_start_and_years_are_calendar_years() {
+        let mut conn = db();
+        let mut s = settings::stored(&conn).unwrap();
+        s.week_start = settings::WeekStart::Sunday;
+        s.month_start_day = 25;
+        settings::update(&mut conn, s).unwrap();
+        for period in [
+            BudgetPeriod::Weekly,
+            BudgetPeriod::Monthly,
+            BudgetPeriod::Yearly,
+        ] {
+            create(&mut conn, fields(None, period, 100), now()).unwrap();
+        }
+        let dates: Vec<_> = figures(&conn, d(2026, 11, 11))
+            .into_iter()
+            .map(|(start, end, ..)| (start, end))
+            .collect();
+        assert_eq!(
+            dates,
+            [
+                (d(2026, 11, 8), d(2026, 11, 14)),
+                (d(2026, 10, 25), d(2026, 11, 24)),
+                (d(2026, 1, 1), d(2026, 12, 31)),
+            ]
+        );
     }
 }

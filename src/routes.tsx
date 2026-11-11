@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, type RouteObject } from "react-router";
 import { AppShell } from "./components/AppShell";
 import { AccountDetailsScreen } from "./features/accounts/AccountDetailsScreen";
 import { AccountsScreen } from "./features/accounts/AccountsScreen";
+import { BudgetsScreen } from "./features/budgets/BudgetsScreen";
 import { SettingsScreen } from "./features/settings/SettingsScreen";
 import { WelcomeScreen } from "./features/onboarding/WelcomeScreen";
 import { DashboardScreen } from "./features/dashboard/DashboardScreen";
@@ -45,6 +46,11 @@ export const routes: RouteObject[] = [
         path: "recurring",
         element: <RecurringScreen />,
         handle: { title: "Recurring" },
+      },
+      {
+        path: "budgets",
+        element: <BudgetsScreen />,
+        handle: { title: "Budgets" },
       },
       {
         path: "settings",
