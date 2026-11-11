@@ -22,9 +22,10 @@ pub struct Schedule {
 
 impl Schedule {
     /// The `n`-th date (0 is `start`), always counted from `start` so a 31st never drifts to the
-    /// 28th (REC-2). `None` once the rule has ended, or past chrono's date range.
+    /// 28th (REC-2). `None` once the rule has ended, past chrono's date range, or for an interval
+    /// of 0, which would repeat `start` forever.
     pub fn occurrence(&self, n: u32) -> Option<NaiveDate> {
-        if self.max_occurrences.is_some_and(|max| n >= max) {
+        if self.interval == 0 || self.max_occurrences.is_some_and(|max| n >= max) {
             return None;
         }
         let steps = n.checked_mul(self.interval)?;
@@ -157,6 +158,19 @@ mod tests {
         };
         assert_eq!(first(&rule, 10), [d(2026, 11, 2), d(2026, 11, 9)]);
         assert_eq!(rule.occurrence(2), None);
+    }
+
+    #[test]
+    fn an_end_before_the_start_or_an_interval_of_0_gives_no_dates() {
+        let ended = Schedule {
+            end: Some(d(2026, 1, 30)),
+            ..every(Frequency::Monthly, 1, d(2026, 1, 31))
+        };
+        assert_eq!(ended.occurrence(0), None);
+        assert_eq!(
+            every(Frequency::Daily, 0, d(2026, 1, 31)).occurrence(0),
+            None
+        );
     }
 
     #[test]
