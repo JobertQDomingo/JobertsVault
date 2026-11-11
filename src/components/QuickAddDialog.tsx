@@ -1,17 +1,31 @@
 import { Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import type { Account } from "@/bindings/Account";
 import type { Category } from "@/bindings/Category";
 import type { DueOccurrence } from "@/bindings/DueOccurrence";
+import type { Frequency } from "@/bindings/Frequency";
 import type { PaymentMethod } from "@/bindings/PaymentMethod";
+import type { RecurringMode } from "@/bindings/RecurringMode";
+import type { RecurringRule } from "@/bindings/RecurringRule";
+import type { RecurringRuleFields } from "@/bindings/RecurringRuleFields";
 import type { TransactionFields } from "@/bindings/TransactionFields";
 import type { TransactionKind } from "@/bindings/TransactionKind";
 import type { WeekStart } from "@/bindings/WeekStart";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useCategories } from "@/hooks/useCategories";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
-import { usePostOccurrence } from "@/hooks/useRecurring";
+import {
+  useCreateRecurringRule,
+  usePostOccurrence,
+  useUpdateRecurringRule,
+} from "@/hooks/useRecurring";
 import { useSettings } from "@/hooks/useSettings";
 import {
   useCreateTransaction,
@@ -23,6 +37,7 @@ import {
   useUpdateTransaction,
 } from "@/hooks/useTransactions";
 import { named, offered } from "@/lib/records";
+import { unitOf } from "@/lib/recurrence";
 import { showSaveError } from "@/lib/saveError";
 import { ACCOUNT_ICONS } from "./AccountRow";
 import { AmountInput } from "./AmountInput";
@@ -46,13 +61,15 @@ import { notify } from "./ui/toast";
 
 /**
  * What quick-add was opened for: nothing (add), a row to edit or duplicate, a credit card to
- * pay (CC-9), or a due recurring date to Edit & post (UI_FLOWS F10).
+ * pay (CC-9), a due recurring date to Edit & post (UI_FLOWS F10), or a recurring rule, new
+ * (`true`) or to edit: the form plus a schedule section (§8.2).
  */
 export type QuickAddRequest = {
   edit?: number;
   duplicate?: number;
   payBill?: number;
   post?: DueOccurrence;
+  rule?: RecurringRule | true;
 };
 
 type Values = {
@@ -65,7 +82,40 @@ type Values = {
   payee: string;
   paymentMethodId: string | null;
   note: string;
+  // A rule's schedule; the date is its start date.
+  frequency: Frequency;
+  interval: string;
+  ends: "never" | "on" | "after";
+  endDate: string;
+  maxOccurrences: string;
+  mode: RecurringMode;
 };
+
+/** A new rule's schedule, and what every other form carries unused. */
+const SCHEDULE = {
+  frequency: "monthly",
+  interval: "1",
+  ends: "never",
+  endDate: "",
+  maxOccurrences: "",
+  mode: "auto",
+} as const;
+
+const FREQUENCIES: { value: Frequency; label: string }[] = [
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "yearly", label: "Yearly" },
+];
+const ENDS: { value: Values["ends"]; label: string }[] = [
+  { value: "never", label: "Never" },
+  { value: "on", label: "On a date" },
+  { value: "after", label: "Number of times" },
+];
+const MODES: { value: RecurringMode; label: string }[] = [
+  { value: "auto", label: "Auto-post" },
+  { value: "confirm", label: "Confirm" },
+];
 
 const KINDS: { value: TransactionKind; label: string }[] = [
   { value: "expense", label: "Expense" },
@@ -98,6 +148,33 @@ function toFields(v: Values): TransactionFields {
   };
 }
 
+/** A count typed as digits, or 0 so the backend's "Enter a number from…" shows under the field. */
+const count = (text: string) =>
+  /^\d{1,6}$/.test(text.trim()) ? Number(text) : 0;
+
+/** The form as a rule: the transaction is its template, dated the start date (REC-1). */
+const toRule = (v: Values): RecurringRuleFields => ({
+  transaction: toFields(v),
+  frequency: v.frequency,
+  interval: count(v.interval),
+  endDate: v.ends === "on" ? v.endDate : null,
+  maxOccurrences: v.ends === "after" ? count(v.maxOccurrences) : null,
+  mode: v.mode,
+});
+
+const titleOf = (request: QuickAddRequest) =>
+  request.edit !== undefined
+    ? "Edit transaction"
+    : request.payBill !== undefined
+      ? "Pay credit card"
+      : request.post
+        ? "Edit & post"
+        : request.rule === true
+          ? "New rule"
+          : request.rule
+            ? "Edit rule"
+            : "Add transaction";
+
 /**
  * The quick-add and edit dialog (UI_FLOWS §4). It waits for what the form starts from, then
  * shows it; closing a form with changes asks "Discard changes?" first.
@@ -110,6 +187,7 @@ export function QuickAddDialog({
   onClose: () => void;
 }) {
   const sourceId = request.edit ?? request.duplicate;
+  const editingRule = request.rule === true ? undefined : request.rule;
   // What the form starts from, taken once. After that the row isn't watched, so deleting it (or
   // a refresh) can't pull the form away mid-save.
   const [start, setStart] = useState<{ values: Values; today: string } | null>(
@@ -159,16 +237,18 @@ export function QuickAddDialog({
           fromRow(source.data, request.duplicate !== undefined ? today : null)
         : request.post
           ? fromRow(request.post.transaction, null)
-          : paying && payBill.data
-            ? // A transfer to the card for what's owed, from the backend's account (UI_FLOWS F2).
-              {
-                ...blank(payBill.data.fromAccountId, today),
-                kind: "transfer",
-                amount: payBill.data.amount,
-                toAccountId: text(request.payBill ?? null),
-                note: "Credit card payment",
-              }
-            : blank(defaults.data?.accountId ?? null, today),
+          : editingRule
+            ? fromRule(editingRule)
+            : paying && payBill.data
+              ? // A transfer to the card for what's owed, from the backend's account (UI_FLOWS F2).
+                {
+                  ...blank(payBill.data.fromAccountId, today),
+                  kind: "transfer",
+                  amount: payBill.data.amount,
+                  toAccountId: text(request.payBill ?? null),
+                  note: "Credit card payment",
+                }
+              : blank(defaults.data?.accountId ?? null, today),
       today,
     });
 
@@ -176,15 +256,7 @@ export function QuickAddDialog({
     <>
       <Dialog open onOpenChange={(open) => !open && close()}>
         <DialogContent
-          title={
-            request.edit !== undefined
-              ? "Edit transaction"
-              : request.payBill !== undefined
-                ? "Pay credit card"
-                : request.post
-                  ? "Edit & post"
-                  : "Add transaction"
-          }
+          title={titleOf(request)}
           // The form puts the cursor in Amount itself.
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
@@ -197,6 +269,15 @@ export function QuickAddDialog({
             <TransactionForm
               editId={request.edit}
               postId={request.post?.id}
+              schedule={
+                request.rule
+                  ? {
+                      ruleId: editingRule?.id,
+                      // A new schedule restarts from the next date (DATA_MODEL §4.1).
+                      restart: editingRule?.nextDate ?? start.today,
+                    }
+                  : undefined
+              }
               payment={paying}
               initial={start.values}
               today={start.today}
@@ -232,6 +313,7 @@ export function QuickAddDialog({
 }
 
 const blank = (accountId: number | null, today: string): Values => ({
+  ...SCHEDULE,
   kind: "expense",
   amount: null,
   categoryId: null,
@@ -245,6 +327,7 @@ const blank = (accountId: number | null, today: string): Values => ({
 
 /** The row's (or a due date's) fields, dated `today` when given. */
 const fromRow = (t: TransactionFields, today: string | null): Values => ({
+  ...SCHEDULE,
   kind: t.kind,
   amount: t.amount,
   categoryId: text(t.categoryId),
@@ -256,13 +339,55 @@ const fromRow = (t: TransactionFields, today: string | null): Values => ({
   note: t.note ?? "",
 });
 
+/** A rule's template and schedule; its date is the start date. */
+const fromRule = (r: RecurringRule): Values => ({
+  ...fromRow(r.transaction, null),
+  frequency: r.frequency,
+  interval: String(r.interval),
+  ends: r.endDate ? "on" : r.maxOccurrences ? "after" : "never",
+  endDate: r.endDate ?? "",
+  maxOccurrences: r.maxOccurrences ? String(r.maxOccurrences) : "",
+  mode: r.mode,
+});
+
 // The mockup's form rows: a 96 px label, the field beside it, its message under the field.
 const ROW =
   "grid-cols-[96px_minmax(0,1fr)] items-center gap-x-3 [&>p]:col-start-2";
 
+/** A row whose control names itself (a Segmented), so its label is plain text. */
+function Labeled({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className={`grid gap-1 ${ROW}`}>
+      <span className="text-small font-semibold text-muted-foreground">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+/** A count with its unit after it, "Every [2] months". Field's aria props reach the input. */
+function WithUnit({
+  unit,
+  ...props
+}: ComponentProps<"input"> & { unit: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        inputMode="numeric"
+        autoComplete="off"
+        className="w-20"
+        {...props}
+      />
+      <span className="text-muted-foreground">{unit}</span>
+    </div>
+  );
+}
+
 function TransactionForm({
   editId,
   postId,
+  schedule,
   payment,
   initial,
   today,
@@ -278,6 +403,8 @@ function TransactionForm({
   editId?: number;
   /** Edit & post: saving posts this due recurring date, and changes only it (F10). */
   postId?: number;
+  /** A recurring rule (§8.2): the schedule section, and `ruleId` when editing one. */
+  schedule?: { ruleId?: number; restart: string };
   /** Pay bill: always a transfer, saved once (the mockup has no type switch or Save & add another). */
   payment: boolean;
   initial: Values;
@@ -306,9 +433,12 @@ function TransactionForm({
   const update = useUpdateTransaction();
   const remove = useDeleteTransaction();
   const post = usePostOccurrence();
+  const createRule = useCreateRecurringRule();
+  const updateRule = useUpdateRecurringRule();
   const [deleting, setDeleting] = useState(false);
-  // An edit, a payment and a post are saved once; a payment's type is fixed too.
-  const addAnother = editId === undefined && postId === undefined && !payment;
+  // An edit, a payment, a post and a rule are saved once; a payment's type is fixed too.
+  const addAnother =
+    editId === undefined && postId === undefined && !schedule && !payment;
   // The ids an archived record may still be offered for: the row being edited or copied. Save &
   // add another starts a new row, which keeps none.
   const [kept, setKept] = useState(initial);
@@ -318,6 +448,17 @@ function TransactionForm({
   const transfer = kind === "transfer";
   const payees =
     usePayeeSuggestions(useWatch({ control, name: "payee" }), kind).data ?? [];
+  const [frequency, interval, ends] = useWatch({
+    control,
+    name: ["frequency", "interval", "ends"],
+  });
+
+  // Editing a rule's frequency or interval starts it again (DATA_MODEL §4.1): from its next
+  // date, unless another start date was already chosen, so the dates already done stay done.
+  const offerRestart = () => {
+    if (schedule?.ruleId !== undefined && getValues("date") === initial.date)
+      setValue("date", schedule.restart, { shouldDirty: true });
+  };
 
   useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange]);
 
@@ -345,6 +486,8 @@ function TransactionForm({
           "payee",
           ...(showMethod ? (["paymentMethodId"] as const) : []),
         ] as const)),
+    // A hidden end field is sent as none, so it never has an error.
+    ...(schedule ? (["interval", "endDate", "maxOccurrences"] as const) : []),
   ];
 
   const save = (another: boolean) => {
@@ -353,7 +496,13 @@ function TransactionForm({
     void handleSubmit(async (values) => {
       try {
         const transaction = toFields(values);
-        if (editId !== undefined)
+        if (schedule?.ruleId !== undefined)
+          await updateRule.mutateAsync({
+            id: schedule.ruleId,
+            rule: toRule(values),
+          });
+        else if (schedule) await createRule.mutateAsync(toRule(values));
+        else if (editId !== undefined)
           await update.mutateAsync({ id: editId, transaction });
         else if (postId !== undefined)
           await post.mutateAsync({ id: postId, transaction });
@@ -409,6 +558,31 @@ function TransactionForm({
             placeholder="Choose an account"
             // Paying a card: the card it pays stays (UI_FLOWS F2).
             disabled={payment && name === "toAccountId"}
+          />
+        </Field>
+      )}
+    />
+  );
+
+  // A rule's start date sits in its schedule section, and may be in the past or the future.
+  const dateField = (
+    <Controller
+      control={control}
+      name="date"
+      render={({ field }) => (
+        <Field
+          label={schedule ? "Starts" : "Date"}
+          htmlFor="qa-date"
+          error={errors.date?.message}
+          className={ROW}
+        >
+          <DatePicker
+            id="qa-date"
+            value={field.value}
+            onChange={field.onChange}
+            weekStart={weekStart}
+            // Until Phase 3 nothing is recorded after today (TXN-8).
+            max={schedule ? undefined : today}
           />
         </Field>
       )}
@@ -523,27 +697,7 @@ function TransactionForm({
               {account("accountId", "Account")}
             </>
           )}
-          <Controller
-            control={control}
-            name="date"
-            render={({ field }) => (
-              <Field
-                label="Date"
-                htmlFor="qa-date"
-                error={errors.date?.message}
-                className={ROW}
-              >
-                <DatePicker
-                  id="qa-date"
-                  value={field.value}
-                  onChange={field.onChange}
-                  weekStart={weekStart}
-                  // Until Phase 3 nothing is recorded after today (TXN-8).
-                  max={today}
-                />
-              </Field>
-            )}
-          />
+          {!schedule && dateField}
           {!transfer && (
             <>
               <Controller
@@ -620,6 +774,109 @@ function TransactionForm({
               {...register("note")}
             />
           </Field>
+          {schedule && (
+            <>
+              <h3 className="mt-1 border-t border-hairline pt-3 text-small font-semibold text-muted-foreground">
+                Schedule
+              </h3>
+              <Labeled label="Repeats">
+                <Controller
+                  control={control}
+                  name="frequency"
+                  render={({ field }) => (
+                    <Segmented
+                      aria-label="Repeats"
+                      value={field.value}
+                      onChange={(next) => {
+                        field.onChange(next);
+                        offerRestart();
+                      }}
+                      options={FREQUENCIES}
+                      className="justify-self-start"
+                    />
+                  )}
+                />
+              </Labeled>
+              <Field
+                label="Every"
+                htmlFor="qa-interval"
+                error={errors.interval?.message}
+                className={ROW}
+              >
+                <WithUnit
+                  id="qa-interval"
+                  unit={unitOf(frequency, interval)}
+                  {...register("interval", { onChange: offerRestart })}
+                />
+              </Field>
+              {dateField}
+              <Labeled label="Ends">
+                <Controller
+                  control={control}
+                  name="ends"
+                  render={({ field }) => (
+                    <Segmented
+                      aria-label="Ends"
+                      value={field.value}
+                      onChange={field.onChange}
+                      options={ENDS}
+                      className="justify-self-start"
+                    />
+                  )}
+                />
+              </Labeled>
+              {ends === "on" && (
+                <Controller
+                  control={control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <Field
+                      label="Ends on"
+                      htmlFor="qa-endDate"
+                      error={errors.endDate?.message}
+                      className={ROW}
+                    >
+                      <DatePicker
+                        id="qa-endDate"
+                        value={field.value}
+                        onChange={field.onChange}
+                        weekStart={weekStart}
+                      />
+                    </Field>
+                  )}
+                />
+              )}
+              {ends === "after" && (
+                <Field
+                  label="Ends after"
+                  htmlFor="qa-maxOccurrences"
+                  error={errors.maxOccurrences?.message}
+                  className={ROW}
+                >
+                  <WithUnit
+                    id="qa-maxOccurrences"
+                    unit="times"
+                    {...register("maxOccurrences")}
+                  />
+                </Field>
+              )}
+              <Labeled label="Mode">
+                <Controller
+                  control={control}
+                  name="mode"
+                  render={({ field }) => (
+                    <Segmented
+                      aria-label="Mode"
+                      value={field.value}
+                      onChange={field.onChange}
+                      options={MODES}
+                      className="justify-self-start"
+                    />
+                  )}
+                />
+              </Labeled>
+            </>
+          )}
         </DialogBody>
         <DialogFooter>
           {editId !== undefined && (

@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import type { DueOccurrence } from "@/bindings/DueOccurrence";
+import type { RecurringRule } from "@/bindings/RecurringRule";
 import { QuickAddDialog, type QuickAddRequest } from "./QuickAddDialog";
 
 type QuickAdd = {
@@ -17,6 +18,8 @@ type QuickAdd = {
   payBill: (cardId: number) => void;
   /** Edit & post: the form starts as the due date's transaction, and saving posts it (F10). */
   post: (due: DueOccurrence) => void;
+  /** A new recurring rule, or one to edit: the form plus a schedule (UI_FLOWS §8.2). */
+  rule: (rule?: RecurringRule) => void;
 };
 
 const QuickAddContext = createContext<QuickAdd>({
@@ -25,11 +28,12 @@ const QuickAddContext = createContext<QuickAdd>({
   duplicate: () => {},
   payBill: () => {},
   post: () => {},
+  rule: () => {},
 });
 
 /**
  * Opens quick-add (UI_FLOWS §4) from any screen: + Add and Ctrl+N, a row to edit or copy it, a
- * card's Pay bill, or a due recurring date's Edit & post.
+ * card's Pay bill, a due recurring date's Edit & post, or a recurring rule.
  */
 export const useQuickAdd = () => useContext(QuickAddContext);
 
@@ -44,6 +48,7 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
       duplicate: (id) => setOpen({ duplicate: id }),
       payBill: (cardId) => setOpen({ payBill: cardId }),
       post: (due) => setOpen({ post: due }),
+      rule: (rule) => setOpen({ rule: rule ?? true }),
     }),
     [],
   );

@@ -318,7 +318,23 @@ Welcome to Jobert's Vault
 - **Section 3: Period comparison.** Rows for income, expense, net and each category, with columns for this period, the comparison period, the difference and the % change (RPT-4). The column headers are the dates counted, e.g. "Nov 1–6" and "Oct 1–6" (the year appears when it isn't this year). The % change is `▲ 12.3%` or `▼ 4.0%`, green when the direction is good (DESIGN_SYSTEM §7), or "—" when there's nothing to compare with. Income and expense amounts are plain, and the difference is signed, in the plain text color.
 
 ### 8.2 Recurring (`/recurring`), Phase 3
-A list of rules showing the next date, amount, frequency, mode (Auto or Confirm) and whether it's paused. "+ New rule" opens the transaction form plus a schedule section: frequency, every *N*, start date, and when it ends (never, on a date, or after a number of times).
+A list of rules, oldest first, in one panel with **+ New rule** in its header. Each row shows:
+- the category chip (⇄ for a transfer) and "Category · Payee" ("Bank → Card" for a transfer)
+- the schedule in words, from the start date, and the next date: "Monthly on the 25th · next Nov 25", with the year when it isn't this year, or "· ended" once the rule has ended
+- the amount, and a badge: **Auto** or **Confirm**, or **Paused** in place of either. A paused rule shows no next date, because resuming moves it (DATA_MODEL §4.1).
+
+Clicking a row edits the rule. Its ⋯ menu has **Edit**, **Pause** or **Resume**, and **Delete**, which asks first: "Delete this rule? The transactions it already created stay." With no rules, an empty state offers **New rule**.
+
+**+ New rule** opens the transaction form (§4), titled "New rule", with a **Schedule** section under it:
+- **Repeats:** Daily, Weekly, Monthly or Yearly. Monthly to start with.
+- **Every** *N*, with its unit ("1 month", "2 weeks"). 1 to start with.
+- **Starts:** today to start with. It may be in the past or the future, and a past start fills in the dates since then.
+- **Ends:** Never, On a date, or Number of times. The last two add an "Ends on" date or an "Ends after *N* times" field.
+- **Mode:** Auto-post (the default) or Confirm (REC-3).
+
+The rule form has no Save & add another. Saving a rule posts or queues its dates up to today at once (ARCHITECTURE §8).
+
+**Editing** a rule ("Edit rule") keeps its start date, so changing the amount, category, mode or end keeps the rule's place. Changing **Repeats** or **Every** starts it again, so the form offers the rule's next date as the new start, unless another start was already chosen (DATA_MODEL §4.1).
 
 ### 8.3 Budgets (`/budgets`), Phase 3
 Budget cards, each with the category chip (or "All spending"), the period, a `ProgressBar`, and "₱320 of ₱400 · ₱80 left".
