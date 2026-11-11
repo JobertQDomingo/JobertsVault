@@ -19,7 +19,9 @@ import { cn } from "@/lib/utils";
 /**
  * The transaction list (UI_FLOWS §3, TXN-3): a summary over every match, then the rows grouped by
  * day with each day's net, newest first, 100 at a time as it scrolls. It scrolls inside its one
- * glass panel (DESIGN_SYSTEM §11). `filtered` picks the empty message; `onClearFilters` its button.
+ * glass panel (DESIGN_SYSTEM §11). Rows after today come first under Upcoming, muted and with no
+ * day net, since the backend counts them in no figure (TXN-8). `filtered` picks the empty message;
+ * `onClearFilters` its button.
  */
 export function TransactionList({
   filter,
@@ -57,7 +59,7 @@ export function TransactionList({
     !accounts.data ||
     !categories.data ||
     !view ||
-    (pages[0].summary.count === 0 && period.isPlaceholderData)
+    (pages[0].items.length === 0 && period.isPlaceholderData)
   )
     body = (
       <Loading className="grid gap-2 p-[18px]">
@@ -66,7 +68,7 @@ export function TransactionList({
         ))}
       </Loading>
     );
-  else if (pages[0].summary.count === 0)
+  else if (pages[0].items.length === 0)
     body = filtered ? (
       <EmptyState
         icon={SearchX}
@@ -95,7 +97,24 @@ export function TransactionList({
     const nets = new Map(
       pages.flatMap((p) => p.dayNets).map((d) => [d.date, d.net]),
     );
-    const days = groupByDate(pages.flatMap((p) => p.items));
+    const all = groupByDate(pages.flatMap((p) => p.items));
+    const upcoming = all.filter((d) => d.date > view.today);
+    const days = all.filter((d) => d.date <= view.today);
+    const header =
+      "flex items-center justify-between px-[18px] pt-3 pb-1.5 text-small font-semibold text-muted-foreground";
+    const rows = (items: (typeof all)[number]["items"], muted = false) =>
+      items.map((t) => (
+        <TransactionRow
+          key={t.id}
+          transaction={t}
+          category={t.categoryId ? categoryById.get(t.categoryId) : undefined}
+          account={accountById.get(t.accountId)}
+          toAccount={t.toAccountId ? accountById.get(t.toAccountId) : undefined}
+          upcoming={muted}
+          onOpen={() => edit(t.id)}
+          onDuplicate={() => duplicate(t.id)}
+        />
+      ));
     body = (
       <>
         <p className="border-b border-hairline px-[18px] py-3 text-muted-foreground">
@@ -119,27 +138,26 @@ export function TransactionList({
               list.fetchNextPage({ cancelRefetch: false });
           }}
         >
+          {upcoming.length > 0 && (
+            <li>
+              <h3 className={header}>Upcoming</h3>
+              {upcoming.map(({ date, items }) => (
+                <section key={date}>
+                  <h4 className={cn(header, "pt-1.5 font-normal")}>
+                    {formatDayHeader(date, view.today)}
+                  </h4>
+                  {rows(items, true)}
+                </section>
+              ))}
+            </li>
+          )}
           {days.map(({ date, items }) => (
             <li key={date}>
-              <h3 className="flex items-center justify-between px-[18px] pt-3 pb-1.5 text-small font-semibold text-muted-foreground">
+              <h3 className={header}>
                 <span>{formatDayHeader(date, view.today)}</span>
                 <MoneyText amount={nets.get(date) ?? 0} kind="net" />
               </h3>
-              {items.map((t) => (
-                <TransactionRow
-                  key={t.id}
-                  transaction={t}
-                  category={
-                    t.categoryId ? categoryById.get(t.categoryId) : undefined
-                  }
-                  account={accountById.get(t.accountId)}
-                  toAccount={
-                    t.toAccountId ? accountById.get(t.toAccountId) : undefined
-                  }
-                  onOpen={() => edit(t.id)}
-                  onDuplicate={() => duplicate(t.id)}
-                />
-              ))}
+              {rows(items)}
             </li>
           ))}
         </ul>

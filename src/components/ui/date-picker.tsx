@@ -41,23 +41,20 @@ export const calendarClasses = {
 };
 
 /**
- * A `MM/DD/YYYY` input with a calendar (DESIGN_SYSTEM §8, §9.1). ↑/↓ move one day. Days after
- * `max` (today, until Phase 3 allows future dates) can't be picked. Weeks start on `weekStart`.
- * Typed text that isn't a date, or is after `max`, still goes to `onChange`, so the backend's
- * message ("Enter a real date", "Date can't be in the future") shows under the field.
+ * A `MM/DD/YYYY` input with a calendar (DESIGN_SYSTEM §8, §9.1). ↑/↓ move one day, and any day
+ * can be picked, future ones too (TXN-8). Weeks start on `weekStart`. Typed text that isn't a date
+ * still goes to `onChange`, so the backend's "Enter a real date" shows under the field.
  */
 export function DatePicker({
   value,
   onChange,
   weekStart,
-  max,
   className,
   ...inputProps
 }: InputProps & {
   value: string;
   onChange: (iso: string) => void;
   weekStart: WeekStart;
-  max?: string;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -90,9 +87,7 @@ export function DatePicker({
                 e.preventDefault();
                 if (!valid) return;
                 setDraft(null);
-                const next = addDays(value, e.key === "ArrowUp" ? 1 : -1);
-                // ISO dates compare correctly as text.
-                if (!max || next <= max) change(next);
+                change(addDays(value, e.key === "ArrowUp" ? 1 : -1));
               } else if (e.key === "Enter") commit(); // and let the form save
             }}
           />
@@ -120,10 +115,8 @@ export function DatePicker({
             required
             autoFocus
             selected={valid ? toDate(value) : undefined}
-            defaultMonth={valid ? toDate(value) : max ? toDate(max) : undefined}
-            endMonth={max ? toDate(max) : undefined}
+            defaultMonth={valid ? toDate(value) : undefined}
             weekStartsOn={weekStart === "monday" ? 1 : 0}
-            disabled={max ? { after: toDate(max) } : undefined}
             onSelect={(date) => {
               change(toIso(date));
               setOpen(false);

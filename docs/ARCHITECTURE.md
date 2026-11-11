@@ -228,9 +228,9 @@ All commands use `camelCase` parameter names in TypeScript and `snake_case` in R
 **Period queries.** `query` is `{ kind, anchor }` for Day, Week, Month and Year, with no anchor meaning today, or `{ kind: "custom", start, end }` for Custom. The frontend never works out period dates. ◀ and ▶ use the previous and next queries that `get_period` returns (DATA_MODEL §5.3).
 
 **The transaction list.** `filter` is a period query plus optional `kind`, `accountId` (which also matches transfers into the account), `categoryId`, `paymentMethodId` and `search` (payee or note, ignoring case for ASCII letters, with `%` and `_` matched literally). `page` counts from 0. `list_transactions` returns:
-- `items`, the page of 100 rows, and whether there's another page.
-- `summary`: the number of matches and their income and expense totals, across all pages.
-- `dayNets`: the net for every date on the page, covering all of that date's matching rows, even when a date continues on the next page.
+- `items`, the page of 100 rows, and whether there's another page. While the period hasn't ended, they start with every matching row dated after today, whatever its date, for the Upcoming section (TXN-8).
+- `summary`: the number of matches and their income and expense totals, across all pages, counting only rows dated today or earlier (DATA_MODEL §5.2).
+- `dayNets`: the net for every date up to today on the page, covering all of that date's matching rows, even when a date continues on the next page.
 
 **Duplicating.** There's no duplicate command. The form loads the row with `get_transaction`, uses today's date from `get_transaction_defaults`, and saves with `create_transaction`, so nothing is created until the user saves (TXN-2).
 

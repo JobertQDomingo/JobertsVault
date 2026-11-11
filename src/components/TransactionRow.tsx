@@ -11,6 +11,7 @@ import { Button } from "./ui/button";
  * One transaction (DESIGN_SYSTEM §9.2): chip │ category with the payee and note │ account, or
  * "Bank → Cash" │ amount. Hover shows ✎ and ⧉; clicking the row also opens it. `compact` is the
  * dashboard's version: chip │ category · payee │ amount, and the whole row is the button.
+ * `upcoming` mutes a row dated after today, which counts in no total yet (TXN-8).
  */
 export function TransactionRow({
   transaction: t,
@@ -18,6 +19,7 @@ export function TransactionRow({
   account,
   toAccount,
   compact = false,
+  upcoming = false,
   onOpen,
   onDuplicate,
 }: {
@@ -26,6 +28,7 @@ export function TransactionRow({
   account?: Account;
   toAccount?: Account;
   compact?: boolean;
+  upcoming?: boolean;
   onOpen?: () => void;
   onDuplicate?: () => void;
 }) {
@@ -44,7 +47,11 @@ export function TransactionRow({
     />
   );
   const amount = (
-    <MoneyText amount={t.amount} kind={t.kind} className="justify-self-end" />
+    <MoneyText
+      amount={t.amount}
+      kind={t.kind}
+      className={cn("justify-self-end", upcoming && "text-muted-foreground")}
+    />
   );
   const rowClasses =
     "grid min-h-[52px] w-full items-center gap-3 border-t border-hairline px-[18px] py-1.5 text-left transition-colors duration-150 hover:bg-glass-hover";
@@ -74,6 +81,7 @@ export function TransactionRow({
         rowClasses,
         "group grid-cols-[32px_minmax(0,1fr)_170px_120px_72px]",
         onOpen && "cursor-pointer",
+        upcoming && "text-muted-foreground",
       )}
     >
       {chip}

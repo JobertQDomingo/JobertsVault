@@ -286,7 +286,6 @@ export function QuickAddDialog({
               }
               payment={paying}
               initial={start.values}
-              today={start.today}
               weekStart={settings.weekStart}
               showMethod={settings.showPaymentMethod}
               accounts={accounts.data?.accounts ?? []}
@@ -396,7 +395,6 @@ function TransactionForm({
   schedule,
   payment,
   initial,
-  today,
   weekStart,
   showMethod,
   accounts,
@@ -414,7 +412,6 @@ function TransactionForm({
   /** Pay bill: always a transfer, saved once (the mockup has no type switch or Save & add another). */
   payment: boolean;
   initial: Values;
-  today: string;
   weekStart: WeekStart;
   showMethod: boolean;
   accounts: Account[];
@@ -594,8 +591,6 @@ function TransactionForm({
             value={field.value}
             onChange={field.onChange}
             weekStart={weekStart}
-            // Until Phase 3 nothing is recorded after today (TXN-8).
-            max={schedule ? undefined : today}
           />
         </Field>
       )}

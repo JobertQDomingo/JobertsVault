@@ -4,18 +4,13 @@ import { expect, test, vi } from "vitest";
 import type { WeekStart } from "@/bindings/WeekStart";
 import { DatePicker } from "./date-picker";
 
-function Picker({
-  onChange = vi.fn(),
-  weekStart = "monday" as WeekStart,
-  max = "2026-10-27",
-}) {
+function Picker({ onChange = vi.fn(), weekStart = "monday" as WeekStart }) {
   const [value, setValue] = useState("2026-10-26");
   return (
     <DatePicker
       aria-label="Date"
       value={value}
       weekStart={weekStart}
-      max={max}
       onChange={(next) => {
         setValue(next);
         onChange(next);
@@ -31,7 +26,7 @@ test("shows the date in US order", () => {
   expect((input() as HTMLInputElement).value).toBe("10/26/2026");
 });
 
-test("up and down move one day, and up stops at the latest allowed day", () => {
+test("up and down move one day", () => {
   const onChange = vi.fn();
   render(<Picker onChange={onChange} />);
   fireEvent.keyDown(input(), { key: "ArrowDown" });
@@ -39,9 +34,6 @@ test("up and down move one day, and up stops at the latest allowed day", () => {
   fireEvent.keyDown(input(), { key: "ArrowUp" });
   fireEvent.keyDown(input(), { key: "ArrowUp" });
   expect(onChange).toHaveBeenLastCalledWith("2026-10-27");
-  onChange.mockClear();
-  fireEvent.keyDown(input(), { key: "ArrowUp" });
-  expect(onChange).not.toHaveBeenCalled();
   expect((input() as HTMLInputElement).value).toBe("10/27/2026");
 });
 
@@ -64,14 +56,6 @@ test("a date that can't be read is passed on as typed, for the backend to explai
   onChange.mockClear();
   fireEvent.keyDown(input(), { key: "ArrowUp" });
   expect(onChange).not.toHaveBeenCalled();
-});
-
-test("a typed future date is passed on, so the backend can say it's in the future", () => {
-  const onChange = vi.fn();
-  render(<Picker onChange={onChange} />);
-  fireEvent.change(input(), { target: { value: "11/15/2026" } });
-  fireEvent.blur(input());
-  expect(onChange).toHaveBeenCalledWith("2026-11-15");
 });
 
 test("Enter reads the typed date before the form saves", () => {
@@ -101,25 +85,11 @@ test("the calendar starts the week on the week start setting", () => {
   ).toBe("Sunday");
 });
 
-test("days after the latest allowed day can't be picked, earlier ones can", () => {
+test("picking a day passes it on and closes the calendar", () => {
   const onChange = vi.fn();
   render(<Picker onChange={onChange} />);
   fireEvent.click(screen.getByRole("button", { name: "Choose date" }));
-  const day = (n: number) =>
-    screen.getByRole("button", {
-      name: new RegExp(`October ${n}(st|nd|rd|th)?,`),
-    });
-  expect((day(28) as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.click(day(20));
+  fireEvent.click(screen.getByRole("button", { name: /October 20(th)?,/ }));
   expect(onChange).toHaveBeenCalledWith("2026-10-20");
   expect(screen.queryByRole("grid")).toBeNull();
-});
-
-test("next month looks disabled at the latest allowed month", () => {
-  render(<Picker />);
-  fireEvent.click(screen.getByRole("button", { name: "Choose date" }));
-  const next = screen.getByRole("button", { name: /next month/i });
-  // react-day-picker marks it aria-disabled, not disabled.
-  expect(next.getAttribute("aria-disabled")).toBe("true");
-  expect(next.className).toContain("aria-disabled:opacity-40");
 });

@@ -207,12 +207,13 @@ pub fn category_totals(conn: &Connection, f: &Filter) -> rusqlite::Result<Vec<(i
 }
 
 /// The payees on `kind` rows matching the LIKE `pattern`, one per payee ignoring ASCII case, most
-/// recently used first. Each comes with its latest such row's spelling and category, the category
-/// only while it isn't archived.
+/// recently used first, counting only rows dated `as_of` or earlier. Each comes with its latest
+/// such row's spelling and category, the category only while it isn't archived.
 pub fn payees(
     conn: &Connection,
     kind: &str,
     pattern: &str,
+    as_of: &str,
     limit: u32,
 ) -> rusqlite::Result<Vec<(String, Option<i64>)>> {
     conn.prepare(
@@ -221,13 +222,13 @@ pub fn payees(
                       ROW_NUMBER() OVER (PARTITION BY payee COLLATE NOCASE
                                          ORDER BY date DESC, id DESC) AS n
                FROM transactions
-               WHERE kind = ?1 AND payee LIKE ?2 ESCAPE '\\') t
+               WHERE kind = ?1 AND payee LIKE ?2 ESCAPE '\\' AND date <= ?4) t
          LEFT JOIN categories c ON c.id = t.category_id
          WHERE t.n = 1
          ORDER BY t.date DESC, t.id DESC
          LIMIT ?3",
     )?
-    .query_map(params![kind, pattern, limit], |r| {
+    .query_map(params![kind, pattern, limit, as_of], |r| {
         Ok((r.get(0)?, r.get(1)?))
     })?
     .collect()
@@ -242,13 +243,14 @@ pub fn recent(conn: &Connection, as_of: &str, limit: u32) -> rusqlite::Result<Ve
     .collect()
 }
 
-/// The source account of the latest transaction whose source is an active non-card account.
-pub fn latest_non_card_source(conn: &Connection) -> rusqlite::Result<Option<i64>> {
+/// The source account of the latest transaction dated `as_of` or earlier whose source is an
+/// active non-card account.
+pub fn latest_non_card_source(conn: &Connection, as_of: &str) -> rusqlite::Result<Option<i64>> {
     conn.query_row(
         "SELECT t.account_id FROM transactions t JOIN accounts a ON a.id = t.account_id
-         WHERE a.archived = 0 AND a.kind <> 'credit_card'
+         WHERE a.archived = 0 AND a.kind <> 'credit_card' AND t.date <= ?1
          ORDER BY t.date DESC, t.id DESC LIMIT 1",
-        [],
+        [as_of],
         |r| r.get(0),
     )
     .optional()

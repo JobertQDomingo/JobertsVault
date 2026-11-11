@@ -66,6 +66,45 @@ test("the summary covers every match, and each day shows its net", async () => {
   expect(screen.getByText("Bank → Credit card")).toBeTruthy();
 });
 
+/** A row dated after today (TXN-8), which the backend lists first and counts in no figure. */
+const RENT = {
+  ...LIST.items[0],
+  id: 9,
+  date: "2026-11-20",
+  payee: "Landlord",
+  note: null,
+};
+
+test("rows after today wait above Today under Upcoming, muted and with no day net", async () => {
+  renderRoute("/transactions", {
+    ...ANSWERS,
+    list_transactions: { ...LIST, items: [RENT, ...LIST.items] },
+  });
+  const upcoming = await screen.findByRole("heading", { name: "Upcoming" });
+  expect(screen.getByRole("heading", { name: "Fri, Nov 20" }).textContent).toBe(
+    "Fri, Nov 20",
+  );
+  const today = screen.getByRole("heading", { name: /^Today/ });
+  expect(
+    upcoming.compareDocumentPosition(today) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  const row = (text: string) => screen.getByText(text).closest(".group");
+  expect(row("Landlord")?.classList).toContain("text-muted-foreground");
+  expect(row("Market · weekly shop")?.classList).not.toContain(
+    "text-muted-foreground",
+  );
+});
+
+test("a period with only upcoming rows lists them, not the empty message", async () => {
+  renderRoute("/transactions", {
+    ...ANSWERS,
+    list_transactions: { ...EMPTY, items: [RENT] },
+  });
+  expect(await screen.findByRole("heading", { name: "Upcoming" })).toBeTruthy();
+  expect(screen.getByText("Landlord")).toBeTruthy();
+  expect(screen.queryByText(/Nothing recorded/)).toBeNull();
+});
+
 test("clicking a row opens it for editing, and ⧉ duplicates it", async () => {
   renderRoute("/transactions", ANSWERS);
   fireEvent.click(await screen.findByText("Market · weekly shop"));

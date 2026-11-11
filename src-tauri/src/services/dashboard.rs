@@ -82,6 +82,7 @@ mod tests {
     use crate::domain::money::Money;
     use crate::domain::period::ComparisonMode;
     use crate::services::accounts::{self, AccountFields, AccountKind, NewAccount};
+    use crate::services::categories::CategoryKind;
     use crate::services::period::{self, PeriodQuery};
     use crate::services::settings;
     use crate::services::transactions::{self, TransactionFields, TransactionKind};
@@ -277,6 +278,75 @@ mod tests {
         assert_eq!(dash.expense, Money(1_000));
         assert!(dash.recent.iter().all(|t| t.id != later));
         assert_eq!(dash.net_balance, Money(-1_000));
+    }
+
+    #[test]
+    fn a_future_dated_transaction_counts_once_its_date_arrives() {
+        // TXN-8: saved through the form's own path, dated after today (Nov 3).
+        let mut conn = db();
+        let bank = account(&mut conn, AccountKind::Bank, "Bank");
+        let card = account(&mut conn, AccountKind::CreditCard, "Card");
+        let salary = Some("Salary");
+        add(
+            &mut conn,
+            TransactionKind::Income,
+            500_000,
+            d(2026, 11, 1),
+            bank,
+            salary,
+            None,
+        );
+        let purchase = spend(&mut conn, 20_000, d(2026, 11, 10), card);
+        let pay = add(
+            &mut conn,
+            TransactionKind::Income,
+            100_000,
+            d(2026, 12, 1),
+            bank,
+            salary,
+            None,
+        );
+
+        let figures = |today: NaiveDate| {
+            let dash = get(&conn, &MONTH, today).unwrap();
+            let card = dash.accounts.iter().find(|a| a.id == card).unwrap();
+            let owed = card.card.as_ref().unwrap();
+            let breakdown =
+                reports::breakdown(&conn, &MONTH, CategoryKind::Expense, None, today).unwrap();
+            let bars: i64 = dash.series.bars.iter().map(|b| b.expense.0).sum();
+            (
+                // The dashboard's cards, with the comparison behind their % change.
+                (
+                    dash.income.0,
+                    dash.expense.0,
+                    dash.comparison.expense.current.0,
+                ),
+                // Balances, and the card's amount owed and cycle spending.
+                (
+                    dash.net_balance.0,
+                    card.balance.0,
+                    owed.amount_owed.0,
+                    owed.cycle_spending.0,
+                ),
+                // Reports: the chart and the category breakdown.
+                (bars, breakdown.total.0),
+                dash.recent.iter().map(|t| t.id).collect::<Vec<_>>(),
+            )
+        };
+
+        let (cards, balances, reports, recent) = figures(d(2026, 11, 3));
+        assert_eq!(cards, (500_000, 0, 0));
+        assert_eq!(balances, (500_000, 0, 0, 0));
+        assert_eq!(reports, (0, 0));
+        assert!(!recent.contains(&purchase) && !recent.contains(&pay));
+
+        // On its date it counts everywhere at once; December's pay still waits.
+        let (cards, balances, reports, recent) = figures(d(2026, 11, 10));
+        assert_eq!(cards, (500_000, 20_000, 20_000));
+        assert_eq!(balances, (480_000, -20_000, 20_000, 20_000));
+        assert_eq!(reports, (20_000, 20_000));
+        assert_eq!(recent[0], purchase);
+        assert!(!recent.contains(&pay));
     }
 
     #[test]

@@ -255,7 +255,6 @@ function ExportRow() {
         value={start}
         onChange={(next) => setPicked((p) => ({ ...p, start: next }))}
         weekStart={weekStart}
-        max={month.data?.today}
         className="w-40"
       />
       <span className="text-muted-foreground">to</span>
@@ -264,7 +263,6 @@ function ExportRow() {
         value={end}
         onChange={(next) => setPicked((p) => ({ ...p, end: next }))}
         weekStart={weekStart}
-        max={month.data?.today}
         className="w-40"
       />
       <Button

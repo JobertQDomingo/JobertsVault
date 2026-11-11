@@ -142,7 +142,7 @@ export function PeriodSwitcher() {
             }
             endMonth={view ? toDate(view.today) : undefined}
             weekStartsOn={settings?.weekStart === "sunday" ? 0 : 1}
-            // Until Phase 3 nothing is recorded after today (TXN-8).
+            // Like ▶, which stops at the current period, no range reaches past today (DATA_MODEL §5.3).
             disabled={view ? { after: toDate(view.today) } : undefined}
             classNames={{
               ...calendarClasses,

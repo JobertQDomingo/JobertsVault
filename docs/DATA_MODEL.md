@@ -195,7 +195,7 @@ CREATE INDEX idx_txn_payee         ON transactions(payee COLLATE NOCASE) WHERE p
 
 **Account filter on the list (TXN-4):** a transaction matches when `account_id = account OR to_account_id = account`, so an account's list includes incoming transfers.
 
-**Payees** don't have their own table. Suggestions (TXN-6, Phase 2) come from the distinct `payee` values on rows of the form's type (expense or income), sorted by most recent use (`date DESC, id DESC`). Each payee is suggested once, ignoring ASCII case and spelled as it was last used, and only when it starts with what's typed (ASCII case ignored, wildcards taken literally). At most 8 are suggested. The suggested category is the one on the latest row of that type with that payee. If that category is archived now, the payee is still suggested but fills in no category.
+**Payees** don't have their own table. Suggestions (TXN-6, Phase 2) come from the distinct `payee` values on rows of the form's type (expense or income), sorted by most recent use (`date DESC, id DESC`), counting only rows dated today or earlier: a future-dated row (TXN-8) isn't a use yet. Each payee is suggested once, ignoring ASCII case and spelled as it was last used, and only when it starts with what's typed (ASCII case ignored, wildcards taken literally). At most 8 are suggested. The suggested category is the one on the latest such row of that type with that payee. If that category is archived now, the payee is still suggested but fills in no category.
 
 ### 3.5 `settings`
 
@@ -392,7 +392,7 @@ net(period)     = income − expense
 ```
 
 - **Transfers are never included** (RPT-6). This is why paying the card bill doesn't count the purchases twice.
-- **Future-dated transactions are never included** (TXN-8, Phase 3). Every total, budget and "recent" list counts only `date ≤ today`, matching balances, so the numbers on a screen always agree. Future-dated rows appear only under Upcoming.
+- **Future-dated transactions are never included** (TXN-8, Phase 3). Every total, budget and "recent" list counts only `date ≤ today`, matching balances, so the numbers on a screen always agree. Future-dated rows appear only under Upcoming: the transaction list of a period that hasn't ended shows every later row that matches its other filters there, whatever its date, while its summary and day nets still count only `date ≤ today`.
 - If the report is filtered by account (RPT-5), only transactions with `account_id = account` are counted.
 - **Refunds** (CC-5) use an income category, so a refund increases *income*, not lowers *expense*. This is intentional: refunds offset net cashflow, not the expense total or the category breakdown (decided 2026-10-26).
 
@@ -464,7 +464,7 @@ monthly_needed = (target_amount − progress) ÷ months left until target_date  
 | Used for | Rule |
 |---|---|
 | **Quick-add (TXN-1)** | `last_used_account_id`, which is updated whenever a transaction is created. If it's missing or the account is archived or deleted, use the first active account by `sort_order`. |
-| **Pay bill's From account (CC-9)** | The active non-card account on the latest transaction (`date DESC, id DESC`), going by each transaction's source `account_id`. If there is none, the first active non-card account by `sort_order`. If there's no such account, the field starts empty. |
+| **Pay bill's From account (CC-9)** | The active non-card account on the latest transaction dated today or earlier (`date DESC, id DESC`), going by each transaction's source `account_id`. If there is none, the first active non-card account by `sort_order`. If there's no such account, the field starts empty. |
 | **Pay bill's amount (CC-9)** | The card's `amount_owed`. If that's 0, the field starts empty. |
 
 ### 5.9 Income-vs-expense chart bars (RPT-1)
@@ -506,7 +506,6 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 |---|---|
 | Amount is > 0 and ≤ 999,999,999,999 minor units | amount |
 | The date is a real calendar date | date |
-| The date isn't in the future: "Date can't be in the future" (Phases 1–2 only; Phase 3 removes this rule for TXN-8) | date |
 | An opening balance is 0 or more and ≤ 999,999,999,999 minor units, and a credit limit is > 0 and ≤ the same maximum | that field |
 | A transfer has no payee or payment method | payee / payment method |
 | The last active account, or the last active category of a kind, can't be archived or deleted (`Conflict`: "Keep at least one active account") | shown as a toast |
@@ -519,7 +518,7 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | Credit card fields are present if and only if the account is a credit card | the card fields |
 | `currency_decimals` can't change once any amount is stored: a transaction, a recurring rule, or an account's non-zero opening balance or credit limit (§1) | settings |
 | A budget's category is an expense category, and a goal's account isn't a credit card | category / account |
-| A recurring rule's template follows the transaction rules above, except the date: its start date may be in the future (§4.1) | that field |
+| A recurring rule's template follows the transaction rules above: its date is the start date (§4.1) | that field |
 | A rule's interval is 1–999, its number of times is 1–9,999, and its end date is a real date on or after the start date. A rule ends on a date or after a number of times, not both. | interval / maxOccurrences / endDate |
 | A rule's new start date, when its schedule changes, is after the last date it already processed, and not before today or its current next date, whichever is earlier (§4.1) | date |
 
@@ -619,6 +618,8 @@ Answered on 2026-11-11:
 16. **A rule's start date** may be in the past; processing fills in the dates since then (§4.1).
 19. **Saving a rule processes it** (REC-4): creating, editing or resuming a rule posts or queues its dates up to today in the same database transaction, so a rule that starts today shows up at once rather than the next day or launch (ARCHITECTURE §8).
 20. **An archived account, category or payment method** that a rule's template uses doesn't stop its dates: they post with it, the same way an edit of the rule may keep it (§4.2, §6).
+21. **Upcoming (TXN-8)** lists every future-dated row that matches the list's other filters, whatever its date, whenever the selected period hasn't ended, since ▶ stops at the current period and a row dated later would otherwise never be seen. Phase 3 drops the "Date can't be in the future" rule (§5.2, §6).
+22. **"Most recent" lookups skip future-dated rows** (TXN-8): payee suggestions and Pay bill's From account count only rows dated today or earlier, so one row dated months ahead can't hold the suggestion or the default until its date (§3.4, §5.8).
 
 Answered on 2026-11-01:
 

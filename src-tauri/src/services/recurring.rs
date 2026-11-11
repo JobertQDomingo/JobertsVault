@@ -202,13 +202,7 @@ pub fn post(
             ..fields_of(&rule)?
         },
     };
-    transactions::validate(
-        &tx,
-        &mut posted,
-        Some(&template(&rule)?),
-        now.date_naive(),
-        false,
-    )?;
+    transactions::validate(&tx, &mut posted, Some(&template(&rule)?), now.date_naive())?;
     let stamp = stamp(now);
     let txn = repo::transactions::insert(&tx, &transactions::values(&posted), &stamp)?;
     repo::recurring::settle_occurrence(&tx, id, "posted", Some(txn), &stamp)?;
@@ -336,8 +330,8 @@ fn stored(conn: &Connection, id: i64) -> Result<repo::recurring::Row, AppError> 
     repo::recurring::find(conn, id)?.ok_or_else(|| not_found("recurring rule", id))
 }
 
-/// The template follows the transaction rules, except that its date may be in the future; then
-/// the schedule's own rules (DATA_MODEL §6). `stored` is the rule being edited.
+/// The template follows the transaction rules, then the schedule's own rules (DATA_MODEL §6).
+/// `stored` is the rule being edited.
 fn validate(
     conn: &Connection,
     f: &mut RecurringRuleFields,
@@ -345,7 +339,7 @@ fn validate(
     today: NaiveDate,
 ) -> Result<(), AppError> {
     let kept = stored.map(template).transpose()?;
-    transactions::validate(conn, &mut f.transaction, kept.as_ref(), today, true)?;
+    transactions::validate(conn, &mut f.transaction, kept.as_ref(), today)?;
     if !(1..=999).contains(&f.interval) {
         return Err(invalid("interval", "Enter a number from 1 to 999"));
     }
@@ -1139,15 +1133,9 @@ mod tests {
             field(post(&mut conn, first.id, Some(edited.clone()), now())),
             "amount"
         );
-        edited.amount = Money(1_450_000);
-        edited.date = "2026-11-04".into();
-        assert_eq!(
-            field(post(&mut conn, first.id, Some(edited.clone()), now())),
-            "date",
-            "not in the future until Phase 3's TXN-8"
-        );
         assert_eq!(transaction_count(&conn), 0, "a refused edit posts nothing");
 
+        edited.amount = Money(1_450_000);
         edited.date = "2026-02-02".into();
         edited.note = Some("  paid late ".into());
         let posted = post(&mut conn, first.id, Some(edited), now()).unwrap();
