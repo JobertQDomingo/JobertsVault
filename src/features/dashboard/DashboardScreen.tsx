@@ -1,4 +1,5 @@
-import { Plus, ReceiptText } from "lucide-react";
+import { Plus, ReceiptText, Repeat } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
 import type { Category } from "@/bindings/Category";
 import type { Dashboard } from "@/bindings/Dashboard";
@@ -15,6 +16,7 @@ import { useQuickAdd } from "@/components/QuickAddProvider";
 import { StatCard } from "@/components/StatCard";
 import { TransactionRow } from "@/components/TransactionRow";
 import { Button } from "@/components/ui/button";
+import { DueDialog } from "@/features/recurring/DueDialog";
 import { useBackupNow } from "@/hooks/useBackup";
 import { useCategories } from "@/hooks/useCategories";
 import { useDashboard } from "@/hooks/useDashboard";
@@ -117,6 +119,7 @@ function DashboardBody({
   return (
     <>
       {data.backupDue && <BackupWarning />}
+      <RecurringDue count={data.recurringDue} today={data.today} />
       <div className="grid grid-cols-3 gap-3">
         <StatCard
           label="Income"
@@ -207,6 +210,35 @@ function DashboardBody({
           </div>
         </GlassPanel>
       </div>
+    </>
+  );
+}
+
+/** Dates Confirm rules queued, with Review (UI_FLOWS F10). */
+function RecurringDue({ count, today }: { count: number; today: string }) {
+  const [reviewing, setReviewing] = useState(false);
+  // The review closes once the last one is posted or skipped, so new ones don't reopen it.
+  if (reviewing && count === 0) setReviewing(false);
+  return (
+    <>
+      {count > 0 && (
+        <Banner
+          tone="info"
+          icon={Repeat}
+          action={
+            <Button size="sm" onClick={() => setReviewing(true)}>
+              Review
+            </Button>
+          }
+        >
+          {count === 1
+            ? "1 recurring transaction is due."
+            : `${count} recurring transactions are due.`}
+        </Banner>
+      )}
+      {reviewing && (
+        <DueDialog today={today} onClose={() => setReviewing(false)} />
+      )}
     </>
   );
 }

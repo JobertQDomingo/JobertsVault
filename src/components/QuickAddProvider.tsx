@@ -5,6 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import type { DueOccurrence } from "@/bindings/DueOccurrence";
 import { QuickAddDialog, type QuickAddRequest } from "./QuickAddDialog";
 
 type QuickAdd = {
@@ -14,6 +15,8 @@ type QuickAdd = {
   duplicate: (id: number) => void;
   /** A transfer to the card for what's owed (CC-9). */
   payBill: (cardId: number) => void;
+  /** Edit & post: the form starts as the due date's transaction, and saving posts it (F10). */
+  post: (due: DueOccurrence) => void;
 };
 
 const QuickAddContext = createContext<QuickAdd>({
@@ -21,11 +24,12 @@ const QuickAddContext = createContext<QuickAdd>({
   edit: () => {},
   duplicate: () => {},
   payBill: () => {},
+  post: () => {},
 });
 
 /**
- * Opens quick-add (UI_FLOWS §4) from any screen: + Add and Ctrl+N, a row to edit or copy it, or a
- * card's Pay bill.
+ * Opens quick-add (UI_FLOWS §4) from any screen: + Add and Ctrl+N, a row to edit or copy it, a
+ * card's Pay bill, or a due recurring date's Edit & post.
  */
 export const useQuickAdd = () => useContext(QuickAddContext);
 
@@ -39,6 +43,7 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
       edit: (id) => setOpen({ edit: id }),
       duplicate: (id) => setOpen({ duplicate: id }),
       payBill: (cardId) => setOpen({ payBill: cardId }),
+      post: (due) => setOpen({ post: due }),
     }),
     [],
   );

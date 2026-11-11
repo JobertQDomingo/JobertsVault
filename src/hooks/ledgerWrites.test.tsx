@@ -49,6 +49,8 @@ import {
   useCreateRecurringRule,
   useDeleteRecurringRule,
   usePauseRecurringRule,
+  usePostOccurrence,
+  useSkipOccurrence,
   useUpdateRecurringRule,
 } from "./useRecurring";
 import * as transactionHooks from "./useTransactions";
@@ -276,6 +278,14 @@ const WRITES = [
     { id: 9 },
   ],
   [
+    "usePostOccurrence",
+    usePostOccurrence,
+    { id: 4, transaction: null },
+    "post_occurrence",
+    { id: 4, transaction: null },
+  ],
+  ["useSkipOccurrence", useSkipOccurrence, 4, "skip_occurrence", { id: 4 }],
+  [
     "useUpdateSettings",
     useUpdateSettings,
     settings,
@@ -337,6 +347,7 @@ const READS = [
   "usePayBillDefaults",
   "usePayeeSuggestions",
   "useRecurringRules",
+  "useDueOccurrences",
   "useSettings",
 ];
 

@@ -242,17 +242,23 @@
   backdrop-filter: none;
 }
 
-/* A warning banner (§9.1): its glass mixed with the warning color at 14%, flat inside a panel. */
+/* A banner (§9.1): its glass mixed with its meaning color at 14%, flat inside a panel. */
 .glass-warning {
-  background: color-mix(in srgb, var(--warning) 14%, var(--glass));
+  --banner: var(--warning);
+}
+.glass-info {
+  --banner: var(--primary);
+}
+:is(.glass-warning, .glass-info) {
+  background: color-mix(in srgb, var(--banner) 14%, var(--glass));
 }
 @media (prefers-reduced-transparency: reduce) {
-  .glass-warning {
-    background: color-mix(in srgb, var(--warning) 14%, var(--glass-solid));
+  :is(.glass-warning, .glass-info) {
+    background: color-mix(in srgb, var(--banner) 14%, var(--glass-solid));
   }
 }
-:is(.glass, .glass-raised) .glass-warning {
-  background: color-mix(in srgb, var(--warning) 14%, transparent);
+:is(.glass, .glass-raised) :is(.glass-warning, .glass-info) {
+  background: color-mix(in srgb, var(--banner) 14%, transparent);
 }
 
 @layer base {
