@@ -73,7 +73,7 @@ pub fn create(
     let tx = conn.transaction()?;
     validate(&tx, &mut fields, None, now.date_naive())?;
     let id = repo::recurring::insert(&tx, &values(&fields), &stamp(now))?;
-    catch_up(&tx, id, now)?;
+    catch_up(&tx, self::stored(&tx, id)?, now)?;
     let saved = get(&tx, id)?;
     tx.commit()?;
     Ok(saved)
@@ -93,8 +93,7 @@ pub fn update(
     let rescheduled = frequency_text(fields.frequency) != stored.frequency
         || fields.interval != stored.interval
         || fields.transaction.date != stored.start_date;
-    let mut next_index = stored.next_index;
-    if rescheduled {
+    let next_index = if rescheduled {
         let start = transactions::real_date(&fields.transaction.date)
             .ok_or_else(|| invalid("date", "Enter a real date"))?;
         if start < earliest_restart(&stored, now.date_naive())? {
@@ -103,10 +102,19 @@ pub fn update(
                 "Choose a later start date. This rule already created or passed over the dates before it.",
             ));
         }
-        next_index = 0;
-    }
+        0
+    } else {
+        // An edit never fills in the past: a rule that had ended and is given a later end date or
+        // more times carries on from today (DATA_MODEL §4.1).
+        let unbounded = Schedule {
+            end: None,
+            ..schedule(&stored)?
+        };
+        let from = index(&stored, stored.next_index)?;
+        unbounded.first_on_or_after(from, now.date_naive()).into()
+    };
     repo::recurring::update(&tx, id, &values(&fields), next_index, &stamp(now))?;
-    catch_up(&tx, id, now)?;
+    catch_up(&tx, self::stored(&tx, id)?, now)?;
     let saved = get(&tx, id)?;
     tx.commit()?;
     Ok(saved)
@@ -132,7 +140,7 @@ pub fn pause(
         }
         repo::recurring::set_paused(&tx, id, paused, next_index, &stamp(now))?;
     }
-    catch_up(&tx, id, now)?;
+    catch_up(&tx, self::stored(&tx, id)?, now)?;
     let saved = get(&tx, id)?;
     tx.commit()?;
     Ok(saved)
@@ -155,13 +163,14 @@ pub fn process_due(conn: &mut Connection, now: DateTime<Local>) -> Result<u32, A
     let mut processed = 0;
     let mut failed = None;
     for row in repo::recurring::all(conn)? {
-        let tx = conn.transaction()?;
-        match catch_up(&tx, row.id, now) {
-            Ok(n) => {
-                tx.commit()?;
-                processed += n;
-            }
-            // Dropping `tx` rolls this rule back.
+        // A failure drops `tx`, which rolls back this rule only.
+        let one = conn.transaction().map_err(AppError::from).and_then(|tx| {
+            let n = catch_up(&tx, row, now)?;
+            tx.commit()?;
+            Ok(n)
+        });
+        match one {
+            Ok(n) => processed += n,
             Err(err) => {
                 failed.get_or_insert(err);
             }
@@ -174,11 +183,15 @@ pub fn process_due(conn: &mut Connection, now: DateTime<Local>) -> Result<u32, A
 /// (ARCHITECTURE §8). A date already recorded is passed over, so none is created twice (REC-4).
 /// The transaction keeps the template's account, category and payment method even once they're
 /// archived, as an edit of the rule may (DATA_MODEL §4.2). How many dates it processed.
-fn catch_up(conn: &Connection, id: i64, now: DateTime<Local>) -> Result<u32, AppError> {
-    let row = stored(conn, id)?;
+fn catch_up(
+    conn: &Connection,
+    row: repo::recurring::Row,
+    now: DateTime<Local>,
+) -> Result<u32, AppError> {
     if row.paused {
         return Ok(0);
     }
+    let id = row.id;
     let schedule = schedule(&row)?;
     let first = index(&row, row.next_index)?;
     let mut done = index(&row, row.done)?;
@@ -631,6 +644,29 @@ mod tests {
             Some(d("2027-01-03"))
         );
         assert_eq!(dates(&conn, id), ["2026-01-31", "2026-11-03"]);
+    }
+
+    #[test]
+    fn extending_a_rule_that_ended_carries_on_from_today() {
+        let mut conn = db();
+        // now() is Nov 3, 2026: both end after Feb 28.
+        let mut twice = rent("2026-01-31");
+        twice.max_occurrences = Some(2);
+        let twice = create(&mut conn, twice, now()).unwrap().id;
+        let mut until = rent("2026-01-31");
+        until.end_date = Some("2026-03-15".into());
+        let until = create(&mut conn, until, now()).unwrap().id;
+        assert_eq!(rule(&conn, twice).next_date, None);
+
+        let mut more = rent("2026-01-31");
+        more.max_occurrences = Some(12);
+        let mut later = rent("2026-01-31");
+        later.end_date = Some("2026-12-31".into());
+        for (id, edit) in [(twice, more), (until, later)] {
+            let saved = update(&mut conn, id, edit, now()).unwrap();
+            assert_eq!(saved.next_date, Some(d("2026-11-30")), "Mar–Oct never come");
+            assert_eq!(dates(&conn, id), ["2026-01-31", "2026-02-28"]);
+        }
     }
 
     #[test]

@@ -286,7 +286,7 @@ CREATE TABLE recurring_rules (
 **Start date:** any real date, past or future. Processing (ARCHITECTURE §8) posts or queues every date from `start_date` up to today, so a past start fills in the dates already gone by.
 
 **Editing a rule (REC-5):**
-- Template fields (amount, category, mode, `end_date`, `max_occurrences`, and so on) affect future occurrences only.
+- Template fields (amount, category, mode, `end_date`, `max_occurrences`, and so on) affect future occurrences only. So a rule that had ended and is given a later end date or more times carries on from its first date on or after today: the dates in between are never created.
 - The schedule changes when `frequency`, `interval` or `start_date` changes. The new `start_date` comes from the form, which offers the rule's next date. It must be after the last date already processed, and not before today or the rule's current next date, whichever is earlier, so the dates passed over while paused are never created and an edit never fills in the past. `next_index` is reset to 0. Because the user picks the date, a rule on the 31st whose next date is Feb 28 can be started again on Mar 31, so it doesn't drift to the 28th.
 
 **Pausing (REC-5):** a paused rule isn't processed. When it's resumed, `next_index` moves to the first date on or after the day it's resumed. The dates it would have had while paused are never created.
