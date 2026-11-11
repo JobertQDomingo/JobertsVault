@@ -9,6 +9,27 @@ export const offered = <T extends { id: number; archived: boolean }>(
 export const named = (item: { name: string; archived: boolean }) =>
   item.archived ? `${item.name} (archived)` : item.name;
 
+type Named = { id: number; name: string };
+
+/** A row's name in the recurring lists: "Category · Payee", or "Bank → Card" for a transfer. */
+export function rowTitle(
+  t: {
+    kind: string;
+    accountId: number;
+    toAccountId: number | null;
+    categoryId: number | null;
+    payee: string | null;
+  },
+  accounts: Named[],
+  categories: Named[],
+) {
+  const name = (list: Named[], id: number | null) =>
+    list.find((item) => item.id === id)?.name;
+  return t.kind === "transfer"
+    ? `${name(accounts, t.accountId) ?? ""} → ${name(accounts, t.toAccountId) ?? ""}`
+    : [name(categories, t.categoryId), t.payee].filter(Boolean).join(" · ");
+}
+
 /**
  * A URL parameter's positive whole id, or null when it's missing, malformed or too big to be exact
  * (so it never reaches Rust as a number no `i64` holds).
