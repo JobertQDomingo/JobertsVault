@@ -38,6 +38,8 @@ const SELECT: &str =
                         FROM transactions t WHERE t.to_account_id = a.id AND t.date <= ?1), 0),
             EXISTS (SELECT 1 FROM transactions t WHERE t.account_id = a.id)
             OR EXISTS (SELECT 1 FROM transactions t WHERE t.to_account_id = a.id)
+            OR EXISTS (SELECT 1 FROM recurring_rules r
+                       WHERE r.account_id = a.id OR r.to_account_id = a.id)
      FROM accounts a";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {

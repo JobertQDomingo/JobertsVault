@@ -136,6 +136,11 @@ pub fn run() {
             commands::transactions::get_transaction_defaults,
             commands::transactions::get_pay_bill_defaults,
             commands::transactions::suggest_payees,
+            commands::recurring::list_recurring_rules,
+            commands::recurring::create_recurring_rule,
+            commands::recurring::update_recurring_rule,
+            commands::recurring::pause_recurring_rule,
+            commands::recurring::delete_recurring_rule,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the app")

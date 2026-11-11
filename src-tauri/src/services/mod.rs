@@ -13,6 +13,7 @@ pub mod payment_methods;
 #[cfg(test)]
 mod perf;
 pub mod period;
+pub mod recurring;
 pub mod reports;
 pub mod settings;
 pub mod system;

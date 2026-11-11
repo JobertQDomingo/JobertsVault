@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.1 |
-| **Last updated** | 2026-11-06 |
+| **Last updated** | 2026-11-11 |
 | **Database** | SQLite (bundled with the app through `rusqlite`) |
 | **Related docs** | [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 
@@ -17,7 +17,7 @@ This document describes every table and field, plus the rules for calculating ba
 |---|---|
 | **Money** | Stored as `INTEGER` in **minor units** (e.g. cents), as an `i64` in Rust. Floating-point numbers are never used for money, anywhere. |
 | **Amount sign** | `transactions.amount` is always **positive**. The transaction's `kind` decides whether money goes in or out. |
-| **Decimal places** | `currency_decimals` (0 or 2) decides how minor units are displayed. It **can only be changed while no amount is stored**: no transactions, and no account with an opening balance other than 0 or a credit limit. Changing it afterwards would change the meaning of every stored amount. |
+| **Decimal places** | `currency_decimals` (0 or 2) decides how minor units are displayed. It **can only be changed while no amount is stored**: no transactions, no recurring rules, and no account with an opening balance other than 0 or a credit limit. Changing it afterwards would change the meaning of every stored amount. |
 | **Dates** | `TEXT` in `YYYY-MM-DD` format (ISO 8601), using the user's local calendar. This format sorts correctly as plain text. No time of day is stored. |
 | **Timestamps** | `created_at` / `updated_at` are `TEXT` in ISO 8601 UTC (`2026-10-26T09:30:00Z`). They're for record-keeping only and are never used in calculations. Services receive the current time as a `now` value, the same way they receive `today`. |
 | **IDs** | `INTEGER PRIMARY KEY`, assigned by SQLite. |
@@ -281,9 +281,15 @@ CREATE TABLE recurring_rules (
 | monthly | `start_date + n × interval` months, with the day clamped to the month's last day (REC-2) |
 | yearly | `start_date + n × interval` years. Feb 29 becomes Feb 28 in non-leap years. |
 
+**When a rule ends:** after its `end_date` (included), or once it has `max_occurrences` rows in `recurring_occurrences`. The count is of dates actually processed (posted, pending or skipped), so it holds across schedule edits, and dates passed over while paused don't count.
+
+**Start date:** any real date, past or future. Processing (ARCHITECTURE §8) posts or queues every date from `start_date` up to today, so a past start fills in the dates already gone by.
+
 **Editing a rule (REC-5):**
-- Template fields (amount, category, and so on) affect future occurrences only.
-- If the schedule changes, `start_date` becomes the next unprocessed date and `next_index` is reset to 0.
+- Template fields (amount, category, mode, `end_date`, `max_occurrences`, and so on) affect future occurrences only.
+- The schedule changes when `frequency`, `interval` or `start_date` changes. The new `start_date` comes from the form, which offers the rule's next date, and must be after the last date already processed. `next_index` is reset to 0. Because the user picks the date, a rule on the 31st whose next date is Feb 28 can be started again on Mar 31, so it doesn't drift to the 28th.
+
+**Pausing (REC-5):** a paused rule isn't processed. When it's resumed, `next_index` moves to the first date on or after the day it's resumed. The dates it would have had while paused are never created.
 
 ### 4.2 `recurring_occurrences`
 
@@ -511,6 +517,9 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | Credit card fields are present if and only if the account is a credit card | the card fields |
 | `currency_decimals` can't change once any amount is stored: a transaction, or an account's non-zero opening balance or credit limit (§1) | settings |
 | A budget's category is an expense category, and a goal's account isn't a credit card | category / account |
+| A recurring rule's template follows the transaction rules above, except the date: its start date may be in the future (§4.1) | that field |
+| A rule's interval is 1–999, its number of times is 1–9,999, and its end date is a real date on or after the start date. A rule ends on a date or after a number of times, not both. | interval / maxOccurrences / endDate |
+| A rule's new start date, when its schedule changes, is after the last date it already processed (§4.1) | date |
 
 Text is trimmed before saving, and empty optional text is stored as `NULL`.
 
@@ -599,6 +608,13 @@ Answered on 2026-11-04:
 
 3. **Payment method names** are 1–40 characters, the same as categories (§6).
 4. **A new category's default color** counts only active categories of its kind, so archived ones don't hold a color, and a tie goes to the lowest palette number (§7).
+
+Answered on 2026-11-11:
+
+13. **Editing a rule's schedule** takes the start date from the form, after the last date already processed, so a month-end rule never drifts. `max_occurrences` counts the dates actually processed, so the count holds across the edit (§4.1).
+14. **Resuming a paused rule** skips the dates it would have had while paused (§4.1).
+15. **A rule's amount locks `currency_decimals`** like any other stored amount (§1). A rule's account, category or payment method counts as in use, so it's archived instead of deleted, and merging categories moves rules along with transactions.
+16. **A rule's start date** may be in the past; processing fills in the dates since then (§4.1).
 
 Answered on 2026-11-01:
 

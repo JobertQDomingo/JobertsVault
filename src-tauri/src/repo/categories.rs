@@ -114,15 +114,14 @@ pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<()> {
     Ok(())
 }
 
-/// Gives every transaction of `from` the category `into`.
-pub fn move_transactions(
-    conn: &Connection,
-    from: i64,
-    into: i64,
-    now: &str,
-) -> rusqlite::Result<()> {
+/// Gives every transaction and recurring rule of `from` the category `into`.
+pub fn move_uses(conn: &Connection, from: i64, into: i64, now: &str) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE transactions SET category_id = ?2, updated_at = ?3 WHERE category_id = ?1",
+        params![from, into, now],
+    )?;
+    conn.execute(
+        "UPDATE recurring_rules SET category_id = ?2, updated_at = ?3 WHERE category_id = ?1",
         params![from, into, now],
     )?;
     Ok(())

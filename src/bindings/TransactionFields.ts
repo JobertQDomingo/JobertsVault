@@ -3,7 +3,7 @@ import type { Money } from "./Money";
 import type { TransactionKind } from "./TransactionKind";
 
 /**
- * What the quick-add and edit form sends (UI_FLOWS §4).
+ * What the quick-add and edit form sends (UI_FLOWS §4). A recurring rule's template is one too.
  */
 export type TransactionFields = { kind: TransactionKind, amount: Money, 
 /**

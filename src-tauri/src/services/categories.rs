@@ -168,13 +168,20 @@ pub fn unarchive(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result
     Ok(())
 }
 
-/// Only a category no transaction uses can go; any other is archived or merged (CAT-4).
+/// Only a category no transaction or recurring rule uses can go; any other is archived or merged
+/// (CAT-4).
 pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     let tx = conn.transaction()?;
     let row = stored(&tx, id)?;
     if row.transaction_count > 0 {
         return Err(AppError::Conflict {
             message: "This category has transactions, so it can only be archived or merged".into(),
+        });
+    }
+    if repo::recurring::uses_category(&tx, id)? {
+        return Err(AppError::Conflict {
+            message: "A recurring rule uses this category, so it can only be archived or merged"
+                .into(),
         });
     }
     if !row.archived {
@@ -185,7 +192,8 @@ pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Moves every transaction of `from_id` to the active category `into_id` of the same kind, then
+/// Moves every transaction and recurring rule of `from_id` to the active category `into_id` of
+/// the same kind, then
 /// deletes `from_id`, as one change (DATA_MODEL §3.2, UI_FLOWS F7).
 pub fn merge(
     conn: &mut Connection,
@@ -208,7 +216,7 @@ pub fn merge(
     if into.archived {
         return Err(invalid("intoId", "Choose an active category"));
     }
-    repo::categories::move_transactions(&tx, from_id, into_id, &stamp(now))?;
+    repo::categories::move_uses(&tx, from_id, into_id, &stamp(now))?;
     repo::categories::delete(&tx, from_id)?;
     tx.commit()?;
     Ok(())

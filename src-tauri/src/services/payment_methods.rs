@@ -102,12 +102,14 @@ fn set_archived(
     Ok(())
 }
 
-/// Only a method no transaction uses can go; any other is archived instead (TXN-7).
+/// Only a method no transaction or recurring rule uses can go; any other is archived instead
+/// (TXN-7).
 pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     let tx = conn.transaction()?;
     if get(&tx, id)?.in_use {
         return Err(AppError::Conflict {
-            message: "This payment method has transactions, so it can only be archived".into(),
+            message: "This payment method has transactions or recurring rules, so it can only be archived"
+                .into(),
         });
     }
     repo::payment_methods::delete(&tx, id)?;

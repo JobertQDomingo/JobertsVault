@@ -11,6 +11,7 @@ import type { AccountFields } from "@/bindings/AccountFields";
 import type { CategoryFields } from "@/bindings/CategoryFields";
 import type { NewAccount } from "@/bindings/NewAccount";
 import type { NewCategory } from "@/bindings/NewCategory";
+import type { RecurringRuleFields } from "@/bindings/RecurringRuleFields";
 import type { Settings } from "@/bindings/Settings";
 import type { TransactionFields } from "@/bindings/TransactionFields";
 import {
@@ -43,6 +44,13 @@ import { useUpdateSettings } from "./useSettings";
 import * as accountHooks from "./useAccounts";
 import * as categoryHooks from "./useCategories";
 import * as paymentMethodHooks from "./usePaymentMethods";
+import * as recurringHooks from "./useRecurring";
+import {
+  useCreateRecurringRule,
+  useDeleteRecurringRule,
+  usePauseRecurringRule,
+  useUpdateRecurringRule,
+} from "./useRecurring";
 import * as transactionHooks from "./useTransactions";
 import {
   useCreateTransaction,
@@ -80,6 +88,14 @@ const transaction: TransactionFields = {
   payee: null,
   paymentMethodId: null,
   note: null,
+};
+const rule: RecurringRuleFields = {
+  transaction,
+  frequency: "monthly",
+  interval: 1,
+  endDate: null,
+  maxOccurrences: null,
+  mode: "auto",
 };
 const settings: Settings = {
   currencySymbol: "₱",
@@ -232,6 +248,34 @@ const WRITES = [
     { id: 8 },
   ],
   [
+    "useCreateRecurringRule",
+    useCreateRecurringRule,
+    rule,
+    "create_recurring_rule",
+    { rule },
+  ],
+  [
+    "useUpdateRecurringRule",
+    useUpdateRecurringRule,
+    { id: 9, rule },
+    "update_recurring_rule",
+    { id: 9, rule },
+  ],
+  [
+    "usePauseRecurringRule",
+    usePauseRecurringRule,
+    { id: 9, paused: true },
+    "pause_recurring_rule",
+    { id: 9, paused: true },
+  ],
+  [
+    "useDeleteRecurringRule",
+    useDeleteRecurringRule,
+    9,
+    "delete_recurring_rule",
+    { id: 9 },
+  ],
+  [
     "useUpdateSettings",
     useUpdateSettings,
     settings,
@@ -292,6 +336,7 @@ const READS = [
   "useTransactionDefaults",
   "usePayBillDefaults",
   "usePayeeSuggestions",
+  "useRecurringRules",
   "useSettings",
 ];
 
@@ -301,6 +346,7 @@ test("the table lists every write hook", () => {
     categoryHooks,
     paymentMethodHooks,
     transactionHooks,
+    recurringHooks,
     settingsHooks,
   ].flatMap((module) => Object.keys(module));
   expect(hooks.filter((name) => !READS.includes(name)).sort()).toEqual(

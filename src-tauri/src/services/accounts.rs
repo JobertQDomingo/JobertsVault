@@ -213,13 +213,15 @@ pub fn unarchive(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result
     Ok(())
 }
 
-/// Only an account no transaction uses can go; any other is archived instead (ACC-3).
+/// Only an account no transaction or recurring rule uses can go; any other is archived instead
+/// (ACC-3).
 pub fn delete(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result<(), AppError> {
     let tx = conn.transaction()?;
     let row = stored(&tx, id, now.date_naive())?;
     if row.in_use {
         return Err(AppError::Conflict {
-            message: "This account has transactions, so it can only be archived".into(),
+            message: "This account has transactions or recurring rules, so it can only be archived"
+                .into(),
         });
     }
     if !row.archived {
