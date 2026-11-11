@@ -195,7 +195,7 @@ CREATE INDEX idx_txn_payee         ON transactions(payee COLLATE NOCASE) WHERE p
 
 **Account filter on the list (TXN-4):** a transaction matches when `account_id = account OR to_account_id = account`, so an account's list includes incoming transfers.
 
-**Payees** don't have their own table. Suggestions (TXN-6, Phase 2) come from the distinct `payee` values on rows of the form's type (expense or income), sorted by most recent use (`date DESC, id DESC`). Each payee is suggested once, ignoring ASCII case and spelled as it was last used, and only when it starts with what's typed (ASCII case ignored, wildcards taken literally). At most 8 are suggested. The suggested category is the one on the latest row of that type with that payee. If that category is archived now, the payee is still suggested but fills in no category.
+**Payees** don't have their own table. Suggestions (TXN-6, Phase 2) come from the distinct `payee` values on rows of the form's type (expense or income), sorted by most recent use (`date DESC, id DESC`), counting only rows dated today or earlier: a future-dated row (TXN-8) isn't a use yet. Each payee is suggested once, ignoring ASCII case and spelled as it was last used, and only when it starts with what's typed (ASCII case ignored, wildcards taken literally). At most 8 are suggested. The suggested category is the one on the latest such row of that type with that payee. If that category is archived now, the payee is still suggested but fills in no category.
 
 ### 3.5 `settings`
 
@@ -464,7 +464,7 @@ monthly_needed = (target_amount − progress) ÷ months left until target_date  
 | Used for | Rule |
 |---|---|
 | **Quick-add (TXN-1)** | `last_used_account_id`, which is updated whenever a transaction is created. If it's missing or the account is archived or deleted, use the first active account by `sort_order`. |
-| **Pay bill's From account (CC-9)** | The active non-card account on the latest transaction (`date DESC, id DESC`), going by each transaction's source `account_id`. If there is none, the first active non-card account by `sort_order`. If there's no such account, the field starts empty. |
+| **Pay bill's From account (CC-9)** | The active non-card account on the latest transaction dated today or earlier (`date DESC, id DESC`), going by each transaction's source `account_id`. If there is none, the first active non-card account by `sort_order`. If there's no such account, the field starts empty. |
 | **Pay bill's amount (CC-9)** | The card's `amount_owed`. If that's 0, the field starts empty. |
 
 ### 5.9 Income-vs-expense chart bars (RPT-1)
@@ -619,6 +619,7 @@ Answered on 2026-11-11:
 19. **Saving a rule processes it** (REC-4): creating, editing or resuming a rule posts or queues its dates up to today in the same database transaction, so a rule that starts today shows up at once rather than the next day or launch (ARCHITECTURE §8).
 20. **An archived account, category or payment method** that a rule's template uses doesn't stop its dates: they post with it, the same way an edit of the rule may keep it (§4.2, §6).
 21. **Upcoming (TXN-8)** lists every future-dated row that matches the list's other filters, whatever its date, whenever the selected period hasn't ended, since ▶ stops at the current period and a row dated later would otherwise never be seen. Phase 3 drops the "Date can't be in the future" rule (§5.2, §6).
+22. **"Most recent" lookups skip future-dated rows** (TXN-8): payee suggestions and Pay bill's From account count only rows dated today or earlier, so one row dated months ahead can't hold the suggestion or the default until its date (§3.4, §5.8).
 
 Answered on 2026-11-01:
 

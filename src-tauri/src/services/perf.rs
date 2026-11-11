@@ -248,7 +248,7 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
     // TXN-6: one letter matches all 300 payees; "store 12" narrows to 11.
     for (label, prefix) in [("payees: \"s\"", "s"), ("payees: \"store 12\"", "store 12")] {
         time(label, || {
-            transactions::suggest_payees(&conn, prefix, CategoryKind::Expense).unwrap()
+            transactions::suggest_payees(&conn, prefix, CategoryKind::Expense, today()).unwrap()
         });
     }
     let list = |label: &str, f: TransactionFilter, page: u32| {

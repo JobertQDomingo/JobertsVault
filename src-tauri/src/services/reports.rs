@@ -339,7 +339,7 @@ fn category_totals(
 }
 
 /// The dates of `period` that count: rows dated after today count nowhere (DATA_MODEL §5.2).
-fn counted(period: &Period, today: NaiveDate) -> (NaiveDate, NaiveDate) {
+pub(crate) fn counted(period: &Period, today: NaiveDate) -> (NaiveDate, NaiveDate) {
     (period.start(), period.end().min(today))
 }
 

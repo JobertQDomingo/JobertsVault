@@ -31,8 +31,13 @@ pub fn suggest_payees(
     prefix: String,
     kind: CategoryKind,
 ) -> Result<Vec<PayeeSuggestion>, AppError> {
-    services::transactions::suggest_payees(&*state.conn()?, &prefix, kind)
-        .inspect_err(|err| log::record(&state.log_path, err))
+    services::transactions::suggest_payees(
+        &*state.conn()?,
+        &prefix,
+        kind,
+        chrono::Local::now().date_naive(),
+    )
+    .inspect_err(|err| log::record(&state.log_path, err))
 }
 
 #[tauri::command(async)]

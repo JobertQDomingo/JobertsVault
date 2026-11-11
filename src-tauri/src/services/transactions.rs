@@ -8,6 +8,7 @@ use crate::error::AppError;
 use crate::repo;
 use crate::services::categories::{self, CategoryKind};
 use crate::services::period::{self, PeriodQuery};
+use crate::services::reports;
 use crate::services::{accounts, invalid, not_found, stamp};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -160,7 +161,7 @@ pub fn list(
     } else {
         "9999-12-31".into()
     };
-    let counted_end = period.end().min(today).to_string();
+    let counted_end = reports::counted(&period, today).1.to_string();
     // shortcut: SQLite's LIKE ignores case for ASCII letters only, so "Ñ" doesn't match "ñ".
     let search = filter
         .search
@@ -257,10 +258,11 @@ pub fn pay_bill_defaults(
             message: "Only a credit card has a bill to pay".into(),
         })?
         .amount_owed;
-    let from_account_id = match repo::transactions::latest_non_card_source(conn)? {
-        Some(id) => Some(id),
-        None => repo::accounts::first_active(conn, false)?,
-    };
+    let from_account_id =
+        match repo::transactions::latest_non_card_source(conn, &today.to_string())? {
+            Some(id) => Some(id),
+            None => repo::accounts::first_active(conn, false)?,
+        };
     Ok(PayBillDefaults {
         from_account_id,
         amount: (owed > Money::ZERO).then_some(owed),
@@ -290,23 +292,29 @@ pub struct PayeeSuggestion {
 const SUGGESTIONS: u32 = 8;
 
 /// The payees used on `kind` rows that start with `prefix` (ASCII case ignored), most recently used
-/// first (TXN-6, DATA_MODEL §3.4). Nothing typed suggests nothing.
+/// first (TXN-6, DATA_MODEL §3.4). A row after `today` isn't a use yet (TXN-8). Nothing typed
+/// suggests nothing.
 pub fn suggest_payees(
     conn: &Connection,
     prefix: &str,
     kind: CategoryKind,
+    today: NaiveDate,
 ) -> Result<Vec<PayeeSuggestion>, AppError> {
     let prefix = prefix.trim();
     if prefix.is_empty() {
         return Ok(Vec::new());
     }
     let pattern = format!("{}%", like_text(prefix));
-    Ok(
-        repo::transactions::payees(conn, categories::kind_text(kind), &pattern, SUGGESTIONS)?
-            .into_iter()
-            .map(|(payee, category_id)| PayeeSuggestion { payee, category_id })
-            .collect(),
-    )
+    Ok(repo::transactions::payees(
+        conn,
+        categories::kind_text(kind),
+        &pattern,
+        &today.to_string(),
+        SUGGESTIONS,
+    )?
+    .into_iter()
+    .map(|(payee, category_id)| PayeeSuggestion { payee, category_id })
+    .collect())
 }
 
 pub fn get(conn: &Connection, id: i64) -> Result<Transaction, AppError> {
@@ -1171,6 +1179,9 @@ mod tests {
         assert_eq!(from(&conn), Some(wallet));
         accounts::archive(&mut conn, wallet, true, now()).unwrap();
         assert_eq!(from(&conn), Some(bank));
+        // A row dated after today hasn't been used yet (TXN-8).
+        spend(&mut conn, 100, cash, d(2026, 12, 1));
+        assert_eq!(from(&conn), Some(bank));
     }
 
     #[test]
@@ -1570,7 +1581,7 @@ mod tests {
         paid(&mut conn, expense, "corner cafe", dining, 2);
         paid(&mut conn, expense, "Cinema", food, 1);
 
-        let found = suggest_payees(&conn, "co", CategoryKind::Expense).unwrap();
+        let found = suggest_payees(&conn, "co", CategoryKind::Expense, today()).unwrap();
         // One suggestion per payee, spelled as it was used last, with that row's category.
         assert_eq!(
             found,
@@ -1579,12 +1590,45 @@ mod tests {
                 category_id: Some(dining),
             }]
         );
-        let found = suggest_payees(&conn, " C ", CategoryKind::Expense).unwrap();
+        let found = suggest_payees(&conn, " C ", CategoryKind::Expense, today()).unwrap();
         assert_eq!(names(&found), ["Cinema", "corner cafe"]);
         assert!(
-            suggest_payees(&conn, "  ", CategoryKind::Expense)
+            suggest_payees(&conn, "  ", CategoryKind::Expense, today())
                 .unwrap()
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn a_row_after_today_is_no_use_of_its_payee_yet() {
+        // TXN-8: a future row neither ranks first nor picks the category until its date.
+        let mut conn = db();
+        let (food, dining) = (food(&conn), id_of(&conn, "categories", "Dining Out"));
+        paid(&mut conn, TransactionKind::Expense, "Corner Cafe", food, 2);
+        let f = TransactionFields {
+            category_id: Some(dining),
+            payee: Some("Corner Cafe".into()),
+            date: "2026-12-01".into(),
+            ..expense(&conn, 100, cash(&conn))
+        };
+        create(&mut conn, f.clone(), now()).unwrap();
+        create(
+            &mut conn,
+            TransactionFields {
+                payee: Some("Corner Shop".into()),
+                ..f
+            },
+            now(),
+        )
+        .unwrap();
+
+        let found = suggest_payees(&conn, "corner", CategoryKind::Expense, today()).unwrap();
+        assert_eq!(
+            found,
+            [PayeeSuggestion {
+                payee: "Corner Cafe".into(),
+                category_id: Some(food),
+            }]
         );
     }
 
@@ -1595,9 +1639,9 @@ mod tests {
         paid(&mut conn, TransactionKind::Expense, "Acme Store", food, 3);
         paid(&mut conn, TransactionKind::Income, "Acme Corp", salary, 2);
 
-        let expense = suggest_payees(&conn, "acme", CategoryKind::Expense).unwrap();
+        let expense = suggest_payees(&conn, "acme", CategoryKind::Expense, today()).unwrap();
         assert_eq!(names(&expense), ["Acme Store"]);
-        let income = suggest_payees(&conn, "acme", CategoryKind::Income).unwrap();
+        let income = suggest_payees(&conn, "acme", CategoryKind::Income, today()).unwrap();
         assert_eq!(
             income,
             [PayeeSuggestion {
@@ -1621,7 +1665,7 @@ mod tests {
         );
         categories::archive(&mut conn, dining, now()).unwrap();
 
-        let found = suggest_payees(&conn, "Corner", CategoryKind::Expense).unwrap();
+        let found = suggest_payees(&conn, "Corner", CategoryKind::Expense, today()).unwrap();
         assert_eq!(
             found,
             [PayeeSuggestion {
@@ -1642,7 +1686,7 @@ mod tests {
         paid(&mut conn, expense, "AxB Mart", food, 1);
 
         let suggest = |text| {
-            names(&suggest_payees(&conn, text, CategoryKind::Expense).unwrap())
+            names(&suggest_payees(&conn, text, CategoryKind::Expense, today()).unwrap())
                 .into_iter()
                 .map(String::from)
                 .collect::<Vec<_>>()
@@ -1665,7 +1709,7 @@ mod tests {
                 10 - i,
             );
         }
-        let found = suggest_payees(&conn, "shop", CategoryKind::Expense).unwrap();
+        let found = suggest_payees(&conn, "shop", CategoryKind::Expense, today()).unwrap();
         assert_eq!(
             names(&found),
             [
