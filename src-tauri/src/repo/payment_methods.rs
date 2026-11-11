@@ -11,6 +11,7 @@ pub struct Row {
 
 const SELECT: &str = "SELECT m.id, m.name, m.sort_order, m.archived,
             EXISTS (SELECT 1 FROM transactions t WHERE t.payment_method_id = m.id)
+            OR EXISTS (SELECT 1 FROM recurring_rules r WHERE r.payment_method_id = m.id)
      FROM payment_methods m";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {

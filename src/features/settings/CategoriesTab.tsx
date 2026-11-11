@@ -104,7 +104,7 @@ export function CategoriesTab() {
               >
                 Archive
               </MenuItem>
-              {c.transactionCount === 0 && (
+              {!c.inUse && (
                 <MenuItem destructive onSelect={() => setOpen({ delete: c })}>
                   Delete
                 </MenuItem>

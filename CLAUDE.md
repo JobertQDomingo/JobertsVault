@@ -43,7 +43,7 @@ Build **only the current phase**. Don't build features from a later phase, or ou
 - **Weeks start on Monday** by default. A month can start on any day from 1 to 28 (`month_start_day`). **Years are always calendar years.**
 - **Comparisons:** a period still in progress is compared with the same number of days at the start of the previous period, unless `comparison_mode = full`. If the comparison total is 0, show "—".
 - **Recurring dates** are always calculated from `start_date + n × interval`, never from the previous occurrence. Days past the end of a short month fall on its last day.
-- **`currency_decimals` can't change** once any amount is stored: a transaction, or an account's non-zero opening balance or credit limit.
+- **`currency_decimals` can't change** once any amount is stored: a transaction, a recurring rule, or an account's non-zero opening balance or credit limit.
 - **In-use records are archived, not deleted.** Accounts, categories and payment methods use `ON DELETE RESTRICT`. Unused ones can be deleted. The last active account, and the last active category of each kind, can't be archived or deleted.
 - **Custom periods** move by the length of their range, and ▶ stops at the current period. The frontend never works out period dates: it uses what `get_period` returns.
 - **Debug builds use `jobertsvault-dev.db`**, so development never touches real data. Never remove this split. Debug builds also never check for or install updates.

@@ -3,6 +3,10 @@ import type { CategoryKind } from "./CategoryKind";
 
 export type Category = { id: number, name: string, kind: CategoryKind, color: string, icon: string, sortOrder: number, archived: boolean, 
 /**
- * Only a category with none can be deleted. Merging moves them all (CAT-4).
+ * Merging moves them all (CAT-4).
  */
-transactionCount: number, };
+transactionCount: number, 
+/**
+ * A transaction or recurring rule uses it, so it can't be deleted (CAT-4).
+ */
+inUse: boolean, };

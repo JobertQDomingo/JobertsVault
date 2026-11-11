@@ -61,6 +61,7 @@ const category = (over: Partial<Category> & Pick<Category, "id" | "name">) =>
     sortOrder: over.id,
     archived: false,
     transactionCount: 1,
+    inUse: true,
     ...over,
   }) satisfies Category;
 

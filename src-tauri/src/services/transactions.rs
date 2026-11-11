@@ -19,8 +19,8 @@ pub enum TransactionKind {
     Transfer,
 }
 
-/// What the quick-add and edit form sends (UI_FLOWS §4).
-#[derive(Clone, Debug, Deserialize, TS)]
+/// What the quick-add and edit form sends (UI_FLOWS §4). A recurring rule's template is one too.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct TransactionFields {
@@ -307,7 +307,7 @@ pub fn create(
     now: DateTime<Local>,
 ) -> Result<Transaction, AppError> {
     let tx = conn.transaction()?;
-    validate(&tx, &mut fields, None, now.date_naive())?;
+    validate(&tx, &mut fields, None, now.date_naive(), false)?;
     let id = repo::transactions::insert(&tx, &values(&fields), &stamp(now))?;
     repo::settings::set(&tx, LAST_USED_ACCOUNT, &fields.account_id.to_string())?;
     let saved = get(&tx, id)?;
@@ -323,7 +323,7 @@ pub fn update(
 ) -> Result<Transaction, AppError> {
     let tx = conn.transaction()?;
     let stored = get(&tx, id)?;
-    validate(&tx, &mut fields, Some(&stored), now.date_naive())?;
+    validate(&tx, &mut fields, Some(&stored), now.date_naive(), false)?;
     repo::transactions::update(&tx, id, &values(&fields), &stamp(now))?;
     let saved = get(&tx, id)?;
     tx.commit()?;
@@ -340,12 +340,14 @@ pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
 }
 
 /// Every rule in DATA_MODEL §6, after trimming the text. `stored` is the row being edited: it may
-/// keep an archived record it already uses, but a new one can't pick one.
-fn validate(
+/// keep an archived record it already uses, but a new one can't pick one. A recurring rule's
+/// template passes `allow_future`, since its date is the start date (DATA_MODEL §4.1).
+pub(crate) fn validate(
     conn: &Connection,
     f: &mut TransactionFields,
     stored: Option<&Transaction>,
     today: NaiveDate,
+    allow_future: bool,
 ) -> Result<(), AppError> {
     if f.amount <= Money::ZERO {
         return Err(invalid("amount", "Enter an amount above 0"));
@@ -353,13 +355,9 @@ fn validate(
     if f.amount > Money::MAX {
         return Err(invalid("amount", "That amount is too large"));
     }
-    let date = parse_date(&f.date)
-        // Parsing also takes "2026-1-5" and "-0001-01-01"; only the stored YYYY-MM-DD form is
-        // accepted, which the column's CHECK requires.
-        .filter(|d| f.date.len() == 10 && d.to_string() == f.date)
-        .ok_or_else(|| invalid("date", "Enter a real date"))?;
+    let date = real_date(&f.date).ok_or_else(|| invalid("date", "Enter a real date"))?;
     // Phases 1–2 only: Phase 3 allows future dates (TXN-8).
-    if date > today {
+    if date > today && !allow_future {
         return Err(invalid("date", "Date can't be in the future"));
     }
     f.payee = clean(f.payee.take());
@@ -438,12 +436,19 @@ fn check_account(
     Ok(())
 }
 
+/// `text` as a date, only in the stored `YYYY-MM-DD` form.
+pub(crate) fn real_date(text: &str) -> Option<NaiveDate> {
+    // Parsing also takes "2026-1-5" and "-0001-01-01"; only the stored YYYY-MM-DD form is
+    // accepted, which the column's CHECK requires.
+    parse_date(text).filter(|d| text.len() == 10 && d.to_string() == text)
+}
+
 /// Trimmed, and `None` when nothing is left (DATA_MODEL §6).
 fn clean(text: Option<String>) -> Option<String> {
     text.map(|t| t.trim().to_owned()).filter(|t| !t.is_empty())
 }
 
-fn values(f: &TransactionFields) -> repo::transactions::Values<'_> {
+pub(crate) fn values(f: &TransactionFields) -> repo::transactions::Values<'_> {
     repo::transactions::Values {
         kind: kind_text(f.kind),
         amount: f.amount.0,
@@ -461,14 +466,7 @@ pub(crate) fn view(row: repo::transactions::Row) -> Result<Transaction, AppError
     let bad = |what: &str| AppError::Database {
         message: format!("Transaction {} has an invalid {what}", row.id),
     };
-    let kind = [
-        TransactionKind::Income,
-        TransactionKind::Expense,
-        TransactionKind::Transfer,
-    ]
-    .into_iter()
-    .find(|k| kind_text(*k) == row.kind)
-    .ok_or_else(|| bad("kind"))?;
+    let kind = kind_of(&row.kind).ok_or_else(|| bad("kind"))?;
     let date = parse_date(&row.date).ok_or_else(|| bad("date"))?;
     Ok(Transaction {
         id: row.id,
@@ -484,7 +482,17 @@ pub(crate) fn view(row: repo::transactions::Row) -> Result<Transaction, AppError
     })
 }
 
-fn kind_text(kind: TransactionKind) -> &'static str {
+pub(crate) fn kind_of(text: &str) -> Option<TransactionKind> {
+    [
+        TransactionKind::Income,
+        TransactionKind::Expense,
+        TransactionKind::Transfer,
+    ]
+    .into_iter()
+    .find(|k| kind_text(*k) == text)
+}
+
+pub(crate) fn kind_text(kind: TransactionKind) -> &'static str {
     match kind {
         TransactionKind::Income => "income",
         TransactionKind::Expense => "expense",

@@ -82,7 +82,9 @@ pub fn stored(conn: &Connection) -> Result<Settings, AppError> {
 
 /// Changing the decimals would change the meaning of every stored amount (DATA_MODEL §1).
 fn decimals_locked(conn: &Connection) -> Result<bool, AppError> {
-    Ok(repo::transactions::any(conn)? || repo::accounts::any_with_amount(conn)?)
+    Ok(repo::transactions::any(conn)?
+        || repo::recurring::any(conn)?
+        || repo::accounts::any_with_amount(conn)?)
 }
 
 /// The stored rows whose key `wanted` picks, over the defaults.

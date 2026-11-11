@@ -14,6 +14,8 @@ export const queryKeys = {
   transactions: (filter: TransactionFilter) =>
     ["ledger", "transactions", filter] as const,
   transaction: (id: number) => ["ledger", "transaction", id] as const,
+  // A category merge moves rules, and their amounts are money.
+  recurringRules: ["ledger", "recurring"],
   // A save can add a payee or change its last category.
   payees: (prefix: string, kind: CategoryKind) =>
     ["ledger", "payees", prefix, kind] as const,

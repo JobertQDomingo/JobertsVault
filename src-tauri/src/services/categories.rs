@@ -51,9 +51,11 @@ pub struct Category {
     #[ts(type = "number")]
     pub sort_order: i64,
     pub archived: bool,
-    /// Only a category with none can be deleted. Merging moves them all (CAT-4).
+    /// Merging moves them all (CAT-4).
     #[ts(type = "number")]
     pub transaction_count: i64,
+    /// A transaction or recurring rule uses it, so it can't be deleted (CAT-4).
+    pub in_use: bool,
 }
 
 /// The color a new category of each kind starts with (DATA_MODEL §7).
@@ -168,13 +170,20 @@ pub fn unarchive(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result
     Ok(())
 }
 
-/// Only a category no transaction uses can go; any other is archived or merged (CAT-4).
+/// Only a category no transaction or recurring rule uses can go; any other is archived or merged
+/// (CAT-4).
 pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     let tx = conn.transaction()?;
     let row = stored(&tx, id)?;
     if row.transaction_count > 0 {
         return Err(AppError::Conflict {
             message: "This category has transactions, so it can only be archived or merged".into(),
+        });
+    }
+    if row.in_rule {
+        return Err(AppError::Conflict {
+            message: "A recurring rule uses this category, so it can only be archived or merged"
+                .into(),
         });
     }
     if !row.archived {
@@ -185,7 +194,8 @@ pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Moves every transaction of `from_id` to the active category `into_id` of the same kind, then
+/// Moves every transaction and recurring rule of `from_id` to the active category `into_id` of
+/// the same kind, then
 /// deletes `from_id`, as one change (DATA_MODEL §3.2, UI_FLOWS F7).
 pub fn merge(
     conn: &mut Connection,
@@ -208,7 +218,7 @@ pub fn merge(
     if into.archived {
         return Err(invalid("intoId", "Choose an active category"));
     }
-    repo::categories::move_transactions(&tx, from_id, into_id, &stamp(now))?;
+    repo::categories::move_uses(&tx, from_id, into_id, &stamp(now))?;
     repo::categories::delete(&tx, from_id)?;
     tx.commit()?;
     Ok(())
@@ -286,6 +296,7 @@ fn view(row: repo::categories::Row) -> Result<Category, AppError> {
         sort_order: row.sort_order,
         archived: row.archived,
         transaction_count: row.transaction_count,
+        in_use: row.transaction_count > 0 || row.in_rule,
     })
 }
 
@@ -387,6 +398,7 @@ mod tests {
                 sort_order: 0,
                 archived: false,
                 transaction_count: 0,
+                in_use: false,
             }
         );
         assert_eq!(
@@ -433,6 +445,7 @@ mod tests {
                 sort_order: 17,
                 archived: false,
                 transaction_count: 0,
+                in_use: false,
             }
         );
         assert_eq!(find(&conn, snacks.id), snacks);

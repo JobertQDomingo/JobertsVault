@@ -3,5 +3,6 @@
 pub mod accounts;
 pub mod categories;
 pub mod payment_methods;
+pub mod recurring;
 pub mod settings;
 pub mod transactions;

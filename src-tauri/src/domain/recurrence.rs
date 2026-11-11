@@ -1,6 +1,10 @@
 use chrono::{Days, Months, NaiveDate};
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
 pub enum Frequency {
     Daily,
     Weekly,
@@ -17,15 +21,16 @@ pub struct Schedule {
     pub start: NaiveDate,
     /// The last day an occurrence may fall on, included.
     pub end: Option<NaiveDate>,
+    /// How many dates the rule processes in its life, counted by `next`.
     pub max_occurrences: Option<u32>,
 }
 
 impl Schedule {
     /// The `n`-th date (0 is `start`), always counted from `start` so a 31st never drifts to the
-    /// 28th (REC-2). `None` once the rule has ended, past chrono's date range, or for an interval
-    /// of 0, which would repeat `start` forever.
+    /// 28th (REC-2). `None` after `end`, past chrono's date range, or for an interval of 0, which
+    /// would repeat `start` forever.
     pub fn occurrence(&self, n: u32) -> Option<NaiveDate> {
-        if self.interval == 0 || self.max_occurrences.is_some_and(|max| n >= max) {
+        if self.interval == 0 {
             return None;
         }
         let steps = n.checked_mul(self.interval)?;
@@ -40,6 +45,25 @@ impl Schedule {
                 .checked_add_months(Months::new(steps.checked_mul(12)?)),
         }?;
         self.end.is_none_or(|end| date <= end).then_some(date)
+    }
+
+    /// The date at `index`, unless the rule has already processed `done` dates out of
+    /// `max_occurrences`. The count is of processed dates, not indexes, so it holds when a
+    /// schedule edit starts the index again and when a resume skips the paused dates (§4.1).
+    pub fn next(&self, index: u32, done: u32) -> Option<NaiveDate> {
+        if self.max_occurrences.is_some_and(|max| done >= max) {
+            return None;
+        }
+        self.occurrence(index)
+    }
+
+    /// The first index from `index` on whose date is on or after `day`, or the index where the
+    /// dates run out. Resuming a paused rule moves to it, so the paused dates are never created.
+    pub fn first_on_or_after(&self, mut index: u32, day: NaiveDate) -> u32 {
+        while self.occurrence(index).is_some_and(|date| date < day) {
+            index += 1;
+        }
+        index
     }
 }
 
@@ -151,13 +175,40 @@ mod tests {
     }
 
     #[test]
-    fn a_rule_ends_after_its_number_of_times() {
+    fn a_rule_ends_once_it_has_processed_its_number_of_times() {
         let rule = Schedule {
             max_occurrences: Some(2),
             ..every(Frequency::Weekly, 1, d(2026, 11, 2))
         };
-        assert_eq!(first(&rule, 10), [d(2026, 11, 2), d(2026, 11, 9)]);
-        assert_eq!(rule.occurrence(2), None);
+        assert_eq!(rule.next(0, 0), Some(d(2026, 11, 2)));
+        assert_eq!(rule.next(1, 1), Some(d(2026, 11, 9)));
+        assert_eq!(rule.next(2, 2), None);
+        // Started again from a later date after one was processed: one more to go.
+        assert_eq!(rule.next(0, 1), Some(d(2026, 11, 2)));
+        assert_eq!(rule.next(1, 2), None);
+        assert_eq!(
+            every(Frequency::Weekly, 1, d(2026, 11, 2)).next(500, 500),
+            d(2026, 11, 2).checked_add_days(Days::new(3500)),
+            "no number of times never ends"
+        );
+    }
+
+    #[test]
+    fn resuming_moves_to_the_first_date_on_or_after_the_day() {
+        let rule = every(Frequency::Monthly, 1, d(2026, 1, 31));
+        assert_eq!(rule.first_on_or_after(1, d(2026, 6, 15)), 5, "Jun 30");
+        assert_eq!(
+            rule.first_on_or_after(1, d(2026, 6, 30)),
+            5,
+            "the day itself"
+        );
+        assert_eq!(rule.first_on_or_after(5, d(2026, 2, 1)), 5, "never back");
+        let ended = Schedule {
+            end: Some(d(2026, 3, 31)),
+            ..rule
+        };
+        assert_eq!(ended.first_on_or_after(1, d(2026, 6, 15)), 3);
+        assert_eq!(ended.occurrence(3), None, "nothing left");
     }
 
     #[test]
