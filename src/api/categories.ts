@@ -30,7 +30,7 @@ export const archiveCategory = (id: number) =>
 export const unarchiveCategory = (id: number) =>
   call<null>("unarchive_category", { id });
 
-/** Only a category with no transactions (`transactionCount` 0) can be deleted. */
+/** Only a category no transaction or recurring rule uses (`inUse` false) can be deleted. */
 export const deleteCategory = (id: number) =>
   call<null>("delete_category", { id });
 

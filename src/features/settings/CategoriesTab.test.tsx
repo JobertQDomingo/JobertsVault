@@ -166,11 +166,16 @@ test("Archive saves at once, and the backend's refusal is a toast", async () => 
   expect(calls("archive_category")).toEqual([{ id: 3 }]);
 });
 
-test("Delete is only offered with no transactions, and asks first", async () => {
+test("Delete is only offered when nothing uses it, and asks first", async () => {
   const unused: CategoryList = {
     ...CATEGORIES,
     categories: CATEGORIES.categories.map((c) =>
-      c.id === 4 ? { ...c, transactionCount: 0 } : c,
+      c.id === 4
+        ? { ...c, transactionCount: 0, inUse: false }
+        : // Only a recurring rule uses Dining Out.
+          c.name === "Dining Out"
+          ? { ...c, transactionCount: 0 }
+          : c,
     ),
   };
   open({ ...ANSWERS, list_categories: unused });

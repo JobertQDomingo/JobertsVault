@@ -79,7 +79,7 @@ pub fn create(
 }
 
 /// Changes future dates only (REC-5). A new frequency, interval or start date starts the
-/// schedule again from the start date, which must be after the last date already processed.
+/// schedule again from the start date, which can't bring back a date already settled.
 pub fn update(
     conn: &mut Connection,
     id: i64,
@@ -94,15 +94,12 @@ pub fn update(
         || fields.transaction.date != stored.start_date;
     let mut next_index = stored.next_index;
     if rescheduled {
-        // Same-format date text compares in date order (DATA_MODEL §1).
-        if stored
-            .last_date
-            .as_deref()
-            .is_some_and(|last| fields.transaction.date.as_str() <= last)
-        {
+        let start = transactions::real_date(&fields.transaction.date)
+            .ok_or_else(|| invalid("date", "Enter a real date"))?;
+        if start < earliest_restart(&stored, now.date_naive())? {
             return Err(invalid(
                 "date",
-                "Choose a start date after the last one this rule already created",
+                "Choose a later start date. This rule already created or passed over the dates before it.",
             ));
         }
         next_index = 0;
@@ -146,6 +143,21 @@ pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     }
     tx.commit()?;
     Ok(())
+}
+
+/// The earliest start date a schedule edit may take (DATA_MODEL §4.1): after the last date
+/// processed, and not before today or the rule's next date, whichever is earlier, so the dates a
+/// resume passed over are never created.
+fn earliest_restart(row: &repo::recurring::Row, today: NaiveDate) -> Result<NaiveDate, AppError> {
+    let next = schedule(row)?.next(index(row, row.next_index)?, index(row, row.done)?);
+    let floor = next.map_or(today, |next| next.min(today));
+    let after_last = row
+        .last_date
+        .as_deref()
+        .map(|last| transactions::real_date(last).ok_or_else(|| bad(row, "date")))
+        .transpose()?
+        .and_then(|last| last.succ_opt());
+    Ok(after_last.map_or(floor, |after| after.max(floor)))
 }
 
 fn get(conn: &Connection, id: i64) -> Result<RecurringRule, AppError> {
@@ -500,6 +512,41 @@ mod tests {
     }
 
     #[test]
+    fn a_schedule_edit_never_brings_back_dates_passed_over_while_paused() {
+        let mut conn = db();
+        let id = create(&mut conn, rent("2026-01-31"), now()).unwrap().id;
+        process(&conn, id, &["2026-01-31"]);
+        pause(&mut conn, id, true, now()).unwrap();
+        pause(&mut conn, id, false, now()).unwrap();
+        let mut back_in_march = rent("2026-03-31");
+        back_in_march.interval = 2;
+        assert_eq!(field(update(&mut conn, id, back_in_march, now())), "date");
+        // now() is Nov 3, 2026.
+        let mut from_today = rent("2026-11-03");
+        from_today.interval = 2;
+        assert_eq!(
+            update(&mut conn, id, from_today, now()).unwrap().next_date,
+            Some(d("2026-11-03"))
+        );
+    }
+
+    #[test]
+    fn a_rule_not_started_yet_can_start_earlier_but_not_in_the_past() {
+        let mut conn = db();
+        let id = create(&mut conn, rent("2027-01-31"), now()).unwrap().id;
+        assert_eq!(
+            update(&mut conn, id, rent("2026-12-15"), now())
+                .unwrap()
+                .next_date,
+            Some(d("2026-12-15"))
+        );
+        assert_eq!(
+            field(update(&mut conn, id, rent("2026-10-01"), now())),
+            "date"
+        );
+    }
+
+    #[test]
     fn resuming_skips_the_dates_it_was_paused_for() {
         let mut conn = db();
         let id = create(&mut conn, rent("2026-01-31"), now()).unwrap().id;
@@ -589,6 +636,9 @@ mod tests {
             accounts::delete(&mut conn, bank, now()),
             Err(AppError::Conflict { .. })
         ));
+        let food = categories::list(&conn).unwrap().categories;
+        let food = food.iter().find(|c| c.id == FOOD).unwrap();
+        assert!(food.in_use && food.transaction_count == 0);
         assert!(matches!(
             categories::delete(&mut conn, FOOD),
             Err(AppError::Conflict { .. })

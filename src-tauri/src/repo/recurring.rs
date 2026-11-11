@@ -172,11 +172,3 @@ pub fn set_paused(
 pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<usize> {
     conn.execute("DELETE FROM recurring_rules WHERE id = ?1", [id])
 }
-
-pub fn uses_category(conn: &Connection, id: i64) -> rusqlite::Result<bool> {
-    conn.query_row(
-        "SELECT EXISTS (SELECT 1 FROM recurring_rules WHERE category_id = ?1)",
-        [id],
-        |row| row.get(0),
-    )
-}

@@ -51,9 +51,11 @@ pub struct Category {
     #[ts(type = "number")]
     pub sort_order: i64,
     pub archived: bool,
-    /// Only a category with none can be deleted. Merging moves them all (CAT-4).
+    /// Merging moves them all (CAT-4).
     #[ts(type = "number")]
     pub transaction_count: i64,
+    /// A transaction or recurring rule uses it, so it can't be deleted (CAT-4).
+    pub in_use: bool,
 }
 
 /// The color a new category of each kind starts with (DATA_MODEL §7).
@@ -178,7 +180,7 @@ pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
             message: "This category has transactions, so it can only be archived or merged".into(),
         });
     }
-    if repo::recurring::uses_category(&tx, id)? {
+    if row.in_rule {
         return Err(AppError::Conflict {
             message: "A recurring rule uses this category, so it can only be archived or merged"
                 .into(),
@@ -294,6 +296,7 @@ fn view(row: repo::categories::Row) -> Result<Category, AppError> {
         sort_order: row.sort_order,
         archived: row.archived,
         transaction_count: row.transaction_count,
+        in_use: row.transaction_count > 0 || row.in_rule,
     })
 }
 
@@ -395,6 +398,7 @@ mod tests {
                 sort_order: 0,
                 archived: false,
                 transaction_count: 0,
+                in_use: false,
             }
         );
         assert_eq!(
@@ -441,6 +445,7 @@ mod tests {
                 sort_order: 17,
                 archived: false,
                 transaction_count: 0,
+                in_use: false,
             }
         );
         assert_eq!(find(&conn, snacks.id), snacks);

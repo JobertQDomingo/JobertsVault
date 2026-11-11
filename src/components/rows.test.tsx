@@ -50,6 +50,7 @@ const GROCERIES: Category = {
   sortOrder: 0,
   archived: false,
   transactionCount: 3,
+  inUse: true,
 };
 const txn = (over: Partial<Transaction>): Transaction => ({
   id: 7,

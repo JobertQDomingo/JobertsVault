@@ -287,7 +287,7 @@ CREATE TABLE recurring_rules (
 
 **Editing a rule (REC-5):**
 - Template fields (amount, category, mode, `end_date`, `max_occurrences`, and so on) affect future occurrences only.
-- The schedule changes when `frequency`, `interval` or `start_date` changes. The new `start_date` comes from the form, which offers the rule's next date, and must be after the last date already processed. `next_index` is reset to 0. Because the user picks the date, a rule on the 31st whose next date is Feb 28 can be started again on Mar 31, so it doesn't drift to the 28th.
+- The schedule changes when `frequency`, `interval` or `start_date` changes. The new `start_date` comes from the form, which offers the rule's next date. It must be after the last date already processed, and not before today or the rule's current next date, whichever is earlier, so the dates passed over while paused are never created and an edit never fills in the past. `next_index` is reset to 0. Because the user picks the date, a rule on the 31st whose next date is Feb 28 can be started again on Mar 31, so it doesn't drift to the 28th.
 
 **Pausing (REC-5):** a paused rule isn't processed. When it's resumed, `next_index` moves to the first date on or after the day it's resumed. The dates it would have had while paused are never created.
 
@@ -515,11 +515,11 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | Name lengths (account ≤ 50, category ≤ 40, payment method ≤ 40, payee ≤ 100, note ≤ 500) | that field |
 | Names are unique within their scope | name |
 | Credit card fields are present if and only if the account is a credit card | the card fields |
-| `currency_decimals` can't change once any amount is stored: a transaction, or an account's non-zero opening balance or credit limit (§1) | settings |
+| `currency_decimals` can't change once any amount is stored: a transaction, a recurring rule, or an account's non-zero opening balance or credit limit (§1) | settings |
 | A budget's category is an expense category, and a goal's account isn't a credit card | category / account |
 | A recurring rule's template follows the transaction rules above, except the date: its start date may be in the future (§4.1) | that field |
 | A rule's interval is 1–999, its number of times is 1–9,999, and its end date is a real date on or after the start date. A rule ends on a date or after a number of times, not both. | interval / maxOccurrences / endDate |
-| A rule's new start date, when its schedule changes, is after the last date it already processed (§4.1) | date |
+| A rule's new start date, when its schedule changes, is after the last date it already processed, and not before today or its current next date, whichever is earlier (§4.1) | date |
 
 Text is trimmed before saving, and empty optional text is stored as `NULL`.
 
@@ -611,7 +611,7 @@ Answered on 2026-11-04:
 
 Answered on 2026-11-11:
 
-13. **Editing a rule's schedule** takes the start date from the form, after the last date already processed, so a month-end rule never drifts. `max_occurrences` counts the dates actually processed, so the count holds across the edit (§4.1).
+13. **Editing a rule's schedule** takes the start date from the form, after the last date already processed (and not before today or the current next date, whichever is earlier), so a month-end rule never drifts. `max_occurrences` counts the dates actually processed, so the count holds across the edit (§4.1).
 14. **Resuming a paused rule** skips the dates it would have had while paused (§4.1).
 15. **A rule's amount locks `currency_decimals`** like any other stored amount (§1). A rule's account, category or payment method counts as in use, so it's archived instead of deleted, and merging categories moves rules along with transactions.
 16. **A rule's start date** may be in the past; processing fills in the dates since then (§4.1).
