@@ -39,6 +39,6 @@ export const archiveAccount = ({
 export const unarchiveAccount = (id: number) =>
   call<null>("unarchive_account", { id });
 
-/** Only an account with no transactions (`inUse` false) can be deleted. */
+/** Only an account no transaction, recurring rule or goal uses (`inUse` false) can be deleted. */
 export const deleteAccount = (id: number) =>
   call<null>("delete_account", { id });

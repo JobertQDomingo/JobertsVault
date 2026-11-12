@@ -17,7 +17,7 @@ This document describes every table and field, plus the rules for calculating ba
 |---|---|
 | **Money** | Stored as `INTEGER` in **minor units** (e.g. cents), as an `i64` in Rust. Floating-point numbers are never used for money, anywhere. |
 | **Amount sign** | `transactions.amount` is always **positive**. The transaction's `kind` decides whether money goes in or out. |
-| **Decimal places** | `currency_decimals` (0 or 2) decides how minor units are displayed. It **can only be changed while no amount is stored**: no transactions, no recurring rules, no budgets, and no account with an opening balance other than 0 or a credit limit. Changing it afterwards would change the meaning of every stored amount. |
+| **Decimal places** | `currency_decimals` (0 or 2) decides how minor units are displayed. It **can only be changed while no amount is stored**: no transactions, no recurring rules, no budgets, no goals, and no account with an opening balance other than 0 or a credit limit. Changing it afterwards would change the meaning of every stored amount. |
 | **Dates** | `TEXT` in `YYYY-MM-DD` format (ISO 8601), using the user's local calendar. This format sorts correctly as plain text. No time of day is stored. |
 | **Timestamps** | `created_at` / `updated_at` are `TEXT` in ISO 8601 UTC (`2026-10-26T09:30:00Z`). They're for record-keeping only and are never used in calculations. Services receive the current time as a `now` value, the same way they receive `today`. |
 | **IDs** | `INTEGER PRIMARY KEY`, assigned by SQLite. |
@@ -355,7 +355,11 @@ CREATE TABLE goals (
 ) STRICT;
 ```
 
-- The linked account can't be a credit card. This is checked in Rust.
+- The linked account can't be a credit card. This is checked in Rust. A new goal can't use an archived account, but an edit may keep the one it has, and a goal on an archived account still shows its progress.
+- **A goal puts its account in use**, like a transaction or a recurring rule, so that account can only be archived, never deleted, while the goal exists (`ON DELETE RESTRICT`).
+- Several goals may share an account, and each one counts the account's whole balance.
+- `target_date` is optional and may already have passed. Every field can be edited, and nothing refers to a goal, so it can always be deleted.
+- A goal's target amount locks `currency_decimals` (§1).
 - `achieved_at` is set the first time the account's balance reaches the target amount (GOL-4).
 
 ---
@@ -469,6 +473,11 @@ progress = max(0, current balance of the linked account)
 monthly_needed = (target_amount − progress) ÷ months left until target_date   (rounded up, if there is a target date)
 ```
 
+- **Progress** is the linked account's balance as of today (§5.1), so a future-dated row counts only once its date arrives (§5.2). A balance below 0 is no progress.
+- **% done** is a whole percent **rounded down**, so it shows 100 only once the target is really reached.
+- **Months left** are calendar months from today to `target_date`, a part month counting as a whole one: from Nov 12, Dec 12 is 1 month and Dec 13 is 2. Adding a month clamps to the month's end, so from Jan 31, Feb 28 is 1 month. Once the target date is today or has passed, months left is 0 and there's no monthly amount.
+- **Monthly needed** is rounded up to the minor unit, so saving it every month always reaches the target: ₱2,600 over 6 months is ₱433.34. There's none once nothing is left to save, or without a target date.
+
 ### 5.8 Default accounts
 
 | Used for | Rule |
@@ -526,8 +535,9 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | Name lengths (account ≤ 50, category ≤ 40, payment method ≤ 40, payee ≤ 100, note ≤ 500) | that field |
 | Names are unique within their scope | name |
 | Credit card fields are present if and only if the account is a credit card | the card fields |
-| `currency_decimals` can't change once any amount is stored: a transaction, a recurring rule, a budget, or an account's non-zero opening balance or credit limit (§1) | settings |
+| `currency_decimals` can't change once any amount is stored: a transaction, a recurring rule, a budget, a goal, or an account's non-zero opening balance or credit limit (§1) | settings |
 | A budget's category is an expense category, and a goal's account isn't a credit card | category / account |
+| A goal's name is 1–50 characters and unique, ignoring case; its target amount is > 0 and ≤ the maximum; its target date, if any, is a real date (past dates are allowed); a new goal can't use an archived account, but an edit may keep the one it has | name / targetAmount / targetDate / accountId |
 | A new budget can't use an archived category, but an edit may keep the one it has. A category, or all spending, has at most one budget per period. | categoryId / period |
 | A recurring rule's template follows the transaction rules above: its date is the start date (§4.1) | that field |
 | A rule's interval is 1–999, its number of times is 1–9,999, and its end date is a real date on or after the start date. A rule ends on a date or after a number of times, not both. | interval / maxOccurrences / endDate |
@@ -635,6 +645,13 @@ Answered on 2026-11-11:
 24. **Deleting or merging a category deletes its budgets** in the same database transaction, and the confirm dialogs say so. A budget doesn't make a category in use, and a merge doesn't move budgets to the target (§3.2, §4.3).
 25. **A budget's amount locks `currency_decimals`** like every other stored amount (§1).
 26. **Budgets always show their own current period** (BUD-2, DSH-6): the dashboard's budgets don't follow the period switcher, the same way its account balances don't (§5.6).
+
+Answered on 2026-11-12:
+
+27. **Months left for a goal (GOL-3)** are calendar months to the target date, a part month counting as a whole one, and the monthly amount is rounded up (§5.7).
+28. **A goal whose target date is today or has passed** has no monthly amount: months left is 0, and the Goals screen says the date has passed. Past target dates are accepted on save (§4.4).
+29. **A goal puts its account in use** (GOL-2), so an account with a goal is archived instead of deleted, matching `ON DELETE RESTRICT` (§4.4).
+30. **A goal's target amount locks `currency_decimals`** like every other stored amount (§1).
 
 Answered on 2026-11-01:
 

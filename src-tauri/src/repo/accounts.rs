@@ -14,7 +14,8 @@ pub struct Row {
     pub archived: bool,
     /// Calculated as of the date asked for, never stored (DATA_MODEL §5.1).
     pub balance: i64,
-    /// Whether any transaction uses it, as its source or as a transfer's destination.
+    /// Whether a transaction (as its source or a transfer's destination), a recurring rule or a
+    /// goal uses it.
     pub in_use: bool,
 }
 
@@ -40,6 +41,7 @@ const SELECT: &str =
             OR EXISTS (SELECT 1 FROM transactions t WHERE t.to_account_id = a.id)
             OR EXISTS (SELECT 1 FROM recurring_rules r
                        WHERE r.account_id = a.id OR r.to_account_id = a.id)
+            OR EXISTS (SELECT 1 FROM goals g WHERE g.account_id = a.id)
      FROM accounts a";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {

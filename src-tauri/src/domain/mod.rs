@@ -6,6 +6,7 @@ pub mod budget;
 pub mod card_cycle;
 pub mod category;
 pub mod csv;
+pub mod goal;
 pub mod money;
 pub mod period;
 pub mod recurrence;

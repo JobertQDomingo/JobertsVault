@@ -10,6 +10,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 import type { AccountFields } from "@/bindings/AccountFields";
 import type { BudgetFields } from "@/bindings/BudgetFields";
 import type { CategoryFields } from "@/bindings/CategoryFields";
+import type { GoalFields } from "@/bindings/GoalFields";
 import type { NewAccount } from "@/bindings/NewAccount";
 import type { NewCategory } from "@/bindings/NewCategory";
 import type { RecurringRuleFields } from "@/bindings/RecurringRuleFields";
@@ -60,6 +61,8 @@ import {
   useDeleteBudget,
   useUpdateBudget,
 } from "./useBudgets";
+import * as goalHooks from "./useGoals";
+import { useCreateGoal, useDeleteGoal, useUpdateGoal } from "./useGoals";
 import * as transactionHooks from "./useTransactions";
 import {
   useCreateTransaction,
@@ -110,6 +113,12 @@ const budget: BudgetFields = {
   categoryId: 8,
   period: "monthly",
   amount: 40000,
+};
+const goal: GoalFields = {
+  name: "Trip",
+  targetAmount: 500000,
+  targetDate: "2027-05-01",
+  accountId: 1,
 };
 const settings: Settings = {
   currencySymbol: "₱",
@@ -306,6 +315,15 @@ const WRITES = [
     { id: 3, budget },
   ],
   ["useDeleteBudget", useDeleteBudget, 3, "delete_budget", { id: 3 }],
+  ["useCreateGoal", useCreateGoal, goal, "create_goal", { goal }],
+  [
+    "useUpdateGoal",
+    useUpdateGoal,
+    { id: 3, goal },
+    "update_goal",
+    { id: 3, goal },
+  ],
+  ["useDeleteGoal", useDeleteGoal, 3, "delete_goal", { id: 3 }],
   [
     "useUpdateSettings",
     useUpdateSettings,
@@ -370,6 +388,7 @@ const READS = [
   "useRecurringRules",
   "useDueOccurrences",
   "useBudgets",
+  "useGoals",
   "useSettings",
 ];
 
@@ -381,6 +400,7 @@ test("the table lists every write hook", () => {
     transactionHooks,
     recurringHooks,
     budgetHooks,
+    goalHooks,
     settingsHooks,
   ].flatMap((module) => Object.keys(module));
   expect(hooks.filter((name) => !READS.includes(name)).sort()).toEqual(
