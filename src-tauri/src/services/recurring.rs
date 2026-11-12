@@ -1002,6 +1002,116 @@ mod tests {
         assert_eq!(rule(&conn, id).next_date, Some(d("2026-06-30")));
     }
 
+    /// REC-4: the app was last open on Aug 10 and is opened again on Nov 12, 3 months later.
+    #[test]
+    fn after_3_months_closed_no_date_is_missed_or_created_twice() {
+        let mut conn = db();
+        let savings = bank(&mut conn, "Savings");
+        let last_open = on("2026-08-10");
+        let make = |conn: &mut Connection, fields| create(conn, fields, last_open).unwrap().id;
+
+        let mut daily = rent("2026-08-01");
+        daily.frequency = Frequency::Daily;
+        daily.transaction.amount = Money(10_000);
+        let daily = make(&mut conn, daily);
+        // Mondays, queued for confirming.
+        let mut weekly = rent("2026-08-03");
+        weekly.frequency = Frequency::Weekly;
+        weekly.mode = RecurringMode::Confirm;
+        let weekly = make(&mut conn, weekly);
+        let month_end = make(&mut conn, rent("2026-07-31"));
+        let mut three_times = rent("2026-08-05");
+        three_times.max_occurrences = Some(3);
+        let three_times = make(&mut conn, three_times);
+        let mut transfer = rent("2026-08-15");
+        transfer.transaction = TransactionFields {
+            kind: TransactionKind::Transfer,
+            to_account_id: Some(savings),
+            category_id: None,
+            payee: None,
+            payment_method_id: None,
+            ..transfer.transaction
+        };
+        transfer.end_date = Some("2026-09-20".into());
+        let transfer = make(&mut conn, transfer);
+
+        // Saving processed each rule up to Aug 10, so that day's run finds nothing more.
+        assert_eq!(process_due(&mut conn, last_open).unwrap(), 0);
+        assert_eq!(dates(&conn, daily).len(), 10);
+        assert_eq!(dates(&conn, weekly), ["2026-08-03", "2026-08-10"]);
+
+        let reopened = on("2026-11-12");
+        // Aug 11 – Nov 12 daily, 13 Mondays, 3 month ends, Sep 5 and Oct 5, and the transfer's
+        // Aug 15 and Sep 15 (it started after the app was closed).
+        assert_eq!(
+            process_due(&mut conn, reopened).unwrap(),
+            94 + 13 + 3 + 2 + 2
+        );
+        // Startup and the window's focus both run it; neither adds a date again.
+        assert_eq!(process_due(&mut conn, reopened).unwrap(), 0);
+        // A clock set back finds nothing and removes nothing.
+        assert_eq!(process_due(&mut conn, on("2026-11-01")).unwrap(), 0);
+
+        let every_day: Vec<_> = d("2026-08-01")
+            .iter_days()
+            .take_while(|day| *day <= d("2026-11-12"))
+            .map(|day| day.to_string())
+            .collect();
+        assert_eq!(dates(&conn, daily), every_day);
+        let mondays: Vec<_> = d("2026-08-03")
+            .iter_weeks()
+            .take_while(|day| *day <= d("2026-11-12"))
+            .map(|day| day.to_string())
+            .collect();
+        assert_eq!(dates(&conn, weekly), mondays);
+        assert_eq!(mondays.len(), 15);
+        assert!(
+            occurrences(&conn, weekly)
+                .iter()
+                .all(|(_, status, txn)| status == "pending" && txn.is_none())
+        );
+        assert_eq!(list_due(&conn).unwrap().len(), 15);
+        assert_eq!(
+            dates(&conn, month_end),
+            ["2026-07-31", "2026-08-31", "2026-09-30", "2026-10-31"]
+        );
+        assert_eq!(
+            dates(&conn, three_times),
+            ["2026-08-05", "2026-09-05", "2026-10-05"]
+        );
+        assert_eq!(dates(&conn, transfer), ["2026-08-15", "2026-09-15"]);
+
+        // Each posted date has its own transaction, and nothing else was created.
+        let posted: Vec<i64> = [daily, month_end, three_times, transfer]
+            .iter()
+            .flat_map(|id| occurrences(&conn, *id))
+            .map(|(_, status, txn)| {
+                assert_eq!(status, "posted");
+                txn.unwrap()
+            })
+            .collect();
+        let unique: std::collections::BTreeSet<_> = posted.iter().collect();
+        assert_eq!((posted.len(), unique.len()), (104 + 4 + 3 + 2, 113));
+        assert_eq!(transaction_count(&conn), 113);
+        // Cash paid 104 × 100.00 daily, 7 × 15,000.00 rent and 2 × 15,000.00 transferred.
+        let today = d("2026-11-12");
+        assert_eq!(
+            accounts::get(&conn, CASH, today).unwrap().balance,
+            Money(-(104 * 10_000 + 9 * 1_500_000))
+        );
+        assert_eq!(
+            accounts::get(&conn, savings, today).unwrap().balance,
+            Money(2 * 1_500_000)
+        );
+
+        // The next day brings only the next daily date.
+        assert_eq!(process_due(&mut conn, on("2026-11-13")).unwrap(), 1);
+        assert_eq!(rule(&conn, daily).next_date, Some(d("2026-11-14")));
+        assert_eq!(rule(&conn, weekly).next_date, Some(d("2026-11-16")));
+        assert_eq!(rule(&conn, three_times).next_date, None);
+        assert_eq!(rule(&conn, transfer).next_date, None);
+    }
+
     #[test]
     fn a_confirm_rule_queues_its_dates_without_posting() {
         let mut conn = db();
