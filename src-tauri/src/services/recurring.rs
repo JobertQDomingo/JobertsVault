@@ -1019,6 +1019,12 @@ mod tests {
         weekly.frequency = Frequency::Weekly;
         weekly.mode = RecurringMode::Confirm;
         let weekly = make(&mut conn, weekly);
+        // Every other Thursday: dates come from start + n × 2 weeks, never the previous date.
+        let mut fortnightly = rent("2026-08-06");
+        fortnightly.frequency = Frequency::Weekly;
+        fortnightly.interval = 2;
+        fortnightly.transaction.amount = Money(50_000);
+        let fortnightly = make(&mut conn, fortnightly);
         let month_end = make(&mut conn, rent("2026-07-31"));
         let mut three_times = rent("2026-08-05");
         three_times.max_occurrences = Some(3);
@@ -1041,11 +1047,11 @@ mod tests {
         assert_eq!(dates(&conn, weekly), ["2026-08-03", "2026-08-10"]);
 
         let reopened = on("2026-11-12");
-        // Aug 11 – Nov 12 daily, 13 Mondays, 3 month ends, Sep 5 and Oct 5, and the transfer's
-        // Aug 15 and Sep 15 (it started after the app was closed).
+        // Aug 11 – Nov 12 daily, 13 Mondays, 7 Thursdays, 3 month ends, Sep 5 and Oct 5, and
+        // the transfer's Aug 15 and Sep 15 (it started after the app was closed).
         assert_eq!(
             process_due(&mut conn, reopened).unwrap(),
-            94 + 13 + 3 + 2 + 2
+            94 + 13 + 7 + 3 + 2 + 2
         );
         // Startup and the window's focus both run it; neither adds a date again.
         assert_eq!(process_due(&mut conn, reopened).unwrap(), 0);
@@ -1072,6 +1078,19 @@ mod tests {
         );
         assert_eq!(list_due(&conn).unwrap().len(), 15);
         assert_eq!(
+            dates(&conn, fortnightly),
+            [
+                "2026-08-06",
+                "2026-08-20",
+                "2026-09-03",
+                "2026-09-17",
+                "2026-10-01",
+                "2026-10-15",
+                "2026-10-29",
+                "2026-11-12",
+            ]
+        );
+        assert_eq!(
             dates(&conn, month_end),
             ["2026-07-31", "2026-08-31", "2026-09-30", "2026-10-31"]
         );
@@ -1081,23 +1100,31 @@ mod tests {
         );
         assert_eq!(dates(&conn, transfer), ["2026-08-15", "2026-09-15"]);
 
-        // Each posted date has its own transaction, and nothing else was created.
-        let posted: Vec<i64> = [daily, month_end, three_times, transfer]
-            .iter()
-            .flat_map(|id| occurrences(&conn, *id))
-            .map(|(_, status, txn)| {
+        // Each posted date has its own transaction, dated that day, and nothing else was created.
+        let mut posted = std::collections::BTreeSet::new();
+        for id in [daily, fortnightly, month_end, three_times, transfer] {
+            for (date, status, txn) in occurrences(&conn, id) {
                 assert_eq!(status, "posted");
-                txn.unwrap()
-            })
-            .collect();
-        let unique: std::collections::BTreeSet<_> = posted.iter().collect();
-        assert_eq!((posted.len(), unique.len()), (104 + 4 + 3 + 2, 113));
-        assert_eq!(transaction_count(&conn), 113);
-        // Cash paid 104 × 100.00 daily, 7 × 15,000.00 rent and 2 × 15,000.00 transferred.
+                let txn = transactions::get(&conn, txn.unwrap()).unwrap();
+                assert_eq!(txn.date, d(&date));
+                if id == transfer {
+                    assert_eq!(
+                        (txn.kind, txn.to_account_id, txn.category_id),
+                        (TransactionKind::Transfer, Some(savings), None)
+                    );
+                    assert_eq!((txn.payee, txn.payment_method_id), (None, None));
+                }
+                assert!(posted.insert(txn.id), "a transaction posted twice");
+            }
+        }
+        assert_eq!(posted.len(), 104 + 8 + 4 + 3 + 2);
+        assert_eq!(transaction_count(&conn), posted.len() as i64);
+        // Cash paid 104 × 100.00 daily, 8 × 500.00 fortnightly, 7 × 15,000.00 rent and
+        // 2 × 15,000.00 transferred.
         let today = d("2026-11-12");
         assert_eq!(
             accounts::get(&conn, CASH, today).unwrap().balance,
-            Money(-(104 * 10_000 + 9 * 1_500_000))
+            Money(-(104 * 10_000 + 8 * 50_000 + 9 * 1_500_000))
         );
         assert_eq!(
             accounts::get(&conn, savings, today).unwrap().balance,
@@ -1108,6 +1135,7 @@ mod tests {
         assert_eq!(process_due(&mut conn, on("2026-11-13")).unwrap(), 1);
         assert_eq!(rule(&conn, daily).next_date, Some(d("2026-11-14")));
         assert_eq!(rule(&conn, weekly).next_date, Some(d("2026-11-16")));
+        assert_eq!(rule(&conn, fortnightly).next_date, Some(d("2026-11-26")));
         assert_eq!(rule(&conn, three_times).next_date, None);
         assert_eq!(rule(&conn, transfer).next_date, None);
     }
