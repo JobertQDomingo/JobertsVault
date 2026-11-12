@@ -7,6 +7,7 @@ import type { CategoryList } from "@/bindings/CategoryList";
 import type { Comparison } from "@/bindings/Comparison";
 import type { Dashboard } from "@/bindings/Dashboard";
 import type { GoalProgress } from "@/bindings/GoalProgress";
+import type { UpcomingDate } from "@/bindings/UpcomingDate";
 import type { PaymentMethod } from "@/bindings/PaymentMethod";
 import type { PeriodView } from "@/bindings/PeriodView";
 import type { Timeseries } from "@/bindings/Timeseries";
@@ -326,6 +327,40 @@ export const GOALS: GoalProgress[] = [
   }),
 ];
 
+/** Coming up on Nov 5 (DSH-7): a card subscription that auto-posts, and a top-up to confirm. */
+export const UPCOMING: UpcomingDate[] = [
+  {
+    ruleId: 1,
+    mode: "auto",
+    transaction: {
+      kind: "expense",
+      amount: 1599,
+      date: "2026-11-06",
+      accountId: 4,
+      toAccountId: null,
+      categoryId: 2,
+      payee: "Netflix",
+      paymentMethodId: null,
+      note: null,
+    },
+  },
+  {
+    ruleId: 2,
+    mode: "confirm",
+    transaction: {
+      kind: "transfer",
+      amount: 50000,
+      date: "2026-11-08",
+      accountId: 2,
+      toAccountId: 3,
+      categoryId: null,
+      payee: null,
+      paymentMethodId: null,
+      note: null,
+    },
+  },
+];
+
 export const DASHBOARD: Dashboard = {
   period: PERIOD,
   income: 420000,
@@ -340,6 +375,7 @@ export const DASHBOARD: Dashboard = {
   netBalance: 828575,
   recent: RECENT,
   budgets: BUDGETS,
+  upcoming: UPCOMING,
   today: TODAY,
 };
 

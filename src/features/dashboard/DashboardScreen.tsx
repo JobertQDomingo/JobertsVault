@@ -1,10 +1,13 @@
-import { Plus, ReceiptText, Repeat, Target } from "lucide-react";
+import { CalendarClock, Plus, ReceiptText, Repeat, Target } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import type { BudgetProgress } from "@/bindings/BudgetProgress";
 import type { Category } from "@/bindings/Category";
+import type { Account } from "@/bindings/Account";
 import type { Dashboard } from "@/bindings/Dashboard";
+import type { UpcomingDate } from "@/bindings/UpcomingDate";
 import { AccountRow } from "@/components/AccountRow";
+import { CategoryChip, TransferChip } from "@/components/CategoryChip";
 import { Banner } from "@/components/Banner";
 import { EmptyState } from "@/components/EmptyState";
 import { ErrorState } from "@/components/ErrorState";
@@ -29,6 +32,7 @@ import { useCategories } from "@/hooks/useCategories";
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePeriodQuery } from "@/hooks/usePeriodQuery";
 import { formatDayHeader, formatSpan, groupByDate } from "@/lib/dates";
+import { rowTitle } from "@/lib/records";
 import { cn } from "@/lib/utils";
 
 const COLUMNS =
@@ -217,9 +221,14 @@ function DashboardBody({
           </div>
         </GlassPanel>
       </div>
-      {/* The mockup's second column, "Coming up", is DSH-7. */}
       <div className="grid grid-cols-2 items-start gap-3">
         <Budgets budgets={data.budgets} categories={categoryList} />
+        <ComingUp
+          upcoming={data.upcoming}
+          accounts={data.accounts}
+          categories={categoryList}
+          today={data.today}
+        />
       </div>
     </>
   );
@@ -259,6 +268,88 @@ function Budgets({
             </li>
           ))}
         </ul>
+      )}
+    </GlassPanel>
+  );
+}
+
+// Past this many dates, the panel links to the rest, so it stays near the Budgets panel's height.
+const COMING_UP_ROWS = 8;
+
+/**
+ * Each date a recurring rule falls on in the next 7 days, soonest first (DSH-7): what it is, the
+ * day, the account and whether it posts by itself or waits to be confirmed (UI_FLOWS §2).
+ */
+function ComingUp({
+  upcoming,
+  accounts,
+  categories,
+  today,
+}: {
+  upcoming: UpcomingDate[];
+  accounts: Account[];
+  categories: Category[];
+  today: string;
+}) {
+  const more = upcoming.length - COMING_UP_ROWS;
+  return (
+    <GlassPanel className="overflow-hidden pb-2">
+      <CardHeader title="Coming up" to="/recurring" link="View all" />
+      {upcoming.length === 0 ? (
+        <EmptyState
+          icon={CalendarClock}
+          message="Nothing in the next 7 days."
+        />
+      ) : (
+        <ul>
+          {upcoming
+            .slice(0, COMING_UP_ROWS)
+            .map(({ ruleId, mode, transaction: t }) => {
+              const category = categories.find((c) => c.id === t.categoryId);
+              const transfer = t.kind === "transfer";
+              const account = accounts.find((a) => a.id === t.accountId)?.name;
+              const when = [
+                formatDayHeader(t.date, today),
+                // A transfer's title already names both accounts.
+                !transfer && account,
+                mode === "confirm" ? "needs confirming" : "auto",
+              ]
+                .filter(Boolean)
+                .join(" · ");
+              return (
+                <li
+                  key={`${ruleId}-${t.date}`}
+                  className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 px-[18px] py-1.5"
+                >
+                  {transfer ? (
+                    <TransferChip />
+                  ) : (
+                    <CategoryChip
+                      color={category?.color ?? "cat-11"}
+                      icon={category?.icon ?? "ellipsis"}
+                    />
+                  )}
+                  <span className="grid min-w-0">
+                    <span className="truncate font-semibold">
+                      {rowTitle(t, accounts, categories)}
+                    </span>
+                    <span className="truncate text-small text-muted-foreground">
+                      {when}
+                    </span>
+                  </span>
+                  <MoneyText amount={t.amount} kind={t.kind} />
+                </li>
+              );
+            })}
+        </ul>
+      )}
+      {more > 0 && (
+        <Link
+          to="/recurring"
+          className="block px-[18px] pt-1 font-semibold text-primary hover:underline"
+        >
+          + {more} more
+        </Link>
       )}
     </GlassPanel>
   );

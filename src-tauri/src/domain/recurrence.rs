@@ -57,6 +57,27 @@ impl Schedule {
         self.occurrence(index)
     }
 
+    /// The dates from `index` on that fall after `after` and on or before `until`, soonest first,
+    /// for Coming up (DSH-7). Dates up to `after` that processing hasn't reached yet still count
+    /// toward `max_occurrences`, as processing will count them.
+    pub fn dates_between(
+        &self,
+        mut index: u32,
+        mut done: u32,
+        after: NaiveDate,
+        until: NaiveDate,
+    ) -> Vec<NaiveDate> {
+        let mut dates = Vec::new();
+        while let Some(date) = self.next(index, done).filter(|date| *date <= until) {
+            if date > after {
+                dates.push(date);
+            }
+            index += 1;
+            done += 1;
+        }
+        dates
+    }
+
     /// The first index from `index` on whose date is on or after `day`, or the index where the
     /// dates run out. Resuming a paused rule moves to it, so the paused dates are never created.
     pub fn first_on_or_after(&self, mut index: u32, day: NaiveDate) -> u32 {
@@ -87,6 +108,55 @@ mod tests {
 
     fn first(schedule: &Schedule, count: u32) -> Vec<NaiveDate> {
         (0..count).map_while(|n| schedule.occurrence(n)).collect()
+    }
+
+    #[test]
+    fn dates_between_takes_the_window_after_today_up_to_a_week_on() {
+        let today = d(2026, 11, 12);
+        let week = d(2026, 11, 19);
+        let daily = every(Frequency::Daily, 2, d(2026, 11, 10));
+        // Nov 10 and 12 are processed or due already; Nov 20 is past the window.
+        assert_eq!(
+            daily.dates_between(2, 2, today, week),
+            [d(2026, 11, 14), d(2026, 11, 16), d(2026, 11, 18)]
+        );
+        let monthly = every(Frequency::Monthly, 1, d(2026, 1, 31));
+        assert_eq!(monthly.dates_between(10, 10, today, week), []);
+        assert_eq!(
+            monthly.dates_between(10, 10, d(2026, 11, 23), d(2026, 11, 30)),
+            [d(2026, 11, 30)]
+        );
+        // A date exactly a week away is in; one on today isn't.
+        let weekly = every(Frequency::Weekly, 1, d(2026, 11, 12));
+        assert_eq!(weekly.dates_between(0, 0, today, week), [week]);
+    }
+
+    #[test]
+    fn dates_between_stops_at_the_end_date_and_the_number_of_times() {
+        let today = d(2026, 11, 12);
+        let week = d(2026, 11, 19);
+        let mut daily = every(Frequency::Daily, 1, d(2026, 11, 13));
+        daily.end = Some(d(2026, 11, 15));
+        assert_eq!(
+            daily.dates_between(0, 0, today, week),
+            [d(2026, 11, 13), d(2026, 11, 14), d(2026, 11, 15)]
+        );
+        daily.end = None;
+        daily.max_occurrences = Some(5);
+        // 3 already processed under an earlier schedule leave 2.
+        assert_eq!(
+            daily.dates_between(0, 3, today, week),
+            [d(2026, 11, 13), d(2026, 11, 14)]
+        );
+        // An unprocessed date up to today uses one of them too.
+        let from_today = Schedule {
+            start: today,
+            ..daily
+        };
+        assert_eq!(
+            from_today.dates_between(0, 3, today, week),
+            [d(2026, 11, 13)]
+        );
     }
 
     #[test]

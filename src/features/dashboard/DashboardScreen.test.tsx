@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
-import { CATEGORIES, DASHBOARD, PERIOD } from "@/test/fixtures";
+import { CATEGORIES, DASHBOARD, PERIOD, UPCOMING } from "@/test/fixtures";
 import { renderRoute, type Answers } from "@/test/render";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -86,7 +86,10 @@ test("clicking a recent transaction opens it for editing", async () => {
 
 test("View all goes to Transactions, Manage to Accounts", async () => {
   const { router } = renderRoute("/", ANSWERS);
-  fireEvent.click(await screen.findByRole("link", { name: "View all" }));
+  await screen.findByText("Recent transactions", { selector: "h2" });
+  fireEvent.click(
+    panel("Recent transactions").getByRole("link", { name: "View all" }),
+  );
   await waitFor(() =>
     expect(router.state.location.pathname).toBe("/transactions"),
   );
@@ -268,4 +271,47 @@ test("with no budgets, the panel says so and still links to Budgets", async () =
   const budgets = panel("Budgets");
   expect(budgets.getByText("No budgets yet.")).toBeTruthy();
   expect(budgets.getByRole("link", { name: "Manage" })).toBeTruthy();
+});
+
+test("Coming up lists each recurring date in the next 7 days, soonest first (DSH-7)", async () => {
+  renderRoute("/", ANSWERS);
+  await screen.findByText("Coming up", { selector: "h2" });
+  const coming = panel("Coming up");
+  const rows = coming.getAllByRole("listitem");
+  expect(rows).toHaveLength(2);
+  within(rows[0]).getByText("Dining Out · Netflix");
+  within(rows[0]).getByText("Fri, Nov 6 · Credit card · auto");
+  within(rows[0]).getByText("−₱15.99");
+  within(rows[1]).getByText("Bank → E-wallet");
+  within(rows[1]).getByText("Sun, Nov 8 · needs confirming");
+  expect(
+    coming.getByRole("link", { name: "View all" }).getAttribute("href"),
+  ).toBe("/recurring");
+});
+
+test("with nothing coming up, the panel says so", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: { ...DASHBOARD, upcoming: [] },
+  });
+  await screen.findByText("Coming up", { selector: "h2" });
+  panel("Coming up").getByText("Nothing in the next 7 days.");
+});
+
+test("past 8 dates, Coming up says how many more", async () => {
+  const many = Array.from({ length: 10 }, (_, i) => ({
+    ...UPCOMING[0],
+    transaction: { ...UPCOMING[0].transaction, date: "2026-11-06" },
+    ruleId: i + 1,
+  }));
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: { ...DASHBOARD, upcoming: many },
+  });
+  await screen.findByText("Coming up", { selector: "h2" });
+  const coming = panel("Coming up");
+  expect(coming.getAllByRole("listitem")).toHaveLength(8);
+  expect(
+    coming.getByRole("link", { name: "+ 2 more" }).getAttribute("href"),
+  ).toBe("/recurring");
 });

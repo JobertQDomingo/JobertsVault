@@ -9,6 +9,7 @@ use crate::repo;
 use crate::services::accounts::{self, Account};
 use crate::services::budgets::{self, BudgetProgress};
 use crate::services::period::{self, PeriodQuery, PeriodView};
+use crate::services::recurring::{self, UpcomingDate};
 use crate::services::reports::{self, Comparison, Timeseries};
 use crate::services::transactions::{self, Transaction};
 
@@ -39,6 +40,9 @@ pub struct Dashboard {
     /// Every budget's own current period, whatever the period shown, as `list_budgets` returns
     /// them (DSH-6).
     pub budgets: Vec<BudgetProgress>,
+    /// Every date a recurring rule falls on after today and up to a week on, soonest first, as
+    /// Coming up shows them (DSH-7).
+    pub upcoming: Vec<UpcomingDate>,
     pub today: NaiveDate,
 }
 
@@ -68,6 +72,7 @@ pub fn get(
         backup_due: super::backup::is_due(conn, today)?,
         recurring_due: repo::recurring::pending(conn)?.len(),
         budgets: budgets::list(conn, today)?,
+        upcoming: recurring::upcoming(conn, today)?,
         period,
         income,
         expense,
@@ -422,7 +427,15 @@ mod tests {
         };
         // now() is Nov 3, 2026: Oct 24 and 31 are due.
         recurring::create(&mut conn, rule, now()).unwrap();
-        assert_eq!(get(&conn, &MONTH, d(2026, 11, 3)).unwrap().recurring_due, 2);
+        let dash = get(&conn, &MONTH, d(2026, 11, 3)).unwrap();
+        assert_eq!(dash.recurring_due, 2);
+        // Nov 7 is coming up; Nov 14 is more than a week away (DSH-7).
+        let dates: Vec<_> = dash
+            .upcoming
+            .iter()
+            .map(|u| u.transaction.date.as_str())
+            .collect();
+        assert_eq!(dates, ["2026-11-07"]);
     }
 
     #[test]
