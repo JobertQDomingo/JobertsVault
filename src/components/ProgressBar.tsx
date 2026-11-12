@@ -22,16 +22,10 @@ export function ProgressBar({
   "aria-label"?: string;
 }) {
   const labelId = useId();
-  const color =
-    tone === "goal"
-      ? done
-        ? "bg-success"
-        : "bg-primary"
-      : percent >= 100
-        ? "bg-danger"
-        : percent >= 80
-          ? "bg-warning"
-          : "bg-primary";
+  const limitColor =
+    percent >= 100 ? "bg-danger" : percent >= 80 ? "bg-warning" : "bg-primary";
+  const goalColor = done ? "bg-success" : "bg-primary";
+  const color = tone === "goal" ? goalColor : limitColor;
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
       <div

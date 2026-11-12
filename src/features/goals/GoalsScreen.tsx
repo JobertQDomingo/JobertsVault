@@ -82,6 +82,7 @@ export function GoalsScreen() {
             actions={
               goal.archived ? (
                 <MenuItem
+                  disabled={unarchive.isPending}
                   onSelect={() =>
                     unarchive.mutate(goal.id, {
                       onSuccess: () => notify.success("Unarchived"),
@@ -97,6 +98,7 @@ export function GoalsScreen() {
                     Edit
                   </MenuItem>
                   <MenuItem
+                    disabled={archive.isPending}
                     onSelect={() =>
                       archive.mutate(goal.id, {
                         onSuccess: () => notify.success("Archived"),
@@ -119,7 +121,11 @@ export function GoalsScreen() {
         {active.length ? (
           cards(active)
         ) : (
-          <EmptyState icon={Flag} message="No goals yet." action={newGoal} />
+          <EmptyState
+            icon={Flag}
+            message={archived.length ? "No active goals." : "No goals yet."}
+            action={newGoal}
+          />
         )}
         {archived.length > 0 && (
           <>

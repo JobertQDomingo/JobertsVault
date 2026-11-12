@@ -6,8 +6,9 @@ import type { Money } from "./Money";
  */
 export type Goal = { id: number, 
 /**
- * The day its progress first reached the target (GOL-4). It stays if the balance drops
- * later; a new target amount or account clears it.
+ * The day Goals first found its progress at the target (GOL-4), which can be later than the
+ * day the balance got there. It stays if the balance drops; a higher target or another
+ * account clears it. An archived goal isn't checked.
  */
 achievedAt: string | null, 
 /**

@@ -360,7 +360,7 @@ CREATE TABLE goals (
 - Several goals may share an account, and each one counts the account's whole balance.
 - `target_date` is optional and may already have passed. Every field can be edited, and nothing refers to a goal, so it can always be deleted.
 - A goal's target amount locks `currency_decimals` (§1).
-- `achieved_at` is set the first time the account's balance reaches the target amount (GOL-4). `list_goals` checks this each time it runs, in a database transaction, and stores today's date (`YYYY-MM-DD`). It stays if the balance drops later. An edit that changes the target amount or the account clears it, so the goal is checked again. An achieved goal asks for no monthly amount (§5.7).
+- `achieved_at` is set the first time the account's balance reaches the target amount (GOL-4). `list_goals` checks this each time it runs, in a database transaction, and stores today's date (`YYYY-MM-DD`). So it's the day Goals first found it reached, which can be later than the day the balance got there. It stays if the balance drops later. Raising the target amount or changing the account clears it, so the goal is checked again; lowering the target on the same account keeps it. An archived goal isn't checked, since it may have been given up. An achieved goal asks for no monthly amount (§5.7).
 - **Any goal can be archived** (GOL-4), achieved or not, and unarchived. An archived goal still shows its progress and can still be edited or deleted.
 
 ---
@@ -653,7 +653,7 @@ Answered on 2026-11-12:
 28. **A goal whose target date is today or has passed** has no monthly amount: months left is 0, and the Goals screen says the date has passed. Past target dates are accepted on save (§4.4).
 29. **A goal puts its account in use** (GOL-2), so an account with a goal is archived instead of deleted, matching `ON DELETE RESTRICT` (§4.4).
 30. **A goal's target amount locks `currency_decimals`** like every other stored amount (§1).
-31. **A goal is marked achieved when `list_goals` runs** (GOL-4) and finds its progress at the target: that day is stored in `achieved_at`, and it stays if the balance drops. A new target amount or account clears it. A reach and drop between two visits to Goals isn't recorded (§4.4).
+31. **A goal is marked achieved when `list_goals` runs** (GOL-4) and finds its progress at the target: that day is stored in `achieved_at`, and it stays if the balance drops. A higher target or another account clears it, and archived goals aren't checked. A reach and drop between two visits to Goals isn't recorded (§4.4).
 32. **Any goal can be archived**, achieved or not, and archived goals fold under Show archived with Unarchive and Delete (§4.4, UI_FLOWS §8.4).
 
 Answered on 2026-11-01:

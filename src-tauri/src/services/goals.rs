@@ -36,8 +36,9 @@ pub struct Goal {
     pub id: i64,
     #[serde(flatten)]
     pub fields: GoalFields,
-    /// The day its progress first reached the target (GOL-4). It stays if the balance drops
-    /// later; a new target amount or account clears it.
+    /// The day Goals first found its progress at the target (GOL-4), which can be later than the
+    /// day the balance got there. It stays if the balance drops; a higher target or another
+    /// account clears it. An archived goal isn't checked.
     pub achieved_at: Option<NaiveDate>,
     /// Hidden from the goal cards, under Show archived. Any goal can be archived.
     pub archived: bool,
@@ -86,7 +87,8 @@ pub fn list(conn: &mut Connection, today: NaiveDate) -> Result<Vec<GoalProgress>
             .ok_or_else(|| AppError::Database {
                 message: format!("Goal {} has no account", goal.id),
             })?;
-        if goal.achieved_at.is_none() && balance >= goal.fields.target_amount.0 {
+        // An archived goal may have been given up, so it isn't marked.
+        if !goal.archived && goal.achieved_at.is_none() && balance >= goal.fields.target_amount.0 {
             repo::goals::set_achieved(&tx, goal.id, &today.to_string())?;
             goal.achieved_at = Some(today);
         }
@@ -672,6 +674,15 @@ mod tests {
         )
         .unwrap();
         assert_eq!(renamed.achieved_at, Some(today));
+        // A lower target on the same account was reached then too, so it keeps its day.
+        let lowered = update(
+            &mut conn,
+            trip.id,
+            fields("Japan", 40_000, Some("2027-01-01"), bank),
+            now(),
+        )
+        .unwrap();
+        assert_eq!(lowered.achieved_at, Some(today));
         // A higher target is checked again: not reached, so not achieved.
         let raised = update(
             &mut conn,
@@ -702,6 +713,28 @@ mod tests {
         )
         .unwrap();
         assert_eq!(moved.achieved_at, None);
+    }
+
+    #[test]
+    fn an_archived_goal_isnt_marked_achieved() {
+        let mut conn = db();
+        let bank = account(&mut conn, "Bank", AccountKind::Bank, 0);
+        let car = create(&mut conn, fields("Car", 50_000, None, bank), now()).unwrap();
+        archive(&mut conn, car.id, now()).unwrap();
+        save(
+            &mut conn,
+            TransactionKind::Income,
+            bank,
+            60_000,
+            d(2026, 11, 12),
+        );
+        assert_eq!(states(&mut conn, d(2026, 11, 12)), [(None, true)]);
+        // Brought back, it's checked again.
+        unarchive(&mut conn, car.id, now()).unwrap();
+        assert_eq!(
+            states(&mut conn, d(2026, 11, 13)),
+            [(Some(d(2026, 11, 13)), false)]
+        );
     }
 
     #[test]

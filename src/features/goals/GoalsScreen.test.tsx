@@ -84,6 +84,12 @@ test("with no goals, the empty state offers New goal", async () => {
   expect(screen.getAllByRole("button", { name: "New goal" })).toHaveLength(2);
 });
 
+test("with only archived goals, the empty state says none are active", async () => {
+  renderRoute("/goals", { ...ANSWERS, list_goals: [GOALS[3]] });
+  await screen.findByText("No active goals.");
+  screen.getByRole("button", { name: "Show archived (1)" });
+});
+
 test("New goal offers only active accounts that aren't cards, and the date is optional (GOL-1, GOL-2)", async () => {
   renderRoute("/goals", ANSWERS);
   fireEvent.click(

@@ -68,11 +68,12 @@ pub fn insert(conn: &Connection, v: &Values, now: &str) -> rusqlite::Result<i64>
     Ok(conn.last_insert_rowid())
 }
 
-/// A new target amount or account clears `achieved_at`, so the goal is checked again (GOL-4).
+/// A higher target amount or another account clears `achieved_at`, so the goal is checked again
+/// (GOL-4). A lower target on the same account keeps it: the goal was reached then too.
 pub fn update(conn: &Connection, id: i64, v: &Values, now: &str) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE goals SET name = ?2, target_amount = ?3, target_date = ?4, account_id = ?5,
-                          achieved_at = CASE WHEN target_amount = ?3 AND account_id = ?5
+                          achieved_at = CASE WHEN ?3 <= target_amount AND account_id = ?5
                                              THEN achieved_at END,
                           updated_at = ?6
          WHERE id = ?1",
