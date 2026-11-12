@@ -325,7 +325,11 @@ test("past 8 dates, Coming up says how many more", async () => {
   ).toBe("/recurring");
 });
 
-const cardDue = (days: number) => ({ accountId: 4, amountOwed: 64000, days });
+const cardDue = (days: number, accountId = 4) => ({
+  accountId,
+  amountOwed: 64000,
+  days,
+});
 
 test("a card due within 5 days shows a banner with the amount owed and Pay bill (CC-7)", async () => {
   renderRoute("/", {
@@ -357,7 +361,7 @@ test("a card due within 5 days shows a banner with the amount owed and Pay bill 
 test("the card banner says today and tomorrow (CC-7)", async () => {
   renderRoute("/", {
     ...ANSWERS,
-    get_dashboard: { ...DASHBOARD, cardsDue: [cardDue(0), cardDue(1)] },
+    get_dashboard: { ...DASHBOARD, cardsDue: [cardDue(0), cardDue(1, 2)] },
   });
   expect(await screen.findByText(/payment due today/)).toBeTruthy();
   expect(screen.getByText(/payment due tomorrow/)).toBeTruthy();

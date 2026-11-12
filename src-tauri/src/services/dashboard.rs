@@ -518,4 +518,34 @@ mod tests {
         );
         assert_eq!(due(d(2026, 11, 5))[0].days, 0, "due today");
     }
+
+    #[test]
+    fn cards_due_come_soonest_first() {
+        let mut conn = db();
+        let later = account(&mut conn, AccountKind::CreditCard, "Due 5th");
+        let sooner = account(&mut conn, AccountKind::CreditCard, "Due 3rd");
+        accounts::update(
+            &mut conn,
+            sooner,
+            AccountFields {
+                name: "Due 3rd".into(),
+                opening_balance: Money(0),
+                credit_limit: Some(Money(1_000_000)),
+                statement_day: Some(20),
+                due_day: Some(3),
+            },
+            now(),
+        )
+        .unwrap();
+        spend(&mut conn, 1_000, d(2026, 10, 25), later);
+        spend(&mut conn, 1_000, d(2026, 10, 25), sooner);
+
+        let ids: Vec<_> = get(&conn, &MONTH, d(2026, 11, 1))
+            .unwrap()
+            .cards_due
+            .iter()
+            .map(|c| (c.account_id, c.days))
+            .collect();
+        assert_eq!(ids, [(sooner, 2), (later, 4)]);
+    }
 }
