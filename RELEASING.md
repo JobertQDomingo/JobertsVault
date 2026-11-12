@@ -148,7 +148,7 @@ Only the `release` job can write to the repository. The write token goes only to
 | "X is missing, so vX.Y.Z stays a draft" | An asset has the wrong name, often from a changed `assetNamePattern` or product name. Fix the workflow in a PR, merge, then `gh workflow run release.yml`. |
 | "X is lower than the newest release" | The version bump went down. Open a new release PR with a higher version. |
 | A published version has a bug | Fix it in a PR, then release a patch. Never delete or move a published release or tag: installed copies only move forward. |
-| An update brought a migration that broke the data | The copy from before the migration is in `%APPDATA%\com.jobertsvault.app\backups\pre-migration\`. Close the app, delete `jobertsvault.db-wal` and `jobertsvault.db-shm` if they're there (left over, they would be replayed onto the copy), then copy the backup over `jobertsvault.db` by hand (Restore arrives in Phase 2). Then release a fix, because the broken version would migrate it again. |
+| An update brought a migration that broke the data | The copy from before the migration is in `%APPDATA%\com.jobertsvault.app\backups\pre-migration\`. Close the app, delete `jobertsvault.db-wal` and `jobertsvault.db-shm` if they're there (left over, they would be replayed onto the copy), then copy the backup over `jobertsvault.db` by hand. Don't use **Restore** in Settings, which runs pending migrations on the file, so the broken one would run again. Then release a fix, because the broken version would migrate it again. |
 | You merged changes but forgot the bump | Nothing was released. Open a release PR. |
 | "Node.js 20 is deprecated" warnings in Actions | Harmless. Move the named action (e.g. `actions/checkout@v7`) to its newest major version in a `ci/` PR. `tauri-action` is pinned to a commit: move it on purpose, after reading its changes. |
 | `main` rejects a direct push | The **Protect Main** ruleset is working. Use a branch and a PR. |
@@ -213,7 +213,7 @@ $out = "$W\src-tauri\target\release\bundle\nsis"
 Push-Location $W
 npx tauri build --config "$R\0.9.0.json"
 # 0.9.1 brings a migration: add M::up("CREATE TABLE rehearsal_marker (id INTEGER PRIMARY KEY) STRICT;")
-# after the 0001 entry in the vec! in src-tauri\src\db\migrations.rs, then:
+# as the last entry in the vec! in src-tauri\src\db\migrations.rs, then:
 npx tauri build --config "$R\0.9.1.json"
 Pop-Location
 foreach ($v in "0.9.0", "0.9.1") {
@@ -253,7 +253,7 @@ python -m http.server 8765 --bind 127.0.0.1 --directory "$HOME\jv-rehearsal"
 | A. Offline | Server off. Install `setup-0.9.0.exe` and open it. Finish the welcome form, add a transaction, then turn **Automatic updates** off. | It starts normally, with no error. |
 | D1. Swapped installer | `latest.json` as D1. Server on. Settings → **Check for updates** → **Update now**. | "0.9.1 is out.", then refused with a signature error ending "Nothing was changed." It stays on 0.9.0. |
 | D2. Relabelled old release | `latest.json` as D2. **Check for updates** → **Update now**. | Refused: "The update was signed for version 0.9.0 but the update endpoint announced version 0.9.1…" It stays on 0.9.0. |
-| B. Update now, with a migration | `latest.json` good. **Check for updates** → **Update now**. | It closes, installs and reopens on 0.9.1. Settings shows 0.9.1. The transaction is still there, and `%APPDATA%\com.jobertsvault.app.rehearsal\backups\pre-migration\` has a `…-v1-….db` copy. |
+| B. Update now, with a migration | `latest.json` good. **Check for updates** → **Update now**. | It closes, installs and reopens on 0.9.1. Settings shows 0.9.1. The transaction is still there, and `%APPDATA%\com.jobertsvault.app.rehearsal\backups\pre-migration\` has a copy named after the schema version 0.9.0 had (`…-v2-….db` while the last migration is `0002`). |
 | F. Error screen | Install `setup-0.9.0.exe` again by hand (server on). | It can't open the newer database, and the error screen shows. **Check for updates** → "0.9.1 is out." → **Update now** reopens it on 0.9.1, with the data intact. |
 | C. Automatic | Uninstall, delete `%APPDATA%\com.jobertsvault.app.rehearsal`, server off. Install 0.9.0, finish the welcome form (automatic updates stay on), add a transaction and close. Server on. Open it. | "Updating Jobert's Vault to 0.9.1…", then it reopens on 0.9.1 with the transaction, and a new pre-migration copy. |
 

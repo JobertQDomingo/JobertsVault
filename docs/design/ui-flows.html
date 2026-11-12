@@ -114,6 +114,8 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
                 <div class="nav"><button class="v-btn ghost icon" type="button" aria-label="Previous period"><i data-lucide="chevron-left"></i></button><span class="label">October 2026</span><button class="v-btn ghost icon" type="button" aria-label="Next period"><i data-lucide="chevron-right"></i></button></div>
                 <button class="v-btn secondary sm" type="button" disabled>Today</button>
               </div>
+              <div class="v-banner warning later later-tag"><i data-lucide="triangle-alert" class="s20"></i><div class="msg">No backup in the last 7 days.</div><button class="v-btn secondary sm" type="button">Back up now</button><span class="phase">P2</span></div>
+              <div class="v-banner warning later later-tag"><i data-lucide="credit-card" class="s20"></i><div class="msg">Credit card payment due in 3 days: ₱640.00 owed</div><button class="v-btn secondary sm" type="button">Pay bill</button><span class="phase">P3</span></div>
               <div class="v-banner info later later-tag"><i data-lucide="repeat" class="s20"></i><div class="msg">2 recurring transactions are due.</div><button class="v-btn secondary sm" type="button">Review</button><span class="phase">P3</span></div>
               <div class="cols c3">
                 <div class="v-card v-stat"><span class="lab"><i data-lucide="arrow-down-left" class="s14 inc"></i>Income</span><span class="display inc">+₱4,200.00</span><span class="chg later"><span class="pct good">▲ 3.1%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
@@ -121,7 +123,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
                 <div class="v-card v-stat net"><span class="lab"><i data-lucide="scale" class="s14 muted"></i>Net cashflow</span><span class="display inc">+₱1,249.60</span><span class="chg later"><span class="pct good">▲ 44.2%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
               </div>
               <div class="v-card later later-tag" style="padding:14px 16px 10px">
-                <div class="row" style="justify-content:space-between;margin-bottom:6px"><b>Income vs expense by day</b><span class="row" style="gap:10px"><span class="legend"><span><i class="sq" style="background:var(--income)"></i>Income</span><span><i class="sq" style="background:var(--expense)"></i>Expense</span></span><span class="phase">P2</span></span></div>
+                <div class="row" style="justify-content:space-between;margin-bottom:6px"><b>Income vs expense</b><span class="row" style="gap:10px"><span class="legend"><span><i class="sq" style="background:var(--income)"></i>Income</span><span><i class="sq" style="background:var(--expense)"></i>Expense</span></span><span class="phase">P2</span></span></div>
                 <svg class="chart" id="mini-chart" viewBox="0 0 680 150" role="img" aria-label="Daily income and expense for October 2026"></svg>
               </div>
               <div class="cols c2">
@@ -146,17 +148,17 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
               </div>
               <div class="cols c2e later">
                 <div class="v-card later-tag">
-                  <div class="v-card-h"><h3>Budgets · October</h3><span class="phase">P3</span></div>
+                  <div class="v-card-h"><h3>Budgets</h3><span class="row" style="gap:10px"><a class="v-link" href="#budgets">Manage</a><span class="phase">P3</span></span></div>
                   <div class="stack" style="padding:6px 16px 16px">
-                    <div class="v-prog-row"><span class="chip-name" style="width:160px"><span class="chip sm" style="--c:var(--cat-2)"><i data-lucide="shopping-cart"></i></span>Food &amp; Groceries</span><div class="v-progress warn"><i style="width:86.7%"></i></div><span class="num cap" style="width:40px;text-align:right">87%</span></div>
-                    <div class="v-prog-row"><span class="chip-name" style="width:160px"><span class="chip sm" style="--c:var(--cat-6)"><i data-lucide="utensils"></i></span>Dining Out</span><div class="v-progress"><i style="width:77.5%"></i></div><span class="num cap" style="width:40px;text-align:right">78%</span></div>
-                    <div class="v-prog-row"><span class="chip-name" style="width:160px"><span class="chip sm" style="--c:var(--cat-4)"><i data-lucide="shopping-bag"></i></span>Shopping</span><div class="v-progress over"><i style="width:100%"></i></div><span class="num cap" style="width:40px;text-align:right">120%</span></div>
+                    <div class="v-prog-row"><span class="chip-name" style="width:160px"><span class="chip sm" style="--c:var(--cat-2)"><i data-lucide="shopping-cart"></i></span>Food &amp; Groceries</span><span class="cap muted" style="width:56px">Monthly</span><div class="v-progress warn"><i style="width:86.7%"></i></div><span class="num cap" style="width:40px;text-align:right">86%</span></div>
+                    <div class="v-prog-row"><span class="chip-name" style="width:160px"><span class="chip sm" style="--c:var(--cat-6)"><i data-lucide="utensils"></i></span>Dining Out</span><span class="cap muted" style="width:56px">Weekly</span><div class="v-progress"><i style="width:77.5%"></i></div><span class="num cap" style="width:40px;text-align:right">77%</span></div>
+                    <div class="v-prog-row"><span class="chip-name" style="width:160px"><span class="chip sm" style="--c:var(--cat-4)"><i data-lucide="shopping-bag"></i></span>Shopping</span><span class="cap muted" style="width:56px">Monthly</span><div class="v-progress over"><i style="width:100%"></i></div><span class="num cap" style="width:40px;text-align:right">120%</span></div>
                   </div>
                 </div>
                 <div class="v-card later-tag">
-                  <div class="v-card-h"><h3>Coming up · next 7 days</h3><span class="phase">P3</span></div>
+                  <div class="v-card-h"><h3>Coming up</h3><span class="row" style="gap:10px"><a class="v-link" href="#recurring">View all</a><span class="phase">P3</span></span></div>
+                  <div class="v-row compact"><span class="chip" style="--c:var(--cat-9)"><i data-lucide="repeat"></i></span><div class="what"><b>Subscriptions · Netflix</b><span>Thu, Oct 29 · Credit card · auto</span></div><span class="money exp">−₱15.99</span></div>
                   <div class="v-row compact"><span class="chip" style="--c:var(--cat-11)"><i data-lucide="house"></i></span><div class="what"><b>Rent/Housing</b><span>Sun, Nov 1 · Bank · needs confirming</span></div><span class="money exp">−₱1,200.00</span></div>
-                  <div class="v-row compact"><span class="chip" style="--c:var(--cat-9)"><i data-lucide="repeat"></i></span><div class="what"><b>Subscriptions</b><span>Thu, Oct 29 · Credit card · auto</span></div><span class="money exp">−₱15.99</span></div>
                 </div>
               </div>
             </div>
@@ -206,7 +208,8 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
                 <div class="row" style="padding:12px 16px;gap:16px;font-size:13px"><b>38 transactions</b><span>Income <span class="money inc">+₱4,200.00</span></span><span>Expense <span class="money exp">−₱2,950.40</span></span></div>
                 <div class="later later-tag">
                   <div class="v-day"><span>Upcoming</span><span class="phase">P3</span></div>
-                  <div class="v-row upcoming"><span class="chip" style="--c:var(--cat-11)"><i data-lucide="house"></i></span><div class="what"><b>Rent/Housing</b><span>Sun, Nov 1 · Landlord</span></div><span class="acct">Bank</span><span class="money exp amt">−₱1,200.00</span><span class="acts"></span></div>
+                  <div class="v-day" style="font-weight:400"><span>Sun, Nov 1</span></div>
+                  <div class="v-row upcoming"><span class="chip" style="--c:var(--cat-11)"><i data-lucide="house"></i></span><div class="what"><b>Rent/Housing</b><span>Landlord</span></div><span class="acct">Bank</span><span class="money exp amt">−₱1,200.00</span><span class="acts"></span></div>
                 </div>
                 <div class="v-day"><span>Today, Mon Oct 26</span><span class="money exp">−₱85.20</span></div>
                 <div class="v-row is-hover"><span class="chip" style="--c:var(--cat-2)"><i data-lucide="shopping-cart"></i></span><div class="what"><b>Food &amp; Groceries</b><span>Market · weekly shop</span></div><span class="acct">Cash</span><span class="money exp amt">−₱85.20</span><span class="acts"><button class="v-btn ghost icon" type="button" aria-label="Edit"><i data-lucide="pencil"></i></button><button class="v-btn ghost icon" type="button" aria-label="Duplicate"><i data-lucide="copy"></i></button></span></div>
@@ -364,8 +367,9 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
         <div class="set-row"><span class="v-label">Decimal places</span><div class="row"><div class="v-input" style="width:120px;opacity:.6"><span class="grow">2</span><i data-lucide="lock" class="muted s14"></i></div><span class="v-help">Locked because transactions exist. Changing it would change every stored amount.</span></div></div>
         <div class="set-row"><span class="v-label">First day of week</span><div class="v-seg" style="justify-self:start"><span class="on">Monday</span><span>Sunday</span></div></div>
         <div class="set-row"><span class="v-label">Month starts on day</span><div class="row"><div class="v-input" style="width:120px"><span class="grow">1</span><i data-lucide="chevron-down" class="muted"></i></div><span class="v-help">1 = calendar month. Pick 25 for a payday cycle (25th to 24th).</span></div></div>
+        <div class="set-row later"><span class="v-label">Compare periods <span class="phase">P2</span></span><div class="v-seg" style="justify-self:start"><span class="on">Same days so far</span><span>Full previous period</span></div></div>
         <div class="set-row"><span class="v-label">Payment method field</span><div class="row"><span class="v-switch on" role="img" aria-label="On"></span><span class="v-help">Shown in the transaction form</span></div></div>
-        <div class="set-row"><span class="v-label">Updates</span><div class="row"><button class="v-btn secondary sm" type="button">Check for updates</button><span class="v-help">Version 0.1.0</span></div></div>
+        <div class="set-row"><span class="v-label">Version</span><div class="row"><span>0.3.0</span><button class="v-btn secondary sm" type="button">Check for updates</button></div></div>
         <div class="set-row"><span class="v-label">Automatic updates</span><div class="row"><span class="v-switch on" role="img" aria-label="On"></span><span class="v-help">Install updates automatically when the app starts</span></div></div>
       </div>
     </div>
@@ -448,7 +452,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
             <div class="v-dialog-h"><h3>Merge "Snacks"</h3></div>
             <div class="v-dialog-b">
               <div class="form-row"><span class="v-label">Into</span><div class="v-input"><span class="chip sm" style="--c:var(--cat-6)"><i data-lucide="utensils"></i></span><span class="grow">Dining Out</span><i data-lucide="chevron-down" class="muted"></i></div></div>
-              <p style="margin:0">Move 23 transactions from "Snacks" to "Dining Out" and delete "Snacks"?</p>
+              <p style="margin:0">Move 23 transactions from 'Snacks' to 'Dining Out' and delete 'Snacks' and any budget for it?</p>
             </div>
             <div class="v-dialog-f"><button class="v-btn secondary sm" type="button">Cancel</button><button class="v-btn primary sm" type="button">Merge categories</button></div>
           </div>
@@ -476,12 +480,13 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
         <div class="preview" style="padding:12px">
           <div class="v-card" style="padding:4px 16px 8px">
             <div class="set-row" style="grid-template-columns:150px minmax(0,1fr)"><span class="v-label">Backup folder</span><div class="row" style="gap:8px;min-width:0"><code style="overflow-wrap:anywhere;font-size:11.5px">%APPDATA%\com.jobertsvault.app\backups</code><button class="v-btn secondary sm" type="button">Change…</button></div></div>
-            <div class="set-row" style="grid-template-columns:150px minmax(0,1fr)"><span class="v-label">Daily backups</span><div class="row"><span class="v-switch on" role="img" aria-label="On"></span><span class="v-help">Keeps the newest 30</span></div></div>
+            <div class="set-row" style="grid-template-columns:150px minmax(0,1fr)"><span class="v-label">Automatic backup</span><div class="row"><span class="v-switch on" role="img" aria-label="On"></span><span class="v-help">Once a day, the first time the app opens. The newest 30 are kept.</span></div></div>
             <div class="set-row" style="grid-template-columns:150px minmax(0,1fr)"><span class="v-label">Last backup</span><span>Today, 9:30 AM <span class="cap">(automatic)</span></span></div>
-            <div class="row" style="padding:12px 0 6px;gap:8px"><button class="v-btn primary sm" type="button"><i data-lucide="hard-drive-download"></i>Back up now</button><button class="v-btn secondary sm" type="button">Restore from backup…</button><button class="v-btn ghost sm" type="button"><i data-lucide="file-spreadsheet"></i>Export CSV…</button></div>
+            <div class="row" style="padding:12px 0 6px;gap:8px"><button class="v-btn primary sm" type="button"><i data-lucide="hard-drive-download"></i>Back up now</button><button class="v-btn secondary sm" type="button">Restore from backup…</button></div>
+            <div class="set-row" style="grid-template-columns:150px minmax(0,1fr)"><span class="v-label">Export to CSV</span><div class="row" style="gap:8px"><div class="v-input" style="width:120px"><span class="grow num">11/01/2026</span></div><span class="muted">to</span><div class="v-input" style="width:120px"><span class="grow num">11/07/2026</span></div><button class="v-btn secondary sm" type="button"><i data-lucide="file-spreadsheet"></i>Export…</button></div></div>
           </div>
         </div>
-        <div class="v-banner warning"><i data-lucide="triangle-alert" class="s20"></i><div class="msg">Your last backup was 9 days ago.</div><button class="v-btn secondary sm" type="button">Back up now</button></div>
+        <div class="v-banner warning"><i data-lucide="triangle-alert" class="s20"></i><div class="msg">Your last backup is more than 7 days old.</div><button class="v-btn secondary sm" type="button">Back up now</button></div>
         <p class="cap" style="margin:0">Restore asks first: "This replaces all current data with the backup from Oct 20, 2026 9:30 AM. A safety copy of your current data will be saved first."</p>
       </div>
 
@@ -489,8 +494,8 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
         <div class="flow-h"><span class="fid">F10</span><h4>Confirm recurring transactions</h4><span class="phase">Phase 3</span></div>
         <ol class="steps"><li>Dashboard banner "2 recurring transactions are due" → <b>Review</b>.</li><li>Each item: <b>Post</b>, <b>Edit &amp; post</b> or <b>Skip</b>.</li></ol>
         <div class="preview shot on-surface">
-          <div class="due-row" style="border-top:0"><span class="chip" style="--c:var(--cat-7)"><i data-lucide="zap"></i></span><div class="what" style="min-width:0"><b>Utilities · Water bill</b><div class="cap">Due Sat, Oct 24 · Bank</div></div><span class="money exp" style="text-align:right">−₱32.40</span><span class="row" style="gap:4px"><button class="v-btn primary sm" type="button">Post</button><button class="v-btn ghost sm" type="button">Edit</button><button class="v-btn ghost sm" type="button">Skip</button></span></div>
-          <div class="due-row"><span class="chip" style="--c:var(--cat-8)"><i data-lucide="heart-pulse"></i></span><div class="what" style="min-width:0"><b>Health &amp; Medical · Gym</b><div class="cap">Due Mon, Oct 26 · Credit card</div></div><span class="money exp" style="text-align:right">−₱30.00</span><span class="row" style="gap:4px"><button class="v-btn primary sm" type="button">Post</button><button class="v-btn ghost sm" type="button">Edit</button><button class="v-btn ghost sm" type="button">Skip</button></span></div>
+          <div class="due-row" style="border-top:0"><span class="chip" style="--c:var(--cat-7)"><i data-lucide="zap"></i></span><div class="what" style="min-width:0"><b>Utilities · Water bill</b><div class="cap">Due Sat, Oct 24 · Bank</div></div><span class="money exp" style="text-align:right">−₱32.40</span><span class="row" style="gap:4px"><button class="v-btn primary sm" type="button">Post</button><button class="v-btn ghost sm" type="button">Edit &amp; post</button><button class="v-btn ghost sm" type="button">Skip</button></span></div>
+          <div class="due-row"><span class="chip" style="--c:var(--cat-8)"><i data-lucide="heart-pulse"></i></span><div class="what" style="min-width:0"><b>Health &amp; Medical · Gym</b><div class="cap">Due Mon, Oct 26 · Credit card</div></div><span class="money exp" style="text-align:right">−₱30.00</span><span class="row" style="gap:4px"><button class="v-btn primary sm" type="button">Post</button><button class="v-btn ghost sm" type="button">Edit &amp; post</button><button class="v-btn ghost sm" type="button">Skip</button></span></div>
         </div>
       </div>
     </div>
@@ -499,7 +504,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
   <!-- 8. Later screens -->
   <section class="s" id="later">
     <h2><span class="sec-no">§8</span> Phase 2–4 screens <span class="phase">outline</span></h2>
-    <p class="sec-intro">Rougher than the Phase 1 screens. These get detailed designs when their phase starts. They always show here, whatever the Phase 2–3 switch is set to.</p>
+    <p class="sec-intro">Rougher than the Phase 1 screens. UI_FLOWS §8 has the full detail. They always show here, whatever the Phase 2–3 switch is set to.</p>
 
     <h3 class="sub">Reports <span class="phase">Phase 2</span></h3>
     <div class="preview stack">
@@ -508,15 +513,15 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
           <div class="v-seg"><span>Day</span><span>Week</span><span>Month</span><span class="on">Year</span><span>Custom</span></div>
           <div class="nav"><button class="v-btn ghost icon" type="button" aria-label="Previous period"><i data-lucide="chevron-left"></i></button><span class="label" style="min-width:80px">2026</span><button class="v-btn ghost icon" type="button" aria-label="Next period"><i data-lucide="chevron-right"></i></button></div>
         </div>
-        <div class="v-toolbar"><div class="v-input" style="width:auto"><span class="muted">Compare to</span><b>Same days so far</b><i data-lucide="chevron-down" class="muted"></i></div><div class="v-input" style="width:auto"><span>All accounts</span><i data-lucide="chevron-down" class="muted"></i></div></div>
+        <div class="v-toolbar"><div class="v-input" style="width:auto"><span>All accounts</span><i data-lucide="chevron-down" class="muted"></i></div></div>
       </div>
       <div class="v-card" style="padding:14px 16px 12px">
-        <div class="row" style="justify-content:space-between;margin-bottom:8px"><b>Income vs expense by month</b><span class="legend"><span><i class="sq" style="background:var(--income)"></i>Income</span><span><i class="sq" style="background:var(--expense)"></i>Expense</span><span><i class="ln"></i>Net cashflow</span></span></div>
+        <div class="row" style="justify-content:space-between;margin-bottom:8px"><b>Income vs expense</b><span class="legend"><span><i class="sq" style="background:var(--income)"></i>Income</span><span><i class="sq" style="background:var(--expense)"></i>Expense</span><span><i class="ln"></i>Net cashflow</span></span></div>
         <div style="overflow-x:auto"><svg class="chart" id="year-chart" viewBox="0 0 760 260" style="min-width:560px" role="img" aria-label="Monthly income, expense and net cashflow for 2026"></svg></div>
       </div>
       <div class="grid g2">
         <div class="v-card" style="padding:14px 16px">
-          <div class="row" style="justify-content:space-between;margin-bottom:12px"><b>Where October's money went</b><div class="v-seg"><span class="on">Expense</span><span>Income</span></div></div>
+          <div class="row" style="justify-content:space-between;margin-bottom:12px"><b>Category breakdown</b><div class="v-seg"><span class="on">Expense</span><span>Income</span></div></div>
           <div class="donut-wrap">
             <svg id="donut" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Expense by category, October 2026"></svg>
             <div class="rank" id="rank"></div>
@@ -524,17 +529,17 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
           <p class="cap" style="margin:10px 0 0">Click a category to open its transactions. The 8 largest get a slice, and the rest are grouped as Other.</p>
         </div>
         <div class="v-card">
-          <div class="v-card-h" style="padding-bottom:10px"><h3>Oct 1–26 vs Sep 1–26</h3></div>
+          <div class="v-card-h" style="padding-bottom:10px"><h3>Period comparison</h3><div class="v-input" style="width:auto"><span class="muted">Compare to</span><b>Same days so far</b><i data-lucide="chevron-down" class="muted"></i></div></div>
           <div class="tbl-wrap" style="border:0;border-radius:0 0 8px 8px">
             <table class="t">
-              <thead><tr><th></th><th style="text-align:right">This period</th><th style="text-align:right">Compared</th><th style="text-align:right">Change</th></tr></thead>
+              <thead><tr><th></th><th style="text-align:right">Oct 1–26</th><th style="text-align:right">Sep 1–26</th><th style="text-align:right">Difference</th><th style="text-align:right">Change</th></tr></thead>
               <tbody>
-                <tr><td><b>Income</b></td><td class="money" style="text-align:right">₱4,200.00</td><td class="num" style="text-align:right">₱4,073.70</td><td style="text-align:right"><span class="pct good">▲ 3.1%</span></td></tr>
-                <tr><td><b>Expense</b></td><td class="money" style="text-align:right">₱2,950.40</td><td class="num" style="text-align:right">₱3,207.00</td><td style="text-align:right"><span class="pct good">▼ 8.0%</span></td></tr>
-                <tr><td><b>Net</b></td><td class="money inc" style="text-align:right">+₱1,249.60</td><td class="num" style="text-align:right">+₱866.70</td><td style="text-align:right"><span class="pct good">▲ 44.2%</span></td></tr>
-                <tr><td>Rent/Housing</td><td class="num" style="text-align:right">₱1,200.00</td><td class="num" style="text-align:right">₱1,200.00</td><td style="text-align:right"><span class="pct none">0.0%</span></td></tr>
-                <tr><td>Food &amp; Groceries</td><td class="num" style="text-align:right">₱520.40</td><td class="num" style="text-align:right">₱486.10</td><td style="text-align:right"><span class="pct bad">▲ 7.1%</span></td></tr>
-                <tr><td>Dining Out</td><td class="num" style="text-align:right">₱310.00</td><td class="num" style="text-align:right">₱402.50</td><td style="text-align:right"><span class="pct good">▼ 23.0%</span></td></tr>
+                <tr><td><b>Income</b></td><td class="money" style="text-align:right">₱4,200.00</td><td class="num" style="text-align:right">₱4,073.70</td><td class="num" style="text-align:right">+₱126.30</td><td style="text-align:right"><span class="pct good">▲ 3.1%</span></td></tr>
+                <tr><td><b>Expense</b></td><td class="money" style="text-align:right">₱2,950.40</td><td class="num" style="text-align:right">₱3,207.00</td><td class="num" style="text-align:right">−₱256.60</td><td style="text-align:right"><span class="pct good">▼ 8.0%</span></td></tr>
+                <tr><td><b>Net cashflow</b></td><td class="money inc" style="text-align:right">+₱1,249.60</td><td class="num" style="text-align:right">+₱866.70</td><td class="num" style="text-align:right">+₱382.90</td><td style="text-align:right"><span class="pct good">▲ 44.2%</span></td></tr>
+                <tr><td>Rent/Housing</td><td class="num" style="text-align:right">₱1,200.00</td><td class="num" style="text-align:right">₱1,200.00</td><td class="num" style="text-align:right">₱0.00</td><td style="text-align:right"><span class="pct none">0.0%</span></td></tr>
+                <tr><td>Food &amp; Groceries</td><td class="num" style="text-align:right">₱520.40</td><td class="num" style="text-align:right">₱486.10</td><td class="num" style="text-align:right">+₱34.30</td><td style="text-align:right"><span class="pct bad">▲ 7.1%</span></td></tr>
+                <tr><td>Dining Out</td><td class="num" style="text-align:right">₱310.00</td><td class="num" style="text-align:right">₱402.50</td><td class="num" style="text-align:right">−₱92.50</td><td style="text-align:right"><span class="pct good">▼ 23.0%</span></td></tr>
               </tbody>
             </table>
           </div>
@@ -555,7 +560,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
       <div>
         <h3 class="sub" style="margin-top:0">Budgets <span class="phase">Phase 3</span></h3>
         <div class="preview stack">
-          <div class="v-card budget-card"><div class="row" style="justify-content:space-between"><span class="chip-name"><span class="chip sm" style="--c:var(--cat-2)"><i data-lucide="shopping-cart"></i></span><b>Food &amp; Groceries</b></span><span class="cap">Monthly</span></div><div class="v-prog-row"><div class="v-progress warn"><i style="width:86.7%"></i></div><span class="cap num">87%</span></div><span class="cap num">₱520.40 of ₱600.00 · ₱79.60 left</span></div>
+          <div class="v-card budget-card"><div class="row" style="justify-content:space-between"><span class="chip-name"><span class="chip sm" style="--c:var(--cat-2)"><i data-lucide="shopping-cart"></i></span><b>Food &amp; Groceries</b></span><span class="cap">Monthly</span></div><div class="v-prog-row"><div class="v-progress warn"><i style="width:86.7%"></i></div><span class="cap num">86%</span></div><span class="cap num">₱520.40 of ₱600.00 · ₱79.60 left</span></div>
           <div class="v-card budget-card"><div class="row" style="justify-content:space-between"><span class="chip-name"><span class="chip sm" style="--c:var(--cat-4)"><i data-lucide="shopping-bag"></i></span><b>Shopping</b></span><span class="cap">Monthly</span></div><div class="v-prog-row"><div class="v-progress over"><i style="width:100%"></i></div><span class="cap num">120%</span></div><span class="cap num" style="color:var(--danger)">₱180.00 of ₱150.00 · ₱30.00 over</span></div>
           <div class="v-card budget-card"><div class="row" style="justify-content:space-between"><span class="chip-name"><i data-lucide="layers" class="muted"></i><b>All spending</b></span><span class="cap">Monthly</span></div><div class="v-prog-row"><div class="v-progress warn"><i style="width:84.3%"></i></div><span class="cap num">84%</span></div><span class="cap num">₱2,950.40 of ₱3,500.00 · ₱549.60 left</span></div>
         </div>
@@ -563,8 +568,8 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
       <div>
         <h3 class="sub" style="margin-top:0">Goals <span class="phase">Phase 3</span></h3>
         <div class="preview stack">
-          <div class="v-card goal-card"><div class="row" style="justify-content:space-between"><b>Emergency fund</b><span class="cap chip-name"><i data-lucide="landmark" class="s14"></i>Bank</span></div><div class="v-prog-row"><div class="v-progress"><i style="width:84.1%"></i></div><span class="cap num">84%</span></div><span class="cap num">₱8,410.75 of ₱10,000.00 · by Jun 30, 2027</span><span class="cap num"><b style="color:var(--foreground)">Save ₱199/month</b> to reach it</span></div>
-          <div class="v-card goal-card"><div class="row" style="justify-content:space-between"><b>Concert tickets</b><span class="badge ok"><i data-lucide="check" class="s14"></i>Achieved</span></div><div class="v-prog-row"><div class="v-progress"><i style="width:100%;background:var(--success)"></i></div><span class="cap num">100%</span></div><span class="cap num">₱150.00 of ₱150.00 · E-wallet</span></div>
+          <div class="v-card goal-card"><b>Emergency fund</b><span class="cap">Bank · by Jun 30, 2027</span><div class="v-prog-row"><div class="v-progress"><i style="width:84.1%"></i></div><span class="cap num">84%</span></div><span class="cap num">₱8,410.75 of ₱10,000.00 · ₱1,589.25 left</span><span class="cap num"><b style="color:var(--foreground)">Save ₱176.59/month</b> to reach it</span></div>
+          <div class="v-card goal-card"><div class="row" style="justify-content:space-between"><b>Concert tickets</b><span class="badge ok"><i data-lucide="check" class="s14"></i>Achieved</span></div><span class="cap">E-wallet</span><div class="v-prog-row"><div class="v-progress"><i style="width:100%;background:var(--success)"></i></div><span class="cap num">100%</span></div><span class="cap num">₱150.00 of ₱150.00 · ₱0.00 left</span></div>
         </div>
       </div>
     </div>
@@ -583,10 +588,10 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
       <p class="preview-label"><span>App can't start · full window</span></p>
       <div class="err-screen">
         <i data-lucide="database-zap" class="s24" style="color:var(--danger)"></i>
-        <b style="font-size:18px;line-height:28px">Jobert's Vault couldn't open your data</b>
+        <b style="font-size:18px;line-height:28px">Jobert's Vault couldn't start</b>
         <code>%APPDATA%\com.jobertsvault.app\jobertsvault.db</code>
         <span class="muted">Error: file is not a database</span>
-        <div class="row" style="justify-content:center"><button class="v-btn primary" type="button"><i data-lucide="folder-open"></i>Open data folder</button><button class="v-btn secondary" type="button">Quit</button></div>
+        <div class="row" style="justify-content:center"><button class="v-btn secondary" type="button">Check for updates</button><button class="v-btn primary" type="button"><i data-lucide="folder-open"></i>Open data folder</button></div>
       </div>
     </div>
   </section>
