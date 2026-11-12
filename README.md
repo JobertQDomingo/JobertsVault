@@ -2,15 +2,15 @@
 
 A private desktop app for Windows that tracks personal cashflow (income and expenses) by **day, week, month or year**. You enter every transaction yourself, and all data stays in a local SQLite file on your computer. Your financial data is never sent over the internet. The only network use is checking GitHub for app updates, which you can turn off, and the app works fully offline.
 
-> **Status:** in development. The app opens, migrates and seeds its database at startup, and backs up an existing database before migrating it, but it has no screens yet. See [ROADMAP.md](ROADMAP.md) for progress.
+> **Status:** in development. `v0.3.0` has everything from Phases 1–3 below. Phase 4 (Polish, ending in `v1.0.0`) is next. See [ROADMAP.md](ROADMAP.md) for progress.
 
 ## Features
 
 | Phase | Features |
 |---|---|
-| **1: MVP** | Accounts (cash, bank, e-wallet, credit card), income, expense and transfer transactions, editable categories, a dashboard with income, expense and net cashflow for each day, week (starting Monday), month or year, account balances and net balance, credit card amount owed, available credit and due date, quick-add with **Ctrl+N**, light and dark themes that follow Windows, automatic updates, a database backup before migrations |
+| **1: MVP** | Accounts (cash, bank, e-wallet, credit card), income, expense and transfer transactions, editable categories, a dashboard with income, expense and net cashflow for each day, week (starting Monday), month, year or custom range, account balances and net balance, credit card amount owed, available credit and due date, quick-add with **Ctrl+N**, light and dark themes that follow Windows, automatic updates, a database backup before migrations |
 | **2: Reports & backups** | Income-vs-expense charts, category breakdown, period comparison, payee suggestions, automatic daily backups, restore, CSV export |
-| **3: Planning** | Recurring transactions, budgets, savings goals, credit card due-date reminders |
+| **3: Planning** | Recurring transactions, budgets, savings goals, credit card due-date reminders, future-dated transactions |
 | **4: Polish** | Theme and Reduce transparency switches, more keyboard shortcuts, polished onboarding on first launch, installer polish |
 
 See [PRD.md](docs/PRD.md) for the full requirements.
@@ -55,7 +55,7 @@ The first `tauri dev` compiles every Rust dependency, which takes several minute
 | `npm run lint` / `npm run typecheck` | Runs ESLint and Prettier, and the TypeScript checks |
 | `npm run format` | Fixes formatting with Prettier |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | Runs the backend tests and regenerates the TypeScript types in `src/bindings/` |
-| `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` | Runs the Rust linter |
+| `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | Runs the Rust linter |
 
 ## Where your data lives
 
@@ -85,7 +85,7 @@ Start with [docs/README.md](docs/README.md) for the reading order.
 | [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) | The Glassmorphism 2.0 style: glass layers, colors, fonts, components |
 | [UI_FLOWS.md](docs/UI_FLOWS.md) | Screens and user flows |
 | [ROADMAP.md](ROADMAP.md) | Phase checklists and progress |
-| [RELEASING.md](RELEASING.md) | How a change gets from a branch to every installed copy (the release loop arrives in ROADMAP 1.10) |
+| [RELEASING.md](RELEASING.md) | How a change gets from a branch to every installed copy |
 | [docs/decisions/](docs/decisions/README.md) | Decision records 0001–0010: why the big choices were made |
 | [docs/design/](docs/design/) | Visual previews of the design system and every screen. Open the `.html` files in a browser. |
 | `assets/brand/` | The logo (`logo.svg`), one-color versions and the 1024 px app icon source |

@@ -118,7 +118,7 @@ npm run tauri build
 ## Conventions
 
 - **Naming:** `snake_case` in Rust and SQL, `camelCase` in TypeScript (serde `rename_all = "camelCase"`), `PascalCase` for components.
-- **Branches and pull requests:** every change goes through a PR on a `feat/`, `fix/`, `docs/`, `chore/` or `ci/` branch, and is squash-merged once CI is green. The PR title becomes a line in the release notes, so write it for the reader, with a type prefix and requirement IDs, e.g. `feat: add transfer validation (TXN-1)`. This applies once ROADMAP 1.0 is done.
+- **Branches and pull requests:** every change goes through a PR on a `feat/`, `fix/`, `docs/`, `chore/` or `ci/` branch, and is squash-merged once CI is green. The PR title becomes a line in the release notes, so write it for the reader, with a type prefix and requirement IDs, e.g. `feat: add transfer validation (TXN-1)`.
 - **Commits:** imperative mood, short, with requirement IDs, e.g. `Add transfer validation (TXN-1)`. Don't add Claude attribution, such as a `Co-Authored-By: Claude ...` line.
 - **Dependencies:** ask before adding any new crate or npm package that isn't listed in ARCHITECTURE.md §2.
 - **Never commit** `*.db`, `*.db-wal`, `*.db-shm`, backups or exported CSV files.

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.1 |
-| **Last updated** | 2026-11-11 |
+| **Last updated** | 2026-11-12 |
 | **Database** | SQLite (bundled with the app through `rusqlite`) |
 | **Related docs** | [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 
@@ -629,39 +629,9 @@ None at the moment. Answered on 2026-10-26:
 1. **Refunds** count as income. They offset net cashflow, and the PRD wording (CC-5) was updated to match.
 2. **Archived accounts** still count toward the net balance. Archiving one whose balance isn't 0 shows a warning (§5.1).
 
-Answered on 2026-11-04:
-
-3. **Payment method names** are 1–40 characters, the same as categories (§6).
-4. **A new category's default color** counts only active categories of its kind, so archived ones don't hold a color, and a tie goes to the lowest palette number (§7).
-
-Answered on 2026-11-11:
-
-13. **Editing a rule's schedule** takes the start date from the form, after the last date already processed (and not before today or the current next date, whichever is earlier), so a month-end rule never drifts. `max_occurrences` counts the dates actually processed, so the count holds across the edit (§4.1).
-14. **Resuming a paused rule** skips the dates it would have had while paused (§4.1).
-15. **A rule's amount locks `currency_decimals`** like any other stored amount (§1). A rule's account, category or payment method counts as in use, so it's archived instead of deleted, and merging categories moves rules along with transactions.
-16. **A rule's start date** may be in the past; processing fills in the dates since then (§4.1).
-19. **Saving a rule processes it** (REC-4): creating, editing or resuming a rule posts or queues its dates up to today in the same database transaction, so a rule that starts today shows up at once rather than the next day or launch (ARCHITECTURE §8).
-20. **An archived account, category or payment method** that a rule's template uses doesn't stop its dates: they post with it, the same way an edit of the rule may keep it (§4.2, §6).
-21. **Upcoming (TXN-8)** lists every future-dated row that matches the list's other filters, whatever its date, whenever the selected period hasn't ended, since ▶ stops at the current period and a row dated later would otherwise never be seen. Phase 3 drops the "Date can't be in the future" rule (§5.2, §6).
-22. **"Most recent" lookups skip future-dated rows** (TXN-8): payee suggestions and Pay bill's From account count only rows dated today or earlier, so one row dated months ahead can't hold the suggestion or the default until its date (§3.4, §5.8).
-23. **Budgets are never archived** (BUD-1): they're edited or deleted, because nothing refers to one and a budget keeps no history. The `archived` column stays 0 (§4.3).
-24. **Deleting or merging a category deletes its budgets** in the same database transaction, and the confirm dialogs say so. A budget doesn't make a category in use, and a merge doesn't move budgets to the target (§3.2, §4.3).
-25. **A budget's amount locks `currency_decimals`** like every other stored amount (§1).
-26. **Budgets always show their own current period** (BUD-2, DSH-6): the dashboard's budgets don't follow the period switcher, the same way its account balances don't (§5.6).
-
-Answered on 2026-11-12:
-
-27. **Months left for a goal (GOL-3)** are calendar months to the target date, a part month counting as a whole one, and the monthly amount is rounded up (§5.7).
-28. **A goal whose target date is today or has passed** has no monthly amount: months left is 0, and the Goals screen says the date has passed. Past target dates are accepted on save (§4.4).
-29. **A goal puts its account in use** (GOL-2), so an account with a goal is archived instead of deleted, matching `ON DELETE RESTRICT` (§4.4).
-30. **A goal's target amount locks `currency_decimals`** like every other stored amount (§1).
-31. **A goal is marked achieved when `list_goals` runs** (GOL-4) and finds its progress at the target: that day is stored in `achieved_at`, and it stays if the balance drops. A higher target or another account clears it, and archived goals aren't checked. A reach and drop between two visits to Goals isn't recorded (§4.4).
-32. **Any goal can be archived**, achieved or not, and archived goals fold under Show archived with Unarchive and Delete (§4.4, UI_FLOWS §8.4).
-33. **Coming up (DSH-7)** covers tomorrow to 7 days from today, since dates up to today are already posted or in the Due list. It lists recurring rules' dates only, not one-off future-dated transactions, and every date of a rule, the dashboard showing at most 8 and then "+ N more" (§4.1, UI_FLOWS §2).
-
 Answered on 2026-11-01:
 
-3. **Future dates** are rejected until Phase 3 (§6).
+3. **Future dates** are rejected until Phase 3 (§6). Phase 3 lifted the rule (27).
 4. **Custom periods** move by the length of their range (§5.3).
 5. **Opening balances** are entered as 0 or more (§6).
 6. **Transfers** have no payee or payment method (§3.4).
@@ -676,16 +646,43 @@ Answered on 2026-11-03:
 
 Answered on 2026-11-04:
 
-12. **The decimals lock** covers every stored amount, not only transactions: an account's opening balance other than 0, or a credit limit, locks `currency_decimals` too, because changing it would reinterpret those amounts (§1). The seeded Cash account holds 0, so a new database starts unlocked. ADR 0002's rule still holds, since a transaction still locks it.
-13. **Pay bill's From account** goes by each transaction's source `account_id`: the latest transaction whose source is an active non-card account. A transfer's destination doesn't count as using that account (§5.8).
-14. **Today on a Custom period** jumps to the range in the same sequence that contains today, which is where ▶ stops (§5.3).
+12. **Payment method names** are 1–40 characters, the same as categories (§6).
+13. **A new category's default color** counts only active categories of its kind, so archived ones don't hold a color, and a tie goes to the lowest palette number (§7).
+14. **The decimals lock** covers every stored amount, not only transactions: an account's opening balance other than 0, or a credit limit, locks `currency_decimals` too, because changing it would reinterpret those amounts (§1). The seeded Cash account holds 0, so a new database starts unlocked. ADR 0002's rule still holds, since a transaction still locks it.
+15. **Pay bill's From account** goes by each transaction's source `account_id`: the latest transaction whose source is an active non-card account. A transfer's destination doesn't count as using that account (§5.8).
+16. **Today on a Custom period** jumps to the range in the same sequence that contains today, which is where ▶ stops (§5.3).
 
 Answered on 2026-11-06:
 
-15. **Chart bars (RPT-1)** are calendar-aligned: a Day period is one bar, a Year is 12 calendar months even when `month_start_day` > 1, and Custom weeks follow `week_start` and Custom months are calendar months, cut to the range. "Up to 6 months" means ending before the same date 6 months after the start (§5.9).
-16. **Payee suggestions (TXN-6)** match the form's type: an expense suggests only payees used on expenses, with the category of the latest expense to that payee, and the same for income. A payee whose last category is archived is still suggested, but choosing it leaves the category as it is (§3.4).
+17. **Chart bars (RPT-1)** are calendar-aligned: a Day period is one bar, a Year is 12 calendar months even when `month_start_day` > 1, and Custom weeks follow `week_start` and Custom months are calendar months, cut to the range. "Up to 6 months" means ending before the same date 6 months after the start (§5.9).
+18. **Payee suggestions (TXN-6)** match the form's type: an expense suggests only payees used on expenses, with the category of the latest expense to that payee, and the same for income. A payee whose last category is archived is still suggested, but choosing it leaves the category as it is (§3.4).
 
 Answered on 2026-11-07:
 
-17. **A restore keeps this computer's backup settings** (BAK-4): `backup_folder`, `auto_backup_enabled`, `last_backup_at` and `last_auto_backup_date` keep their current values, and are deleted where the current data has none, while every other setting comes from the backup. Restoring on a second Windows account then doesn't point its backups at the first account's folder, and the last backup date doesn't go back in time (§3.5, ARCHITECTURE §7).
-18. **Phase 3's migration is `0002_planning.sql`**, not `0003`: Phase 2 needed no schema change, and keeping each file's number equal to the schema version it creates keeps the pre-migration backups' `v<schema version>` names easy to match to a file (§8).
+19. **A restore keeps this computer's backup settings** (BAK-4): `backup_folder`, `auto_backup_enabled`, `last_backup_at` and `last_auto_backup_date` keep their current values, and are deleted where the current data has none, while every other setting comes from the backup. Restoring on a second Windows account then doesn't point its backups at the first account's folder, and the last backup date doesn't go back in time (§3.5, ARCHITECTURE §7).
+20. **Phase 3's migration is `0002_planning.sql`**, not `0003`: Phase 2 needed no schema change, and keeping each file's number equal to the schema version it creates keeps the pre-migration backups' `v<schema version>` names easy to match to a file (§8).
+
+Answered on 2026-11-11:
+
+21. **Editing a rule's schedule** takes the start date from the form, after the last date already processed (and not before today or the current next date, whichever is earlier), so a month-end rule never drifts. `max_occurrences` counts the dates actually processed, so the count holds across the edit (§4.1).
+22. **Resuming a paused rule** skips the dates it would have had while paused (§4.1).
+23. **A rule's amount locks `currency_decimals`** like any other stored amount (§1). A rule's account, category or payment method counts as in use, so it's archived instead of deleted, and merging categories moves rules along with transactions.
+24. **A rule's start date** may be in the past; processing fills in the dates since then (§4.1).
+25. **Saving a rule processes it** (REC-4): creating, editing or resuming a rule posts or queues its dates up to today in the same database transaction, so a rule that starts today shows up at once rather than the next day or launch (ARCHITECTURE §8).
+26. **An archived account, category or payment method** that a rule's template uses doesn't stop its dates: they post with it, the same way an edit of the rule may keep it (§4.2, §6).
+27. **Upcoming (TXN-8)** lists every future-dated row that matches the list's other filters, whatever its date, whenever the selected period hasn't ended, since ▶ stops at the current period and a row dated later would otherwise never be seen. Phase 3 drops the "Date can't be in the future" rule (§5.2, §6).
+28. **"Most recent" lookups skip future-dated rows** (TXN-8): payee suggestions and Pay bill's From account count only rows dated today or earlier, so one row dated months ahead can't hold the suggestion or the default until its date (§3.4, §5.8).
+29. **Budgets are never archived** (BUD-1): they're edited or deleted, because nothing refers to one and a budget keeps no history. The `archived` column stays 0 (§4.3).
+30. **Deleting or merging a category deletes its budgets** in the same database transaction, and the confirm dialogs say so. A budget doesn't make a category in use, and a merge doesn't move budgets to the target (§3.2, §4.3).
+31. **A budget's amount locks `currency_decimals`** like every other stored amount (§1).
+32. **Budgets always show their own current period** (BUD-2, DSH-6): the dashboard's budgets don't follow the period switcher, the same way its account balances don't (§5.6).
+
+Answered on 2026-11-12:
+
+33. **Months left for a goal (GOL-3)** are calendar months to the target date, a part month counting as a whole one, and the monthly amount is rounded up (§5.7).
+34. **A goal whose target date is today or has passed** has no monthly amount: months left is 0, and the Goals screen says the date has passed. Past target dates are accepted on save (§4.4).
+35. **A goal puts its account in use** (GOL-2), so an account with a goal is archived instead of deleted, matching `ON DELETE RESTRICT` (§4.4).
+36. **A goal's target amount locks `currency_decimals`** like every other stored amount (§1).
+37. **A goal is marked achieved when `list_goals` runs** (GOL-4) and finds its progress at the target: that day is stored in `achieved_at`, and it stays if the balance drops. A higher target or another account clears it, and archived goals aren't checked. A reach and drop between two visits to Goals isn't recorded (§4.4).
+38. **Any goal can be archived**, achieved or not, and archived goals fold under Show archived with Unarchive and Delete (§4.4, UI_FLOWS §8.4).
+39. **Coming up (DSH-7)** covers tomorrow to 7 days from today, since dates up to today are already posted or in the Due list. It lists recurring rules' dates only, not one-off future-dated transactions, and every date of a rule, the dashboard showing at most 8 and then "+ N more" (§4.1, UI_FLOWS §2).

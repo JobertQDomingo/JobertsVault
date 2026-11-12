@@ -4,7 +4,7 @@
 |---|---|
 | **App name** | Jobert's Vault |
 | **Status** | Approved v1.1 |
-| **Last updated** | 2026-11-04 |
+| **Last updated** | 2026-11-12 |
 | **Platform** | Windows desktop app built with Tauri 2: React + TypeScript frontend, Rust backend, SQLite database |
 
 ---
@@ -258,7 +258,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 - [x] The dashboard shows correct income, expense and net totals for Day, Week (Mon–Sun), Month, Year and Custom, and moving between periods works.
 - [x] Transfers, including paying the card bill, never appear in income or expense totals.
 - [x] I can filter and search the transaction list.
-- [x] A future date is rejected with a clear message.
+- [x] A future date is rejected with a clear message. (Phase 1 only: Phase 3 allows future dates, TXN-8.)
 - [x] Ctrl+N opens quick-add from any screen, and I can log a typical transaction with only the keyboard in 5 seconds or less.
 - [x] **Pay bill** opens a transfer pre-filled with the full amount owed, and a partial payment works.
 - [x] A card's details show the amount owed, available credit, % of the limit used, cycle spending and next due date.
