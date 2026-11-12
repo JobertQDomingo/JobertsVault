@@ -1,4 +1,4 @@
-use chrono::{DateTime, Local, NaiveDate};
+use chrono::{DateTime, Days, Local, NaiveDate};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -182,6 +182,51 @@ pub fn list_due(conn: &Connection) -> Result<Vec<DueOccurrence>, AppError> {
             })
         })
         .collect()
+}
+
+/// One date a rule will post or queue in the next 7 days (DSH-7).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct UpcomingDate {
+    #[ts(type = "number")]
+    pub rule_id: i64,
+    /// Auto posts it on the day; Confirm queues it in the Due list.
+    pub mode: RecurringMode,
+    /// The rule's template as it is now, dated that day.
+    pub transaction: TransactionFields,
+}
+
+/// Every date an active rule falls on after today and up to a week on, soonest first, then by
+/// rule (DSH-7). Paused and ended rules have none. One-off future-dated transactions aren't here:
+/// they're under Upcoming on the transaction list (TXN-8).
+pub fn upcoming(conn: &Connection, today: NaiveDate) -> Result<Vec<UpcomingDate>, AppError> {
+    let until = today
+        .checked_add_days(Days::new(7))
+        .unwrap_or(NaiveDate::MAX);
+    let mut list = Vec::new();
+    for row in repo::recurring::all(conn)? {
+        if row.paused {
+            continue;
+        }
+        let dates = schedule(&row)?.dates_between(
+            index(&row, row.next_index)?,
+            index(&row, row.done)?,
+            today,
+            until,
+        );
+        let rule = view(row)?;
+        list.extend(dates.into_iter().map(|date| UpcomingDate {
+            rule_id: rule.id,
+            mode: rule.mode,
+            transaction: TransactionFields {
+                date: date.to_string(),
+                ..rule.transaction.clone()
+            },
+        }));
+    }
+    list.sort_by(|a, b| (&a.transaction.date, a.rule_id).cmp(&(&b.transaction.date, b.rule_id)));
+    Ok(list)
 }
 
 /// Post and Edit & post (F10): the date's transaction from the edited `fields`, or from the
@@ -564,6 +609,43 @@ mod tests {
 
     fn rule(conn: &Connection, id: i64) -> RecurringRule {
         get(conn, id).unwrap()
+    }
+
+    #[test]
+    fn upcoming_lists_each_active_rules_dates_in_the_next_7_days() {
+        let mut conn = db();
+        let today = on("2026-11-12");
+        let monthly = create(&mut conn, rent("2026-11-15"), today).unwrap();
+        let mut every_3 = rent("2026-11-10");
+        every_3.frequency = Frequency::Daily;
+        every_3.interval = 3;
+        every_3.mode = RecurringMode::Confirm;
+        let daily = create(&mut conn, every_3, today).unwrap();
+        // Nov 10 is already in the Due list, so it isn't coming up.
+        assert_eq!(dates(&conn, daily.id), ["2026-11-10"]);
+        let mut weekly = rent("2026-11-14");
+        weekly.frequency = Frequency::Weekly;
+        let paused = create(&mut conn, weekly, today).unwrap();
+        pause(&mut conn, paused.id, true, today).unwrap();
+        create(&mut conn, rent("2026-11-20"), today).unwrap();
+        let shown: Vec<_> = upcoming(&conn, d("2026-11-12"))
+            .unwrap()
+            .into_iter()
+            .map(|u| (u.transaction.date, u.rule_id, u.mode))
+            .collect();
+        let confirm = RecurringMode::Confirm;
+        assert_eq!(
+            shown,
+            [
+                ("2026-11-13".to_string(), daily.id, confirm),
+                ("2026-11-15".to_string(), monthly.id, RecurringMode::Auto),
+                ("2026-11-16".to_string(), daily.id, confirm),
+                ("2026-11-19".to_string(), daily.id, confirm),
+            ]
+        );
+        let first = &upcoming(&conn, d("2026-11-12")).unwrap()[0];
+        assert_eq!(first.transaction.amount, Money(1_500_000));
+        assert_eq!(first.transaction.payee.as_deref(), Some("Landlord"));
     }
 
     #[test]

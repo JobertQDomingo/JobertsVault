@@ -289,6 +289,8 @@ CREATE TABLE recurring_rules (
 - Template fields (amount, category, mode, `end_date`, `max_occurrences`, and so on) affect future occurrences only. So a rule that had ended and is given a later end date or more times carries on from its first date on or after today: the dates in between are never created.
 - The schedule changes when `frequency`, `interval` or `start_date` changes. The new `start_date` comes from the form, which offers the rule's next date. It must be after the last date already processed, and not before today or the rule's current next date, whichever is earlier, so the dates passed over while paused are never created and an edit never fills in the past. `next_index` is reset to 0. Because the user picks the date, a rule on the 31st whose next date is Feb 28 can be started again on Mar 31, so it doesn't drift to the 28th.
 
+**Coming up (DSH-7):** the dashboard lists every date an active rule falls on after today and up to 7 days on (today Nov 12: Nov 13–19), soonest first. Dates up to today are already posted or in the Due list. A paused rule has none, and dates still to be processed up to today count toward `max_occurrences`, as processing will count them. Only rules are listed, not one-off future-dated transactions (TXN-8).
+
 **Pausing (REC-5):** a paused rule isn't processed. When it's resumed, `next_index` moves to the first date on or after the day it's resumed. The dates it would have had while paused are never created.
 
 ### 4.2 `recurring_occurrences`
@@ -655,6 +657,7 @@ Answered on 2026-11-12:
 30. **A goal's target amount locks `currency_decimals`** like every other stored amount (§1).
 31. **A goal is marked achieved when `list_goals` runs** (GOL-4) and finds its progress at the target: that day is stored in `achieved_at`, and it stays if the balance drops. A higher target or another account clears it, and archived goals aren't checked. A reach and drop between two visits to Goals isn't recorded (§4.4).
 32. **Any goal can be archived**, achieved or not, and archived goals fold under Show archived with Unarchive and Delete (§4.4, UI_FLOWS §8.4).
+33. **Coming up (DSH-7)** covers tomorrow to 7 days from today, since dates up to today are already posted or in the Due list. It lists recurring rules' dates only, not one-off future-dated transactions, and every date of a rule, the dashboard showing at most 8 and then "+ N more" (§4.1, UI_FLOWS §2).
 
 Answered on 2026-11-01:
 

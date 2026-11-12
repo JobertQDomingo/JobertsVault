@@ -6,6 +6,7 @@ import type { Money } from "./Money";
 import type { PeriodView } from "./PeriodView";
 import type { Timeseries } from "./Timeseries";
 import type { Transaction } from "./Transaction";
+import type { UpcomingDate } from "./UpcomingDate";
 
 /**
  * Everything the dashboard shows, from one call so its numbers agree (ARCHITECTURE §4.5).
@@ -44,4 +45,9 @@ recent: Array<Transaction>,
  * Every budget's own current period, whatever the period shown, as `list_budgets` returns
  * them (DSH-6).
  */
-budgets: Array<BudgetProgress>, today: string, };
+budgets: Array<BudgetProgress>, 
+/**
+ * Every date a recurring rule falls on after today and up to a week on, soonest first, as
+ * Coming up shows them (DSH-7).
+ */
+upcoming: Array<UpcomingDate>, today: string, };
