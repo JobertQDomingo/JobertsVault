@@ -20,7 +20,7 @@ This file is the progress tracker.
 | **0 · Setup** | An empty app that builds, runs and passes all checks | — | `npm run tauri dev` opens the fixed 1440 × 900 window, and every check in CLAUDE.md passes | 11 / 11 |
 | **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 53 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
-| **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 13 / 16 |
+| **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 14 / 16 |
 | **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done, installer tested on both monitors | 0 / 9 |
 
 ---
@@ -160,7 +160,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] Mark goals achieved and archive them, plus the Goals screen [GOL-4]
 - [x] Coming up in the next 7 days on the dashboard [DSH-7]
 - [x] Card due-date banner with Pay bill [CC-7]
-- [ ] The Recurring, Budgets and Goals items appear in the sidebar
+- [x] The Recurring, Budgets and Goals items appear in the sidebar
 - [ ] Recurring service tests: none missed and none duplicated after the app was closed for 3 months
 - [ ] Release `v0.3.0` with `/release`
 

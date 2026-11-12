@@ -1,9 +1,12 @@
 import {
   ChartPie,
+  Flag,
   LayoutDashboard,
   Landmark,
   List,
+  Repeat,
   Settings,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 import { NavLink } from "react-router";
@@ -20,14 +23,14 @@ function Item({
   to: string;
   icon: LucideIcon;
   label: string;
-  /** The key after Ctrl (UI_FLOWS §10); AppShell handles it. */
-  shortcut: string;
+  /** The key after Ctrl (UI_FLOWS §10); AppShell handles it. The planning screens have none. */
+  shortcut?: string;
 }) {
   return (
     <NavLink
       to={to}
-      title={`${label} (Ctrl+${shortcut})`}
-      aria-keyshortcuts={`Control+${shortcut}`}
+      title={shortcut ? `${label} (Ctrl+${shortcut})` : undefined}
+      aria-keyshortcuts={shortcut ? `Control+${shortcut}` : undefined}
       // Only the dashboard needs an exact match: /accounts/5 still lights up Accounts.
       end={to === "/"}
       className={({ isActive }) =>
@@ -44,10 +47,7 @@ function Item({
   );
 }
 
-/**
- * The logo, the screens built so far and Settings at the bottom (UI_FLOWS §1). Later-phase screens
- * stay hidden until they're built.
- */
+/** The logo, every screen in UI_FLOWS §1 and Settings at the bottom. */
 export function Sidebar() {
   return (
     <GlassPanel className="flex flex-col px-2.5 py-3.5">
@@ -65,6 +65,9 @@ export function Sidebar() {
         />
         <Item to="/accounts" icon={Landmark} label="Accounts" shortcut="3" />
         <Item to="/reports" icon={ChartPie} label="Reports" shortcut="4" />
+        <Item to="/recurring" icon={Repeat} label="Recurring" />
+        <Item to="/budgets" icon={Target} label="Budgets" />
+        <Item to="/goals" icon={Flag} label="Goals" />
         <div className="flex-1" />
         <hr className="mx-1 my-2 border-hairline" />
         <Item to="/settings" icon={Settings} label="Settings" shortcut="," />
