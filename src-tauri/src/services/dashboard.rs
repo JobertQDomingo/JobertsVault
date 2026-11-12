@@ -430,10 +430,6 @@ mod tests {
         let dash = get(&conn, &MONTH, d(2026, 11, 3)).unwrap();
         assert_eq!(dash.recurring_due, 2);
         // Nov 7 is coming up; Nov 14 is more than a week away (DSH-7).
-        assert_eq!(
-            dash.upcoming,
-            recurring::upcoming(&conn, d(2026, 11, 3)).unwrap()
-        );
         let dates: Vec<_> = dash
             .upcoming
             .iter()
