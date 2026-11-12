@@ -68,7 +68,8 @@ pub struct Account {
     pub balance: Money,
     /// Only for a credit card.
     pub card: Option<CardSummary>,
-    /// Whether any transaction uses it, in either direction. Only an unused account can be deleted.
+    /// Whether a transaction (in either direction), a recurring rule or a goal uses it. Only an
+    /// unused account can be deleted.
     pub in_use: bool,
 }
 

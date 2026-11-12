@@ -22,7 +22,9 @@ pub fn months_left(today: NaiveDate, target: NaiveDate) -> i64 {
 /// unit so saving it every month always reaches the target. None when nothing is left to save
 /// or no month is (GOL-3).
 pub fn monthly_needed(remaining: Money, months: i64) -> Option<Money> {
-    (remaining > Money::ZERO && months > 0).then(|| Money((remaining.0 + months - 1) / months))
+    // Divides first, so no amount can overflow on the way up.
+    (remaining > Money::ZERO && months > 0)
+        .then(|| Money(remaining.0 / months + i64::from(remaining.0 % months != 0)))
 }
 
 #[cfg(test)]
@@ -71,6 +73,10 @@ mod tests {
         assert_eq!(monthly_needed(Money(260_000), 2), Some(Money(130_000)));
         assert_eq!(monthly_needed(Money(1), 12), Some(Money(1)));
         assert_eq!(monthly_needed(Money::MAX, 1), Some(Money::MAX));
+        assert_eq!(
+            monthly_needed(Money(i64::MAX), 2),
+            Some(Money(i64::MAX / 2 + 1))
+        );
     }
 
     #[test]

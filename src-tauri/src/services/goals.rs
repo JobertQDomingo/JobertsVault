@@ -63,8 +63,12 @@ pub struct GoalProgress {
 
 /// Every goal with its progress, in the order they were created.
 pub fn list(conn: &Connection, today: NaiveDate) -> Result<Vec<GoalProgress>, AppError> {
+    let goals = repo::goals::all(conn)?;
+    if goals.is_empty() {
+        return Ok(Vec::new());
+    }
     let accounts = repo::accounts::all(conn, today)?;
-    repo::goals::all(conn)?
+    goals
         .into_iter()
         .map(|row| {
             let goal = view(row);
@@ -75,13 +79,13 @@ pub fn list(conn: &Connection, today: NaiveDate) -> Result<Vec<GoalProgress>, Ap
                 .ok_or_else(|| AppError::Database {
                     message: format!("Goal {} has no account", goal.id),
                 })?;
-            Ok(progress(goal, balance, today))
+            progress(goal, balance, today)
         })
         .collect()
 }
 
 /// DATA_MODEL §5.7.
-fn progress(goal: Goal, balance: i64, today: NaiveDate) -> GoalProgress {
+fn progress(goal: Goal, balance: i64, today: NaiveDate) -> Result<GoalProgress, AppError> {
     let target = goal.fields.target_amount;
     let progress = Money(balance.max(0));
     let remaining = Money(target.0.saturating_sub(progress.0).max(0));
@@ -89,16 +93,21 @@ fn progress(goal: Goal, balance: i64, today: NaiveDate) -> GoalProgress {
         .fields
         .target_date
         .as_deref()
-        .and_then(real_date)
+        .map(|text| {
+            real_date(text).ok_or_else(|| AppError::Database {
+                message: format!("Goal {} has an invalid target date", goal.id),
+            })
+        })
+        .transpose()?
         .map(|date| months_left(today, date));
-    GoalProgress {
+    Ok(GoalProgress {
         progress,
         remaining,
         percent: used_percent(progress, target).min(100),
         months_left: months,
         monthly_needed: months.and_then(|m| monthly_needed(remaining, m)),
         goal,
-    }
+    })
 }
 
 pub fn create(
@@ -538,6 +547,18 @@ mod tests {
             figures(&conn, d(2026, 11, 12)),
             [(0, 100, 0, Some(0), None), (0, 100, 0, Some(0), None)]
         );
+    }
+
+    #[test]
+    fn a_stored_target_date_that_isnt_real_is_a_database_error() {
+        let mut conn = db();
+        create(&mut conn, fields("Trip", 100, None, CASH), now()).unwrap();
+        conn.execute("UPDATE goals SET target_date = '2027-2-3'", [])
+            .unwrap();
+        assert!(matches!(
+            list(&conn, d(2026, 11, 12)),
+            Err(AppError::Database { .. })
+        ));
     }
 
     #[test]
