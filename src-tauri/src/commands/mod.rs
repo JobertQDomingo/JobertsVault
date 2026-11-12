@@ -3,6 +3,7 @@ pub mod backup;
 pub mod budgets;
 pub mod categories;
 pub mod dashboard;
+pub mod goals;
 pub mod payment_methods;
 pub mod period;
 pub mod recurring;

@@ -150,6 +150,10 @@ pub fn run() {
             commands::budgets::create_budget,
             commands::budgets::update_budget,
             commands::budgets::delete_budget,
+            commands::goals::list_goals,
+            commands::goals::create_goal,
+            commands::goals::update_goal,
+            commands::goals::delete_goal,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the app")

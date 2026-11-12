@@ -20,6 +20,8 @@ export const queryKeys = {
   dueOccurrences: ["ledger", "due"],
   // Deleting or merging a category deletes its budgets.
   budgets: ["ledger", "budgets"],
+  // Progress is the account's balance, which every transaction write changes.
+  goals: ["ledger", "goals"],
   // A save can add a payee or change its last category.
   payees: (prefix: string, kind: CategoryKind) =>
     ["ledger", "payees", prefix, kind] as const,
