@@ -58,7 +58,7 @@ test.each(["Recurring", "Budgets", "Goals"])(
     expect(link(name).getAttribute("aria-current")).toBe("page");
     expect(link("Dashboard").getAttribute("aria-current")).toBeNull();
     expect(link(name).getAttribute("aria-keyshortcuts")).toBeNull();
-    expect(link(name).title).toBe("");
+    expect(link(name).hasAttribute("title")).toBe(false);
   },
 );
 

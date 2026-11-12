@@ -434,3 +434,4 @@ Answered on 2026-11-11:
 Answered on 2026-11-12:
 
 17. **Card due banner** (CC-7): one banner per card, named after it, so two cards are never confused (CC-8). Archived cards get none, since they take no new transfers and archiving one with a balance already needed a confirmed warning (§2).
+18. **Planning screens in the sidebar:** Recurring, Budgets and Goals come after Reports, as §1 shows, with no `Ctrl+` shortcut, since §10 lists none for them. The Phase 4 shortcut review can add some.
