@@ -6,6 +6,7 @@ import type { Category } from "@/bindings/Category";
 import type { CategoryList } from "@/bindings/CategoryList";
 import type { Comparison } from "@/bindings/Comparison";
 import type { Dashboard } from "@/bindings/Dashboard";
+import type { GoalProgress } from "@/bindings/GoalProgress";
 import type { PaymentMethod } from "@/bindings/PaymentMethod";
 import type { PeriodView } from "@/bindings/PeriodView";
 import type { Timeseries } from "@/bindings/Timeseries";
@@ -256,6 +257,73 @@ export const BUDGETS: BudgetProgress[] = [
     remaining: -3000,
     percent: 120,
   },
+];
+
+const goal = (
+  over: Partial<GoalProgress> &
+    Pick<GoalProgress, "id" | "name" | "accountId" | "targetAmount">,
+) =>
+  ({
+    targetDate: null,
+    achievedAt: null,
+    archived: false,
+    progress: 0,
+    remaining: over.targetAmount,
+    percent: 0,
+    monthsLeft: null,
+    monthlyNeeded: null,
+    ...over,
+  }) satisfies GoalProgress;
+
+/**
+ * `list_goals` on Nov 5, from ACCOUNTS' balances: one on its way, one achieved, one past its
+ * date, and an archived one (UI_FLOWS §8.4).
+ */
+export const GOALS: GoalProgress[] = [
+  goal({
+    id: 1,
+    name: "Japan trip",
+    accountId: 2,
+    targetAmount: 1000000,
+    targetDate: "2027-05-05",
+    progress: 841075,
+    remaining: 158925,
+    percent: 84,
+    monthsLeft: 6,
+    monthlyNeeded: 26488,
+  }),
+  goal({
+    id: 2,
+    name: "New laptop",
+    accountId: 1,
+    targetAmount: 30000,
+    targetDate: "2026-12-01",
+    achievedAt: "2026-11-01",
+    progress: 32000,
+    remaining: 0,
+    percent: 100,
+    monthsLeft: 1,
+  }),
+  goal({
+    id: 3,
+    name: "Car",
+    accountId: 3,
+    targetAmount: 2000000,
+    targetDate: "2026-10-01",
+    progress: 15000,
+    remaining: 1985000,
+    monthsLeft: 0,
+  }),
+  goal({
+    id: 4,
+    name: "Old plan",
+    accountId: 5,
+    targetAmount: 10000,
+    archived: true,
+    progress: 4500,
+    remaining: 5500,
+    percent: 45,
+  }),
 ];
 
 export const DASHBOARD: Dashboard = {

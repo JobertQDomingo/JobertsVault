@@ -1,5 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { createGoal, deleteGoal, listGoals, updateGoal } from "@/api/goals";
+import {
+  archiveGoal,
+  createGoal,
+  deleteGoal,
+  listGoals,
+  unarchiveGoal,
+  updateGoal,
+} from "@/api/goals";
 import { queryKeys } from "@/lib/queryKeys";
 import { useLedgerMutation } from "./useLedgerMutation";
 
@@ -9,4 +16,6 @@ export const useGoals = () =>
 // Ledger writes: a goal's target locks the decimals and puts its account in use.
 export const useCreateGoal = () => useLedgerMutation(createGoal);
 export const useUpdateGoal = () => useLedgerMutation(updateGoal);
+export const useArchiveGoal = () => useLedgerMutation(archiveGoal);
+export const useUnarchiveGoal = () => useLedgerMutation(unarchiveGoal);
 export const useDeleteGoal = () => useLedgerMutation(deleteGoal);

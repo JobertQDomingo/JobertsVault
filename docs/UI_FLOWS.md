@@ -349,7 +349,17 @@ Clicking a card edits it. Its ⋯ menu has **Edit** and **Delete**, which asks f
 A category, or all spending, has one budget per period. A second one shows the backend's message under the field it names.
 
 ### 8.4 Goals (`/goals`), Phase 3
-Goal cards showing the name, the linked account, a progress bar, "₱2,400 of ₱5,000", the target date and "Save ₱433/month to reach it". A goal that's been reached gets an "Achieved" badge.
+One panel, with **+ New goal** in its header, holding a grid of flat goal cards (three across), in the order they were created. Each card shows the name, the linked account and target date ("Bank · by May 5, 2027"), a `ProgressBar` with the % done, "₱2,400.00 of ₱5,000.00 · ₱2,600.00 left", and "Save ₱433.34/month to reach it" (GOL-3). Once the target date is today or has passed, that line says "Target date passed" instead, and a goal with no target date has no line. A goal that's been reached gets an **Achieved** badge in `--success`, its bar turns green, and it asks for no monthly amount, even if the balance drops later (GOL-4). A goal's bar has no amber or red thresholds.
+
+Clicking a card edits it. Its ⋯ menu has **Edit**, **Archive** and **Delete** ("Delete this goal? Its account and transactions stay. This can't be undone."). Any goal can be archived, achieved or not. Archived goals fold under **Show archived (n)** below the grid, as the same cards, whose ⋯ has **Unarchive** and **Delete**. With no active goals, an empty state offers **New goal**.
+
+**+ New goal** opens a small dialog, "New goal" (or "Edit goal"):
+- **Name:** 1–50 characters, unique.
+- **Target:** the amount to reach.
+- **Target date:** optional, any date. With one, the card says how much to save each month.
+- **Account:** an active account that isn't a credit card. An edit keeps its own account even if it's been archived. A note says the account's balance is the goal's progress (GOL-2).
+
+The backend's message shows under the field it names.
 
 ---
 

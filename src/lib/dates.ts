@@ -34,6 +34,9 @@ export const addDays = (iso: string, days: number) =>
 export const formatDateTime = (local: string) =>
   format(parse(local, "yyyy-MM-dd'T'HH:mm", new Date()), "MMM d, yyyy h:mm a");
 
+/** A date with its year, e.g. `May 5, 2027` (a goal's target date). */
+export const formatDate = (iso: string) => format(toDate(iso), "MMM d, yyyy");
+
 /** A date without its year, e.g. `Nov 5` (a card's due date). */
 export const formatShortDate = (iso: string) => format(toDate(iso), "MMM d");
 

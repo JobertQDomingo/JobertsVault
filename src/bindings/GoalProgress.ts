@@ -23,10 +23,19 @@ percent: number,
  */
 monthsLeft: number | null, 
 /**
- * `remaining` over `months_left`, rounded up; none when nothing is left to save, no month
- * is, or there's no target date.
+ * `remaining` over `months_left`, rounded up; none once achieved, when nothing is left to
+ * save, when no month is, or without a target date.
  */
 monthlyNeeded: Money | null, id: number, 
+/**
+ * The day its progress first reached the target (GOL-4). It stays if the balance drops
+ * later; a new target amount or account clears it.
+ */
+achievedAt: string | null, 
+/**
+ * Hidden from the goal cards, under Show archived. Any goal can be archived.
+ */
+archived: boolean, 
 /**
  * 1–50 characters, unique ignoring case.
  */

@@ -62,7 +62,13 @@ import {
   useUpdateBudget,
 } from "./useBudgets";
 import * as goalHooks from "./useGoals";
-import { useCreateGoal, useDeleteGoal, useUpdateGoal } from "./useGoals";
+import {
+  useArchiveGoal,
+  useCreateGoal,
+  useDeleteGoal,
+  useUnarchiveGoal,
+  useUpdateGoal,
+} from "./useGoals";
 import * as transactionHooks from "./useTransactions";
 import {
   useCreateTransaction,
@@ -323,6 +329,8 @@ const WRITES = [
     "update_goal",
     { id: 3, goal },
   ],
+  ["useArchiveGoal", useArchiveGoal, 3, "archive_goal", { id: 3 }],
+  ["useUnarchiveGoal", useUnarchiveGoal, 3, "unarchive_goal", { id: 3 }],
   ["useDeleteGoal", useDeleteGoal, 3, "delete_goal", { id: 3 }],
   [
     "useUpdateSettings",

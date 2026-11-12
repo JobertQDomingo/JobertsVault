@@ -7,7 +7,7 @@ use crate::{log, services};
 
 #[tauri::command(async)]
 pub fn list_goals(state: State<'_, AppState>) -> Result<Vec<GoalProgress>, AppError> {
-    services::goals::list(&*state.conn()?, chrono::Local::now().date_naive())
+    services::goals::list(&mut *state.conn()?, chrono::Local::now().date_naive())
         .inspect_err(|err| log::record(&state.log_path, err))
 }
 
@@ -24,6 +24,18 @@ pub fn update_goal(
     goal: GoalFields,
 ) -> Result<Goal, AppError> {
     services::goals::update(&mut *state.conn()?, id, goal, chrono::Local::now())
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+#[tauri::command(async)]
+pub fn archive_goal(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
+    services::goals::archive(&mut *state.conn()?, id, chrono::Local::now())
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+#[tauri::command(async)]
+pub fn unarchive_goal(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
+    services::goals::unarchive(&mut *state.conn()?, id, chrono::Local::now())
         .inspect_err(|err| log::record(&state.log_path, err))
 }
 

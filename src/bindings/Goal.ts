@@ -6,6 +6,15 @@ import type { Money } from "./Money";
  */
 export type Goal = { id: number, 
 /**
+ * The day its progress first reached the target (GOL-4). It stays if the balance drops
+ * later; a new target amount or account clears it.
+ */
+achievedAt: string | null, 
+/**
+ * Hidden from the goal cards, under Show archived. Any goal can be archived.
+ */
+archived: boolean, 
+/**
  * 1–50 characters, unique ignoring case.
  */
 name: string, targetAmount: Money, 
