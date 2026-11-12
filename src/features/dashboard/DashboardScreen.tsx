@@ -1,7 +1,15 @@
-import { CalendarClock, Plus, ReceiptText, Repeat, Target } from "lucide-react";
+import {
+  CalendarClock,
+  CreditCard,
+  Plus,
+  ReceiptText,
+  Repeat,
+  Target,
+} from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import type { BudgetProgress } from "@/bindings/BudgetProgress";
+import type { CardDue } from "@/bindings/CardDue";
 import type { Category } from "@/bindings/Category";
 import type { Account } from "@/bindings/Account";
 import type { Dashboard } from "@/bindings/Dashboard";
@@ -130,6 +138,13 @@ function DashboardBody({
   return (
     <>
       {data.backupDue && <BackupWarning />}
+      {data.cardsDue.map((due) => (
+        <CardDueBanner
+          key={due.accountId}
+          due={due}
+          name={accounts.get(due.accountId)?.name}
+        />
+      ))}
       <RecurringDue count={data.recurringDue} today={data.today} />
       <div className="grid grid-cols-3 gap-3">
         <StatCard
@@ -381,6 +396,30 @@ function RecurringDue({ count, today }: { count: number; today: string }) {
         <DueDialog today={today} onClose={() => setReviewing(false)} />
       )}
     </>
+  );
+}
+
+/** A card payment due within 5 days, with something owed (CC-7). */
+function CardDueBanner({ due, name }: { due: CardDue; name?: string }) {
+  const { payBill } = useQuickAdd();
+  const when =
+    due.days === 0
+      ? "today"
+      : due.days === 1
+        ? "tomorrow"
+        : `in ${due.days} days`;
+  return (
+    <Banner
+      icon={CreditCard}
+      action={
+        <Button size="sm" onClick={() => payBill(due.accountId)}>
+          Pay bill
+        </Button>
+      }
+    >
+      {name} payment due {when}:{" "}
+      <MoneyText amount={due.amountOwed} kind="owed" />
+    </Banner>
   );
 }
 

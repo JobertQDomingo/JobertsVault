@@ -376,6 +376,7 @@ export const DASHBOARD: Dashboard = {
   recent: RECENT,
   budgets: BUDGETS,
   upcoming: UPCOMING,
+  cardsDue: [],
   today: TODAY,
 };
 

@@ -1,5 +1,7 @@
 use chrono::{Datelike, Months, NaiveDate};
 
+use crate::domain::money::Money;
+
 /// A credit card's current statement cycle and next payment due date (DATA_MODEL §5.5).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CardCycle {
@@ -21,6 +23,13 @@ pub fn card_cycle(statement_day: u8, due_day: u8, today: NaiveDate) -> Option<Ca
         end,
         due: on_or_after(today, due_day)?,
     })
+}
+
+/// The days left until `due` when the dashboard reminds about it: 5 or fewer, while something is
+/// owed (CC-7, DATA_MODEL §5.5).
+pub fn reminder_days(due: NaiveDate, owed: Money, today: NaiveDate) -> Option<i64> {
+    let days = (due - today).num_days();
+    (owed > Money::ZERO && (0..=5).contains(&days)).then_some(days)
 }
 
 /// That day of `d`'s month, or the month's last day when it's shorter.
@@ -127,5 +136,28 @@ mod tests {
     fn a_date_at_the_calendar_limits_has_no_cycle_instead_of_panicking() {
         assert_eq!(card_cycle(20, 5, NaiveDate::MAX), None);
         assert_eq!(card_cycle(20, 5, NaiveDate::MIN), None);
+    }
+
+    #[test]
+    fn the_reminder_shows_from_5_days_before_the_due_date_while_something_is_owed() {
+        let owed = Money(64_000);
+        let due = d(2026, 11, 5);
+        assert_eq!(reminder_days(due, owed, d(2026, 10, 30)), None, "6 days");
+        assert_eq!(reminder_days(due, owed, d(2026, 10, 31)), Some(5));
+        assert_eq!(reminder_days(due, owed, d(2026, 11, 4)), Some(1));
+        assert_eq!(
+            reminder_days(due, owed, d(2026, 11, 5)),
+            Some(0),
+            "due today"
+        );
+        assert_eq!(reminder_days(due, Money::ZERO, d(2026, 11, 3)), None);
+    }
+
+    #[test]
+    fn the_reminder_counts_days_across_a_month_end() {
+        assert_eq!(
+            reminder_days(d(2026, 3, 2), Money(1), d(2026, 2, 26)),
+            Some(4)
+        );
     }
 }

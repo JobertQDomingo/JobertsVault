@@ -76,7 +76,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
 **Added later:**
 - **Phase 2:** a "No backup in the last 7 days." banner at the top with **Back up now** (BAK-7, F9)
 - **Phase 3:**
-  - a "Card payment due in 3 days: ₱640.00 owed" banner at the top (CC-7), with a **Pay bill** button
+  - a "Credit card payment due in 3 days: ₱640.00 owed" banner at the top (CC-7), with a **Pay bill** button that opens F2's transfer. Each active card due within 5 days with something owed gets its own banner, named after the card, soonest first. It says "due today" and "due tomorrow" for 0 and 1 days
   - a **Budgets** panel under Recent transactions, with **Manage** (to `/budgets`) in its header: one row per budget, with its chip and name, its period and a `ProgressBar` with the % used. Each bar is for that budget's own current week, month or year, whatever the period switcher shows, like the account balances (DSH-6). With no budgets, it says "No budgets yet."
   - a **Coming up** panel beside Budgets, with **View all** (to `/recurring`) in its header: every date an active recurring rule falls on from tomorrow to 7 days from today, soonest first (DSH-7). Each row has the category chip (or the transfer chip), the title ("Dining Out · Netflix", or "Bank → E-wallet"), "Fri, Nov 6 · Credit card · auto" (or "· needs confirming" for a Confirm rule; a transfer leaves out the account its title names), and the amount. A rule with several dates in the week has a row for each. Past 8 rows, it ends with "+ N more", linking to `/recurring`. With none, it says "Nothing in the next 7 days." Paused and ended rules have no dates, and one-off future-dated transactions stay under Upcoming on the Transactions screen (TXN-8)
   - the "2 recurring transactions are due." banner (F10)
@@ -430,3 +430,7 @@ Answered on 2026-11-07:
 Answered on 2026-11-11:
 
 16. **Review due items** (F10) opens a dialog over the dashboard, rather than a Due section on the Recurring screen, so it works from the banner on its own. Edit & post opens the transaction form over it.
+
+Answered on 2026-11-12:
+
+17. **Card due banner** (CC-7): one banner per card, named after it, so two cards are never confused (CC-8). Archived cards get none, since they take no new transfers and archiving one with a balance already needed a confirmed warning (§2).

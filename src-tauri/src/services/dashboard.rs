@@ -3,6 +3,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
+use crate::domain::card_cycle;
 use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
@@ -43,7 +44,23 @@ pub struct Dashboard {
     /// Every date a recurring rule falls on after today and up to a week on, soonest first, as
     /// Coming up shows them (DSH-7).
     pub upcoming: Vec<UpcomingDate>,
+    /// Active cards whose payment is due within 5 days with something owed, soonest first, for
+    /// their banners (CC-7).
+    pub cards_due: Vec<CardDue>,
     pub today: NaiveDate,
+}
+
+/// A card's due-date reminder (CC-7, DATA_MODEL §5.5).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CardDue {
+    #[ts(type = "number")]
+    pub account_id: i64,
+    pub amount_owed: Money,
+    /// 0 when the payment is due today.
+    #[ts(type = "number")]
+    pub days: i64,
 }
 
 pub fn get(
@@ -64,6 +81,20 @@ pub fn get(
         accounts,
         net_balance,
     } = accounts::list(conn, today)?;
+    // Archived accounts take no new transfers, so their Pay bill couldn't work.
+    let mut cards_due: Vec<_> = accounts
+        .iter()
+        .filter(|a| !a.archived)
+        .filter_map(|a| {
+            let card = a.card.as_ref()?;
+            Some(CardDue {
+                account_id: a.id,
+                amount_owed: card.amount_owed,
+                days: card_cycle::reminder_days(card.due_date, card.amount_owed, today)?,
+            })
+        })
+        .collect();
+    cards_due.sort_by_key(|c| c.days);
     let recent = repo::transactions::recent(conn, &today.to_string(), 5)?
         .into_iter()
         .map(transactions::view)
@@ -73,6 +104,7 @@ pub fn get(
         recurring_due: repo::recurring::pending(conn)?.len(),
         budgets: budgets::list(conn, today)?,
         upcoming: recurring::upcoming(conn, today)?,
+        cards_due,
         period,
         income,
         expense,
@@ -461,5 +493,29 @@ mod tests {
             (dash.budgets[0].start, dash.budgets[0].spent),
             (d(2026, 11, 1), Money(52_040))
         );
+    }
+
+    #[test]
+    fn active_cards_due_within_5_days_with_something_owed_get_a_reminder() {
+        let mut conn = db();
+        // The helper's cards are due on the 5th.
+        let soon = account(&mut conn, AccountKind::CreditCard, "Visa");
+        account(&mut conn, AccountKind::CreditCard, "Paid off");
+        let shelved = account(&mut conn, AccountKind::CreditCard, "Shelved");
+        spend(&mut conn, 64_000, d(2026, 10, 25), soon);
+        spend(&mut conn, 10_000, d(2026, 10, 25), shelved);
+        accounts::archive(&mut conn, shelved, true, now()).unwrap();
+
+        let due = |today| get(&conn, &MONTH, today).unwrap().cards_due;
+        assert_eq!(due(d(2026, 10, 30)), [], "6 days away");
+        assert_eq!(
+            due(d(2026, 11, 2)),
+            [CardDue {
+                account_id: soon,
+                amount_owed: Money(64_000),
+                days: 3,
+            }]
+        );
+        assert_eq!(due(d(2026, 11, 5))[0].days, 0, "due today");
     }
 }
