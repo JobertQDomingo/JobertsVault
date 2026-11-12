@@ -13,4 +13,10 @@ export const createGoal = (goal: GoalFields) =>
 export const updateGoal = ({ id, goal }: { id: number; goal: GoalFields }) =>
   call<Goal>("update_goal", { id, goal });
 
+/** Any goal can be archived, achieved or not (GOL-4). */
+export const archiveGoal = (id: number) => call<null>("archive_goal", { id });
+
+export const unarchiveGoal = (id: number) =>
+  call<null>("unarchive_goal", { id });
+
 export const deleteGoal = (id: number) => call<null>("delete_goal", { id });

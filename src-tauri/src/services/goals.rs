@@ -36,6 +36,12 @@ pub struct Goal {
     pub id: i64,
     #[serde(flatten)]
     pub fields: GoalFields,
+    /// The day Goals first found its progress at the target (GOL-4), which can be later than the
+    /// day the balance got there. It stays if the balance drops; a higher target or another
+    /// account clears it. An archived goal isn't checked.
+    pub achieved_at: Option<NaiveDate>,
+    /// Hidden from the goal cards, under Show archived. Any goal can be archived.
+    pub archived: bool,
 }
 
 /// A goal and how close its account is to the target as of today (GOL-3, DATA_MODEL §5.7).
@@ -56,32 +62,40 @@ pub struct GoalProgress {
     /// date is today or has passed, and none without a target date.
     #[ts(type = "number | null")]
     pub months_left: Option<i64>,
-    /// `remaining` over `months_left`, rounded up; none when nothing is left to save, no month
-    /// is, or there's no target date.
+    /// `remaining` over `months_left`, rounded up; none once achieved, when nothing is left to
+    /// save, when no month is, or without a target date.
     pub monthly_needed: Option<Money>,
 }
 
-/// Every goal with its progress, in the order they were created.
-pub fn list(conn: &Connection, today: NaiveDate) -> Result<Vec<GoalProgress>, AppError> {
-    let goals = repo::goals::all(conn)?;
+/// Every goal with its progress, archived ones included, in the order they were created. A goal
+/// whose progress has reached its target is marked achieved today, the first time it's seen
+/// there (GOL-4).
+pub fn list(conn: &mut Connection, today: NaiveDate) -> Result<Vec<GoalProgress>, AppError> {
+    let tx = conn.transaction()?;
+    let goals = repo::goals::all(&tx)?;
     if goals.is_empty() {
         return Ok(Vec::new());
     }
-    let accounts = repo::accounts::all(conn, today)?;
-    goals
-        .into_iter()
-        .map(|row| {
-            let goal = view(row);
-            let balance = accounts
-                .iter()
-                .find(|a| a.id == goal.fields.account_id)
-                .map(|a| a.balance)
-                .ok_or_else(|| AppError::Database {
-                    message: format!("Goal {} has no account", goal.id),
-                })?;
-            progress(goal, balance, today)
-        })
-        .collect()
+    let accounts = repo::accounts::all(&tx, today)?;
+    let mut list = Vec::with_capacity(goals.len());
+    for row in goals {
+        let mut goal = view(row)?;
+        let balance = accounts
+            .iter()
+            .find(|a| a.id == goal.fields.account_id)
+            .map(|a| a.balance)
+            .ok_or_else(|| AppError::Database {
+                message: format!("Goal {} has no account", goal.id),
+            })?;
+        // An archived goal may have been given up, so it isn't marked.
+        if !goal.archived && goal.achieved_at.is_none() && balance >= goal.fields.target_amount.0 {
+            repo::goals::set_achieved(&tx, goal.id, &today.to_string())?;
+            goal.achieved_at = Some(today);
+        }
+        list.push(progress(goal, balance, today)?);
+    }
+    tx.commit()?;
+    Ok(list)
 }
 
 /// DATA_MODEL §5.7.
@@ -105,7 +119,9 @@ fn progress(goal: Goal, balance: i64, today: NaiveDate) -> Result<GoalProgress, 
         remaining,
         percent: used_percent(progress, target).min(100),
         months_left: months,
-        monthly_needed: months.and_then(|m| monthly_needed(remaining, m)),
+        monthly_needed: months
+            .filter(|_| goal.achieved_at.is_none())
+            .and_then(|m| monthly_needed(remaining, m)),
         goal,
     })
 }
@@ -139,7 +155,30 @@ pub fn update(
     Ok(goal)
 }
 
-/// Nothing points at a goal, so any can go.
+/// Hides it under Show archived, achieved or not (GOL-4).
+pub fn archive(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result<(), AppError> {
+    set_archived(conn, id, true, now)
+}
+
+pub fn unarchive(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result<(), AppError> {
+    set_archived(conn, id, false, now)
+}
+
+fn set_archived(
+    conn: &mut Connection,
+    id: i64,
+    archived: bool,
+    now: DateTime<Local>,
+) -> Result<(), AppError> {
+    let tx = conn.transaction()?;
+    if repo::goals::set_archived(&tx, id, archived, &stamp(now))? == 0 {
+        return Err(not_found("goal", id));
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+/// Nothing points at a goal, so any can go, archived or not.
 pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     let tx = conn.transaction()?;
     if repo::goals::delete(&tx, id)? == 0 {
@@ -192,8 +231,8 @@ fn validate(
 
 fn get(conn: &Connection, id: i64) -> Result<Goal, AppError> {
     repo::goals::find(conn, id)?
-        .map(view)
         .ok_or_else(|| not_found("goal", id))
+        .and_then(view)
 }
 
 fn values(f: &GoalFields) -> repo::goals::Values<'_> {
@@ -205,8 +244,17 @@ fn values(f: &GoalFields) -> repo::goals::Values<'_> {
     }
 }
 
-fn view(row: repo::goals::Row) -> Goal {
-    Goal {
+fn view(row: repo::goals::Row) -> Result<Goal, AppError> {
+    let achieved_at = row
+        .achieved_at
+        .as_deref()
+        .map(|text| {
+            real_date(text).ok_or_else(|| AppError::Database {
+                message: format!("Goal {} has an invalid achieved date", row.id),
+            })
+        })
+        .transpose()?;
+    Ok(Goal {
         id: row.id,
         fields: GoalFields {
             name: row.name,
@@ -214,7 +262,9 @@ fn view(row: repo::goals::Row) -> Goal {
             target_date: row.target_date,
             account_id: row.account_id,
         },
-    }
+        achieved_at,
+        archived: row.archived,
+    })
 }
 
 #[cfg(test)]
@@ -292,7 +342,7 @@ mod tests {
         transactions::create(conn, fields, now()).unwrap();
     }
 
-    fn names(conn: &Connection) -> Vec<String> {
+    fn names(conn: &mut Connection) -> Vec<String> {
         list(conn, now().date_naive())
             .unwrap()
             .into_iter()
@@ -314,7 +364,7 @@ mod tests {
             fields("Trip", 500_000, Some("2027-05-01"), CASH)
         );
         create(&mut conn, fields("Rainy day", 100_000, None, CASH), now()).unwrap();
-        assert_eq!(names(&conn), ["Trip", "Rainy day"]);
+        assert_eq!(names(&mut conn), ["Trip", "Rainy day"]);
     }
 
     #[test]
@@ -366,7 +416,9 @@ mod tests {
             edited,
             Goal {
                 id: trip.id,
-                fields: fields("Japan", 900, Some("2027-01-31"), bank)
+                fields: fields("Japan", 900, Some("2027-01-31"), bank),
+                achieved_at: None,
+                archived: false,
             }
         );
         let result = update(&mut conn, trip.id, fields("car", 900, None, bank), now());
@@ -396,7 +448,7 @@ mod tests {
         let trip = create(&mut conn, fields("Trip", 100, None, CASH), now()).unwrap();
         create(&mut conn, fields("Car", 100, None, CASH), now()).unwrap();
         delete(&mut conn, trip.id).unwrap();
-        assert_eq!(names(&conn), ["Car"]);
+        assert_eq!(names(&mut conn), ["Car"]);
         assert!(matches!(
             update(&mut conn, 999, fields("X", 1, None, CASH), now()),
             Err(AppError::NotFound { id: 999, .. })
@@ -437,7 +489,7 @@ mod tests {
     type Figures = (i64, i64, i64, Option<i64>, Option<i64>);
 
     /// Each goal's figures as of `today`.
-    fn figures(conn: &Connection, today: NaiveDate) -> Vec<Figures> {
+    fn figures(conn: &mut Connection, today: NaiveDate) -> Vec<Figures> {
         list(conn, today)
             .unwrap()
             .into_iter()
@@ -487,7 +539,7 @@ mod tests {
         );
         // 2,600.00 left over 6 months is 433.34 a month (UI_FLOWS §8.4).
         assert_eq!(
-            figures(&conn, d(2026, 11, 12)),
+            figures(&mut conn, d(2026, 11, 12)),
             [(240_000, 260_000, 48, Some(6), Some(43_334))]
         );
     }
@@ -518,7 +570,7 @@ mod tests {
         .unwrap();
         create(&mut conn, fields("Almost", 700_001, None, high), now()).unwrap();
         assert_eq!(
-            figures(&conn, d(2026, 11, 12)),
+            figures(&mut conn, d(2026, 11, 12)),
             [
                 (0, 100_000, 0, Some(2), Some(50_000)),
                 (700_000, 0, 100, Some(2), None),
@@ -544,9 +596,174 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            figures(&conn, d(2026, 11, 12)),
+            figures(&mut conn, d(2026, 11, 12)),
             [(0, 100, 0, Some(0), None), (0, 100, 0, Some(0), None)]
         );
+    }
+
+    /// (achieved on, archived) of each goal, as `list` shows them on `today`.
+    fn states(conn: &mut Connection, today: NaiveDate) -> Vec<(Option<NaiveDate>, bool)> {
+        list(conn, today)
+            .unwrap()
+            .into_iter()
+            .map(|p| (p.goal.achieved_at, p.goal.archived))
+            .collect()
+    }
+
+    #[test]
+    fn a_goal_is_achieved_the_first_day_its_progress_reaches_the_target_and_stays_so() {
+        let mut conn = db();
+        let bank = account(&mut conn, "Bank", AccountKind::Bank, 40_000);
+        create(
+            &mut conn,
+            fields("Trip", 50_000, Some("2027-05-12"), bank),
+            now(),
+        )
+        .unwrap();
+        create(&mut conn, fields("Car", 900_000, None, bank), now()).unwrap();
+        save(
+            &mut conn,
+            TransactionKind::Income,
+            bank,
+            10_000,
+            d(2026, 11, 14),
+        );
+        assert_eq!(
+            states(&mut conn, d(2026, 11, 13)),
+            [(None, false), (None, false)]
+        );
+        assert_eq!(
+            states(&mut conn, d(2026, 11, 14)),
+            [(Some(d(2026, 11, 14)), false), (None, false)]
+        );
+        // Spending it later keeps the first day, and an achieved goal asks for no monthly amount.
+        save(
+            &mut conn,
+            TransactionKind::Expense,
+            bank,
+            20_000,
+            d(2026, 11, 15),
+        );
+        let trip = &list(&mut conn, d(2026, 11, 16)).unwrap()[0];
+        assert_eq!(trip.goal.achieved_at, Some(d(2026, 11, 14)));
+        assert_eq!((trip.progress.0, trip.percent), (30_000, 60));
+        assert_eq!((trip.months_left, trip.monthly_needed), (Some(6), None));
+    }
+
+    #[test]
+    fn a_new_target_amount_or_account_clears_achieved_but_other_edits_keep_it() {
+        let mut conn = db();
+        let bank = account(&mut conn, "Bank", AccountKind::Bank, 50_000);
+        let other = account(&mut conn, "Other", AccountKind::Bank, 0);
+        let trip = create(&mut conn, fields("Trip", 50_000, None, bank), now()).unwrap();
+        let today = d(2026, 11, 12);
+        assert_eq!(states(&mut conn, today), [(Some(today), false)]);
+        // A new name and date keep it, even below the target now.
+        save(
+            &mut conn,
+            TransactionKind::Expense,
+            bank,
+            1_000,
+            d(2026, 11, 12),
+        );
+        let renamed = update(
+            &mut conn,
+            trip.id,
+            fields("Japan", 50_000, Some("2027-01-01"), bank),
+            now(),
+        )
+        .unwrap();
+        assert_eq!(renamed.achieved_at, Some(today));
+        // A lower target on the same account was reached then too, so it keeps its day.
+        let lowered = update(
+            &mut conn,
+            trip.id,
+            fields("Japan", 40_000, Some("2027-01-01"), bank),
+            now(),
+        )
+        .unwrap();
+        assert_eq!(lowered.achieved_at, Some(today));
+        // A higher target is checked again: not reached, so not achieved.
+        let raised = update(
+            &mut conn,
+            trip.id,
+            fields("Japan", 60_000, None, bank),
+            now(),
+        )
+        .unwrap();
+        assert_eq!(raised.achieved_at, None);
+        assert_eq!(states(&mut conn, today), [(None, false)]);
+        // Another account, even one that already holds the target, is checked again too.
+        update(
+            &mut conn,
+            trip.id,
+            fields("Japan", 49_000, None, bank),
+            now(),
+        )
+        .unwrap();
+        assert_eq!(
+            states(&mut conn, d(2026, 11, 13)),
+            [(Some(d(2026, 11, 13)), false)]
+        );
+        let moved = update(
+            &mut conn,
+            trip.id,
+            fields("Japan", 49_000, None, other),
+            now(),
+        )
+        .unwrap();
+        assert_eq!(moved.achieved_at, None);
+    }
+
+    #[test]
+    fn an_archived_goal_isnt_marked_achieved() {
+        let mut conn = db();
+        let bank = account(&mut conn, "Bank", AccountKind::Bank, 0);
+        let car = create(&mut conn, fields("Car", 50_000, None, bank), now()).unwrap();
+        archive(&mut conn, car.id, now()).unwrap();
+        save(
+            &mut conn,
+            TransactionKind::Income,
+            bank,
+            60_000,
+            d(2026, 11, 12),
+        );
+        assert_eq!(states(&mut conn, d(2026, 11, 12)), [(None, true)]);
+        // Brought back, it's checked again.
+        unarchive(&mut conn, car.id, now()).unwrap();
+        assert_eq!(
+            states(&mut conn, d(2026, 11, 13)),
+            [(Some(d(2026, 11, 13)), false)]
+        );
+    }
+
+    #[test]
+    fn any_goal_can_be_archived_and_unarchived_and_still_shows_progress() {
+        let mut conn = db();
+        let trip = create(&mut conn, fields("Trip", 100, None, CASH), now()).unwrap();
+        create(&mut conn, fields("Car", 100, None, CASH), now()).unwrap();
+        archive(&mut conn, trip.id, now()).unwrap();
+        // Twice is fine.
+        archive(&mut conn, trip.id, now()).unwrap();
+        assert_eq!(
+            states(&mut conn, d(2026, 11, 12)),
+            [(None, true), (None, false)]
+        );
+        // An archived goal can still be deleted.
+        unarchive(&mut conn, trip.id, now()).unwrap();
+        assert_eq!(
+            states(&mut conn, d(2026, 11, 12)),
+            [(None, false), (None, false)]
+        );
+        archive(&mut conn, trip.id, now()).unwrap();
+        delete(&mut conn, trip.id).unwrap();
+        assert_eq!(names(&mut conn), ["Car"]);
+        for result in [
+            archive(&mut conn, 999, now()),
+            unarchive(&mut conn, 999, now()),
+        ] {
+            assert!(matches!(result, Err(AppError::NotFound { id: 999, .. })));
+        }
     }
 
     #[test]
@@ -556,7 +773,7 @@ mod tests {
         conn.execute("UPDATE goals SET target_date = '2027-2-3'", [])
             .unwrap();
         assert!(matches!(
-            list(&conn, d(2026, 11, 12)),
+            list(&mut conn, d(2026, 11, 12)),
             Err(AppError::Database { .. })
         ));
     }
@@ -568,7 +785,7 @@ mod tests {
         create(&mut conn, fields("Trip", 60_000, None, savings), now()).unwrap();
         accounts::archive(&mut conn, savings, true, now()).unwrap();
         assert_eq!(
-            figures(&conn, d(2026, 11, 12)),
+            figures(&mut conn, d(2026, 11, 12)),
             [(30_000, 30_000, 50, None, None)]
         );
     }

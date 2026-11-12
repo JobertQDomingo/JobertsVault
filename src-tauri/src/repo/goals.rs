@@ -7,6 +7,8 @@ pub struct Row {
     pub target_amount: i64,
     pub target_date: Option<String>,
     pub account_id: i64,
+    pub achieved_at: Option<String>,
+    pub archived: bool,
 }
 
 /// The columns a create or an edit writes.
@@ -21,7 +23,8 @@ pub fn any(conn: &Connection) -> rusqlite::Result<bool> {
     conn.query_row("SELECT EXISTS (SELECT 1 FROM goals)", [], |row| row.get(0))
 }
 
-const SELECT: &str = "SELECT id, name, target_amount, target_date, account_id FROM goals";
+const SELECT: &str =
+    "SELECT id, name, target_amount, target_date, account_id, achieved_at, archived FROM goals";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
     Ok(Row {
@@ -30,6 +33,8 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
         target_amount: r.get(2)?,
         target_date: r.get(3)?,
         account_id: r.get(4)?,
+        achieved_at: r.get(5)?,
+        archived: r.get(6)?,
     })
 }
 
@@ -63,9 +68,13 @@ pub fn insert(conn: &Connection, v: &Values, now: &str) -> rusqlite::Result<i64>
     Ok(conn.last_insert_rowid())
 }
 
+/// A higher target amount or another account clears `achieved_at`, so the goal is checked again
+/// (GOL-4). A lower target on the same account keeps it: the goal was reached then too.
 pub fn update(conn: &Connection, id: i64, v: &Values, now: &str) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE goals SET name = ?2, target_amount = ?3, target_date = ?4, account_id = ?5,
+                          achieved_at = CASE WHEN ?3 <= target_amount AND account_id = ?5
+                                             THEN achieved_at END,
                           updated_at = ?6
          WHERE id = ?1",
         params![
@@ -78,6 +87,27 @@ pub fn update(conn: &Connection, id: i64, v: &Values, now: &str) -> rusqlite::Re
         ],
     )?;
     Ok(())
+}
+
+pub fn set_achieved(conn: &Connection, id: i64, on: &str) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE goals SET achieved_at = ?2 WHERE id = ?1",
+        params![id, on],
+    )?;
+    Ok(())
+}
+
+/// The number of rows changed: 0 when there's no such goal.
+pub fn set_archived(
+    conn: &Connection,
+    id: i64,
+    archived: bool,
+    now: &str,
+) -> rusqlite::Result<usize> {
+    conn.execute(
+        "UPDATE goals SET archived = ?2, updated_at = ?3 WHERE id = ?1",
+        params![id, archived, now],
+    )
 }
 
 /// The number of rows deleted: 0 when there's no such goal.

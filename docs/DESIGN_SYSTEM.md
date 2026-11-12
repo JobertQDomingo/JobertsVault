@@ -354,7 +354,7 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **`CategoryChip`** | The icon chip from §6, with the name next to it if needed. |
 | **`AccountRow`** | Account icon in a `--wash` square, the name, and the balance on the right. A credit card also shows "Available ₱X · Due Nov 5". |
 | **`TransactionRow`** | Category chip │ category, plus the payee and note in muted text │ account (or "Bank → Cash") │ amount, right-aligned. Hover adds `--glass-hover` and the edit and duplicate buttons. 52 px tall. |
-| **`ProgressBar`** | 8 px pill on a `--wash` track. The fill is `--primary` below 80%, `--warning` from 80% and `--danger` from 100% (BUD-3). The % is always written next to it. |
+| **`ProgressBar`** | 8 px pill on a `--wash` track. The fill is `--primary` below 80%, `--warning` from 80% and `--danger` from 100% (BUD-3). A goal's bar has no thresholds: `--primary`, and `--success` once the goal is achieved (GOL-4). The % is always written next to it. |
 | **`QuickAddDialog`** | The transaction form inside a Level 2 dialog (UI_FLOWS §4). |
 
 ---

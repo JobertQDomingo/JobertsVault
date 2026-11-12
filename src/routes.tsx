@@ -6,6 +6,7 @@ import { BudgetsScreen } from "./features/budgets/BudgetsScreen";
 import { SettingsScreen } from "./features/settings/SettingsScreen";
 import { WelcomeScreen } from "./features/onboarding/WelcomeScreen";
 import { DashboardScreen } from "./features/dashboard/DashboardScreen";
+import { GoalsScreen } from "./features/goals/GoalsScreen";
 import { RecurringScreen } from "./features/recurring/RecurringScreen";
 import { ReportsScreen } from "./features/reports/ReportsScreen";
 import { TransactionsScreen } from "./features/transactions/TransactionsScreen";
@@ -51,6 +52,11 @@ export const routes: RouteObject[] = [
         path: "budgets",
         element: <BudgetsScreen />,
         handle: { title: "Budgets" },
+      },
+      {
+        path: "goals",
+        element: <GoalsScreen />,
+        handle: { title: "Goals" },
       },
       {
         path: "settings",
