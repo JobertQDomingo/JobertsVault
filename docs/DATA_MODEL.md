@@ -451,7 +451,7 @@ The statement closing date in a given month is `min(statement_day, last day of t
 - **Current cycle:** from the day after the most recent closing date before today, through the next closing date (today or later).
 - **Cycle spending (CC-6):** total expenses on the card within the current cycle.
 - **Next due date:** the first date on or after today whose day is `min(due_day, last day of the month)`.
-- **Reminder (CC-7, Phase 3):** shown when the next due date is 5 days away or closer and `amount_owed > 0`.
+- **Reminder (CC-7, Phase 3):** shown when the next due date is 5 days away or closer (0–5 days, 0 being today) and `amount_owed > 0`, for active cards only.
 
 ### 5.6 Budget progress (Phase 3)
 

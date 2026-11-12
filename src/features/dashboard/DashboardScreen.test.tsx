@@ -2,7 +2,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
-import { CATEGORIES, DASHBOARD, PERIOD, UPCOMING } from "@/test/fixtures";
+import {
+  ACCOUNT_LIST,
+  CATEGORIES,
+  DASHBOARD,
+  PAY_BILL_DEFAULTS,
+  PAYMENT_METHODS,
+  PERIOD,
+  UPCOMING,
+} from "@/test/fixtures";
 import { renderRoute, type Answers } from "@/test/render";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -236,10 +244,11 @@ test("a backup that's due shows a warning with Back up now (BAK-7)", async () =>
   );
 });
 
-test("no warning while backups are recent", async () => {
+test("no warning while backups are recent and no card is due", async () => {
   renderRoute("/", ANSWERS);
   await screen.findByText("Recent transactions");
   expect(screen.queryByText("No backup in the last 7 days.")).toBeNull();
+  expect(screen.queryByText(/payment due/)).toBeNull();
 });
 
 test("budgets show each one's progress in its own current period (DSH-6)", async () => {
@@ -314,4 +323,46 @@ test("past 8 dates, Coming up says how many more", async () => {
   expect(
     coming.getByRole("link", { name: "+ 2 more" }).getAttribute("href"),
   ).toBe("/recurring");
+});
+
+const cardDue = (days: number, accountId = 4) => ({
+  accountId,
+  amountOwed: 64000,
+  days,
+});
+
+test("a card due within 5 days shows a banner with the amount owed and Pay bill (CC-7)", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: { ...DASHBOARD, cardsDue: [cardDue(3)] },
+    list_accounts: ACCOUNT_LIST,
+    list_payment_methods: PAYMENT_METHODS,
+    get_pay_bill_defaults: PAY_BILL_DEFAULTS,
+  });
+  const banner = (
+    await screen.findByText(/payment due in 3 days/)
+  ).closest<HTMLElement>("[role=status]")!;
+  expect(banner.textContent).toBe(
+    "Credit card payment due in 3 days: ₱640.00 owedPay bill",
+  );
+  fireEvent.click(within(banner).getByRole("button", { name: "Pay bill" }));
+  const dialog = await screen.findByRole("dialog", { name: "Pay credit card" });
+  await waitFor(() =>
+    expect(
+      (
+        within(dialog).getByRole("textbox", {
+          name: "Amount",
+        }) as HTMLInputElement
+      ).value,
+    ).toBe("640.00"),
+  );
+});
+
+test("the card banner says today and tomorrow (CC-7)", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: { ...DASHBOARD, cardsDue: [cardDue(0), cardDue(1, 2)] },
+  });
+  expect(await screen.findByText(/payment due today/)).toBeTruthy();
+  expect(screen.getByText(/payment due tomorrow/)).toBeTruthy();
 });
