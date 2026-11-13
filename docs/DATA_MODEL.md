@@ -648,6 +648,7 @@ streak       = today − the latest borrowed_on of any loan      (in days; none 
 ```
 
 - **% paid** is rounded down, so it says 100 only once the loan is really paid off.
+- **The streak** goes by dates borrowed only. Adding a loan the user already has never resets it to 0, but its date borrowed, if it's the newest, is when the user last borrowed, so the streak counts from there.
 - **Money freed up (LOAN-7):** one row per month (the app's months, §5.3), from the current month to the month after the debt-free date:
   ```
   due(m)   = Σ scheduled amount of every payment due in m, whatever its status

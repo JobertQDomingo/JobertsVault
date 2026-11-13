@@ -325,7 +325,7 @@ Welcome to Jobert's Vault
    - **This is:** [A new loan │ A loan I already have]. A new loan is selected to start with, so a new one always gets the check below.
    - **Amount borrowed:** optional. The help text says "Add it to see what the loan costs in interest."
    - **Date borrowed:** today to start with. It's required for a new loan and optional for one the user already has.
-   - **Payments:** one row each, with **Date** and **Amount** and an ✕ to remove it. **+ Add payment**, or Enter in the last amount, adds a row starting one month after the previous one with the same amount. That's a form default from `lib/dates.ts` that the user can change; the backend checks every row. On a loan the user already has, a row dated before today shows "Paid before".
+   - **Payments:** one row each, with **Date** and **Amount** and an ✕ to remove it. **+ Add payment**, or Enter in the last amount, adds a row with the previous row's amount, dated one more month after the first payment, with the day clamped to the month's end, so month ends don't drift (Jan 31, Feb 28, Mar 31). That's a form default from `lib/dates.ts` that the user can change; the backend checks every row. On a loan the user already has, a row dated before today shows "Paid before".
 2. **Save:**
    - **A loan the user already has** is saved at once, with a "Loan added" toast.
    - **A new loan** first shows the "Before you add this loan" confirm (LOAN-10), from `preview_loan`: "Your debt-free date moves from Mon, Jun 28, 2027 to Fri, Oct 15, 2027.", "Safe to spend drops from ₱8,400.00 to ₱7,400.00.", and, when it would make a pay window short, a line such as "Nov 30 – Dec 4 would run short by ₱180.00." **Go back** returns to the form, and **Add this loan anyway** (destructive) saves it and restarts the loan-free streak.
@@ -338,7 +338,7 @@ Welcome to Jobert's Vault
 
 ### F14: Record a payslip (Phase 4, PAY-2, PAY-4)
 1. **On payday:** the Due banner (F10) → **Review** → **Record payslip** on the payday's row. **Paid early:** **Record now** on the Safe to spend card, or on the payday's early row in the Due dialog, from 3 days before.
-2. The "Payslip · Salary" dialog opens, filled in from the last Salary payslip, or from the rule's amount the first time (`get_payslip_defaults`):
+2. The "Payslip · Salary" dialog opens, filled in from that payday rule's last payslip, else the last Salary payslip, else the rule's amount the first time (`get_payslip_defaults`):
    - **Date:** the payday, or today when it's early
    - **Account**
    - **Gross pay**
@@ -562,7 +562,7 @@ Answered on 2026-11-13 (Phase 4):
 21. **Safe to spend on the dashboard** is a card at the top of the right column, above Accounts. Like the balances, it's always for today (§2).
 22. **Recording pay early (PAY-4)** works from the Safe to spend card and from the Due dialog. The Due banner counts only the dates that are due, so it doesn't nag for 3 days before every payday (§2, F10).
 23. **The payslip's net pay** comes from the backend (`preview_payslip`) as the user types. The frontend never adds up money itself (CLAUDE.md rule 2) (F14).
-24. **A new payment row's date** (one month after the previous one) is a form default from `lib/dates.ts`, not a figure the app relies on. The backend checks every row (F12).
+24. **A new payment row's date** (one more month after the first payment, never after the previous row, so month ends don't drift) is a form default from `lib/dates.ts`, not a figure the app relies on. The backend checks every row (F12).
 25. **Adding a new loan** goes through a "Before you add this loan" confirm whose action is **Add this loan anyway**, styled destructive, so taking on debt is never the easy button (F12, LOAN-10).
 26. **A loan's payments** open in a dialog from its card, rather than on a page of their own, like the recurring dates due (§8.5).
 27. **The Forecast table** opens one row at a time to show its movements, inside the one panel, so nothing new is blurred (§8.6).
