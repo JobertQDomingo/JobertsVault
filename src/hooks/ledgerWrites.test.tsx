@@ -11,6 +11,7 @@ import type { AccountFields } from "@/bindings/AccountFields";
 import type { BudgetFields } from "@/bindings/BudgetFields";
 import type { CategoryFields } from "@/bindings/CategoryFields";
 import type { GoalFields } from "@/bindings/GoalFields";
+import type { LoanFields } from "@/bindings/LoanFields";
 import type { NewAccount } from "@/bindings/NewAccount";
 import type { NewCategory } from "@/bindings/NewCategory";
 import type { RecurringRuleFields } from "@/bindings/RecurringRuleFields";
@@ -62,6 +63,14 @@ import {
   useUpdateBudget,
 } from "./useBudgets";
 import * as goalHooks from "./useGoals";
+import * as loanHooks from "./useLoans";
+import {
+  useArchiveLoan,
+  useCreateLoan,
+  useDeleteLoan,
+  useUnarchiveLoan,
+  useUpdateLoan,
+} from "./useLoans";
 import {
   useArchiveGoal,
   useCreateGoal,
@@ -125,6 +134,14 @@ const goal: GoalFields = {
   targetAmount: 500000,
   targetDate: "2027-05-01",
   accountId: 1,
+};
+const loan: LoanFields = {
+  name: "E-wallet loan",
+  accountId: 1,
+  categoryId: 25,
+  amountBorrowed: null,
+  borrowedOn: null,
+  payments: [{ id: null, dueDate: "2026-12-15", amount: 100000 }],
 };
 const settings: Settings = {
   currencySymbol: "₱",
@@ -333,6 +350,23 @@ const WRITES = [
   ["useUnarchiveGoal", useUnarchiveGoal, 3, "unarchive_goal", { id: 3 }],
   ["useDeleteGoal", useDeleteGoal, 3, "delete_goal", { id: 3 }],
   [
+    "useCreateLoan",
+    useCreateLoan,
+    { isNew: false, ...loan },
+    "create_loan",
+    { loan: { isNew: false, ...loan } },
+  ],
+  [
+    "useUpdateLoan",
+    useUpdateLoan,
+    { id: 3, loan },
+    "update_loan",
+    { id: 3, loan },
+  ],
+  ["useArchiveLoan", useArchiveLoan, 3, "archive_loan", { id: 3 }],
+  ["useUnarchiveLoan", useUnarchiveLoan, 3, "unarchive_loan", { id: 3 }],
+  ["useDeleteLoan", useDeleteLoan, 3, "delete_loan", { id: 3 }],
+  [
     "useUpdateSettings",
     useUpdateSettings,
     settings,
@@ -397,6 +431,7 @@ const READS = [
   "useDueOccurrences",
   "useBudgets",
   "useGoals",
+  "useLoans",
   "useSettings",
 ];
 
@@ -409,6 +444,7 @@ test("the table lists every write hook", () => {
     recurringHooks,
     budgetHooks,
     goalHooks,
+    loanHooks,
     settingsHooks,
   ].flatMap((module) => Object.keys(module));
   expect(hooks.filter((name) => !READS.includes(name)).sort()).toEqual(

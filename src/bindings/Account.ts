@@ -20,7 +20,7 @@ balance: Money,
  */
 card: CardSummary | null, 
 /**
- * Whether a transaction (in either direction), a recurring rule or a goal uses it. Only an
- * unused account can be deleted.
+ * Whether a transaction (in either direction), a recurring rule, a goal or a loan uses it.
+ * Only an unused account can be deleted.
  */
 inUse: boolean, };

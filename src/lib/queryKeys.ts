@@ -22,6 +22,8 @@ export const queryKeys = {
   budgets: ["ledger", "budgets"],
   // Progress is the account's balance, which every transaction write changes.
   goals: ["ledger", "goals"],
+  // A loan payment's expense is a transaction, and a merge moves loans.
+  loans: ["ledger", "loans"],
   // A save can add a payee or change its last category.
   payees: (prefix: string, kind: CategoryKind) =>
     ["ledger", "payees", prefix, kind] as const,

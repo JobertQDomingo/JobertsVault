@@ -11,6 +11,7 @@ pub struct Row {
     pub archived: bool,
     pub transaction_count: i64,
     pub in_rule: bool,
+    pub in_loan: bool,
 }
 
 /// The columns a create or an edit writes.
@@ -22,7 +23,8 @@ pub struct Values<'a> {
 
 const SELECT: &str = "SELECT c.id, c.name, c.kind, c.color, c.icon, c.sort_order, c.archived,
             (SELECT count(*) FROM transactions t WHERE t.category_id = c.id),
-            EXISTS (SELECT 1 FROM recurring_rules r WHERE r.category_id = c.id)
+            EXISTS (SELECT 1 FROM recurring_rules r WHERE r.category_id = c.id),
+            EXISTS (SELECT 1 FROM loans l WHERE l.category_id = c.id)
      FROM categories c";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
@@ -36,6 +38,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
         archived: r.get(6)?,
         transaction_count: r.get(7)?,
         in_rule: r.get(8)?,
+        in_loan: r.get(9)?,
     })
 }
 
@@ -117,7 +120,7 @@ pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<()> {
     Ok(())
 }
 
-/// Gives every transaction and recurring rule of `from` the category `into`.
+/// Gives every transaction, recurring rule and loan of `from` the category `into`.
 pub fn move_uses(conn: &Connection, from: i64, into: i64, now: &str) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE transactions SET category_id = ?2, updated_at = ?3 WHERE category_id = ?1",
@@ -125,6 +128,10 @@ pub fn move_uses(conn: &Connection, from: i64, into: i64, now: &str) -> rusqlite
     )?;
     conn.execute(
         "UPDATE recurring_rules SET category_id = ?2, updated_at = ?3 WHERE category_id = ?1",
+        params![from, into, now],
+    )?;
+    conn.execute(
+        "UPDATE loans SET category_id = ?2, updated_at = ?3 WHERE category_id = ?1",
         params![from, into, now],
     )?;
     Ok(())
