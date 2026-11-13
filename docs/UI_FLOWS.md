@@ -94,7 +94,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
     - from 3 days before a payday: "Payday Mon, Nov 30. Paid early? **Record now**" (PAY-4, F14)
     - **View forecast** in its header, to `/forecast`
     - With no payday rule: "Mark your pay as a payday to see what's safe to spend." with **Open Recurring**
-  - **"Loans left: ₱24,600.00 · debt-free Jun 28, 2027"** under the net balance in Accounts, linking to `/debt-free`. It's hidden when nothing is left (LOAN-11).
+  - **"Loans left: ₱14,000.00 · debt-free Aug 10, 2027"** under the net balance in Accounts, linking to `/debt-free`. It's hidden when nothing is left (LOAN-11).
 
 ---
 
@@ -325,10 +325,10 @@ Welcome to Jobert's Vault
    - **This is:** [A new loan │ A loan I already have]. A new loan is selected to start with, so a new one always gets the check below.
    - **Amount borrowed:** optional. The help text says "Add it to see what the loan costs in interest."
    - **Date borrowed:** today to start with. It's required for a new loan and optional for one the user already has.
-   - **Payments:** one row each, with **Date** and **Amount** and an ✕ to remove it. **+ Add payment**, or Enter in the last amount, adds a row with the previous row's amount, dated one more month after the first payment, with the day clamped to the month's end, so month ends don't drift (Jan 31, Feb 28, Mar 31). That's a form default from `lib/dates.ts` that the user can change; the backend checks every row. On a loan the user already has, a row dated before today shows "Paid before".
+   - **Payments:** one row each, with **Date** and **Amount** and an ✕ to remove it. **+ Add payment**, or Enter in the last amount, adds a row with the previous row's amount, dated one more month after the first payment, with the day clamped to the month's end, so month ends don't drift (Jan 31, Feb 28, Mar 31). That's a form default from `lib/dates.ts` that the user can change; the backend checks every row. On a loan the user already has, a row dated before the day the loan is added (today, while it's being added) shows "Paid before".
 2. **Save:**
    - **A loan the user already has** is saved at once, with a "Loan added" toast.
-   - **A new loan** first shows the "Before you add this loan" confirm (LOAN-10), from `preview_loan`: "Your debt-free date moves from Mon, Jun 28, 2027 to Fri, Oct 15, 2027.", "Safe to spend drops from ₱8,400.00 to ₱7,400.00.", and, when it would make a pay window short, a line such as "Nov 30 – Dec 4 would run short by ₱180.00." **Go back** returns to the form, and **Add this loan anyway** (destructive) saves it and restarts the loan-free streak.
+   - **A new loan** first shows the "Before you add this loan" confirm (LOAN-10), from `preview_loan`: "Your debt-free date moves from Tue, Aug 10, 2027 to Fri, Oct 15, 2027.", "Safe to spend drops from ₱8,400.00 to ₱7,400.00.", and, when it would make a pay window short, a line such as "Nov 30 – Dec 4 would run short by ₱180.00." **Go back** returns to the form, and **Add this loan anyway** (destructive) saves it and restarts the loan-free streak.
 3. **Edit** (the loan's ⋯ → **Edit**, or **Edit** in its payments dialog) is the same form, titled "Edit loan". Paid rows are locked and show "Paid Nov 9". "This is" can't change.
 
 ### F13: Pay a loan payment (Phase 4, LOAN-3, LOAN-4)
@@ -351,7 +351,7 @@ Welcome to Jobert's Vault
 ### F15: Before you borrow (Phase 4, LOAN-9)
 1. On Debt-free, the **Before you borrow** panel asks for the **Payment** amount, **How many** payments and the **First payment** date. The payments are monthly, on the first payment's day of the month.
 2. **Try it** shows the result from `preview_loan`, and nothing is saved:
-   - "Debt-free: Jun 28, 2027 → Oct 15, 2027 (109 days later)"
+   - "Debt-free: Aug 10, 2027 → Oct 15, 2027 (66 days later)"
    - "Safe to spend now: ₱8,400.00 → ₱7,400.00"
    - each pay window it changes, with what's left before and after ("Dec 15–29: ₱18,300.00 → ₱17,300.00"), and any window it would make short in `--danger`
 
@@ -423,28 +423,27 @@ The backend's message shows under the field it names.
 
 ```
 ┌─ Debt-free ─────────────────────────────────────────────────────────────────────┐
-│ Debt-free on Mon, Jun 28, 2027                                 227 days to go   │
-│ ₱24,600.00 left · ₱6,150.00 paid   ██████░░░░░░░░░░░░░░░░ 20% paid               │
-│ 52 days since your last new loan · ₱3,050.00 in interest on 2 loans             │
+│ Debt-free on Tue, Aug 10, 2027                                 270 days to go   │
+│ ₱14,000.00 left · ₱4,000.00 paid   █████░░░░░░░░░░░░░░░░░ 22% paid               │
+│ 52 days since your last new loan · ₱3,000.00 in interest on 2 loans             │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ┌─ Loans ──────────────────────────────── [+ Add loan] ┐ ┌─ Before you borrow ─────┐
 │ ┌─ E-wallet loan ────────┐ ┌─ Bank loan ───────────┐ │ │ Payment   [ ₱1,000.00 ] │
-│ │ E-wallet · 3 of 8 paid │ │ Bank · 1 of 12 paid   │ │ │ How many  [ 6 ]         │
-│ │ ███████░░░░░░ 37%      │ │ █░░░░░░░░░░░░ 8%      │ │ │ First     [ 12/18/2026 ]│
-│ │ ₱5,000.00 left         │ │ ₱11,000.00 left       │ │ │           [ Try it ]    │
-│ │ Next ₱1,000.00 Nov 20  │ │ Next ₱1,000.00 Dec 14 │ │ │ (the result, F15)       │
+│ │ E-wallet · 3 of 8 paid │ │ Bank · 1 of 10 paid   │ │ │ How many  [ 6 ]         │
+│ │ ███████░░░░░░ 37%      │ │ █░░░░░░░░░░░░ 10%     │ │ │ First     [ 12/18/2026 ]│
+│ │ ₱5,000.00 left         │ │ ₱9,000.00 left        │ │ │           [ Try it ]    │
+│ │ Next ₱1,000.00 Nov 20  │ │ Next ₱1,000.00 Dec 10 │ │ │ (the result, F15)       │
 │ └────────────────────────┘ └───────────────────────┘ │ └─────────────────────────┘
 │ ▸ Show archived (1)                                  │
 └──────────────────────────────────────────────────────┘
 ┌─ Money freed up ────────────────────────────────────────────────────────────────┐
-│ November 2026     ₱2,500.00 to loans                                            │
-│ December 2026     ₱7,800.00 to loans    ₱5,300.00 more than this month          │
-│ April 2027        ₱1,400.00 to loans    ₱1,100.00 less than this month          │
-│ November 2027     ₱0.00                 ₱2,500.00 less than this month          │
+│ November 2026     ₱2,000.00 to loans                                            │
+│ April 2027        ₱1,000.00 to loans    ₱1,000.00 less than this month          │
+│ September 2027    ₱0.00                 ₱2,000.00 less than this month          │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **The top panel** (LOAN-5 to LOAN-8) shows the debt-free date and days to go, the total left and paid with a `ProgressBar` of the share paid, the loan-free streak ("52 days since your last new loan", hidden when no loan has a date borrowed) and the total interest (hidden when no loan has an amount borrowed). With everything paid, it says "You're debt-free." in `--success`.
+- **The top panel** (LOAN-5 to LOAN-8) shows the debt-free date and days to go, the total left and paid with a `ProgressBar` of the share paid, the loan-free streak ("52 days since your last new loan", hidden when no loan has a date borrowed) and the total interest (hidden when no loan has an amount borrowed). With everything paid, it says "You're debt-free." in `--success`. When everything left is overdue, it says "₱2,000.00 overdue. Pay it to be debt-free." in `--danger`, with an icon, in place of the countdown (DATA_MODEL §5.11).
 - **Loans:** one flat card per active loan, two across, in the order they were added. Each card has the name, "E-wallet · 3 of 8 paid", a `ProgressBar` of % paid, "₱5,000.00 left", the interest when it has an amount borrowed, and the next payment. An overdue next payment says "Overdue since Mon, Nov 16" in `--danger`, with an icon. A paid-off loan gets a **Paid off** badge in `--success`. The cards are flat tints inside the one panel, as on Budgets (DESIGN_SYSTEM §2.3). Archived loans fold under **Show archived (n)**.
 - **Clicking a card** opens its payments dialog (640 px), titled with the loan's name, with **Edit** in its header. It has one row per payment, oldest first: the date, the amount, and "Unpaid" with **Mark paid** (F13), "Overdue" in `--danger` with **Mark paid**, "Paid Nov 20" with a ⋯ menu holding **Mark unpaid**, or "Paid before".
 - **A card's ⋯ menu** has **Edit**, plus **Archive** once it's paid off, and **Delete** when none of its payments was marked paid: "Delete this loan? Its payments are deleted. This can't be undone." An archived card's ⋯ has **Unarchive**.
@@ -467,7 +466,7 @@ The backend's message shows under the field it names.
 │ Nov 30 – Dec 4    ₱9,900.00     ₱10,500.00    ₱12,000.00     ₱8,400.00  lowest  │
 │ ▾ Dec 5–14        ₱8,400.00     ₱6,000.00     ₱4,000.00      ₱10,400.00         │
 │     Sat, Dec 5    Bonus (expected)                   Bank      +₱6,000.00       │
-│     Thu, Dec 10   Bank loan                          Bank      −₱4,000.00       │
+│     Thu, Dec 10   Insurance · yearly                 Bank      −₱4,000.00       │
 │ Dec 15–29         ₱10,400.00    ₱10,500.00    ₱2,600.00      ₱18,300.00         │
 │ …                                                                               │
 └─────────────────────────────────────────────────────────────────────────────────┘
@@ -477,7 +476,7 @@ Today in this sketch is Sun, Nov 15, a payday whose payslip is already recorded.
 
 - **The top panel** is the dashboard's Safe to spend card at full width (SAFE-5, SAFE-6): the amount, the amount per day, and what's held back and for which window, or "Short by ₱X on *date*" in `--danger`. When a payday is 1–3 days away, it also has "Paid early? **Record now**" (F14).
 - **The toolbar's segmented control** switches between **Pay windows** and **Months**, kept in the URL (`?view=months`) (SAFE-7).
-- **The table** has one row per pay window, or per month, over the next 12 months. Each row shows its dates (the current one starting today), what it starts with, the pay and other money coming in, the bills, and what's left at its end if nothing else is spent (DATA_MODEL §5.15). A payslip already recorded shows as "₱10,250.00 received" in muted text, without being added again. The window money is held back for is marked **lowest**. A window that would run short has a triangle icon and its Left in `--danger` with "Short".
+- **The table** has one row per pay window, or per month, over the next 12 months. Each row shows its dates (the current one starting today), what it starts with, the pay and other money coming in, the bills, and what's left at its end if nothing else is spent (DATA_MODEL §5.15). A payslip already recorded shows as "₱10,500.00 received" in muted text, without being added again. The window money is held back for is marked **lowest**. A window that would run short on any day has a triangle icon and its Left in `--danger` with "Short".
 - **Clicking a row** opens it in place to list its movements, by date: each loan payment (by loan name), card bill ("Credit card payment"), recurring date ("Utilities · Water bill"), future-dated row, and payday ("Salary (expected)"), with its account and a signed amount. Only one row is open at a time.
 - **With no payday rule,** the screen is one empty state: "Mark your pay as a payday to see what's safe to spend." with **Open Recurring**.
 

@@ -299,7 +299,7 @@ CREATE TABLE recurring_rules (
 - Template fields (amount, category, mode, `end_date`, `max_occurrences`, and so on) affect future occurrences only. So a rule that had ended and is given a later end date or more times carries on from its first date on or after today: the dates in between are never created.
 - The schedule changes when `frequency`, `interval` or `start_date` changes. The new `start_date` comes from the form, which offers the rule's next date. It must be after the last date already processed, and not before today or the rule's current next date, whichever is earlier, so the dates passed over while paused are never created and an edit never fills in the past. `next_index` is reset to 0. Because the user picks the date, a rule on the 31st whose next date is Feb 28 can be started again on Mar 31, so it doesn't drift to the 28th.
 
-**Coming up (DSH-7):** the dashboard lists every date an active rule falls on after today and up to 7 days on (today Nov 12: Nov 13–19), soonest first. Dates up to today are already posted or in the Due list. A paused rule has none, and dates still to be processed up to today count toward `max_occurrences`, as processing will count them. Only rules are listed, not one-off future-dated transactions (TXN-8).
+**Coming up (DSH-7):** the dashboard lists every date an active rule falls on after today and up to 7 days on (today Nov 12: Nov 13–19), soonest first. Dates up to today are already posted or in the Due list. A paused rule has none, and dates still to be processed up to today count toward `max_occurrences`, as processing will count them. Only rules are listed, not one-off future-dated transactions (TXN-8). A payday recorded early (§4.8) already has its occurrence row, so its date isn't listed.
 
 **Pausing (REC-5):** a paused rule isn't processed. When it's resumed, `next_index` moves to the first date on or after the day it's resumed. The dates it would have had while paused are never created.
 
@@ -400,12 +400,12 @@ CREATE TABLE loans (
 |---|---|
 | `name` | 1–50 characters, unique ignoring case, e.g. "E-wallet loan". The loans the user already has are kept one per lender app, with stacked loans together (PRD decision log). A **new** loan is always added as a loan of its own, even from an app that has one already, so it goes through Before you borrow and restarts the streak (LOAN-10). |
 | `account_id` | The account its payments come from. Not a credit card (checked in Rust). A new loan needs an active account, and an edit may keep an archived one. **A loan puts its account in use**, like a goal, so that account can only be archived. |
-| `category_id` | The expense category its payments are recorded in: **Loan** to start with (§7). A new loan needs an active expense category, and an edit may keep an archived one. A loan puts its category in use, and merging categories moves it (§3.2). |
+| `category_id` | The expense category its payments are recorded in: **Loan** to start with (§7), when there's an active expense category of that name; otherwise the form starts empty. A new loan needs an active expense category, and an edit may keep an archived one. A loan puts its category in use, and merging categories moves it (§3.2). |
 | `is_new` | 1 for a **new loan** (LOAN-10: it shows Before you borrow first and restarts the streak), 0 for **one I already have**. It can't change after the loan is created. |
 | `amount_borrowed` | Optional, for the interest cost (LOAN-6, §5.11) |
 | `borrowed_on` | The date borrowed. Required for a new loan (today to start with) and optional for one the user already has. Never after today. |
 | `added_on` | The local date the loan was added to the app. It's a date, not a timestamp, because it's used in a calculation: on a loan the user already has, the payments dated before it are **paid before** (§4.6). |
-| `archived` | Only a **paid-off** loan (no unpaid payment) can be archived, and it can be unarchived any time. An archived loan has no banner and nothing in the forecast, and it still counts in the Debt-free totals (§5.11). |
+| `archived` | Only a **paid-off** loan (no unpaid payment) can be archived, and it can be unarchived any time. An archived loan has no banner and nothing in the forecast, and it still counts in the Debt-free totals (§5.11). Anything that gives an archived loan an unpaid payment again (Mark unpaid, deleting a payment's expense, or adding rows) unarchives it in the same database transaction, so an archived loan never hides money still owed. |
 
 - **Deleting:** a loan with any payment marked paid in the app can't be deleted (`Conflict`). It's archived once it's paid off. Any other loan can be deleted, and its payments go with it (`ON DELETE CASCADE`).
 - A loan's amounts (its payments and amount borrowed) lock `currency_decimals` (§1).
@@ -441,7 +441,7 @@ A payment's **status** is never stored. It's read from the row, so it can't go s
 - **An unpaid payment is not a transaction.** It counts toward no balance, total, report, budget or goal (§5.2). Only the forecast counts it, as a bill to come (§5.15).
 - **Saving a loan** (LOAN-1, LOAN-2) writes the loan and its payments in one database transaction. A payment with a transaction is never changed by a save. Every other row can be edited, added or removed, and its `paid_before` is set again: 1 when the loan isn't new and the row is dated before `added_on`, otherwise 0. A new loan's payments can't be dated before its `borrowed_on`.
 - **Mark paid** (LOAN-3) is allowed only on an unpaid payment. In one database transaction, it creates an expense from the fields the user confirmed (§6, keeping the loan's account and category even if they've been archived since, like a recurring rule's template, §4.2) and sets `transaction_id`. The fields start as today's date, the scheduled amount, the loan's account and category, the loan's name as the payee, and no payment method or note. It doesn't change `last_used_account_id`, the same as posting a due date.
-- **Mark unpaid** deletes the payment's transaction. `ON DELETE SET NULL` then makes the payment unpaid, which is also what happens when that transaction is deleted from the transaction list. Editing the transaction keeps the link, and its amount becomes the paid amount.
+- **Mark unpaid** deletes the payment's transaction. `ON DELETE SET NULL` then makes the payment unpaid, which is also what happens when that transaction is deleted from the transaction list. Editing the transaction keeps the link, and its amount becomes the paid amount. It stays an expense: `update_transaction` refuses to change its kind (`Conflict`: "This pays a loan. Mark it unpaid to change it.").
 
 ### 4.7 Payslips (Phase 4): `transactions.payslip_id`
 
@@ -464,7 +464,7 @@ A **payslip** (PAY-2) is one **gross** row, an income in the payday rule's categ
 ALTER TABLE recurring_rules ADD COLUMN is_payday INTEGER NOT NULL DEFAULT 0 CHECK (is_payday IN (0,1));
 ```
 
-- **Only an income rule in Confirm mode can be a payday** (PAY-1, checked in Rust). Its `amount` is the user's estimate of the net pay (§5.13), its category is the payslip's gross category, and its account is the payslip's account.
+- **Only an income rule in Confirm mode, into a cash, bank or e-wallet account, can be a payday** (PAY-1, checked in Rust), since that's where a payslip goes. Its `amount` is the user's estimate of the net pay (§5.13), its category is the payslip's gross category, and its account is the payslip's account.
 - Processing is unchanged (ARCHITECTURE §8): a payday date up to today is queued as `pending`.
 - **A pending payday is settled with a payslip** (§4.7), never with Post or Edit & post, which return a `Conflict`. Skip works as usual.
 - **Recording early (PAY-4):** a payday date after today and up to 3 days on (today Nov 13: Nov 14–16) that has no occurrence row yet can be recorded early, if the rule isn't paused and hasn't ended. In one database transaction, the service saves the payslip and inserts that date's occurrence row as `posted`, pointing at the gross row. When the date arrives, processing finds the row and passes over it (the unique key, §4.2), so the payday is never created twice. The row counts toward `max_occurrences`, like any processed date.
@@ -641,13 +641,15 @@ Across **every loan, archived ones included**:
 ```
 total left   = Σ left
 total paid   = Σ paid
-debt-free on = the latest due_date of any unpaid payment       (none once nothing is left)
-days to go   = debt-free on − today                            (0 when that's today or has passed)
+debt-free on = the latest due_date of any unpaid payment, or today when that has passed
+                                                               (none once nothing is left)
+days to go   = debt-free on − today
 interest     = Σ interest of the loans that have one           (none when no loan has one)
 streak       = today − the latest borrowed_on of any loan      (in days; none when no loan has a borrowed_on)
 ```
 
 - **% paid** is rounded down, so it says 100 only once the loan is really paid off.
+- **When everything left is overdue**, the debt-free date is today, and the Debt-free screen says what's overdue instead of counting down (UI_FLOWS §8.5).
 - **The streak** goes by dates borrowed only. Adding a loan the user already has never resets it to 0, but its date borrowed, if it's the newest, is when the user last borrowed, so the streak counts from there.
 - **Money freed up (LOAN-7):** one row per month (the app's months, §5.3), from the current month to the month after the debt-free date:
   ```
@@ -657,7 +659,7 @@ streak       = today − the latest borrowed_on of any loan      (in days; none 
   ```
   The current month counts its paid payments too, so the starting point doesn't move as the user pays. `freed` is below 0 when a later month is heavier than this one.
 - **The dashboard line (LOAN-11)** shows `total left` and `debt-free on`, and is hidden when nothing is left.
-- **Reminder banners (LOAN-4):** for each active loan, its `next` payment when that's due within 5 days or is overdue (`due_date ≤ today + 5`), soonest first. `days = due_date − today`, below 0 when it's overdue, and the banner also gives the number of other overdue payments that loan has. **"Move money first"** goes by account. In date order, the payments these banners show from the same account are added up, and when that running total passes the account's balance today (§5.1), the banner gives the difference.
+- **Reminder banners (LOAN-4):** for each active loan, its `next` payment when that's due within 5 days or is overdue (`due_date ≤ today + 5`), soonest first. `days = due_date − today`, below 0 when it's overdue, and the banner also gives the number of other overdue payments that loan has. **"Move money first"** goes by account. In date order, the payments these banners show from the same account are added up, and each banner gives only its own part of what that running total lacks against the account's balance today (§5.1). So following every banner moves exactly enough: with ₱200 in the account and ₱1,000 then ₱500 due, the banners say ₱800, then ₱500.
 
 ### 5.12 Pay windows (SAFE-1, Phase 4)
 
@@ -737,16 +739,17 @@ For each pay window `k` (§5.12), in order:
 start(k)      = money now for the current window, else left(k − 1)
 in(k), out(k) = the movements dated in window k
 left(k)       = start(k) + in(k) − out(k)            -- what would be left at its end with nothing else spent
+run(d)        = money now + every movement dated up to the end of day d   -- the running total, day by day
 
-safe to spend = max(0, the lowest left(k) over every window)
-held back     = left(current) − safe to spend        -- when that's more than 0, held back for the window with the
-                                                        lowest left (the first one on a tie)
-short         = the first window with left(k) < 0: short by −left(k), from the first date in that
-                window when the running total goes below 0
+safe to spend = max(0, the lowest run(d) over every day of the horizon)
+held back     = left(current) − safe to spend        -- when that's more than 0, held back for the window that
+                                                        holds the lowest day (the first one on a tie)
+short         = the first day with run(d) < 0: short by −(the lowest run(d) in that day's window), on that day
 per day       = ⌊safe to spend ÷ days left in the current window, counting today⌋, in minor units
 ```
 
-- **Safe to spend never looks only to the next payday.** It's the lowest point over the whole 12 months, so money for a short pay window later is held back now (SAFE-5). Budgets and savings goals don't hold anything back (PRD §3).
+- **Safe to spend never looks only to the next payday.** It's the lowest point over the whole 12 months, day by day, so money for a short pay window later is held back now, and so is money for a bill due before other income arrives later in the same window (SAFE-5). Budgets and savings goals don't hold anything back (PRD §3).
+- **A window runs short** when any day in it has `run(d)` below 0, even if money later in the window brings it back.
 - **When it's short**, safe to spend is 0, and the dashboard and Forecast say "Short by ₱X on *date*", using `short`.
 - **With no payday rule**, there are no pay windows: the forecast returns none and says how to set one up (SAFE-6).
 - **A payslip already recorded** in the current window is in `money now`. The Forecast lists it as received, without adding it again.
@@ -793,7 +796,7 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | A loan has 1–600 payments, each with a real date and an amount > 0 and ≤ the maximum. A new loan's payments aren't dated before its date borrowed. | payments |
 | Only an unpaid payment can be marked paid, and only a paid one marked unpaid. A payment with a transaction can't be edited or removed (`Conflict`). | shown as a toast |
 | A loan with a payment marked paid can't be deleted, and only a paid-off loan can be archived (`Conflict`: "Pay or remove its unpaid payments first") | shown as a toast |
-| A payday rule is an income rule in Confirm mode (§4.8) | isPayday / mode |
+| A payday rule is an income rule in Confirm mode, into a cash, bank or e-wallet account (§4.8) | isPayday / mode / accountId |
 | A payslip's gross is > 0 and ≤ the maximum. It has 0–30 deduction lines, each with an expense category (active, though an edit may keep an archived one) and an amount > 0. Its net is more than 0 ("Deductions can't add up to the gross pay or more"). Its date is a real date, and its account an active cash, bank or e-wallet account (an edit may keep an archived one). | gross / deductions / date / accountId |
 | A payday can be recorded early only when it's 1–3 days after today, has no occurrence yet, and its rule isn't paused or ended (§4.8, `Conflict` otherwise) | shown as a toast |
 
@@ -970,5 +973,12 @@ Answered on 2026-11-13 (Phase 4):
 52. **Card bills** are the statement balance on each due date, as if it's paid in full. Transfers to or from a card aren't counted in the forecast, because the bills stand in for them (§5.14).
 53. **Every unpaid loan payment counts in the forecast,** whatever its account, since the debt is paid from spendable money (§5.15).
 54. **The horizon** runs from today through the day before the same date 12 months on (§5.12).
-55. **Safe to spend** is the lowest of every pay window's end over the horizon, never below 0, with the held-back amount and the first short window reported beside it (§5.15).
+55. **Safe to spend** is the lowest point of the running total, day by day, over the horizon, never below 0, with the held-back amount and the first short day reported beside it. Checking only each window's end would miss a bill due before money that arrives later in the same window (§5.15).
 56. **A loan's amounts lock `currency_decimals`** like every other stored amount (§1).
+57. **An archived loan is unarchived** by anything that gives it an unpaid payment again: Mark unpaid, deleting a payment's expense, or adding rows (§4.5).
+58. **A loan payment's expense stays an expense:** `update_transaction` refuses to change its kind, so a paid payment always has a loan expense behind it (§4.6).
+59. **When everything left on the loans is overdue**, the debt-free date is today, and the screen shows what's overdue rather than a date in the past (§5.11).
+60. **A payday rule goes into a cash, bank or e-wallet account**, because that's where its payslip is recorded (§4.8).
+61. **Coming up (DSH-7) leaves out a payday recorded early**, since it already has its occurrence row (§4.1, §4.8).
+62. **"Move money first"** gives each banner only its own part of the shortfall, so following every banner moves exactly enough (§5.11).
+63. **A new loan's category** starts as the active expense category named Loan, when there is one. If the user's own "Loan" category is archived, the form starts empty (§4.5).

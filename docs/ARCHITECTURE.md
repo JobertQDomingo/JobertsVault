@@ -484,7 +484,7 @@ A failed release stays a hidden draft, so no installed copy ever sees it.
 | Smooth glass UI | Blur only on panels and raised elements (about 12 or fewer on screen), never on list rows. Lists scroll inside one panel, and nothing is blurred when Windows transparency is off (DESIGN_SYSTEM §11). |
 | Each view loads in < 300 ms with 50,000 transactions | Date and account indexes; totals calculated with SQL `SUM` (never adding up rows in JS); one IPC call for the dashboard; the transaction list loads in pages of 100 |
 
-**Checking the 300 ms target:** `cargo test --manifest-path src-tauri/Cargo.toml --release perf -- --ignored --nocapture` seeds 50,000 transactions into a database file and fails if a dashboard, transaction list or report query takes 300 ms or more. From Phase 4 it also times `list_loans` and `get_forecast`, with a year of recurring rules and loan payments seeded.
+**Checking the 300 ms target:** `cargo test --manifest-path src-tauri/Cargo.toml --release perf -- --ignored --nocapture` seeds 50,000 transactions into a database file and fails if a dashboard, transaction list or report query takes 300 ms or more. From Phase 4 it also times `list_loans`, `get_forecast` and `get_dashboard` (which now works out Safe to spend too), with a year of recurring rules and loan payments seeded.
 
 ## 13. Coding conventions
 
