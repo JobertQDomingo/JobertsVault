@@ -10,7 +10,7 @@ Read the relevant doc **before** changing code in its area. If the code and a do
 
 | Doc | Read it when you're… |
 |---|---|
-| [PRD.md](docs/PRD.md) | Deciding *what* a feature does. Requirements have IDs (`TXN-1`, `CC-3`, …) and a phase (P1–P4). |
+| [PRD.md](docs/PRD.md) | Deciding *what* a feature does. Requirements have IDs (`TXN-1`, `CC-3`, …) and a phase (P1–P5). |
 | [DATA_MODEL.md](docs/DATA_MODEL.md) | Touching tables, SQL, balances, totals, periods, comparisons, card cycles, recurrence or validation |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Adding a command, module, library, screen or route, or changing startup, errors or security |
 | [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) / [UI_FLOWS.md](docs/UI_FLOWS.md) | Building UI. The style is **Glassmorphism 2.0**: follow the glass layer rules in DESIGN_SYSTEM §2 (text always on a panel, never blur inside blur, blur budget) and use only the design tokens. The window is a fixed 1440 × 900, so don't add responsive breakpoints for the app window. |

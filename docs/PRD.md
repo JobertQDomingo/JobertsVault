@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **App name** | Jobert's Vault |
-| **Status** | Approved v1.1 |
-| **Last updated** | 2026-11-12 |
+| **Status** | Approved v1.2 |
+| **Last updated** | 2026-11-13 |
 | **Platform** | Windows desktop app built with Tauri 2: React + TypeScript frontend, Rust backend, SQLite database |
 
 ---
@@ -13,7 +13,7 @@
 
 A private Windows desktop app for tracking personal cashflow (income and expenses) and viewing it by **day, week, month, year or a custom range**. All data is entered by hand and stored locally on the user's computer. Financial data is never sent over the internet. The only network use is checking for and downloading app updates (§7.13).
 
-Besides cashflow, the app tracks balances across several accounts (including one credit card), budgets, recurring transactions and savings goals. Local backups, restore and CSV export came in Phase 2 (`v0.2.0`).
+Besides cashflow, the app tracks balances across several accounts (including one credit card), budgets, recurring transactions and savings goals. Local backups, restore and CSV export came in Phase 2 (`v0.2.0`). Phase 4 (`v0.4.0`) adds loans with payment reminders, payslips with their deductions, and **Safe to spend**: what the user can spend until the next payday after every bill coming in the next 12 months.
 
 ## 2. Goals
 
@@ -23,6 +23,7 @@ Besides cashflow, the app tracks balances across several accounts (including one
 4. **Accurate balances.** Every account balance, including the credit card amount owed, matches reality.
 5. **Plan ahead.** Budgets, recurring transactions and savings goals help the user stay on track.
 6. **Data is never lost.** Automatic backups, easy restore and export to an open format (CSV).
+7. **Never miss a loan payment, and know what's safe to spend.** Every loan payment is reminded until it's paid, borrowing again is made to feel what it costs, and the user always sees how much they can spend until the next payday.
 
 ## 3. Non-goals (out of scope for v1)
 
@@ -37,6 +38,9 @@ Besides cashflow, the app tracks balances across several accounts (including one
 - Splitting one transaction across several categories
 - Recording the time of day on transactions (date only)
 - Budget rollover (unused budget never carries over)
+- Splitting a loan payment into interest and principal
+- Tracking a loan repaid through payroll deductions as a loan (it's only a deduction line, PAY-3)
+- Setting money aside in Safe to spend for budgets or savings goals
 
 ## 4. Target user
 
@@ -60,6 +64,12 @@ One person (the developer/owner) who:
 | **Period** | A time window for reports: Day, Week, Month, Year or Custom. |
 | **Opening balance** | An account's balance when it is first added to the app, entered as 0 or more (for a credit card, the amount owed). It is **not** counted as income. |
 | **Transaction date** | A calendar date only, with no time of day. Transactions on the same date are listed in the order they were entered. |
+| **Loan** | Money the user borrowed and repays on a schedule, kept as one loan per lender app. It's a list of **loan payments**, not an account. |
+| **Loan payment** | One scheduled payment of a loan: a date and an amount. It stays **unpaid** until the user marks it paid, which records an expense. An unpaid payment counts toward no balance, total, report or budget. |
+| **Payday** | The date of an income recurring rule marked as a payday, such as salary or incentives. |
+| **Payslip** | What's recorded on a payday: the gross pay as income, and each deduction as an expense, on the same account and date. Gross minus deductions is the **net pay**. |
+| **Pay window** | The days from one payday up to the day before the next one. |
+| **Safe to spend** | What the user can spend in the current pay window after setting aside every bill due in the next 12 months (SAFE-5). |
 
 ## 6. Period rules
 
@@ -77,7 +87,7 @@ The user can move to the previous or next period with ◀ ▶ buttons and jump b
 
 ## 7. Functional requirements
 
-Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3** is in Phase 3 (planning), and **P4** is in Phase 4 (polish).
+Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3** is in Phase 3 (planning), **P4** is in Phase 4 (loans and forecast), and **P5** is in Phase 5 (polish).
 
 ### 7.1 Accounts
 
@@ -202,17 +212,17 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | SET-2 | First day of week (default **Monday**) and month start day (default **1**). | P1 |
 | SET-3 | Backup folder location and whether automatic backups are on. | P2 |
 | SET-4 | Category and payment method management. | P1 |
-| SET-5 | A switch for light, dark or system theme. Until it arrives, the app follows the Windows setting. | P4 |
+| SET-5 | A switch for light, dark or system theme. Until it arrives, the app follows the Windows setting. | P5 |
 | SET-6 | Show or hide the payment method field (shown by default). | P1 |
 | SET-7 | Default comparison mode for RPT-4a: same number of days so far (default) or full previous period. | P2 |
-| SET-8 | A **Reduce transparency** switch in Settings → Appearance makes every glass panel solid and turns off blur for this app, even when Windows transparency effects are on. | P4 |
+| SET-8 | A **Reduce transparency** switch in Settings → Appearance makes every glass panel solid and turns off blur for this app, even when Windows transparency effects are on. | P5 |
 
 ### 7.12 First launch
 
 | ID | Requirement | Priority |
 |---|---|---|
 | ONB-1 | On first launch, a plain setup form asks for the currency (₱ preselected, symbol before the amount, 2 decimals) and lets the user add their first accounts: bank, e-wallet and credit card with its limit, statement day and due day. Cash already exists. The form can be skipped with "Set up later". Closing the app without finishing shows the form again on the next launch. | P1 |
-| ONB-2 | The setup is polished into a step-by-step onboarding with a progress indicator and a short tour of quick-add and the period bar. | P4 |
+| ONB-2 | The setup is polished into a step-by-step onboarding with a progress indicator and a short tour of quick-add and the period bar. | P5 |
 
 ### 7.13 Updates
 
@@ -226,6 +236,43 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | UPD-6 | The startup error screen also has a **Check for updates** button, so a newer version can fix an app that can't open its database. | P1 |
 | UPD-7 | Development builds never check for or install updates. | P1 |
 
+### 7.14 Loans
+
+| ID | Requirement | Priority |
+|---|---|---|
+| LOAN-1 | The user can add a loan with a name, the account it's paid from, whether it's a **new loan** or **one I already have**, an optional amount borrowed and a date borrowed (required for a new loan, today by default, and optional for one the user already has). Its payments are typed one row at a time, each with a date and an amount > 0. Each new row starts one month after the previous one with the same amount, and both can be changed. On a loan the user already has, rows dated before today are saved as **paid before**: they count as paid but create no transaction, so past cashflow doesn't change. | P4 |
+| LOAN-2 | The user can edit a loan's name and account, and add, edit or remove its unpaid payments. A loan with any payment marked paid in the app can't be deleted, only archived. Other loans can be deleted. A loan whose payments are all paid is marked **Paid off** and can be archived. | P4 |
+| LOAN-3 | **Mark paid** records an expense in the loan's category (Loan by default) from the loan's account. The date starts as today and the amount as the scheduled one. Both can be changed, for example to add a late fee. A payment can be marked paid before its date. Deleting that transaction makes the payment unpaid again. An unpaid payment never counts toward a balance, total, report or budget. | P4 |
+| LOAN-4 | From 5 days before an unpaid payment's date, the dashboard shows a banner for it, such as "E-wallet loan: ₱1,000.00 due Wed, Nov 18", with a **Pay** button that opens Mark paid. If the loan's account holds less than the payment, the banner says how much to move there first. After its date, an unpaid payment shows as **Overdue** in red until it's marked paid. | P4 |
+| LOAN-5 | A **Debt-free** screen shows the debt-free date (the date of the last unpaid payment) with a countdown, the total left and the total paid, and for each loan: % paid, the amount left and the next payment. | P4 |
+| LOAN-6 | **Interest cost**: for a loan with an amount borrowed, the screen shows the sum of all its payments minus the amount borrowed, and the total across loans. | P4 |
+| LOAN-7 | **Money freed up**: month by month until the debt-free date, how much less goes to loans than in the current month. | P4 |
+| LOAN-8 | **Loan-free streak**: the number of days since the newest date borrowed of any loan. | P4 |
+| LOAN-9 | **Before you borrow**: the user types a loan they're thinking about (payment amount, number of payments, day of the month and first payment date) without saving it, and sees how much later the debt-free date would be and how Safe to spend would change in each pay window. | P4 |
+| LOAN-10 | Adding a **new loan** first shows the LOAN-9 result for it, then asks "Add this loan anyway?". Saving it restarts the loan-free streak. A loan the user already has skips this step. | P4 |
+| LOAN-11 | The dashboard shows "Loans left: ₱X · debt-free *date*" under the net balance. Loans never change the net balance. | P4 |
+
+### 7.15 Payroll
+
+| ID | Requirement | Priority |
+|---|---|---|
+| PAY-1 | An income recurring rule can be marked **This is a payday**. A payday rule is always in Confirm mode, and its amount is the user's estimate of the net pay (SAFE-4). | P4 |
+| PAY-2 | Confirming a payday opens a **payslip** form: the gross pay and any number of deduction lines, each with a deduction category and an amount > 0. The net pay is shown as the user types and must be more than 0. The form starts from the last payslip in the same income category, gross and lines included. Saving records the gross as income in the rule's category and each line as an expense, on the rule's account and the payslip's date. The rows of one payslip are edited and deleted together. | P4 |
+| PAY-3 | Preset expense categories for deductions: SSS, PhilHealth, Pag-IBIG, Withholding tax, Salary loan and Other deductions. They count like any other expense. A loan repaid through payroll is only a deduction line, never a loan in §7.14. | P4 |
+| PAY-4 | A payday appears in the "Recurring transactions due" list up to 3 days before its date, with **Record now**. The payslip takes the real date, and that payday is then settled, so it can't be recorded twice. | P4 |
+
+### 7.16 Safe to spend
+
+| ID | Requirement | Priority |
+|---|---|---|
+| SAFE-1 | **Pay windows:** the dates of active payday rules split time into pay windows, each from a payday up to the day before the next one. A bill due on a payday belongs to the window that starts that day. Windows use the scheduled dates, even when pay is recorded early (PAY-4). | P4 |
+| SAFE-2 | **Money** is today's balance of every active Cash, Bank and E-wallet account, except an account linked to a savings goal. | P4 |
+| SAFE-3 | **Bills** are everything due from those accounts in the next 12 months: unpaid loan payments, future-dated expenses, recurring dates that are due but not settled, and the coming dates of recurring expense rules. Each credit card's statement balance counts as a bill on its due date, and a card purchase, including a recurring one, goes into the statement it falls in. An overdue loan payment or an unsettled recurring date counts as due today. Future-dated income and other recurring income count as money coming in. Transfers between counted accounts don't count, and a transfer to a card is covered by its statement balance. | P4 |
+| SAFE-4 | **Expected pay:** a future payday counts as the lowest net pay of the last 3 payslips in its income category. Until there are 3, the rule's estimated amount counts too, and the lowest of them is used. | P4 |
+| SAFE-5 | **Safe to spend** for the current pay window is money plus expected pay minus bills, less whatever must be held back so that no pay window in the next 12 months runs short. If even that isn't enough, it shows ₱0 and "Short by ₱X on *date*". | P4 |
+| SAFE-6 | A **Safe to spend** card on the dashboard shows the amount until the next payday, the amount per day (over the days left in the window, counting today), and how much is held back and for which pay window, with a link to the Forecast screen. With no payday rule, it says how to set one up. | P4 |
+| SAFE-7 | A **Forecast** screen lists each pay window in the next 12 months, or each month, with a **Pay windows / Months** switch (months follow the month start day). Each row shows the pay (expected or received), the bills, what's left, and a warning on a window that would run short. Opening a row lists its bills. | P4 |
+
 ---
 
 ## 8. Non-functional requirements
@@ -234,7 +281,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 |---|---|
 | **Privacy** | Financial data never leaves the computer. No analytics or telemetry. The only network requests are for app updates from this project's GitHub releases (§7.13), and turning automatic updates off stops them. The app works fully offline. The local error log never records amounts, payees or notes. |
 | **Data integrity** | Money is stored as **integers in minor units** (e.g. cents), never as floating-point numbers. Every write is wrapped in a database transaction, so a crash can't leave data half-saved. |
-| **Performance** | Cold start in < 2 s, not counting the time the update check waits on a slow connection (up to 3 s, UPD-2). With 50,000 transactions, each dashboard or report view loads in < 300 ms. |
+| **Performance** | Cold start in < 2 s, not counting the time the update check waits on a slow connection (up to 3 s, UPD-2). With 50,000 transactions, each dashboard or report view, including the Debt-free and Forecast screens, loads in < 300 ms. |
 | **Architecture** | All business logic (balances, period totals, comparisons, recurring rules) and all database access live in the **Rust backend**. The React frontend only displays data and calls backend commands. It never runs SQL itself. |
 | **Storage location** | The database is stored in the user's app data folder, at a path based on the app's identifier (e.g. `%APPDATA%\com.jobertsvault.app\`). |
 | **Platform** | Windows 10 and 11, 64-bit. Distributed as an `.exe` installer on GitHub Releases. Installed copies then update themselves (§7.13). |
@@ -249,6 +296,9 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 3. *As a user, I pay my credit card bill from my bank account, and my cashflow doesn't count the purchases twice.*
 4. *As a user, my salary is added automatically on the 25th, and I confirm my internet bill each month before it is recorded.*
 5. *As a user, after my laptop's drive fails, I install the app on a new PC, restore my latest backup from OneDrive, and everything is back.*
+6. *As a user, a banner reminds me 5 days before each loan payment, and one I haven't marked paid turns red, so I never miss a payment until every loan is paid off.*
+7. *As a user, on payday I record my payslip and see what's safe to spend until the next payday, with money already held back for a short pay window next month.*
+8. *As a user, before I take a new loan I try it in Before you borrow and see my debt-free date move months later.*
 
 ## 10. Acceptance criteria for the MVP (Phase 1)
 
@@ -285,7 +335,8 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | **1: MVP** | Accounts (including the credit card), categories, transactions, dashboard totals by period, settings, basic first-launch setup, light and dark themes that follow Windows, automatic updates, a database backup before migrations |
 | **2: Reports & backups** | Charts over time, category breakdown, period comparison, % change, payee suggestions, regular backups, restore, CSV export |
 | **3: Planning** | Recurring transactions, budgets, savings goals, card due-date reminder, future-dated transactions |
-| **4: Polish** | The theme switch, the Reduce transparency switch, more keyboard shortcuts, polished first-launch onboarding, Windows installer polish |
+| **4: Loans & forecast** | Loans with payment reminders and the Debt-free screen, payday rules and payslips with deductions, Safe to spend and the Forecast screen |
+| **5: Polish** | The theme switch, the Reduce transparency switch, more keyboard shortcuts, polished first-launch onboarding, Windows installer polish |
 
 ## 12. How we'll measure success
 
@@ -356,6 +407,18 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-07 | A restore keeps this computer's backup settings (the folder, the automatic backup switch and the last backup dates). Every other setting comes from the backup (DATA_MODEL §9) |
 | 2026-11-07 | BAK-7's warning counts manual and automatic backups, compares local dates (more than 7 days before today), and also shows when there's never been a backup. The daily automatic backup runs on its own thread, so a slow backup folder never delays the window |
 | 2026-11-11 | TXN-8: the transaction list's Upcoming section shows every future-dated row that matches the other filters, whatever its date, whenever the selected period hasn't ended, because ▶ stops at the current period. The summary line and day nets leave Upcoming out, and its days show no net (UI_FLOWS §3) |
+| 2026-11-13 | Added Phase 4, Loans & forecast (`v0.4.0`): loans (LOAN-1 to LOAN-11), payroll (PAY-1 to PAY-4) and Safe to spend (SAFE-1 to SAFE-7). Polish moves to Phase 5 (`v1.0.0`), and its requirements become P5 |
+| 2026-11-13 | A loan is a list of scheduled payments, not an account. Payments stay expenses in the Loan category, and an unpaid payment counts toward nothing until it's marked paid (ADR 0011) |
+| 2026-11-13 | Loans are kept one per lender app and entered one payment row at a time. On a loan the user already has, past rows are saved as "paid before", with no transaction |
+| 2026-11-13 | Loan reminders start 5 days before a payment, and an unpaid payment turns Overdue after its date. A payment can be marked paid early |
+| 2026-11-13 | What's left on loans shows beside the net balance and never changes it, because it includes interest |
+| 2026-11-13 | A new loan shows the Before you borrow result and asks to confirm. A loan the user already has doesn't, and doesn't restart the streak |
+| 2026-11-13 | Payslips record the gross pay as income and each deduction as an expense in normal expense categories. A loan repaid through payroll is only a deduction line |
+| 2026-11-13 | Paydays are income recurring rules marked as paydays, always in Confirm mode, and can be recorded up to 3 days early |
+| 2026-11-13 | Safe to spend looks 12 months ahead and holds back money now for any pay window that would run short |
+| 2026-11-13 | Expected pay is the lowest net of the last 3 payslips in the same income category. The rule's estimate also counts until there are 3 |
+| 2026-11-13 | Safe to spend counts Cash, Bank and E-wallet accounts except those linked to a savings goal. A credit card counts as its statement balance on its due date |
+| 2026-11-13 | Safe to spend shows on a dashboard card and on a Forecast screen with Pay windows and Months views |
 
 ---
 
@@ -364,3 +427,5 @@ None at the moment. All earlier questions have been answered and are recorded in
 **Income:** Salary, Bonus, Freelance/Side income, Interest, Gifts received, Refund, Other income
 
 **Expense:** Food & Groceries, Dining Out, Transportation, Rent/Housing, Utilities (electricity, water, internet), Phone, Shopping, Health & Medical, Insurance, Entertainment, Subscriptions, Personal Care, Education, Gifts & Donations, Travel, Fees & Charges, Other expense
+
+**Added in Phase 4 (expense):** Loan (the default category for loan payments, LOAN-3), and the deduction categories SSS, PhilHealth, Pag-IBIG, Withholding tax, Salary loan and Other deductions (PAY-3). An existing database gets any of these it doesn't already have.

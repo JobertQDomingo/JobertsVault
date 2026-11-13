@@ -72,7 +72,7 @@ When Windows' **Transparency effects** setting is off, the app detects it throug
 - Blur is turned off.
 - The aurora, shapes, colors and layout stay the same.
 
-Settings → Appearance also has a **Reduce transparency** switch (SET-8, Phase 4), stored as `reduce_transparency`, that does the same for this app alone.
+Settings → Appearance also has a **Reduce transparency** switch (SET-8, Phase 5), stored as `reduce_transparency`, that does the same for this app alone.
 
 ---
 
@@ -179,7 +179,7 @@ Categories store a palette key, not a hex code (DATA_MODEL §3.2), so they switc
 ```
 
 - The aurora is one component, `<AuroraBackground>`, rendered once behind the app shell.
-- **Dark mode** is the `.dark` class on `<html>`. **From Phase 1**, it follows the Windows setting through the `prefers-color-scheme` media query, and it changes while the app is open. Phase 4 adds the theme switch (SET-5).
+- **Dark mode** is the `.dark` class on `<html>`. **From Phase 1**, it follows the Windows setting through the `prefers-color-scheme` media query, and it changes while the app is open. Phase 5 adds the theme switch (SET-5).
 
 ---
 

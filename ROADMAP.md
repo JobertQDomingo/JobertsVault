@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **Status** | Active |
-| **Last updated** | 2026-11-12 |
-| **Current focus** | **Phase 4: Polish**: theme switch [SET-5] |
+| **Last updated** | 2026-11-13 |
+| **Current focus** | **Phase 4: Loans & forecast**: the docs for loans, payroll and Safe to spend |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -21,7 +21,8 @@ This file is the progress tracker.
 | **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 53 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 16 / 16 |
-| **4 · Polish** | Ready for daily use for years | `v1.0.0` | All P4 requirements done | 0 / 9 |
+| **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 0 / 13 |
+| **5 · Polish** | Ready for daily use for years | `v1.0.0` | All P5 requirements done | 0 / 9 |
 
 ---
 
@@ -166,7 +167,32 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 
 ---
 
-## Phase 4 · Polish (`v1.0.0`)
+## Phase 4 · Loans & forecast (`v0.4.0`)
+
+- [ ] Docs first:
+  - DATA_MODEL: the loans, loan payments, payslip and payday-flag schema, migration `0003`, the seeded categories and their colors, validation, and the rules for pay windows, Safe to spend and the Debt-free figures
+  - UI_FLOWS: the sidebar, the dashboard's Phase 4 additions, the Debt-free and Forecast screens, and flows for adding a loan, paying one and recording a payslip
+  - ARCHITECTURE: the command catalog, routes and query keys
+  - DESIGN_SYSTEM: the Overdue state and any new component
+  - `docs/design/` previews, kept in sync (docs/README)
+  - CLAUDE.md's "Domain rules that are easy to get wrong"
+  - ADR 0011 (loans are lists of scheduled payments, not accounts), with the decision record list in `docs/decisions/README.md`, `docs/README.md` and `README.md`
+- [ ] Migration `0003_loans_payroll.sql` (DATA_MODEL), which also adds the Loan and deduction categories a database doesn't have yet (PRD Appendix A) [PAY-3]
+- [ ] Loans: create, edit, archive and delete, with payments typed row by row, "a loan I already have" and "paid before" rows [LOAN-1] [LOAN-2]
+- [ ] Mark paid: records the expense, unpaid payments never count, Overdue after the date, with service tests [LOAN-3]
+- [ ] Debt-free figures: debt-free date, totals, progress per loan, interest cost, money freed up and the loan-free streak, with domain tests [LOAN-5] [LOAN-6] [LOAN-7] [LOAN-8]
+- [ ] Debt-free screen, the Add loan form and its sidebar item [LOAN-1] [LOAN-5] [LOAN-6] [LOAN-7] [LOAN-8]
+- [ ] Dashboard: loan banners with Pay and the "move money first" hint, and "Loans left" under the net balance [LOAN-4] [LOAN-11]
+- [ ] Paydays and payslips: the payday switch on income rules, the payslip form with deduction lines, and Record now up to 3 days early [PAY-1] [PAY-2] [PAY-4]
+- [ ] Domain: pay windows, expected pay and the 12-month look-ahead, with tests for bills on a payday, card statements, a window that runs short and the lowest-of-3 rule [SAFE-1] [SAFE-2] [SAFE-3] [SAFE-4] [SAFE-5]
+- [ ] `get_forecast` and the dashboard Safe to spend card [SAFE-6]
+- [ ] Forecast screen with Pay windows and Months, and its sidebar item [SAFE-7]
+- [ ] Before you borrow, and the confirm step when adding a new loan [LOAN-9] [LOAN-10]
+- [ ] Release `v0.4.0` with `/release`, then set up the real loans and paydays in the installed app and delete the old Loan-category upcoming transactions and recurring rules, so no payment counts twice
+
+---
+
+## Phase 5 · Polish (`v1.0.0`)
 
 - [ ] Theme switch: system, light or dark [SET-5]
 - [ ] Reduce transparency switch [SET-8]
