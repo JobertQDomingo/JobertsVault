@@ -3,7 +3,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::domain::money::Money;
 use crate::error::AppError;
@@ -122,13 +122,17 @@ pub struct LoanList {
 
 /// Every loan, archived ones included, with its payments as of `today`.
 pub fn list(conn: &Connection, today: NaiveDate) -> Result<LoanList, AppError> {
-    // Both come sorted by loan id, so each loan takes its run of payments.
-    let mut payments = repo::loans::payments(conn)?.into_iter().peekable();
-    let mut loans = Vec::new();
-    for row in repo::loans::all(conn)? {
-        let mine = std::iter::from_fn(|| payments.next_if(|p| p.loan_id == row.id)).collect();
-        loans.push(view(row, mine, today)?);
+    let mut payments: HashMap<i64, Vec<repo::loans::PaymentRow>> = HashMap::new();
+    for p in repo::loans::payments(conn)? {
+        payments.entry(p.loan_id).or_default().push(p);
     }
+    let loans = repo::loans::all(conn)?
+        .into_iter()
+        .map(|row| {
+            let mine = payments.remove(&row.id).unwrap_or_default();
+            view(row, mine, today)
+        })
+        .collect::<Result<_, _>>()?;
     Ok(LoanList { loans })
 }
 
