@@ -169,7 +169,14 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 
 ## Phase 4 · Loans & forecast (`v0.4.0`)
 
-- [ ] Docs first: DATA_MODEL (loans, loan payments, payslips, the payday flag, pay windows and the Safe to spend rules), UI_FLOWS (the Debt-free screen, Add loan, the payslip form, the Forecast screen and the loan banners), the ARCHITECTURE command catalog and routes, and ADR 0011: loans are lists of scheduled payments, not accounts ([docs/decisions/](docs/decisions/README.md))
+- [ ] Docs first:
+  - DATA_MODEL: the loans, loan payments, payslip and payday-flag schema, migration `0003`, the seeded categories and their colors, validation, and the rules for pay windows, Safe to spend and the Debt-free figures
+  - UI_FLOWS: the sidebar, the dashboard's Phase 4 additions, the Debt-free and Forecast screens, and flows for adding a loan, paying one and recording a payslip
+  - ARCHITECTURE: the command catalog, routes and query keys
+  - DESIGN_SYSTEM: the Overdue state and any new component
+  - `docs/design/` previews, kept in sync (docs/README)
+  - CLAUDE.md's "Domain rules that are easy to get wrong"
+  - ADR 0011 (loans are lists of scheduled payments, not accounts), with the decision record list in `docs/decisions/README.md`, `docs/README.md` and `README.md`
 - [ ] Migration `0003_loans_payroll.sql` (DATA_MODEL), which also adds the Loan and deduction categories a database doesn't have yet (PRD Appendix A) [PAY-3]
 - [ ] Loans: create, edit, archive and delete, with payments typed row by row, "a loan I already have" and "paid before" rows [LOAN-1] [LOAN-2]
 - [ ] Mark paid: records the expense, unpaid payments never count, Overdue after the date, with service tests [LOAN-3]

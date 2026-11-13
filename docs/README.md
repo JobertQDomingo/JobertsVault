@@ -6,7 +6,7 @@ Everything that defines what Jobert's Vault is and how it's built. All the docs 
 
 | # | Doc | Read it to learn… |
 |---|---|---|
-| 1 | [PRD.md](PRD.md) | What the app does: goals, numbered requirements (`TXN-1`, `CC-3`, …) and the four phases |
+| 1 | [PRD.md](PRD.md) | What the app does: goals, numbered requirements (`TXN-1`, `CC-3`, …) and the five phases |
 | 2 | [DATA_MODEL.md](DATA_MODEL.md) | The database tables and every calculation rule: balances, periods, comparisons, card cycles |
 | 3 | [ARCHITECTURE.md](ARCHITECTURE.md) | How it's built: Tauri, React and Rust layers, commands, startup, testing, security |
 | 4 | [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) | The Glassmorphism 2.0 style: glass layers, colors, type, components, the logo |
