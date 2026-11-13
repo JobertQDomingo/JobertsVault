@@ -890,10 +890,11 @@ mod tests {
         use rusqlite_migration::M;
         let dir = TempDir::new("bak4-older");
         let (mut conn, backup) = backed_up_then_changed(&dir);
-        let next_version = Migrations::new(vec![
-            M::up(include_str!("../../migrations/0001_initial.sql")),
-            M::up("CREATE TABLE added_later (x);"),
-        ]);
+        // Every real migration, then one more, so the backup is one version behind.
+        let mut list = db::migration_list(now().to_utc());
+        list.push(M::up("CREATE TABLE added_later (x);"));
+        let latest = i64::try_from(list.len()).unwrap();
+        let next_version = Migrations::new(list);
 
         restore_with(
             &mut conn,
@@ -909,7 +910,15 @@ mod tests {
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 2);
+        assert_eq!(version, latest);
+        let added: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_schema WHERE name = 'added_later'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(added, 1, "the pending migration ran on the restored data");
         assert!(
             !db::pre_migration_dir(dir.path()).exists(),
             "the chosen file, unchanged, is the copy from before the migration"

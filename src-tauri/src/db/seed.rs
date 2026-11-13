@@ -67,6 +67,66 @@ pub fn seed(tx: &Transaction, now: &str) -> rusqlite::Result<()> {
     Ok(())
 }
 
+/// Name, icon: the expense categories Phase 4 adds (DATA_MODEL §7, PRD Appendix A).
+const PHASE_4_EXPENSE: [(&str, &str); 7] = [
+    ("Loan", "coins"),
+    ("SSS", "shield"),
+    ("PhilHealth", "heart-pulse"),
+    ("Pag-IBIG", "house"),
+    ("Withholding tax", "receipt"),
+    ("Salary loan", "banknote"),
+    ("Other deductions", "ellipsis"),
+];
+
+/// The palette as migration 0003 knew it. 0003 keeps its own copy of the palette and of the
+/// least-used rule, so a later change to `domain::category` can't change what it does.
+const PALETTE_0003: [&str; 12] = [
+    "cat-1", "cat-2", "cat-3", "cat-4", "cat-5", "cat-6", "cat-7", "cat-8", "cat-9", "cat-10",
+    "cat-11", "cat-12",
+];
+
+/// The least-used palette key in `used`, the lowest number on a tie (DATA_MODEL §7).
+fn least_used_0003(used: &[String]) -> &'static str {
+    // min_by_key keeps the first of equal minimums, which is the lowest number.
+    PALETTE_0003
+        .into_iter()
+        .min_by_key(|key| used.iter().filter(|color| color == key).count())
+        .unwrap_or(PALETTE_0003[0])
+}
+
+/// Adds the Phase 4 expense categories a database doesn't have yet, inside migration 0003's
+/// transaction, so new and existing databases both get them. One already there under the same
+/// name (ignoring case) is kept as it is. Each new one goes last and takes the least-used color
+/// of the active expense categories at that point, like a category the user adds (DATA_MODEL §7).
+///
+/// Frozen with 0003, as `seed` is with 0001.
+pub fn phase_4_categories(tx: &Transaction, now: &str) -> rusqlite::Result<()> {
+    let mut colors: Vec<String> = tx
+        .prepare("SELECT color FROM categories WHERE kind = 'expense' AND archived = 0")?
+        .query_map([], |row| row.get(0))?
+        .collect::<Result<_, _>>()?;
+    for (name, icon) in PHASE_4_EXPENSE {
+        // `name` is COLLATE NOCASE, so this ignores case.
+        let exists: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM categories WHERE kind = 'expense' AND name = ?1)",
+            [name],
+            |row| row.get(0),
+        )?;
+        if exists {
+            continue;
+        }
+        let color = least_used_0003(&colors);
+        tx.execute(
+            "INSERT INTO categories (name, kind, color, icon, sort_order, created_at, updated_at) \
+             SELECT ?1, 'expense', ?2, ?3, coalesce(max(sort_order) + 1, 0), ?4, ?4 \
+             FROM categories WHERE kind = 'expense'",
+            params![name, color, icon, now],
+        )?;
+        colors.push(color.to_owned());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use crate::db::{migrations, open, prepare};
@@ -156,7 +216,8 @@ mod tests {
                 &conn,
                 "SELECT count(*) FROM categories WHERE kind = 'expense'"
             ),
-            17
+            17 + 7,
+            "the 17 from 0001, then Loan and the payslip deductions from 0003"
         );
         assert_eq!(
             count(&conn, "SELECT count(*) FROM categories WHERE archived = 1"),
@@ -200,7 +261,8 @@ mod tests {
             );
             let conn = state.conn().unwrap();
             assert_eq!(count(&conn, "SELECT count(*) FROM accounts"), 1);
-            assert_eq!(count(&conn, "SELECT count(*) FROM categories"), 24);
+            // 7 income and 17 expense from 0001, and the 7 expense ones 0003 adds.
+            assert_eq!(count(&conn, "SELECT count(*) FROM categories"), 31);
             assert_eq!(count(&conn, "SELECT count(*) FROM payment_methods"), 6);
         }
     }
@@ -215,7 +277,14 @@ mod tests {
 
     #[test]
     fn every_seed_icon_is_curated() {
-        for (name, icon, _) in super::INCOME.iter().chain(&super::EXPENSE) {
+        let seeded = super::INCOME
+            .iter()
+            .chain(&super::EXPENSE)
+            .map(|(name, icon, _)| (name, icon));
+        let phase_4 = super::PHASE_4_EXPENSE
+            .iter()
+            .map(|(name, icon)| (name, icon));
+        for (name, icon) in seeded.chain(phase_4) {
             assert!(
                 crate::domain::category::ICONS.contains(icon),
                 "{name} has {icon}"

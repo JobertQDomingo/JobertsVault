@@ -5,16 +5,28 @@ use rusqlite_migration::{HookResult, M, Migrations};
 use super::seed;
 
 /// Every schema change, oldest first. A released migration is never edited (DATA_MODEL §8).
-/// `now` stamps the seed data that 0001 adds to a new database.
+/// `now` stamps the seed data that 0001 adds to a new database, and the categories 0003 adds.
 pub fn migrations(now: DateTime<Utc>) -> Migrations<'static> {
+    Migrations::new(migration_list(now))
+}
+
+/// The same migrations as a list, so a test can add one after the real ones.
+pub fn migration_list(now: DateTime<Utc>) -> Vec<M<'static>> {
     let stamp = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
-    Migrations::new(vec![
+    let stamp_0003 = stamp.clone();
+    vec![
         M::up_with_hook(
             include_str!("../../migrations/0001_initial.sql"),
             move |tx: &Transaction| -> HookResult { Ok(seed::seed(tx, &stamp)?) },
         ),
         M::up(include_str!("../../migrations/0002_planning.sql")),
-    ])
+        M::up_with_hook(
+            include_str!("../../migrations/0003_loans_payroll.sql"),
+            move |tx: &Transaction| -> HookResult {
+                Ok(seed::phase_4_categories(tx, &stamp_0003)?)
+            },
+        ),
+    ]
 }
 
 #[cfg(test)]
@@ -65,7 +77,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 2);
+        assert_eq!(version, 3);
 
         let strict_tables: Vec<String> = conn
             .prepare("SELECT name FROM pragma_table_list WHERE schema = 'main' AND strict = 1 ORDER BY name")
@@ -81,6 +93,8 @@ mod tests {
                 "budgets",
                 "categories",
                 "goals",
+                "loan_payments",
+                "loans",
                 "payment_methods",
                 "recurring_occurrences",
                 "recurring_rules",
@@ -96,6 +110,14 @@ mod tests {
             .unwrap()
             .collect::<Result<_, _>>()
             .unwrap();
+        let loan_index: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_schema WHERE type = 'index' AND name = 'idx_loan_payments_loan'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(loan_index, 1);
         assert_eq!(
             indexes,
             [
@@ -103,6 +125,7 @@ mod tests {
                 "idx_txn_category_date",
                 "idx_txn_date",
                 "idx_txn_payee",
+                "idx_txn_payslip",
                 "idx_txn_to_account"
             ]
         );
@@ -426,6 +449,278 @@ mod tests {
         assert!(
             conn.execute(goal, rusqlite::params!["Laptop", 0, NOW])
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn a_loan_needs_a_real_account_and_category_and_a_new_one_its_date() {
+        let conn = migrated();
+        let loan = "INSERT INTO loans (name, account_id, category_id, is_new, amount_borrowed, borrowed_on, added_on, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, '2026-11-13', ?7, ?7)";
+        // name, account, category, is_new, amount borrowed, date borrowed, accepted
+        type Row = (
+            &'static str,
+            i64,
+            i64,
+            i64,
+            Option<i64>,
+            Option<&'static str>,
+            bool,
+        );
+        let rows: [Row; 9] = [
+            ("E-wallet loan", 1, 8, 0, None, None, true),
+            (
+                "Bank loan",
+                1,
+                8,
+                1,
+                Some(500_000),
+                Some("2026-11-13"),
+                true,
+            ),
+            ("e-wallet LOAN", 1, 8, 0, None, None, false),
+            ("No date", 1, 8, 1, None, None, false),
+            ("No account", 99, 8, 0, None, None, false),
+            ("No category", 1, 99, 0, None, None, false),
+            ("Odd flag", 1, 8, 2, None, None, false),
+            ("Nothing borrowed", 1, 8, 0, Some(0), None, false),
+            ("US date", 1, 8, 1, None, Some("11/13/2026"), false),
+        ];
+        for row @ (name, account, category, is_new, borrowed, borrowed_on, accepted) in rows {
+            let result = conn.execute(
+                loan,
+                rusqlite::params![name, account, category, is_new, borrowed, borrowed_on, NOW],
+            );
+            assert_eq!(result.is_ok(), accepted, "{row:?}: {result:?}");
+        }
+    }
+
+    /// Adds loan 1 (paid from Cash, in category 8) with payments 1 (Nov 20) and 2 (Dec 20), and
+    /// transaction 1, an expense that can pay one of them.
+    fn add_loan(conn: &Connection) {
+        conn.execute(
+            "INSERT INTO loans (name, account_id, category_id, is_new, added_on, created_at, updated_at) VALUES ('E-wallet loan', 1, 8, 0, '2026-11-13', ?1, ?1)",
+            [NOW],
+        )
+        .unwrap();
+        for date in ["2026-11-20", "2026-12-20"] {
+            conn.execute(
+                "INSERT INTO loan_payments (loan_id, due_date, amount, created_at, updated_at) VALUES (1, ?1, 100000, ?2, ?2)",
+                [date, NOW],
+            )
+            .unwrap();
+        }
+        conn.execute(
+            "INSERT INTO transactions (kind, amount, date, account_id, category_id, created_at, updated_at) VALUES ('expense', 100000, '2026-11-20', 1, 8, ?1, ?1)",
+            [NOW],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn a_loan_payment_is_paid_by_one_transaction_or_paid_before_never_both() {
+        let conn = migrated();
+        add_loan(&conn);
+        let link = "UPDATE loan_payments SET transaction_id = ?1, paid_before = ?2 WHERE id = ?3";
+        assert!(conn.execute(link, rusqlite::params![Some(1), 0, 1]).is_ok());
+        assert!(
+            conn.execute(link, rusqlite::params![Some(1), 0, 2])
+                .is_err(),
+            "one transaction pays one payment"
+        );
+        assert!(
+            conn.execute(link, rusqlite::params![Some(1), 1, 1])
+                .is_err(),
+            "a paid-before payment has no transaction"
+        );
+        assert!(
+            conn.execute(link, rusqlite::params![None::<i64>, 2, 2])
+                .is_err()
+        );
+        let payment = "INSERT INTO loan_payments (loan_id, due_date, amount, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)";
+        for (loan, date, amount) in [
+            (1, "2027-01-20", 0),
+            (1, "20-01-2027", 100),
+            (9, "2027-01-20", 100),
+        ] {
+            assert!(
+                conn.execute(payment, rusqlite::params![loan, date, amount, NOW])
+                    .is_err(),
+                "{loan} {date} {amount}"
+            );
+        }
+
+        conn.execute("DELETE FROM transactions WHERE id = 1", [])
+            .unwrap();
+        let unpaid: Option<i64> = conn
+            .query_row(
+                "SELECT transaction_id FROM loan_payments WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            unpaid, None,
+            "deleting the expense makes the payment unpaid again"
+        );
+
+        for delete in [
+            "DELETE FROM accounts WHERE id = 1",
+            "DELETE FROM categories WHERE id = 8",
+        ] {
+            assert!(
+                conn.execute(delete, []).is_err(),
+                "a loan puts it in use: {delete}"
+            );
+        }
+        conn.execute("DELETE FROM loans WHERE id = 1", []).unwrap();
+        let left: i64 = conn
+            .query_row("SELECT count(*) FROM loan_payments", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(left, 0, "a loan's payments go with it");
+    }
+
+    #[test]
+    fn a_payslip_goes_with_its_gross_row() {
+        let conn = migrated();
+        let txn = "INSERT INTO transactions (kind, amount, date, account_id, category_id, payslip_id, created_at, updated_at) VALUES (?1, ?2, '2026-11-15', 1, ?3, ?4, ?5, ?5)";
+        conn.execute(
+            txn,
+            rusqlite::params!["income", 1_200_000, 1, None::<i64>, NOW],
+        )
+        .unwrap();
+        conn.execute("UPDATE transactions SET payslip_id = id WHERE id = 1", [])
+            .unwrap();
+        conn.execute(txn, rusqlite::params!["expense", 50_000, 8, Some(1), NOW])
+            .unwrap();
+        conn.execute(
+            txn,
+            rusqlite::params!["expense", 2_000, 8, None::<i64>, NOW],
+        )
+        .unwrap();
+        assert!(
+            conn.execute(txn, rusqlite::params!["expense", 2_000, 8, Some(99), NOW])
+                .is_err(),
+            "a payslip row points at a real gross row"
+        );
+
+        conn.execute("DELETE FROM transactions WHERE id = 1", [])
+            .unwrap();
+        let left: Vec<i64> = conn
+            .prepare("SELECT id FROM transactions ORDER BY id")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(left, [3], "the deduction goes with its gross row");
+    }
+
+    #[test]
+    fn a_rule_is_a_payday_only_when_marked() {
+        let conn = migrated();
+        add_rule(&conn);
+        let payday: i64 = conn
+            .query_row("SELECT is_payday FROM recurring_rules", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(payday, 0);
+        assert!(
+            conn.execute("UPDATE recurring_rules SET is_payday = 1", [])
+                .is_ok()
+        );
+        assert!(
+            conn.execute("UPDATE recurring_rules SET is_payday = 2", [])
+                .is_err()
+        );
+    }
+
+    /// The expense categories with an id above `after`: name, icon, color and sort order.
+    fn expense_categories_after(
+        conn: &Connection,
+        after: i64,
+    ) -> Vec<(String, String, String, i64)> {
+        conn.prepare(
+            "SELECT name, icon, color, sort_order FROM categories WHERE kind = 'expense' AND id > ?1 ORDER BY id",
+        )
+        .unwrap()
+        .query_map([after], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap()
+    }
+
+    fn owned(rows: &[(&str, &str, &str, i64)]) -> Vec<(String, String, String, i64)> {
+        rows.iter()
+            .map(|(a, b, c, d)| ((*a).into(), (*b).into(), (*c).into(), *d))
+            .collect()
+    }
+
+    #[test]
+    fn a_new_database_gets_the_phase_4_categories_after_the_others() {
+        let conn = migrated();
+        // 24 seeded categories come first.
+        assert_eq!(
+            expense_categories_after(&conn, 24),
+            owned(&[
+                ("Loan", "coins", "cat-2", 17),
+                ("SSS", "shield", "cat-6", 18),
+                ("PhilHealth", "heart-pulse", "cat-7", 19),
+                ("Pag-IBIG", "house", "cat-8", 20),
+                ("Withholding tax", "receipt", "cat-9", 21),
+                ("Salary loan", "banknote", "cat-10", 22),
+                ("Other deductions", "ellipsis", "cat-12", 23),
+            ]),
+            "DATA_MODEL §7: each takes the least-used color of the active expense categories"
+        );
+    }
+
+    #[test]
+    fn an_existing_database_keeps_a_category_it_already_has() {
+        let mut conn = open(Path::new(":memory:")).unwrap();
+        let all = migrations(Utc.with_ymd_and_hms(2026, 10, 26, 9, 30, 0).unwrap());
+        all.to_version(&mut conn, 2).unwrap();
+        let category = "INSERT INTO categories (name, kind, color, icon, archived, created_at, updated_at) VALUES (?1, ?2, ?3, 'coins', ?4, ?5, ?5)";
+        // The user's own "loan", archived, and an income category that shares a deduction's name.
+        conn.execute(
+            category,
+            rusqlite::params!["loan", "expense", "cat-5", 1, NOW],
+        )
+        .unwrap();
+        conn.execute(
+            category,
+            rusqlite::params!["SSS", "income", "cat-1", 0, NOW],
+        )
+        .unwrap();
+
+        all.to_latest(&mut conn).unwrap();
+
+        let loans: Vec<(String, String, i64)> = conn
+            .prepare("SELECT name, color, archived FROM categories WHERE kind = 'expense' AND name = 'Loan'")
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(
+            loans,
+            [("loan".to_owned(), "cat-5".to_owned(), 1)],
+            "the user's own Loan is kept as it is, and no second one is added"
+        );
+        // After the 24 seeded ones and the user's two (ids 25 and 26).
+        assert_eq!(
+            expense_categories_after(&conn, 26),
+            owned(&[
+                ("SSS", "shield", "cat-2", 17),
+                ("PhilHealth", "heart-pulse", "cat-6", 18),
+                ("Pag-IBIG", "house", "cat-7", 19),
+                ("Withholding tax", "receipt", "cat-8", 20),
+                ("Salary loan", "banknote", "cat-9", 21),
+                ("Other deductions", "ellipsis", "cat-10", 22),
+            ]),
+            "an archived category doesn't count toward the colors, and an income one doesn't block an expense one"
         );
     }
 }
