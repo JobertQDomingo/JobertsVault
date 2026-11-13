@@ -1,7 +1,5 @@
 use rusqlite::{Transaction, params};
 
-use crate::domain::category::least_used_color;
-
 const PAYMENT_METHODS: [&str; 6] = [
     "Cash",
     "Debit Card",
@@ -80,13 +78,33 @@ const PHASE_4_EXPENSE: [(&str, &str); 7] = [
     ("Other deductions", "ellipsis"),
 ];
 
+/// The palette as migration 0003 knew it. 0003 keeps its own copy of the palette and of the
+/// least-used rule, so a later change to `domain::category` can't change what it does.
+const PALETTE_0003: [&str; 12] = [
+    "cat-1", "cat-2", "cat-3", "cat-4", "cat-5", "cat-6", "cat-7", "cat-8", "cat-9", "cat-10",
+    "cat-11", "cat-12",
+];
+
+/// The least-used palette key in `used`, the lowest number on a tie (DATA_MODEL §7).
+fn least_used_0003(used: &[String]) -> &'static str {
+    // min_by_key keeps the first of equal minimums, which is the lowest number.
+    PALETTE_0003
+        .into_iter()
+        .min_by_key(|key| used.iter().filter(|color| color == key).count())
+        .unwrap_or(PALETTE_0003[0])
+}
+
 /// Adds the Phase 4 expense categories a database doesn't have yet, inside migration 0003's
 /// transaction, so new and existing databases both get them. One already there under the same
 /// name (ignoring case) is kept as it is. Each new one goes last and takes the least-used color
-/// of the active expense categories, like a category the user adds (DATA_MODEL §7).
+/// of the active expense categories at that point, like a category the user adds (DATA_MODEL §7).
 ///
 /// Frozen with 0003, as `seed` is with 0001.
 pub fn phase_4_categories(tx: &Transaction, now: &str) -> rusqlite::Result<()> {
+    let mut colors: Vec<String> = tx
+        .prepare("SELECT color FROM categories WHERE kind = 'expense' AND archived = 0")?
+        .query_map([], |row| row.get(0))?
+        .collect::<Result<_, _>>()?;
     for (name, icon) in PHASE_4_EXPENSE {
         // `name` is COLLATE NOCASE, so this ignores case.
         let exists: bool = tx.query_row(
@@ -97,17 +115,14 @@ pub fn phase_4_categories(tx: &Transaction, now: &str) -> rusqlite::Result<()> {
         if exists {
             continue;
         }
-        let colors: Vec<String> = tx
-            .prepare("SELECT color FROM categories WHERE kind = 'expense' AND archived = 0")?
-            .query_map([], |row| row.get(0))?
-            .collect::<Result<_, _>>()?;
-        let color = least_used_color(colors.iter().map(String::as_str));
+        let color = least_used_0003(&colors);
         tx.execute(
             "INSERT INTO categories (name, kind, color, icon, sort_order, created_at, updated_at) \
              SELECT ?1, 'expense', ?2, ?3, coalesce(max(sort_order) + 1, 0), ?4, ?4 \
              FROM categories WHERE kind = 'expense'",
             params![name, color, icon, now],
         )?;
+        colors.push(color.to_owned());
     }
     Ok(())
 }

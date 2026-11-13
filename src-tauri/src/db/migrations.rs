@@ -7,9 +7,14 @@ use super::seed;
 /// Every schema change, oldest first. A released migration is never edited (DATA_MODEL §8).
 /// `now` stamps the seed data that 0001 adds to a new database, and the categories 0003 adds.
 pub fn migrations(now: DateTime<Utc>) -> Migrations<'static> {
+    Migrations::new(migration_list(now))
+}
+
+/// The same migrations as a list, so a test can add one after the real ones.
+pub fn migration_list(now: DateTime<Utc>) -> Vec<M<'static>> {
     let stamp = now.format("%Y-%m-%dT%H:%M:%SZ").to_string();
     let stamp_0003 = stamp.clone();
-    Migrations::new(vec![
+    vec![
         M::up_with_hook(
             include_str!("../../migrations/0001_initial.sql"),
             move |tx: &Transaction| -> HookResult { Ok(seed::seed(tx, &stamp)?) },
@@ -21,7 +26,7 @@ pub fn migrations(now: DateTime<Utc>) -> Migrations<'static> {
                 Ok(seed::phase_4_categories(tx, &stamp_0003)?)
             },
         ),
-    ])
+    ]
 }
 
 #[cfg(test)]
@@ -105,6 +110,14 @@ mod tests {
             .unwrap()
             .collect::<Result<_, _>>()
             .unwrap();
+        let loan_index: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_schema WHERE type = 'index' AND name = 'idx_loan_payments_loan'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(loan_index, 1);
         assert_eq!(
             indexes,
             [
@@ -453,7 +466,7 @@ mod tests {
             Option<&'static str>,
             bool,
         );
-        let rows: [Row; 8] = [
+        let rows: [Row; 9] = [
             ("E-wallet loan", 1, 8, 0, None, None, true),
             (
                 "Bank loan",
@@ -470,6 +483,7 @@ mod tests {
             ("No category", 1, 99, 0, None, None, false),
             ("Odd flag", 1, 8, 2, None, None, false),
             ("Nothing borrowed", 1, 8, 0, Some(0), None, false),
+            ("US date", 1, 8, 1, None, Some("11/13/2026"), false),
         ];
         for row @ (name, account, category, is_new, borrowed, borrowed_on, accepted) in rows {
             let result = conn.execute(
@@ -621,13 +635,18 @@ mod tests {
         );
     }
 
-    /// The expense categories after the 17 seeded ones: name, icon, color and sort order.
-    fn added_expense_categories(conn: &Connection) -> Vec<(String, String, String, i64)> {
+    /// The expense categories with an id above `after`: name, icon, color and sort order.
+    fn expense_categories_after(
+        conn: &Connection,
+        after: i64,
+    ) -> Vec<(String, String, String, i64)> {
         conn.prepare(
-            "SELECT name, icon, color, sort_order FROM categories WHERE kind = 'expense' AND id > 24 ORDER BY id",
+            "SELECT name, icon, color, sort_order FROM categories WHERE kind = 'expense' AND id > ?1 ORDER BY id",
         )
         .unwrap()
-        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)))
+        .query_map([after], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
         .unwrap()
         .collect::<Result<_, _>>()
         .unwrap()
@@ -642,8 +661,9 @@ mod tests {
     #[test]
     fn a_new_database_gets_the_phase_4_categories_after_the_others() {
         let conn = migrated();
+        // 24 seeded categories come first.
         assert_eq!(
-            added_expense_categories(&conn),
+            expense_categories_after(&conn, 24),
             owned(&[
                 ("Loan", "coins", "cat-2", 17),
                 ("SSS", "shield", "cat-6", 18),
@@ -689,28 +709,17 @@ mod tests {
             [("loan".to_owned(), "cat-5".to_owned(), 1)],
             "the user's own Loan is kept as it is, and no second one is added"
         );
-        let added: Vec<(String, String)> = conn
-            .prepare(
-                "SELECT name, color FROM categories WHERE kind = 'expense' AND id > 26 ORDER BY id",
-            )
-            .unwrap()
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-            .unwrap()
-            .collect::<Result<_, _>>()
-            .unwrap();
-        let expected: Vec<(String, String)> = [
-            ("SSS", "cat-2"),
-            ("PhilHealth", "cat-6"),
-            ("Pag-IBIG", "cat-7"),
-            ("Withholding tax", "cat-8"),
-            ("Salary loan", "cat-9"),
-            ("Other deductions", "cat-10"),
-        ]
-        .iter()
-        .map(|(n, c)| ((*n).into(), (*c).into()))
-        .collect();
+        // After the 24 seeded ones and the user's two (ids 25 and 26).
         assert_eq!(
-            added, expected,
+            expense_categories_after(&conn, 26),
+            owned(&[
+                ("SSS", "shield", "cat-2", 17),
+                ("PhilHealth", "heart-pulse", "cat-6", 18),
+                ("Pag-IBIG", "house", "cat-7", 19),
+                ("Withholding tax", "receipt", "cat-8", 20),
+                ("Salary loan", "banknote", "cat-9", 21),
+                ("Other deductions", "ellipsis", "cat-10", 22),
+            ]),
             "an archived category doesn't count toward the colors, and an income one doesn't block an expense one"
         );
     }

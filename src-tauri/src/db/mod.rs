@@ -11,7 +11,7 @@ use rusqlite_migration::Migrations;
 
 use crate::error::AppError;
 
-pub use migrations::migrations;
+pub use migrations::{migration_list, migrations};
 
 /// Debug builds use their own files, so development never touches real data (ARCHITECTURE §6).
 pub const NAME: &str = if cfg!(debug_assertions) {

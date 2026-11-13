@@ -891,20 +891,10 @@ mod tests {
         let dir = TempDir::new("bak4-older");
         let (mut conn, backup) = backed_up_then_changed(&dir);
         // Every real migration, then one more, so the backup is one version behind.
-        let next_version = Migrations::new(vec![
-            M::up(include_str!("../../migrations/0001_initial.sql")),
-            M::up(include_str!("../../migrations/0002_planning.sql")),
-            M::up(include_str!("../../migrations/0003_loans_payroll.sql")),
-            M::up("CREATE TABLE added_later (x);"),
-        ]);
-        let backup_version: i64 = Connection::open(&backup)
-            .unwrap()
-            .pragma_query_value(None, "user_version", |row| row.get(0))
-            .unwrap();
-        assert_eq!(
-            backup_version, 3,
-            "list every real migration above when a new one is added"
-        );
+        let mut list = db::migration_list(now().to_utc());
+        list.push(M::up("CREATE TABLE added_later (x);"));
+        let latest = i64::try_from(list.len()).unwrap();
+        let next_version = Migrations::new(list);
 
         restore_with(
             &mut conn,
@@ -920,7 +910,7 @@ mod tests {
         let version: i64 = conn
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 4);
+        assert_eq!(version, latest);
         let added: i64 = conn
             .query_row(
                 "SELECT count(*) FROM sqlite_schema WHERE name = 'added_later'",
