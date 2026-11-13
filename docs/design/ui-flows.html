@@ -700,7 +700,6 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
         pts.push([cx, y(inc[k] - exp[k])]);
       }
       var lab = el("text", { x: cx, y: T + H + 18, "text-anchor": "middle" }, m);
-      if (k >= inc.length) lab.setAttribute("opacity", "0.5");
       svg.appendChild(lab);
     });
     svg.appendChild(el("polyline", { points: pts.map(function (p) { return p.join(","); }).join(" "), fill: "none", stroke: "var(--primary)", "stroke-width": 2, "stroke-linejoin": "round" }));
