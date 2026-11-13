@@ -87,7 +87,7 @@ Start with [docs/README.md](docs/README.md) for the reading order.
 | [UI_FLOWS.md](docs/UI_FLOWS.md) | Screens and user flows |
 | [ROADMAP.md](ROADMAP.md) | Phase checklists and progress |
 | [RELEASING.md](RELEASING.md) | How a change gets from a branch to every installed copy |
-| [docs/decisions/](docs/decisions/README.md) | Decision records 0001–0010: why the big choices were made |
+| [docs/decisions/](docs/decisions/README.md) | Decision records 0001–0011: why the big choices were made |
 | [docs/design/](docs/design/) | Visual previews of the design system and every screen. Open the `.html` files in a browser. |
 | `assets/brand/` | The logo (`logo.svg`), one-color versions and the 1024 px app icon source |
 

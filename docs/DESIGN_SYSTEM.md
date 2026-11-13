@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Approved v1.1 |
 | **Style** | **Glassmorphism 2.0**: frosted glass panels floating over a soft colored light (the "aurora") |
-| **Last updated** | 2026-11-11 |
+| **Last updated** | 2026-11-13 |
 | **Related docs** | [PRD.md](PRD.md), [UI_FLOWS.md](UI_FLOWS.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 | **Built with** | Tailwind CSS 4 + shadcn/ui (Radix), lucide-react icons, Sora font (bundled) |
 
@@ -118,10 +118,10 @@ All colors are **CSS variables** in `src/styles/globals.css`. Components use the
 | `--income` | Income, increases that are good | `#03684A` | `#6EE7B7` | 5.0 / 7.9 |
 | `--expense` | Expenses, increases that are bad | `#B4183A` | `#FDA4AF` | 4.95 / 6.4 |
 | `--transfer` | Transfers (neutral) | `#3D4560` | `#C3C9DE` | 7.0 / 7.3 |
-| `--warning` | Budget ≥ 80%, due-date banner, stale-backup notice | `#8A4500` | `#FCD34D` | 5.3 / 8.4 |
-| `--danger` | Budget ≥ 100%, delete, errors (same red as `--expense`) | `#B4183A` | `#FDA4AF` | 4.95 / 6.4 |
+| `--warning` | Budget ≥ 80%, due-date banners (card and loan), stale-backup notice | `#8A4500` | `#FCD34D` | 5.3 / 8.4 |
+| `--danger` | Budget ≥ 100%, an overdue loan payment, a pay window that runs short, delete, errors (same red as `--expense`) | `#B4183A` | `#FDA4AF` | 4.95 / 6.4 |
 | `--danger-foreground` | Text on a danger button | `#FFFFFF` | `#0B1020` | 6.7 / 10.0 |
-| `--success` | Goal achieved, "Saved" toasts | `#03684A` | `#6EE7B7` | 5.0 / 7.9 |
+| `--success` | Goal achieved, loan paid off, "You're debt-free", "Saved" toasts | `#03684A` | `#6EE7B7` | 5.0 / 7.9 |
 
 - **Tints:** each meaning color has a tint for chips and banners. It's the color mixed into transparent at **16%** in light mode and **20%** in dark (`--tint`).
 - **Banners** are panel glass with the meaning color mixed in at 14%, and a border with it mixed in at 35%.
@@ -253,6 +253,13 @@ Categories store a palette key, not a hex code (DATA_MODEL §3.2), so they switc
 | Bank account | `landmark` |
 | E-wallet | `smartphone` |
 | Credit card | `credit-card` |
+| Debt-free (sidebar, Phase 4) | `hand-coins` |
+| Forecast (sidebar, Phase 4) | `calendar-range` |
+| A loan payment due (banner) | `calendar-clock`, the same as a card payment due |
+| A loan payment overdue, a pay window that runs short | `octagon-alert` (banner) and `triangle-alert` (in a row) |
+| Payday | `banknote` |
+
+The sidebar and banner icons are imported where they're used, like the ones above, and aren't part of the category icon list.
 
 ### 6.1 Logo: "Line Door"
 
@@ -313,6 +320,9 @@ Displayed as `▲ 12.3%` or `▼ 4.0%`, or `—` when there's nothing to compare
 | Year period label | year | `2026` |
 | Date input | `MM/DD/YYYY` shown, `YYYY-MM-DD` stored | `10/26/2026` |
 | Date and time (backups) | date, year, 12-hour time | `Oct 20, 2026 9:30 AM` |
+| Pay window (Phase 4) | a range, with the year when it isn't this year | `Dec 5–14`, `Nov 30 – Dec 4`, `Dec 30, 2026 – Jan 14, 2027` |
+| A payment due (Phase 4) | "due today", "due tomorrow", or the weekday and date | `due Fri, Nov 20` |
+| An overdue payment (Phase 4) | "overdue since" and the weekday and date | `overdue since Mon, Nov 16` |
 
 Dates always use **US order** (`10/26/2026`, `Oct 26`), whatever the Windows region setting.
 
@@ -336,7 +346,7 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **Dialog** | Level 2 | 24 px radius, max width 480 px (forms), 400 px (confirmations) or 640 px (a list whose rows have actions, such as the recurring dates due, which scrolls inside it past 60% of the window's height). The backdrop is `--overlay` plus a 6 px blur of the app behind. Esc closes it, and focus stays inside. |
 | **Confirm dialog** | Level 2 | A title, one sentence, `secondary` Cancel, and a `primary` or `destructive` button that names the action. |
 | **Toast** | Level 2 | Bottom-right, 16 px radius. Closes after 4 s. One with an action, such as **Open folder**, stays 10 s, and its action is a ghost `sm` button in `--primary` text. Errors stay until closed. |
-| **Banner** | Level 1, tinted | Panel glass mixed with the meaning color at 14%. Has an icon, the message and an optional action. Variants: `warning`, `danger`, `info`. Inside another panel, the tint is flat (§2.3). `components/Banner.tsx` has `warning` (`.glass-warning`, the backup warning and the card due date) and `info` (`.glass-info`, tinted with `--primary` as in the mockups, the recurring dates due). |
+| **Banner** | Level 1, tinted | Panel glass mixed with the meaning color at 14%. Has an icon, the message and an optional action. Variants: `warning`, `danger`, `info`. Inside another panel, the tint is flat (§2.3). `components/Banner.tsx` has `warning` (`.glass-warning`, the backup warning and the card due date) and `info` (`.glass-info`, tinted with `--primary` as in the mockups, the recurring dates due). Phase 4 adds `danger` (`.glass-danger`, an overdue loan payment) and uses `warning` for a loan payment due. A banner can have a second line in `small` text, such as "Move ₱800.00 there first." |
 | **Tabs** | Flat | Inside Settings. A 2 px `--primary` underline marks the active tab. |
 | **Skeleton** | Flat | `--wash` blocks with no shimmer, shown only if loading takes more than **150 ms**. |
 | **Empty state** | Inside a panel | A 24 px icon, one line of text and one main action. |
@@ -354,8 +364,11 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **`CategoryChip`** | The icon chip from §6, with the name next to it if needed. |
 | **`AccountRow`** | Account icon in a `--wash` square, the name, and the balance on the right. A credit card also shows "Available ₱X · Due Nov 5". |
 | **`TransactionRow`** | Category chip │ category, plus the payee and note in muted text │ account (or "Bank → Cash") │ amount, right-aligned. Hover adds `--glass-hover` and the edit and duplicate buttons. 52 px tall. |
-| **`ProgressBar`** | 8 px pill on a `--wash` track. The fill is `--primary` below 80%, `--warning` from 80% and `--danger` from 100% (BUD-3). A goal's bar has no thresholds: `--primary`, and `--success` once the goal is achieved (GOL-4). The % is always written next to it. |
+| **`ProgressBar`** | 8 px pill on a `--wash` track. The fill is `--primary` below 80%, `--warning` from 80% and `--danger` from 100% (BUD-3). A goal's bar has no thresholds: `--primary`, and `--success` once the goal is achieved (GOL-4). A loan's bar is the same, filling as it's paid: `--primary`, and `--success` once it's paid off (LOAN-5). The % is always written next to it. |
 | **`QuickAddDialog`** | The transaction form inside a Level 2 dialog (UI_FLOWS §4). |
+| **`SafeToSpendCard`** (Phase 4) | A Level 1 card: "Safe to spend until Sun, Nov 29" in `--muted-foreground`, the amount in `display` size and `--foreground` (never green: it's what's left, not income), then "₱560.00 a day · 15 days left" and "₱1,500.00 held back for Nov 30 – Dec 4" in `small` text. When it's short, the amount is ₱0.00, and "Short by ₱1,240.00 on Fri, Dec 4" is in `--danger` with the `triangle-alert` icon, so it never relies on color alone (SAFE-6). |
+| **`LoanCard`** (Phase 4) | A flat card inside the Loans panel, like a budget card: the name, "E-wallet · 3 of 8 paid", a `ProgressBar` of % paid, "₱5,000.00 left" and the next payment. An overdue next payment is in `--danger` with the `triangle-alert` icon. A paid-off loan has a **Paid off** badge in `--success` (UI_FLOWS §8.5). |
+| **`ForecastRow`** (Phase 4) | A row of the Forecast table, 52 px tall: the window's dates, then Start, Pay in, Bills and Left, right-aligned with tabular digits. The lowest window gets a **lowest** badge in `--muted-foreground`. A window that runs short has the `triangle-alert` icon, and its Left in `--danger` with the word "Short". Opening it shows its movements as flat rows in `--wash` (UI_FLOWS §8.6). |
 
 ---
 
@@ -409,3 +422,4 @@ Glass costs graphics power, so these rules keep the app smooth:
 | 2026-11-01 | The date picker follows `week_start`, and category icons come from a curated list |
 | 2026-11-01 | Sora has no ₱ sign, so ₱ comes from the Segoe UI fallback |
 | 2026-11-06 | Income-vs-expense bars go up for income and down for expense, so the chart never relies on green versus red alone |
+| 2026-11-13 | Phase 4: the `danger` banner for an overdue loan payment, the Debt-free and Forecast sidebar icons, and the `SafeToSpendCard`, `LoanCard` and `ForecastRow` components. Safe to spend is shown in `--foreground`, never green. |

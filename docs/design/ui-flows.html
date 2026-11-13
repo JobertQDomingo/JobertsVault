@@ -71,7 +71,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
   <header class="doc-head">
     <div class="eyebrow"><img src="../../assets/brand/logo.svg" width="16" height="16" alt=""> Jobert's Vault · UI_FLOWS.md</div>
     <h1>Screens and flows</h1>
-    <p class="lede">The visual version of UI_FLOWS.md, in the Glassmorphism 2.0 style: every Phase 1 screen as a desktop mockup, the 10 key flows, and outlines of the Phase 2–4 screens. The sidebar, top bar, period bar and cards are frosted glass panels floating over the aurora. Dialogs, menus and toasts use the stronger raised glass. The sample data is made up but adds up: the October totals, balances, chart bars and budgets all match each other.</p>
+    <p class="lede">The visual version of UI_FLOWS.md, in the Glassmorphism 2.0 style: every Phase 1 screen as a desktop mockup, the key flows, and outlines of the Phase 2–4 screens. The sidebar, top bar, period bar and cards are frosted glass panels floating over the aurora. Dialogs, menus and toasts use the stronger raised glass. The sample data is made up but adds up: the October totals, balances, chart bars and budgets all match each other.</p>
     <div class="meta">
       <span class="pill style"><i data-lucide="circle-check" class="s14"></i> Approved v1.0</span>
       <span class="pill style"><i data-lucide="sparkles" class="s14"></i> Glassmorphism 2.0</span>
@@ -87,7 +87,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
       <a href="#shortcuts">Shortcuts</a><a href="#questions">Open questions</a>
     </nav>
     <div class="controls">
-      <label class="switch" for="show-later"><input type="checkbox" id="show-later"> Show Phase 2–3 additions</label>
+      <label class="switch" for="show-later"><input type="checkbox" id="show-later"> Show Phase 2–4 additions</label>
       <label class="switch" for="reduce-transparency"><input type="checkbox" id="reduce-transparency"> Transparency off</label>
       <label class="switch" for="actual-size"><input type="checkbox" id="actual-size"> Actual size</label>
       <div class="seg-ctl" role="group" aria-label="Preview theme">
@@ -101,7 +101,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
   <!-- 1–2. Shell + Dashboard -->
   <section class="s" id="dashboard">
     <h2><span class="sec-no">§1–2</span> App shell and dashboard <span class="phase p1">Phase 1</span></h2>
-    <p class="sec-intro">The window is a fixed 1440 × 900. Everything floats as glass over the aurora with 12 px gaps: the sidebar, the top bar, the period bar and the cards. The sidebar lists the screens, with Settings at the bottom, and the current screen gets a soft indigo tint. The top bar always has <b>+ Add</b> (<span class="kbd">Ctrl</span> <span class="kbd">N</span>). Turn on <b>Show Phase 2–3 additions</b> in the bar above to see what later phases add, outlined with dashes. Screens from later phases stay hidden in the sidebar until they're built.</p>
+    <p class="sec-intro">The window is a fixed 1440 × 900. Everything floats as glass over the aurora with 12 px gaps: the sidebar, the top bar, the period bar and the cards. The sidebar lists the screens, with Settings at the bottom, and the current screen gets a soft indigo tint. The top bar always has <b>+ Add</b> (<span class="kbd">Ctrl</span> <span class="kbd">N</span>). Turn on <b>Show Phase 2–4 additions</b> in the bar above to see what later phases add, outlined with dashes. Screens from later phases stay hidden in the sidebar until they're built.</p>
     <div class="frame-fit" data-fit>
       <div class="preview shot">
         <div class="v-shell">
@@ -114,6 +114,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
                 <div class="nav"><button class="v-btn ghost icon" type="button" aria-label="Previous period"><i data-lucide="chevron-left"></i></button><span class="label">October 2026</span><button class="v-btn ghost icon" type="button" aria-label="Next period"><i data-lucide="chevron-right"></i></button></div>
                 <button class="v-btn secondary sm" type="button" disabled>Today</button>
               </div>
+              <div class="v-banner warning later later-tag"><i data-lucide="calendar-clock" class="s20"></i><div class="msg">E-wallet loan: ₱1,000.00 due Wed, Oct 28<div class="cap">E-wallet has ₱150.00. Move ₱850.00 there first.</div></div><button class="v-btn secondary sm" type="button">Pay</button><span class="phase">P4</span></div>
               <div class="v-banner warning later later-tag"><i data-lucide="triangle-alert" class="s20"></i><div class="msg">No backup in the last 7 days.</div><button class="v-btn secondary sm" type="button">Back up now</button><span class="phase">P2</span></div>
               <div class="v-banner warning later later-tag"><i data-lucide="credit-card" class="s20"></i><div class="msg">Credit card payment due in 3 days: ₱640.00 owed</div><button class="v-btn secondary sm" type="button">Pay bill</button><span class="phase">P3</span></div>
               <div class="v-banner info later later-tag"><i data-lucide="repeat" class="s20"></i><div class="msg">2 recurring transactions are due.</div><button class="v-btn secondary sm" type="button">Review</button><span class="phase">P3</span></div>
@@ -137,13 +138,22 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
                   <div class="v-row compact"><span class="chip" style="--c:var(--cat-12)"><i data-lucide="briefcase"></i></span><div class="what"><b>Salary</b><span>Employer · Bank</span></div><span class="money inc">+₱4,200.00</span></div>
                   <div class="v-row compact"><span class="chip" style="--c:var(--cat-1)"><i data-lucide="car"></i></span><div class="what"><b>Transportation</b><span>Bus fare · Cash</span></div><span class="money exp">−₱20.00</span></div>
                 </div>
-                <div class="v-card">
-                  <div class="v-card-h"><h3>Accounts</h3><a class="v-link" href="#accounts">Manage</a></div>
-                  <div class="v-acct"><span class="ico"><i data-lucide="wallet"></i></span><b>Cash</b><span class="money">₱320.00</span></div>
-                  <div class="v-acct"><span class="ico"><i data-lucide="landmark"></i></span><b>Bank</b><span class="money">₱8,410.75</span></div>
-                  <div class="v-acct"><span class="ico"><i data-lucide="smartphone"></i></span><b>E-wallet</b><span class="money">₱150.00</span></div>
-                  <div class="v-acct"><span class="ico"><i data-lucide="credit-card"></i></span><div><b>Credit card</b><div class="sub">Available ₱9,360.00 · Due Nov 5</div></div><span class="money">₱640.00 owed</span></div>
-                  <div class="v-total"><span>Net balance</span><span class="money">₱8,240.75</span></div>
+                <div class="stack">
+                  <div class="v-card v-stat later later-tag">
+                    <span class="lab" style="justify-content:space-between"><span>Safe to spend until Tue, Nov 24</span><span class="row" style="gap:10px"><a class="v-link" href="#forecast">View forecast</a><span class="phase">P4</span></span></span>
+                    <span class="display">₱3,508.77</span>
+                    <span class="cap num">₱116.95 a day · 30 days left</span>
+                    <span class="cap num">₱2,944.28 held back for Dec 25, 2026 – Jan 24, 2027</span>
+                  </div>
+                  <div class="v-card">
+                    <div class="v-card-h"><h3>Accounts</h3><a class="v-link" href="#accounts">Manage</a></div>
+                    <div class="v-acct"><span class="ico"><i data-lucide="wallet"></i></span><b>Cash</b><span class="money">₱320.00</span></div>
+                    <div class="v-acct"><span class="ico"><i data-lucide="landmark"></i></span><b>Bank</b><span class="money">₱8,410.75</span></div>
+                    <div class="v-acct"><span class="ico"><i data-lucide="smartphone"></i></span><b>E-wallet</b><span class="money">₱150.00</span></div>
+                    <div class="v-acct"><span class="ico"><i data-lucide="credit-card"></i></span><div><b>Credit card</b><div class="sub">Available ₱9,360.00 · Due Nov 5</div></div><span class="money">₱640.00 owed</span></div>
+                    <div class="v-total"><span>Net balance</span><span class="money">₱8,240.75</span></div>
+                    <div class="row later later-tag cap" style="justify-content:space-between;padding:10px 18px 12px"><a class="v-link" href="#debt-free">Loans left: <span class="num">₱9,000.00</span> · debt-free Jun 28, 2027</a><span class="phase">P4</span></div>
+                  </div>
                 </div>
               </div>
               <div class="cols c2e later">
@@ -492,11 +502,61 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
 
       <div class="flow">
         <div class="flow-h"><span class="fid">F10</span><h4>Confirm recurring transactions</h4><span class="phase">Phase 3</span></div>
-        <ol class="steps"><li>Dashboard banner "2 recurring transactions are due" → <b>Review</b>.</li><li>Each item: <b>Post</b>, <b>Edit &amp; post</b> or <b>Skip</b>.</li></ol>
+        <ol class="steps"><li>Dashboard banner "2 recurring transactions are due" → <b>Review</b>.</li><li>Each item: <b>Post</b>, <b>Edit &amp; post</b> or <b>Skip</b>.</li><li class="later">A payday has <b>Record payslip</b> and <b>Skip</b> instead, and paydays 1–3 days ahead are listed after the due dates with <b>Record now</b>. <span class="phase">P4</span></li></ol>
         <div class="preview shot on-surface">
           <div class="due-row" style="border-top:0"><span class="chip" style="--c:var(--cat-7)"><i data-lucide="zap"></i></span><div class="what" style="min-width:0"><b>Utilities · Water bill</b><div class="cap">Due Sat, Oct 24 · Bank</div></div><span class="money exp" style="text-align:right">−₱32.40</span><span class="row" style="gap:4px"><button class="v-btn primary sm" type="button">Post</button><button class="v-btn ghost sm" type="button">Edit &amp; post</button><button class="v-btn ghost sm" type="button">Skip</button></span></div>
           <div class="due-row"><span class="chip" style="--c:var(--cat-8)"><i data-lucide="heart-pulse"></i></span><div class="what" style="min-width:0"><b>Health &amp; Medical · Gym</b><div class="cap">Due Mon, Oct 26 · Credit card</div></div><span class="money exp" style="text-align:right">−₱30.00</span><span class="row" style="gap:4px"><button class="v-btn primary sm" type="button">Post</button><button class="v-btn ghost sm" type="button">Edit &amp; post</button><button class="v-btn ghost sm" type="button">Skip</button></span></div>
         </div>
+      </div>
+
+      <div class="flow">
+        <div class="flow-h"><span class="fid">F12</span><h4>Add a new loan</h4><span class="phase">Phase 4</span></div>
+        <ol class="steps"><li>Debt-free → <b>+ Add loan</b>: name, paid from, category, <b>A new loan</b>, amount borrowed, date borrowed, and one row per payment.</li><li><b>Save</b> shows what the loan would do first. A loan you already have skips this step.</li></ol>
+        <div class="preview backdrop">
+          <div class="v-dialog confirm" style="width:100%">
+            <div class="v-dialog-h"><h3>Before you add this loan</h3></div>
+            <div class="v-dialog-b">
+              <p style="margin:0">Your debt-free date moves from <b>Mon, Jun 28, 2027</b> to <b>Fri, Oct 15, 2027</b>.</p>
+              <p style="margin:0">Safe to spend drops from <span class="money">₱3,508.77</span> to <span class="money">₱0.00</span>.</p>
+              <p style="margin:0;color:var(--danger)"><i data-lucide="triangle-alert" class="s14"></i> Dec 25, 2026 – Jan 24, 2027 would run short by <span class="money">₱991.23</span>.</p>
+            </div>
+            <div class="v-dialog-f"><button class="v-btn secondary" type="button">Go back</button><button class="v-btn destructive" type="button">Add this loan anyway</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flow">
+        <div class="flow-h"><span class="fid">F13</span><h4>Pay a loan payment</h4><span class="phase">Phase 4</span></div>
+        <ol class="steps"><li>The loan banner's <b>Pay</b>, or <b>Mark paid</b> on the loan's payment row.</li><li>The transaction form opens as "Mark paid", filled in with the scheduled amount, the loan's account and category, and today. Change the amount for a late fee → Save.</li><li>To undo it: the paid row's ⋯ → <b>Mark unpaid</b>, which deletes the expense.</li></ol>
+        <div class="preview shot on-surface">
+          <div class="due-row" style="border-top:0"><span class="chip" style="--c:var(--cat-2)"><i data-lucide="coins"></i></span><div class="what" style="min-width:0"><b>Sep 28, 2026</b><div class="cap">Paid before</div></div><span class="money" style="text-align:right">₱1,000.00</span><span></span></div>
+          <div class="due-row"><span class="chip" style="--c:var(--cat-2)"><i data-lucide="coins"></i></span><div class="what" style="min-width:0"><b>Wed, Oct 28, 2026</b><div class="cap">Unpaid · due in 2 days</div></div><span class="money" style="text-align:right">₱1,000.00</span><span class="row" style="gap:4px"><button class="v-btn primary sm" type="button">Mark paid</button></span></div>
+          <div class="due-row"><span class="chip" style="--c:var(--cat-2)"><i data-lucide="coins"></i></span><div class="what" style="min-width:0"><b>Sat, Nov 28, 2026</b><div class="cap">Unpaid</div></div><span class="money" style="text-align:right">₱1,000.00</span><span class="row" style="gap:4px"><button class="v-btn ghost sm" type="button">Mark paid</button></span></div>
+        </div>
+        <div class="result"><span>Paying records an expense of <span class="money exp">−₱1,000.00</span> from E-wallet.</span><span class="muted">·</span><span>Until then, the payment changes no balance or total.</span></div>
+      </div>
+
+      <div class="flow">
+        <div class="flow-h"><span class="fid">F14</span><h4>Record a payslip</h4><span class="phase">Phase 4</span></div>
+        <ol class="steps"><li>On payday: <b>Review</b> → <b>Record payslip</b>. Paid early: <b>Record now</b> on the Safe to spend card, from 3 days before.</li><li>It starts from that payday's last payslip, or else the last one of that category. Change what's different → Save.</li></ol>
+        <div class="preview" style="padding:12px">
+          <div class="v-dialog" style="width:100%;box-shadow:var(--shadow)">
+            <div class="v-dialog-h"><h3>Payslip · Salary</h3></div>
+            <div class="v-dialog-b">
+              <div class="row" style="gap:8px"><div class="v-field" style="flex:1"><span class="v-label">Date</span><div class="v-input"><span class="grow">10/25/2026</span></div></div><div class="v-field" style="flex:1"><span class="v-label">Account</span><div class="v-input"><i data-lucide="landmark" class="muted"></i><span class="grow">Bank</span></div></div></div>
+              <div class="form-row"><span class="v-label">Gross pay</span><div class="v-input amount">4,600.00</div></div>
+              <span class="v-label">Deductions</span>
+              <div class="row" style="gap:8px"><div class="v-input" style="flex:1"><span class="chip sm" style="--c:var(--cat-6)"><i data-lucide="shield"></i></span><span class="grow">SSS</span></div><div class="v-input amount" style="width:120px">180.00</div><button class="v-btn ghost icon" type="button" aria-label="Remove"><i data-lucide="x"></i></button></div>
+              <div class="row" style="gap:8px"><div class="v-input" style="flex:1"><span class="chip sm" style="--c:var(--cat-7)"><i data-lucide="heart-pulse"></i></span><span class="grow">PhilHealth</span></div><div class="v-input amount" style="width:120px">115.00</div><button class="v-btn ghost icon" type="button" aria-label="Remove"><i data-lucide="x"></i></button></div>
+              <div class="row" style="gap:8px"><div class="v-input" style="flex:1"><span class="chip sm" style="--c:var(--cat-8)"><i data-lucide="house"></i></span><span class="grow">Pag-IBIG</span></div><div class="v-input amount" style="width:120px">100.00</div><button class="v-btn ghost icon" type="button" aria-label="Remove"><i data-lucide="x"></i></button></div>
+              <div class="row" style="gap:8px"><div class="v-input" style="flex:1"><span class="chip sm" style="--c:var(--cat-9)"><i data-lucide="receipt"></i></span><span class="grow">Withholding tax</span></div><div class="v-input amount" style="width:120px">5.00</div><button class="v-btn ghost icon" type="button" aria-label="Remove"><i data-lucide="x"></i></button></div>
+              <div><button class="v-btn ghost sm" type="button"><i data-lucide="plus"></i>Add deduction</button></div>
+              <div class="v-total" style="border-radius:12px"><span>Net pay</span><span class="money">₱4,200.00</span></div>
+            </div>
+            <div class="v-dialog-f"><button class="v-btn secondary sm" type="button">Cancel</button><button class="v-btn primary sm" type="button">Save</button></div>
+          </div>
+        </div>
+        <div class="result"><span>Records <span class="money inc">+₱4,600.00</span> Salary and 4 deductions (<span class="money exp">−₱400.00</span>), so Bank goes up by the net <span class="money">₱4,200.00</span>.</span></div>
       </div>
     </div>
   </section>
@@ -504,7 +564,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
   <!-- 8. Later screens -->
   <section class="s" id="later">
     <h2><span class="sec-no">§8</span> Phase 2–4 screens <span class="phase">outline</span></h2>
-    <p class="sec-intro">Rougher than the Phase 1 screens. UI_FLOWS §8 has the full detail. They always show here, whatever the Phase 2–3 switch is set to.</p>
+    <p class="sec-intro">Rougher than the Phase 1 screens. UI_FLOWS §8 has the full detail. They always show here, whatever the Phase 2–4 switch is set to.</p>
 
     <h3 class="sub">Reports <span class="phase">Phase 2</span></h3>
     <div class="preview stack">
@@ -573,6 +633,72 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
         </div>
       </div>
     </div>
+
+    <h3 class="sub" id="debt-free">Debt-free <span class="phase">Phase 4</span></h3>
+    <div class="preview stack">
+      <div class="v-card" style="padding:16px 18px;display:grid;gap:8px">
+        <div class="row" style="justify-content:space-between"><b style="font-size:18px;line-height:28px">Debt-free on Mon, Jun 28, 2027</b><span class="cap num">245 days to go</span></div>
+        <div class="v-prog-row"><span class="cap num" style="width:230px"><span class="money" style="color:var(--foreground)">₱9,000.00</span> left · ₱3,000.00 paid</span><div class="v-progress"><i style="width:25%"></i></div><span class="cap num" style="width:64px;text-align:right">25% paid</span></div>
+        <span class="cap num">117 days since your last new loan · ₱1,200.00 in interest</span>
+      </div>
+      <div class="grid g2">
+        <div class="v-card">
+          <div class="v-card-h"><h3>Loans</h3><button class="v-btn primary sm" type="button"><i data-lucide="plus"></i>Add loan</button></div>
+          <div style="padding:6px 16px 16px;display:grid;gap:10px">
+            <div class="v-card budget-card" style="box-shadow:none"><div class="row" style="justify-content:space-between"><b>E-wallet loan</b><span class="cap">E-wallet · 3 of 12 paid</span></div><div class="v-prog-row"><div class="v-progress"><i style="width:25%"></i></div><span class="cap num">25%</span></div><span class="cap num">₱9,000.00 left · ₱1,200.00 interest</span><span class="cap num">Next <b style="color:var(--foreground)">₱1,000.00</b> due Wed, Oct 28</span></div>
+            <span class="cap"><i data-lucide="chevron-right" class="s14"></i> Show archived (1)</span>
+          </div>
+        </div>
+        <div class="v-card">
+          <div class="v-card-h"><h3>Before you borrow</h3></div>
+          <div style="padding:6px 18px 16px;display:grid;gap:10px">
+            <div class="row" style="gap:8px"><div class="v-field" style="flex:1"><span class="v-label">Payment</span><div class="v-input amount">1,500.00</div></div><div class="v-field" style="width:90px"><span class="v-label">How many</span><div class="v-input amount">12</div></div><div class="v-field" style="width:140px"><span class="v-label">First payment</span><div class="v-input"><span class="grow">11/15/2026</span></div></div></div>
+            <div><button class="v-btn secondary sm" type="button">Try it</button></div>
+            <div class="stack" style="gap:4px">
+              <span class="cap num">Debt-free: <b style="color:var(--foreground)">Jun 28, 2027 → Oct 15, 2027</b> (109 days later)</span>
+              <span class="cap num">Safe to spend now: <b style="color:var(--foreground)">₱3,508.77 → ₱0.00</b></span>
+              <span class="cap num" style="color:var(--danger)"><i data-lucide="triangle-alert" class="s14"></i> Dec 25, 2026 – Jan 24, 2027 would run short by ₱991.23</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="v-card">
+        <div class="v-card-h"><h3>Money freed up</h3></div>
+        <div class="v-acct" style="grid-template-columns:minmax(0,1fr) auto"><div><b>October 2026</b><div class="sub">This month</div></div><span class="money">₱1,000.00 to loans</span></div>
+        <div class="v-acct" style="grid-template-columns:minmax(0,1fr) auto"><div><b>June 2027</b><div class="sub">The last payment</div></div><span class="money">₱1,000.00 to loans</span></div>
+        <div class="v-acct" style="grid-template-columns:minmax(0,1fr) auto"><div><b>July 2027</b><div class="sub">₱1,000.00 less than this month</div></div><span class="money">₱0.00</span></div>
+      </div>
+      <span class="cap">One active loan of 12 payments of ₱1,000.00 from E-wallet, borrowed Jul 1 as ₱10,800.00. The 3 from before the app are "paid before". Before you borrow tries 12 payments of ₱1,500.00 from Nov 15: the third one lands in the lowest pay window, which would then run short.</span>
+    </div>
+
+    <h3 class="sub" id="forecast">Forecast <span class="phase">Phase 4</span></h3>
+    <div class="preview stack">
+      <div class="v-card v-stat">
+        <span class="lab">Safe to spend until Tue, Nov 24</span>
+        <span class="display">₱3,508.77</span>
+        <span class="cap num">₱116.95 a day · ₱2,944.28 held back for Dec 25, 2026 – Jan 24, 2027, whose bills are more than its pay</span>
+      </div>
+      <div class="row"><div class="v-toolbar"><div class="v-seg"><span class="on">Pay windows</span><span>Months</span></div></div></div>
+      <div class="v-card">
+        <div class="tbl-wrap" style="border:0;border-radius:19px">
+          <table class="t">
+            <thead><tr><th>Window</th><th style="text-align:right">Start</th><th style="text-align:right">Pay in</th><th style="text-align:right">Bills</th><th style="text-align:right">Left</th></tr></thead>
+            <tbody>
+              <tr><td>Oct 26 – Nov 24</td><td class="num" style="text-align:right">₱8,880.75</td><td class="num" style="text-align:right">—</td><td class="num" style="text-align:right">₱2,427.70</td><td class="money" style="text-align:right">₱6,453.05</td></tr>
+              <tr><td>Nov 25 – Dec 24</td><td class="num" style="text-align:right">₱6,453.05</td><td class="num" style="text-align:right">₱4,200.00</td><td class="num" style="text-align:right">₱2,628.29</td><td class="money" style="text-align:right">₱8,024.76</td></tr>
+              <tr><td><i data-lucide="chevron-down" class="s14 muted"></i> Dec 25, 2026 – Jan 24, 2027 <span class="badge auto">lowest</span></td><td class="num" style="text-align:right">₱8,024.76</td><td class="num" style="text-align:right">₱4,200.00</td><td class="num" style="text-align:right">₱8,715.99</td><td class="money" style="text-align:right">₱3,508.77</td></tr>
+              <tr style="background:var(--wash)"><td class="cap" style="padding-left:28px">Fri, Dec 25 · Salary (expected)</td><td class="cap">Bank</td><td></td><td></td><td class="money inc" style="text-align:right">+₱4,200.00</td></tr>
+              <tr style="background:var(--wash)"><td class="cap" style="padding-left:28px">Mon, Dec 28 · E-wallet loan</td><td class="cap">E-wallet</td><td></td><td></td><td class="money exp" style="text-align:right">−₱1,000.00</td></tr>
+              <tr style="background:var(--wash)"><td class="cap" style="padding-left:28px">Fri, Jan 1 · Rent/Housing</td><td class="cap">Bank</td><td></td><td></td><td class="money exp" style="text-align:right">−₱1,200.00</td></tr>
+              <tr style="background:var(--wash)"><td class="cap" style="padding-left:28px">Tue, Jan 5 · Credit card payment</td><td class="cap">Credit card</td><td></td><td></td><td class="money exp" style="text-align:right">−₱15.99</td></tr>
+              <tr style="background:var(--wash)"><td class="cap" style="padding-left:28px">Sun, Jan 10 · Insurance · yearly</td><td class="cap">Bank</td><td></td><td></td><td class="money exp" style="text-align:right">−₱6,500.00</td></tr>
+              <tr><td>Jan 25 – Feb 24, 2027</td><td class="num" style="text-align:right">₱3,508.77</td><td class="num" style="text-align:right">₱4,200.00</td><td class="num" style="text-align:right">₱2,215.99</td><td class="money" style="text-align:right">₱5,492.78</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <span class="cap">Money now is Cash, Bank and E-wallet (₱8,880.75). Spending the ₱6,453.05 left at Nov 24 would leave the yearly insurance window ₱2,944.28 short, so that much is held back now.</span>
+    </div>
   </section>
 
   <!-- 9. States -->
@@ -628,6 +754,9 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
       <li><b>Pay bill:</b> suggests the full amount owed, editable (CC-9).</li>
       <li><b>Window:</b> fixed 1440 × 900, not resizable or maximizable. It fits both monitors (1920 × 1080 and 2560 × 1080) at 100% scaling and falls back to 1280 × 800, with the same layout zoomed to 88.9%, if the screen is too small.</li>
       <li><b>Logo:</b> C · Line Door, in the sidebar and the title bar.</li>
+      <li><b>Loan banners (Phase 4):</b> one per loan, for its next unpaid payment, saying how many others are overdue.</li>
+      <li><b>Safe to spend (Phase 4):</b> a card at the top of the dashboard's right column, always for today, and the lowest point over the next 12 months, never only "until the next payday".</li>
+      <li><b>New loans (Phase 4):</b> saving one shows what it does to the debt-free date and Safe to spend first. The button to go ahead is destructive.</li>
     </ul>
   </section>
 </div>
@@ -637,7 +766,8 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
   // Sidebar, shared by every full-screen mockup
   var nav = [
     ["dashboard", "Dashboard", "layout-dashboard", ""], ["transactions", "Transactions", "list", ""], ["accounts", "Accounts", "landmark", ""],
-    ["reports", "Reports", "chart-pie", "P2"], ["recurring", "Recurring", "repeat", "P3"], ["budgets", "Budgets", "target", "P3"], ["goals", "Goals", "flag", "P3"]
+    ["reports", "Reports", "chart-pie", "P2"], ["recurring", "Recurring", "repeat", "P3"], ["budgets", "Budgets", "target", "P3"], ["goals", "Goals", "flag", "P3"],
+    ["debt-free", "Debt-free", "hand-coins", "P4"], ["forecast", "Forecast", "calendar-range", "P4"]
   ];
   document.querySelectorAll(".v-side[data-active]").forEach(function (side) {
     var active = side.getAttribute("data-active");

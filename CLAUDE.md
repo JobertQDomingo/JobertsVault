@@ -38,13 +38,16 @@ Build **only the current phase**. Don't build features from a later phase, or ou
 - **Balances are signed.** Credit card debt is a negative balance, and `amount_owed = max(0, −balance)`. In forms, the user types the amount owed as a positive number. Limits aren't enforced: a card can go past its limit, and an account can go below 0.
 - **Opening balances are not income**, and forms accept only 0 or more.
 - **Future-dated transactions are allowed** (TXN-8, Phase 3), but they don't count toward any balance, total, report or budget until their date arrives: every figure counts only `date ≤ today`. They're listed only under Upcoming at the top of the transaction list.
+- **Unpaid loan payments aren't transactions** (Phase 4, ADR 0011). They count toward no balance, total, report or budget until they're marked paid, which records an expense. Deleting that expense makes the payment unpaid again. Only the forecast counts unpaid payments, as bills to come.
+- **A payslip is one gross income row plus its deduction expense rows**, all sharing `payslip_id` (the gross row's id). They're saved, edited and deleted together. A payday is an income rule in Confirm mode, and it's settled with a payslip, never Post.
+- **Safe to spend looks 12 months ahead.** It's the lowest of every pay window's end, never only "until the next payday", and expected pay is the lowest net of the last 3 payslips of that category (plus the rule's estimate until there are 3). DATA_MODEL §5.12–5.15 has the rules.
 - **Refunds are income** (in the "Refund" category). They offset net cashflow but don't reduce expense totals or budgets.
 - **Archived accounts still count toward the net balance.** Archiving an account whose balance isn't 0 requires confirming a warning.
 - **Weeks start on Monday** by default. A month can start on any day from 1 to 28 (`month_start_day`). **Years are always calendar years.**
 - **Comparisons:** a period still in progress is compared with the same number of days at the start of the previous period, unless `comparison_mode = full`. If the comparison total is 0, show "—".
 - **Recurring dates** are always calculated from `start_date + n × interval`, never from the previous occurrence. Days past the end of a short month fall on its last day.
-- **`currency_decimals` can't change** once any amount is stored: a transaction, a recurring rule, a budget, a goal, or an account's non-zero opening balance or credit limit.
-- **In-use records are archived, not deleted.** Accounts, categories and payment methods use `ON DELETE RESTRICT`. Unused ones can be deleted. The last active account, and the last active category of each kind, can't be archived or deleted.
+- **`currency_decimals` can't change** once any amount is stored: a transaction, a recurring rule, a budget, a goal, a loan, or an account's non-zero opening balance or credit limit.
+- **In-use records are archived, not deleted.** Accounts, categories and payment methods use `ON DELETE RESTRICT`, and a loan puts its account and category in use. Unused ones can be deleted. The last active account, and the last active category of each kind, can't be archived or deleted.
 - **Custom periods** move by the length of their range, and ▶ stops at the current period. The frontend never works out period dates: it uses what `get_period` returns.
 - **Debug builds use `jobertsvault-dev.db`**, so development never touches real data. Never remove this split. Debug builds also never check for or install updates.
 - **Migrations are backed up first.** An existing database is copied before any pending migration runs, and a failed backup stops the migration (BAK-5).

@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Approved v1.1 |
+| **Status** | Approved v1.2 |
 | **Style** | Glassmorphism 2.0 ([DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)) |
-| **Last updated** | 2026-11-11 |
+| **Last updated** | 2026-11-13 |
 | **Related docs** | [PRD.md](PRD.md), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), [ARCHITECTURE.md](ARCHITECTURE.md) §5.4 (routes) |
 
 The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors, glass levels and components come from DESIGN_SYSTEM.md. [design/ui-flows.html](design/ui-flows.html) shows every screen drawn in the real style, with consistent ₱ sample data. Open it in a browser.
@@ -25,6 +25,8 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
 │ │ ↻ Recurring (P3) │  │    card      │ │    card      │ │    card      │             │
 │ │ ◎ Budgets   (P3) │  ╰──────────────╯ ╰──────────────╯ ╰──────────────╯             │
 │ │ ⚑ Goals     (P3) │                     (page content)                              │
+│ │ ¤ Debt-free (P4) │                                                                 │
+│ │ ◷ Forecast  (P4) │                                                                 │
 │ │ ──────────────── │                                                                 │
 │ │ ⚙ Settings       │                                                                 │
 │ ╰──────────────────╯                                                                 │
@@ -80,6 +82,19 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
   - a **Budgets** panel under Recent transactions, with **Manage** (to `/budgets`) in its header: one row per budget, with its chip and name, its period and a `ProgressBar` with the % used. Each bar is for that budget's own current week, month or year, whatever the period switcher shows, like the account balances (DSH-6). With no budgets, it says "No budgets yet."
   - a **Coming up** panel beside Budgets, with **View all** (to `/recurring`) in its header: every date an active recurring rule falls on from tomorrow to 7 days from today, soonest first (DSH-7). Each row has the category chip (or the transfer chip), the title ("Dining Out · Netflix", or "Bank → E-wallet"), "Fri, Nov 6 · Credit card · auto" (or "· needs confirming" for a Confirm rule; a transfer leaves out the account its title names), and the amount. A rule with several dates in the week has a row for each. Past 8 rows, it ends with "+ N more", linking to `/recurring`. With none, it says "Nothing in the next 7 days." Paused and ended rules have no dates, and one-off future-dated transactions stay under Upcoming on the Transactions screen (TXN-8)
   - the "2 recurring transactions are due." banner (F10)
+- **Phase 4:**
+  - **Loan banners** (LOAN-4) at the top, before every other banner. There's one per active loan whose next unpaid payment is due within 5 days or is overdue, soonest first (DATA_MODEL §5.11):
+    - `warning`: "E-wallet loan: ₱1,000.00 due Fri, Nov 20" ("due today" and "due tomorrow" for 0 and 1 days)
+    - `danger`, once it's overdue: "E-wallet loan: ₱1,000.00 overdue since Mon, Nov 16", plus "and 1 more overdue" when the loan has others
+    - Each has a **Pay** button that opens Mark paid for that payment (F13). When its account is short, a second line says "E-wallet has ₱200.00. Move ₱800.00 there first."
+  - a **Safe to spend** card at the top of the right column, above Accounts (SAFE-6). It's for today, like the balances, whatever the period switcher shows:
+    - "Safe to spend until Sun, Nov 29", then the amount in `display` size
+    - "₱560.00 a day · 15 days left"
+    - "₱1,500.00 held back for Nov 30 – Dec 4", or, when even that isn't enough, ₱0.00 and "Short by ₱1,240.00 on Fri, Dec 4" in `--danger`, with an icon
+    - from 3 days before a payday: "Payday Mon, Nov 30. Paid early? **Record now**" (PAY-4, F14)
+    - **View forecast** in its header, to `/forecast`
+    - With no payday rule: "Mark your pay as a payday to see what's safe to spend." with **Open Recurring**
+  - **"Loans left: ₱14,000.00 · debt-free Aug 10, 2027"** under the net balance in Accounts, linking to `/debt-free`. It's hidden when nothing is left (LOAN-11).
 
 ---
 
@@ -108,6 +123,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
 - **Clicking a row** opens the edit dialog. **Hover buttons:** ✎ edit, ⧉ duplicate (TXN-2). **Delete** is inside the edit dialog.
 - Rows load in **pages of 100** as you scroll (ARCHITECTURE §12).
 - **Future-dated** transactions (Phase 3, TXN-8) appear above "Today" under an **Upcoming** header, in muted text, grouped by day with no day net. While the period hasn't ended, Upcoming holds every later row that matches the other filters, even past the period's end, so a row dated next month can still be opened. The summary line leaves them out (DATA_MODEL §5.2).
+- **Payslip rows** (Phase 4) are listed like any other, the gross as income and each deduction as an expense. Clicking one opens its payslip (F14), not the transaction form. A row that **pays a loan** opens the transaction form as usual, and its Delete confirm says "Delete this transaction? Its loan payment becomes unpaid again." Unpaid loan payments aren't transactions, so they never appear here.
 
 ---
 
@@ -299,6 +315,45 @@ Welcome to Jobert's Vault
    - **Edit & post** opens the transaction form (§4) over the dialog, titled "Edit & post", filled in from the template with the due date. **Save** posts what's in it and closes it, with a "Posted" toast. It has no Save & add another, and it changes only that date, never the rule.
    - **Skip** settles the date with no transaction, with a "Skipped" toast. It never comes back.
 3. The dialog closes by itself once nothing is left, and the banner goes with it. A failure is a toast, and the date stays on the list.
+4. **Paydays (Phase 4):** a payday's row has **Record payslip** (F14) and **Skip**, in place of Post and Edit & post. After the due dates, the dialog lists each payday 1–3 days ahead as "Payday Mon, Nov 30 · Bank" with **Record now**, for pay that arrives early (PAY-4). The banner counts only the dates that are due, never the early ones.
+
+### F12: Add a loan (Phase 4, LOAN-1, LOAN-10)
+1. Debt-free → **+ Add loan** opens the "Add loan" dialog (640 px, since it holds a list):
+   - **Name**, e.g. "E-wallet loan"
+   - **Paid from:** an active cash, bank or e-wallet account
+   - **Category:** Loan to start with
+   - **This is:** [A new loan │ A loan I already have]. A new loan is selected to start with, so a new one always gets the check below.
+   - **Amount borrowed:** optional. The help text says "Add it to see what the loan costs in interest."
+   - **Date borrowed:** today to start with. It's required for a new loan and optional for one the user already has.
+   - **Payments:** one row each, with **Date** and **Amount** and an ✕ to remove it. **+ Add payment**, or Enter in the last amount, adds a row with the previous row's amount, dated one more month after the first payment, with the day clamped to the month's end, so month ends don't drift (Jan 31, Feb 28, Mar 31). That's a form default from `lib/dates.ts` that the user can change; the backend checks every row. On a loan the user already has, a row dated before the day the loan is added (today, while it's being added) shows "Paid before".
+2. **Save:**
+   - **A loan the user already has** is saved at once, with a "Loan added" toast.
+   - **A new loan** first shows the "Before you add this loan" confirm (LOAN-10), from `preview_loan`: "Your debt-free date moves from Tue, Aug 10, 2027 to Fri, Oct 15, 2027.", "Safe to spend drops from ₱8,400.00 to ₱7,400.00.", and, when it would make a pay window short, a line such as "Nov 30 – Dec 4 would run short by ₱180.00." **Go back** returns to the form, and **Add this loan anyway** (destructive) saves it and restarts the loan-free streak.
+3. **Edit** (the loan's ⋯ → **Edit**, or **Edit** in its payments dialog) is the same form, titled "Edit loan". Paid rows are locked and show "Paid Nov 9". "This is" can't change.
+
+### F13: Pay a loan payment (Phase 4, LOAN-3, LOAN-4)
+1. Click **Pay** on the dashboard's loan banner, or open the loan on Debt-free and click **Mark paid** on an unpaid row.
+2. The transaction form (§4) opens, titled "Mark paid", with the type fixed to Expense and these fields filled in: the scheduled amount, the loan's account and category, today's date, and the loan's name as the payee. Change the amount for a late fee. **Save** records the expense, with a "Marked paid" toast. The balances go down, and the row says "Paid Nov 20".
+3. **To undo it**, open the paid row's ⋯ menu in the payments dialog and choose **Mark unpaid**. It confirms first: "Mark this payment unpaid? The expense recorded for it is deleted." Deleting that expense on the Transactions screen does the same.
+
+### F14: Record a payslip (Phase 4, PAY-2, PAY-4)
+1. **On payday:** the Due banner (F10) → **Review** → **Record payslip** on the payday's row. **Paid early:** **Record now** on the Safe to spend card, or on the payday's early row in the Due dialog, from 3 days before.
+2. The "Payslip · Salary" dialog opens, filled in from that payday rule's last payslip, else the last Salary payslip, else the rule's amount the first time (`get_payslip_defaults`):
+   - **Date:** the payday, or today when it's early
+   - **Account**
+   - **Gross pay**
+   - **Deductions:** one row each, with a category (the deduction categories come first, then the other expense categories) and an amount, plus an ✕. **+ Add deduction** adds one.
+   - **Note**
+   - **Net pay**, shown under the rows. It comes from the backend as the user types (`preview_payslip`), and it's in `--danger` with "Deductions can't add up to the gross pay or more" when it isn't above 0.
+3. **Save** records the gross as income and each deduction as an expense (DATA_MODEL §4.7), with a "Payslip saved" toast, and settles the payday.
+4. **Editing:** clicking any of its rows on Transactions opens it again as "Edit payslip". **Delete** (bottom left) asks "Delete this payslip? Its gross pay and 4 deductions are deleted." The payday stays settled.
+
+### F15: Before you borrow (Phase 4, LOAN-9)
+1. On Debt-free, the **Before you borrow** panel asks for the **Payment** amount, **How many** payments and the **First payment** date. The payments are monthly, on the first payment's day of the month.
+2. **Try it** shows the result from `preview_loan`, and nothing is saved:
+   - "Debt-free: Aug 10, 2027 → Oct 15, 2027 (66 days later)"
+   - "Safe to spend now: ₱8,400.00 → ₱7,400.00"
+   - each pay window it changes, with what's left before and after ("Dec 15–29: ₱18,300.00 → ₱17,300.00"), and any window it would make short in `--danger`
 
 ### F11: Update the app (Phase 1)
 - **Automatic (the default):** at startup, the app checks for a newer version. "Checking for updates…" appears only if the check takes more than 150 ms. If there's a newer version, "Updating Jobert's Vault to 0.2.0…" appears, and the app closes and reopens on it. There's nothing to click (UPD-1).
@@ -337,6 +392,8 @@ The rule form has no Save & add another. Saving a rule posts or queues its dates
 
 **Editing** a rule ("Edit rule") keeps its start date, so changing the amount, category, mode or end keeps the rule's place. Changing **Repeats** or **Every** starts it again, so the form offers the rule's next date as the new start, unless another start was already chosen (DATA_MODEL §4.1).
 
+**Paydays (Phase 4, PAY-1):** an Income rule's form has a **This is a payday** switch under Mode. Turning it on sets Mode to Confirm and disables the Mode choice. The amount's label becomes "Expected net pay", with the help text "Used until 3 payslips are recorded. After that, the lowest of the last 3 counts." In the list, a payday rule has a **Payday** badge in place of Confirm. For pay on the 15th and the 30th, the user makes two monthly rules, one starting on each day.
+
 ### 8.3 Budgets (`/budgets`), Phase 3
 One panel, with **+ New budget** in its header, holding a grid of flat budget cards (three across), all spending first, then in the categories' order. Each card has the category chip (or "All spending"), the period, a `ProgressBar` and "₱320.00 of ₱400.00 · ₱80.00 left". Past its limit, the card says "₱180.00 of ₱150.00 · ₱30.00 over" in `--danger`. The bar turns amber at 80% and red at 100% (BUD-3). The cards are flat tints inside the one panel, so any number of budgets stays within the blur budget (DESIGN_SYSTEM §2.3).
 
@@ -361,6 +418,67 @@ Clicking a card edits it. Its ⋯ menu has **Edit**, **Archive** and **Delete** 
 - **Account:** an active account that isn't a credit card. An edit keeps its own account even if it's been archived. A note says the account's balance is the goal's progress (GOL-2).
 
 The backend's message shows under the field it names.
+
+### 8.5 Debt-free (`/debt-free`), Phase 4
+
+```
+┌─ Debt-free ─────────────────────────────────────────────────────────────────────┐
+│ Debt-free on Tue, Aug 10, 2027                                 270 days to go   │
+│ ₱14,000.00 left · ₱4,000.00 paid   █████░░░░░░░░░░░░░░░░░ 22% paid               │
+│ 52 days since your last new loan · ₱3,000.00 in interest on 2 loans             │
+└─────────────────────────────────────────────────────────────────────────────────┘
+┌─ Loans ──────────────────────────────── [+ Add loan] ┐ ┌─ Before you borrow ─────┐
+│ ┌─ E-wallet loan ────────┐ ┌─ Bank loan ───────────┐ │ │ Payment   [ ₱1,000.00 ] │
+│ │ E-wallet · 3 of 8 paid │ │ Bank · 1 of 10 paid   │ │ │ How many  [ 6 ]         │
+│ │ ███████░░░░░░ 37%      │ │ █░░░░░░░░░░░░ 10%     │ │ │ First     [ 12/18/2026 ]│
+│ │ ₱5,000.00 left         │ │ ₱9,000.00 left        │ │ │           [ Try it ]    │
+│ │ Next ₱1,000.00 Nov 20  │ │ Next ₱1,000.00 Dec 10 │ │ │ (the result, F15)       │
+│ └────────────────────────┘ └───────────────────────┘ │ └─────────────────────────┘
+│ ▸ Show archived (1)                                  │
+└──────────────────────────────────────────────────────┘
+┌─ Money freed up ────────────────────────────────────────────────────────────────┐
+│ November 2026     ₱2,000.00 to loans                                            │
+│ April 2027        ₱1,000.00 to loans    ₱1,000.00 less than this month          │
+│ September 2027    ₱0.00                 ₱2,000.00 less than this month          │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **The top panel** (LOAN-5 to LOAN-8) shows the debt-free date and days to go, the total left and paid with a `ProgressBar` of the share paid, the loan-free streak ("52 days since your last new loan", hidden when no loan has a date borrowed) and the total interest (hidden when no loan has an amount borrowed). With everything paid, it says "You're debt-free." in `--success`. When everything left is overdue, it says "₱2,000.00 overdue. Pay it to be debt-free." in `--danger`, with an icon, in place of the countdown (DATA_MODEL §5.11).
+- **Loans:** one flat card per active loan, two across, in the order they were added. Each card has the name, "E-wallet · 3 of 8 paid", a `ProgressBar` of % paid, "₱5,000.00 left", the interest when it has an amount borrowed, and the next payment. An overdue next payment says "Overdue since Mon, Nov 16" in `--danger`, with an icon. A paid-off loan gets a **Paid off** badge in `--success`. The cards are flat tints inside the one panel, as on Budgets (DESIGN_SYSTEM §2.3). Archived loans fold under **Show archived (n)**.
+- **Clicking a card** opens its payments dialog (640 px), titled with the loan's name, with **Edit** in its header. It has one row per payment, oldest first: the date, the amount, and "Unpaid" with **Mark paid** (F13), "Overdue" in `--danger` with **Mark paid**, "Paid Nov 20" with a ⋯ menu holding **Mark unpaid**, or "Paid before".
+- **A card's ⋯ menu** has **Edit**, plus **Archive** once it's paid off, and **Delete** when none of its payments was marked paid: "Delete this loan? Its payments are deleted. This can't be undone." An archived card's ⋯ has **Unarchive**.
+- **Before you borrow** (LOAN-9) is F15.
+- **Money freed up** (LOAN-7) has one row per month, from this month to the month after the debt-free date: what goes to loans, and how that compares with this month. The list scrolls inside its panel.
+- With no loans, the screen is one empty state: "No loans. Keep it that way." with **Add loan**.
+
+### 8.6 Forecast (`/forecast`), Phase 4
+
+```
+┌─ Safe to spend ─────────────────────────────────────────────────────────────────┐
+│ ₱8,400.00 until Sun, Nov 29 · ₱560.00 a day                                     │
+│ ₱1,500.00 held back for Nov 30 – Dec 4, whose bills are more than its pay       │
+└─────────────────────────────────────────────────────────────────────────────────┘
+╭─ [ Pay windows │ Months ] ─╮
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ Window            Start         Pay in        Bills          Left               │
+│ Nov 15–29         ₱12,500.00    —             ₱2,600.00      ₱9,900.00          │
+│                   ₱10,500.00 received                                           │
+│ Nov 30 – Dec 4    ₱9,900.00     ₱10,500.00    ₱12,000.00     ₱8,400.00  lowest  │
+│ ▾ Dec 5–14        ₱8,400.00     ₱6,000.00     ₱4,000.00      ₱10,400.00         │
+│     Sat, Dec 5    Bonus (expected)                   Bank      +₱6,000.00       │
+│     Thu, Dec 10   Insurance · yearly                 Bank      −₱4,000.00       │
+│ Dec 15–29         ₱10,400.00    ₱10,500.00    ₱2,600.00      ₱18,300.00         │
+│ …                                                                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+Today in this sketch is Sun, Nov 15, a payday whose payslip is already recorded. Spending the ₱9,900.00 left now would leave Nov 30 – Dec 4 ₱1,500.00 short, so ₱1,500.00 is held back and ₱8,400.00 is safe to spend.
+
+- **The top panel** is the dashboard's Safe to spend card at full width (SAFE-5, SAFE-6): the amount, the amount per day, and what's held back and for which window, or "Short by ₱X on *date*" in `--danger`. When a payday is 1–3 days away, it also has "Paid early? **Record now**" (F14).
+- **The toolbar's segmented control** switches between **Pay windows** and **Months**, kept in the URL (`?view=months`) (SAFE-7).
+- **The table** has one row per pay window, or per month, over the next 12 months. Each row shows its dates (the current one starting today), what it starts with, the pay and other money coming in, the bills, and what's left at its end if nothing else is spent (DATA_MODEL §5.15). A payslip already recorded shows as "₱10,500.00 received" in muted text, without being added again. The window money is held back for is marked **lowest**. A window that would run short on any day has a triangle icon and its Left in `--danger` with "Short".
+- **Clicking a row** opens it in place to list its movements, by date: each loan payment (by loan name), card bill ("Credit card payment"), recurring date ("Utilities · Water bill"), future-dated row, and payday ("Salary (expected)"), with its account and a signed amount. Only one row is open at a time.
+- **With no payday rule,** the screen is one empty state: "Mark your pay as a payday to see what's safe to spend." with **Open Recurring**.
 
 ---
 
@@ -435,3 +553,15 @@ Answered on 2026-11-12:
 
 17. **Card due banner** (CC-7): one banner per card, named after it, so two cards are never confused (CC-8). Archived cards get none, since they take no new transfers and archiving one with a balance already needed a confirmed warning (§2).
 18. **Planning screens in the sidebar:** Recurring, Budgets and Goals come after Reports, as §1 shows, with no `Ctrl+` shortcut, since §10 lists none for them. The Phase 5 shortcut review can add some.
+
+Answered on 2026-11-13 (Phase 4):
+
+19. **Debt-free and Forecast** come after Goals in the sidebar (§1), as `/debt-free` and `/forecast`, with no `Ctrl+` shortcut for now.
+20. **Loan banners (LOAN-4):** one per loan, for its next unpaid payment, rather than one per payment. That keeps the dashboard to a few banners, inside the blur budget, even when payments pile up, and the banner says how many others are overdue (§2).
+21. **Safe to spend on the dashboard** is a card at the top of the right column, above Accounts. Like the balances, it's always for today (§2).
+22. **Recording pay early (PAY-4)** works from the Safe to spend card and from the Due dialog. The Due banner counts only the dates that are due, so it doesn't nag for 3 days before every payday (§2, F10).
+23. **The payslip's net pay** comes from the backend (`preview_payslip`) as the user types. The frontend never adds up money itself (CLAUDE.md rule 2) (F14).
+24. **A new payment row's date** (one more month after the first payment, never after the previous row, so month ends don't drift) is a form default from `lib/dates.ts`, not a figure the app relies on. The backend checks every row (F12).
+25. **Adding a new loan** goes through a "Before you add this loan" confirm whose action is **Add this loan anyway**, styled destructive, so taking on debt is never the easy button (F12, LOAN-10).
+26. **A loan's payments** open in a dialog from its card, rather than on a page of their own, like the recurring dates due (§8.5).
+27. **The Forecast table** opens one row at a time to show its movements, inside the one panel, so nothing new is blurred (§8.6).
