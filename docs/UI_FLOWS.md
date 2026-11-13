@@ -220,7 +220,7 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 | **Categories** | Two lists (Income and Expense). Add, rename, change color (12 swatches) and icon (curated list), reorder, archive, unarchive, **merge**, delete if unused | CAT-2, CAT-4 |
 | **Payment methods** | Add, rename, reorder, archive, unarchive, delete if unused | TXN-7 |
 | **Backup** (Phase 2) | **Back up now** (BAK-1, F9). **Restore from backup…** (BAK-4). **Export to CSV**, with From and To dates, from the start of this month to today by default (BAK-6). The backup folder with **Change…**, and a switch for the daily automatic backup (SET-3). The date of the last backup, and the warning when it's more than 7 days old (BAK-7). | BAK-1 to BAK-4, BAK-6, BAK-7, SET-3 |
-| **Appearance** (Phase 4) | Theme: system / light / dark, and a **Reduce transparency** switch | SET-5, SET-8 |
+| **Appearance** (Phase 5) | Theme: system / light / dark, and a **Reduce transparency** switch | SET-5, SET-8 |
 
 Changes to settings save **immediately**, with a "Saved" toast. There's no Save button.
 
@@ -253,7 +253,7 @@ Changes to settings save **immediately**, with a "Saved" toast. There's no Save 
 - **Duplicate:** ⧉ on the row opens the form already filled in with **today's** date → Save.
 - **Delete:** click the row → **Delete** → confirm.
 
-### F5: First launch (Phase 1 basic version ONB-1, Phase 4 polished version ONB-2)
+### F5: First launch (Phase 1 basic version ONB-1, Phase 5 polished version ONB-2)
 
 ```
 Welcome to Jobert's Vault
@@ -263,7 +263,7 @@ Welcome to Jobert's Vault
   Step 3  [Start using the app]
 ```
 
-- The **Phase 1** version is a plain form, because the currency must be set before the first transaction. **Phase 4** adds polish: a step indicator and a short tour.
+- The **Phase 1** version is a plain form, because the currency must be set before the first transaction. **Phase 5** adds polish: a step indicator and a short tour.
 - It can be skipped ("Set up later"). Every setting can be changed later in Settings.
 - It lives at `/welcome`. **Start using the app** or **Set up later** ends it for good (`onboarding_completed`). Closing the app before choosing either one shows it again on the next launch.
 
@@ -394,7 +394,7 @@ The backend's message shows under the field it names.
 | `↑` / `↓` | Previous / next day | Date input |
 | `Esc` | Close a dialog or popover | Everywhere |
 
-The Phase 4 polish adds a `?` shortcut that shows this list in a help dialog.
+The Phase 5 polish adds a `?` shortcut that shows this list in a help dialog.
 
 ---
 
@@ -402,7 +402,7 @@ The Phase 4 polish adds a `?` shortcut that shows this list in a help dialog.
 
 None at the moment. Answered on 2026-10-26:
 
-1. **First launch:** a plain setup form in Phase 1 (ONB-1), polished in Phase 4 (ONB-2).
+1. **First launch:** a plain setup form in Phase 1 (ONB-1), polished in Phase 5 (ONB-2).
 2. **Duplicate:** the copy uses **today's date** (TXN-2).
 3. **Pay bill:** suggests the **full amount owed**, and you can edit it (CC-9).
 4. **Window:** a fixed **1440 × 900** that can't be resized or maximized, instead of remembering its size. It fits both of the owner's monitors (1920 × 1080 and 2560 × 1080) at 100% scaling, and falls back to 1280 × 800 if the screen is too small.
@@ -434,4 +434,4 @@ Answered on 2026-11-11:
 Answered on 2026-11-12:
 
 17. **Card due banner** (CC-7): one banner per card, named after it, so two cards are never confused (CC-8). Archived cards get none, since they take no new transfers and archiving one with a balance already needed a confirmed warning (§2).
-18. **Planning screens in the sidebar:** Recurring, Budgets and Goals come after Reports, as §1 shows, with no `Ctrl+` shortcut, since §10 lists none for them. The Phase 4 shortcut review can add some.
+18. **Planning screens in the sidebar:** Recurring, Budgets and Goals come after Reports, as §1 shows, with no `Ctrl+` shortcut, since §10 lists none for them. The Phase 5 shortcut review can add some.

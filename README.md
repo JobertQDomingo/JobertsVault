@@ -2,7 +2,7 @@
 
 A private desktop app for Windows that tracks personal cashflow (income and expenses) by **day, week, month or year**. You enter every transaction yourself, and all data stays in a local SQLite file on your computer. Your financial data is never sent over the internet. The only network use is checking GitHub for app updates, which you can turn off, and the app works fully offline.
 
-> **Status:** in development. `v0.3.0` has everything from Phases 1–3 below. Phase 4 (Polish, ending in `v1.0.0`) is next. See [ROADMAP.md](ROADMAP.md) for progress.
+> **Status:** in development. `v0.3.0` has everything from Phases 1–3 below. Phase 4 (Loans & forecast, `v0.4.0`) is next, then Phase 5 (Polish, ending in `v1.0.0`). See [ROADMAP.md](ROADMAP.md) for progress.
 
 ## Features
 
@@ -11,7 +11,8 @@ A private desktop app for Windows that tracks personal cashflow (income and expe
 | **1: MVP** | Accounts (cash, bank, e-wallet, credit card), income, expense and transfer transactions, editable categories, a dashboard with income, expense and net cashflow for each day, week (starting Monday), month, year or custom range, account balances and net balance, credit card amount owed, available credit and due date, quick-add with **Ctrl+N**, light and dark themes that follow Windows, automatic updates, a database backup before migrations |
 | **2: Reports & backups** | Income-vs-expense charts, category breakdown, period comparison, payee suggestions, automatic daily backups, restore, CSV export |
 | **3: Planning** | Recurring transactions, budgets, savings goals, credit card due-date reminders, future-dated transactions |
-| **4: Polish** | Theme and Reduce transparency switches, more keyboard shortcuts, polished onboarding on first launch, installer polish |
+| **4: Loans & forecast** | Loans with payment reminders and a Debt-free screen, payslips with their deductions, and Safe to spend until the next payday with a 12-month forecast |
+| **5: Polish** | Theme and Reduce transparency switches, more keyboard shortcuts, polished onboarding on first launch, installer polish |
 
 See [PRD.md](docs/PRD.md) for the full requirements.
 

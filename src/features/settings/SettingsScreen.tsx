@@ -15,7 +15,7 @@ type Tab = (typeof TABS)[number];
 
 /**
  * `/settings` (UI_FLOWS §6): General, Categories, Payment methods and Backup, the tab kept in
- * `?tab=` so Back and reloads keep it. The Appearance tab (P4) comes with its phase.
+ * `?tab=` so Back and reloads keep it. The Appearance tab (P5) comes with its phase.
  */
 export function SettingsScreen() {
   const [params, setParams] = useSearchParams();
