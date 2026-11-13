@@ -68,8 +68,8 @@ pub struct Account {
     pub balance: Money,
     /// Only for a credit card.
     pub card: Option<CardSummary>,
-    /// Whether a transaction (in either direction), a recurring rule or a goal uses it. Only an
-    /// unused account can be deleted.
+    /// Whether a transaction (in either direction), a recurring rule, a goal or a loan uses it.
+    /// Only an unused account can be deleted.
     pub in_use: bool,
 }
 
@@ -214,14 +214,14 @@ pub fn unarchive(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result
     Ok(())
 }
 
-/// Only an account no transaction, recurring rule or goal uses can go; any other is archived
+/// Only an account no transaction, recurring rule, goal or loan uses can go; any other is archived
 /// instead (ACC-3).
 pub fn delete(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result<(), AppError> {
     let tx = conn.transaction()?;
     let row = stored(&tx, id, now.date_naive())?;
     if row.in_use {
         return Err(AppError::Conflict {
-            message: "This account has transactions, recurring rules or goals, so it can only be archived"
+            message: "This account has transactions, recurring rules, goals or loans, so it can only be archived"
                 .into(),
         });
     }

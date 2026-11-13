@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-13 |
-| **Current focus** | **Phase 4: Loans & forecast**: loans: create, edit, archive and delete [LOAN-1] [LOAN-2] |
+| **Current focus** | **Phase 4: Loans & forecast**: Mark paid [LOAN-3] |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -21,7 +21,7 @@ This file is the progress tracker.
 | **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 53 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 16 / 16 |
-| **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 2 / 13 |
+| **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 3 / 13 |
 | **5 · Polish** | Ready for daily use for years | `v1.0.0` | All P5 requirements done | 0 / 9 |
 
 ---
@@ -178,7 +178,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
   - CLAUDE.md's "Domain rules that are easy to get wrong"
   - ADR 0011 (loans are lists of scheduled payments, not accounts), with the decision record list in `docs/decisions/README.md`, `docs/README.md` and `README.md`
 - [x] Migration `0003_loans_payroll.sql` (DATA_MODEL), which also adds the Loan and deduction categories a database doesn't have yet (PRD Appendix A) [PAY-3]
-- [ ] Loans: create, edit, archive and delete, with payments typed row by row, "a loan I already have" and "paid before" rows [LOAN-1] [LOAN-2]
+- [x] Loans: create, edit, archive and delete, with payments typed row by row, "a loan I already have" and "paid before" rows [LOAN-1] [LOAN-2]
 - [ ] Mark paid: records the expense, unpaid payments never count, Overdue after the date, with service tests [LOAN-3]
 - [ ] Debt-free figures: debt-free date, totals, progress per loan, interest cost, money freed up and the loan-free streak, with domain tests [LOAN-5] [LOAN-6] [LOAN-7] [LOAN-8]
 - [ ] Debt-free screen, the Add loan form and its sidebar item [LOAN-1] [LOAN-5] [LOAN-6] [LOAN-7] [LOAN-8]

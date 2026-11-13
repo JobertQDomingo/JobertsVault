@@ -54,7 +54,7 @@ pub struct Category {
     /// Merging moves them all (CAT-4).
     #[ts(type = "number")]
     pub transaction_count: i64,
-    /// A transaction or recurring rule uses it, so it can't be deleted (CAT-4).
+    /// A transaction, recurring rule or loan uses it, so it can't be deleted (CAT-4).
     pub in_use: bool,
 }
 
@@ -170,7 +170,7 @@ pub fn unarchive(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result
     Ok(())
 }
 
-/// Only a category no transaction or recurring rule uses can go; any other is archived or merged
+/// Only a category no transaction, recurring rule or loan uses can go; any other is archived or merged
 /// (CAT-4). Its budgets go with it (DATA_MODEL §4.3).
 pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     let tx = conn.transaction()?;
@@ -186,6 +186,11 @@ pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
                 .into(),
         });
     }
+    if row.in_loan {
+        return Err(AppError::Conflict {
+            message: "A loan uses this category, so it can only be archived or merged".into(),
+        });
+    }
     if !row.archived {
         check_not_last_active(&tx, &row.kind)?;
     }
@@ -195,7 +200,7 @@ pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     Ok(())
 }
 
-/// Moves every transaction and recurring rule of `from_id` to the active category `into_id` of
+/// Moves every transaction, recurring rule and loan of `from_id` to the active category `into_id` of
 /// the same kind, then deletes `from_id` and its budgets, as one change (DATA_MODEL §3.2, §4.3,
 /// UI_FLOWS F7).
 pub fn merge(
@@ -298,7 +303,7 @@ fn view(row: repo::categories::Row) -> Result<Category, AppError> {
         sort_order: row.sort_order,
         archived: row.archived,
         transaction_count: row.transaction_count,
-        in_use: row.transaction_count > 0 || row.in_rule,
+        in_use: row.transaction_count > 0 || row.in_rule || row.in_loan,
     })
 }
 

@@ -7,6 +7,6 @@ export type Category = { id: number, name: string, kind: CategoryKind, color: st
  */
 transactionCount: number, 
 /**
- * A transaction or recurring rule uses it, so it can't be deleted (CAT-4).
+ * A transaction, recurring rule or loan uses it, so it can't be deleted (CAT-4).
  */
 inUse: boolean, };

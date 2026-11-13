@@ -982,3 +982,8 @@ Answered on 2026-11-13 (Phase 4):
 61. **Coming up (DSH-7) leaves out a payday recorded early**, since it already has its occurrence row (§4.1, §4.8).
 62. **"Move money first"** gives each banner only its own part of the shortfall, so following every banner moves exactly enough (§5.11).
 63. **A new loan's category** starts as the active expense category named Loan, when there is one. If the user's own "Loan" category is archived, the form starts empty (§4.5).
+
+Answered on 2026-11-13, while building loans (LOAN-1, LOAN-2):
+
+64. **A payment row's error names it by its place in the rows sent**, from 1 ("Payment 3: enter a real date"). A paid row isn't sent, so an error about one names it by its date (§6).
+65. **A new loan's paid rows can't come before its date borrowed either.** An edit that moves the date borrowed past a paid payment is refused, and the message says to change the date borrowed (§4.6, §6).

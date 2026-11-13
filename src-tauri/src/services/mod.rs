@@ -11,6 +11,7 @@ pub mod categories;
 pub mod dashboard;
 pub mod export;
 pub mod goals;
+pub mod loans;
 pub mod payment_methods;
 #[cfg(test)]
 mod perf;
