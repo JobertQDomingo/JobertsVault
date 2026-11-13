@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-13 |
-| **Current focus** | **Phase 4: Loans & forecast**: the docs for loans, payroll and Safe to spend |
+| **Current focus** | **Phase 4: Loans & forecast**: migration `0003_loans_payroll.sql` [PAY-3] |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -21,7 +21,7 @@ This file is the progress tracker.
 | **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 53 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 16 / 16 |
-| **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 0 / 13 |
+| **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 1 / 13 |
 | **5 · Polish** | Ready for daily use for years | `v1.0.0` | All P5 requirements done | 0 / 9 |
 
 ---
@@ -169,7 +169,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 
 ## Phase 4 · Loans & forecast (`v0.4.0`)
 
-- [ ] Docs first:
+- [x] Docs first:
   - DATA_MODEL: the loans, loan payments, payslip and payday-flag schema, migration `0003`, the seeded categories and their colors, validation, and the rules for pay windows, Safe to spend and the Debt-free figures
   - UI_FLOWS: the sidebar, the dashboard's Phase 4 additions, the Debt-free and Forecast screens, and flows for adding a loan, paying one and recording a payslip
   - ARCHITECTURE: the command catalog, routes and query keys

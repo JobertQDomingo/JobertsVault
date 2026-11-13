@@ -419,6 +419,12 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-13 | Expected pay is the lowest net of the last 3 payslips in the same income category. The rule's estimate also counts until there are 3 |
 | 2026-11-13 | Safe to spend counts Cash, Bank and E-wallet accounts except those linked to a savings goal. A credit card counts as its statement balance on its due date |
 | 2026-11-13 | Safe to spend shows on a dashboard card and on a Forecast screen with Pay windows and Months views |
+| 2026-11-13 | A new loan is always added as a loan of its own, even from a lender app that already has one, so it goes through Before you borrow and restarts the streak (DATA_MODEL §4.5) |
+| 2026-11-13 | Only a paid-off loan can be archived, so an archived loan never hides money still owed (DATA_MODEL §4.5) |
+| 2026-11-13 | LOAN-4's banners are one per loan, for its next unpaid payment, saying how many others are overdue (UI_FLOWS §2) |
+| 2026-11-13 | Before you borrow's payments are monthly from the first payment date, so its day of the month is the first payment's (DATA_MODEL §5.16) |
+| 2026-11-13 | PAY-4's early paydays can also be recorded from the Safe to spend card, and the Due banner counts only dates that are due (UI_FLOWS §2, F10) |
+| 2026-11-13 | In the forecast, every unpaid loan payment counts whatever its account, transfers to or from a card don't count (the card's bills stand in for them), and pay counts only into a counted account (DATA_MODEL §5.13–5.15) |
 
 ---
 

@@ -475,7 +475,36 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
       <div class="v-prog-row"><span style="width:170px" class="chip-name"><span class="chip sm" style="--c:var(--cat-6)"><i data-lucide="utensils"></i></span>Dining Out</span><div class="v-progress"><i style="width:77.5%"></i></div><span class="num cap" style="width:150px;text-align:right">77% · ₱310 of ₱400</span></div>
       <div class="v-prog-row"><span style="width:170px" class="chip-name"><span class="chip sm" style="--c:var(--cat-2)"><i data-lucide="shopping-cart"></i></span>Food &amp; Groceries</span><div class="v-progress warn"><i style="width:86.7%"></i></div><span class="num cap" style="width:150px;text-align:right">86% · ₱520 of ₱600</span></div>
       <div class="v-prog-row"><span style="width:170px" class="chip-name"><span class="chip sm" style="--c:var(--cat-4)"><i data-lucide="shopping-bag"></i></span>Shopping</span><div class="v-progress over"><i style="width:100%"></i></div><span class="num cap" style="width:150px;text-align:right">120% · ₱30 over</span></div>
-      <span class="cap">Below 80% uses the accent, from 80% amber, from 100% red. The % is rounded down and always written next to the bar.</span>
+      <div class="v-prog-row"><span style="width:170px" class="chip-name"><span class="chip sm" style="--c:var(--cat-2)"><i data-lucide="coins"></i></span>E-wallet loan <span class="phase">P4</span></span><div class="v-progress"><i style="width:25%"></i></div><span class="num cap" style="width:150px;text-align:right">25% paid · ₱9,000 left</span></div>
+      <span class="cap">Below 80% uses the accent, from 80% amber, from 100% red. The % is rounded down and always written next to the bar. A goal's bar and a loan's bar have no thresholds: the accent, then green once it's reached or paid off.</span>
+    </div>
+
+    <h3 class="sub">Safe to spend and loan cards <span class="phase">Phase 4</span></h3>
+    <div class="preview">
+      <div class="grid g2">
+        <div class="v-card v-stat">
+          <span class="lab">Safe to spend until Tue, Nov 24</span>
+          <span class="display">₱3,508.77</span>
+          <span class="cap num">₱116.95 a day · 30 days left</span>
+          <span class="cap num">₱2,944.28 held back for Dec 25, 2026 – Jan 24, 2027</span>
+        </div>
+        <div class="v-card v-stat">
+          <span class="lab">Safe to spend until Tue, Nov 24</span>
+          <span class="display">₱0.00</span>
+          <span class="cap num" style="color:var(--danger)"><i data-lucide="triangle-alert" class="s14"></i> Short by ₱991.23 on Fri, Jan 15</span>
+        </div>
+        <div class="v-card" style="padding:16px;display:grid;gap:10px">
+          <div class="row" style="justify-content:space-between"><b>E-wallet loan</b><span class="cap">E-wallet · 3 of 12 paid</span></div>
+          <div class="v-prog-row"><div class="v-progress"><i style="width:25%"></i></div><span class="cap num">25%</span></div>
+          <span class="cap num">₱9,000.00 left · next ₱1,000.00 due Wed, Oct 28</span>
+        </div>
+        <div class="v-card" style="padding:16px;display:grid;gap:10px">
+          <div class="row" style="justify-content:space-between"><b>Phone loan</b><span class="badge ok"><i data-lucide="check" class="s14"></i>Paid off</span></div>
+          <div class="v-prog-row"><div class="v-progress"><i style="width:100%;background:var(--success)"></i></div><span class="cap num">100%</span></div>
+          <span class="cap num">₱0.00 left · 6 of 6 paid</span>
+        </div>
+      </div>
+      <p class="cap" style="margin-top:12px">Safe to spend is in the main text color, never green: it's what's left, not income. When it's short, the amount is ₱0.00 and the shortfall is red with an icon. A loan card is flat inside the Loans panel, like a budget card.</p>
     </div>
 
     <h3 class="sub">Banners and toasts</h3>
@@ -483,6 +512,8 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
       <div class="v-banner warning"><i data-lucide="calendar-clock" class="s20"></i><div class="msg">Credit card payment due in 3 days: ₱640.00 owed</div><button class="v-btn primary sm" type="button">Pay bill</button></div>
       <div class="v-banner danger"><i data-lucide="octagon-alert" class="s20"></i><div class="msg">Shopping is ₱30.00 over its October budget.</div></div>
       <div class="v-banner info"><i data-lucide="repeat" class="s20"></i><div class="msg">2 recurring transactions are due.</div><button class="v-btn secondary sm" type="button">Review</button></div>
+      <div class="v-banner warning"><i data-lucide="calendar-clock" class="s20"></i><div class="msg">E-wallet loan: ₱1,000.00 due Wed, Oct 28<div class="cap">E-wallet has ₱150.00. Move ₱850.00 there first.</div></div><button class="v-btn primary sm" type="button">Pay</button><span class="phase">P4</span></div>
+      <div class="v-banner danger"><i data-lucide="octagon-alert" class="s20"></i><div class="msg">E-wallet loan: ₱1,000.00 overdue since Mon, Oct 26, and 1 more overdue</div><button class="v-btn primary sm" type="button">Pay</button><span class="phase">P4</span></div>
       <div class="row" style="justify-content:flex-end">
         <div class="v-toast"><i data-lucide="circle-check"></i><span class="msg">Saved</span></div>
         <div class="v-toast error"><i data-lucide="circle-alert"></i><span class="msg">Couldn't save. The database is busy, try again.</span><button class="v-btn ghost icon" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>

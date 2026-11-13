@@ -11,7 +11,7 @@ Everything that defines what Jobert's Vault is and how it's built. All the docs 
 | 3 | [ARCHITECTURE.md](ARCHITECTURE.md) | How it's built: Tauri, React and Rust layers, commands, startup, testing, security |
 | 4 | [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) | The Glassmorphism 2.0 style: glass layers, colors, type, components, the logo |
 | 5 | [UI_FLOWS.md](UI_FLOWS.md) | Every screen and the key flows, such as quick-add and paying the card bill |
-| 6 | [decisions/](decisions/README.md) | Why the big choices were made (decision records 0001–0010) |
+| 6 | [decisions/](decisions/README.md) | Why the big choices were made (decision records 0001–0011) |
 
 The progress tracker, [ROADMAP.md](../ROADMAP.md), and the rules for AI coding sessions, [CLAUDE.md](../CLAUDE.md), live at the repository root.
 
