@@ -320,8 +320,8 @@ Displayed as `▲ 12.3%` or `▼ 4.0%`, or `—` when there's nothing to compare
 | Year period label | year | `2026` |
 | Date input | `MM/DD/YYYY` shown, `YYYY-MM-DD` stored | `10/26/2026` |
 | Date and time (backups) | date, year, 12-hour time | `Oct 20, 2026 9:30 AM` |
-| Pay window (Phase 4) | a range, with the year when it isn't this year | `Dec 3–9`, `Nov 18 – Dec 2`, `Dec 18, 2026 – Jan 2, 2027` |
-| A payment due (Phase 4) | "due today", "due tomorrow", or the weekday and date | `due Wed, Nov 18` |
+| Pay window (Phase 4) | a range, with the year when it isn't this year | `Dec 5–14`, `Nov 30 – Dec 4`, `Dec 30, 2026 – Jan 14, 2027` |
+| A payment due (Phase 4) | "due today", "due tomorrow", or the weekday and date | `due Fri, Nov 20` |
 | An overdue payment (Phase 4) | "overdue since" and the weekday and date | `overdue since Mon, Nov 16` |
 
 Dates always use **US order** (`10/26/2026`, `Oct 26`), whatever the Windows region setting.
@@ -366,7 +366,7 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **`TransactionRow`** | Category chip │ category, plus the payee and note in muted text │ account (or "Bank → Cash") │ amount, right-aligned. Hover adds `--glass-hover` and the edit and duplicate buttons. 52 px tall. |
 | **`ProgressBar`** | 8 px pill on a `--wash` track. The fill is `--primary` below 80%, `--warning` from 80% and `--danger` from 100% (BUD-3). A goal's bar has no thresholds: `--primary`, and `--success` once the goal is achieved (GOL-4). A loan's bar is the same, filling as it's paid: `--primary`, and `--success` once it's paid off (LOAN-5). The % is always written next to it. |
 | **`QuickAddDialog`** | The transaction form inside a Level 2 dialog (UI_FLOWS §4). |
-| **`SafeToSpendCard`** (Phase 4) | A Level 1 card: "Safe to spend until Wed, Dec 2" in `--muted-foreground`, the amount in `display` size and `--foreground` (never green: it's what's left, not income), then "₱560.00 a day · 15 days left" and "₱1,500.00 held back for Dec 3–9" in `small` text. When it's short, the amount is ₱0.00, and "Short by ₱1,240.00 on Fri, Dec 4" is in `--danger` with the `triangle-alert` icon, so it never relies on color alone (SAFE-6). |
+| **`SafeToSpendCard`** (Phase 4) | A Level 1 card: "Safe to spend until Sun, Nov 29" in `--muted-foreground`, the amount in `display` size and `--foreground` (never green: it's what's left, not income), then "₱560.00 a day · 15 days left" and "₱1,500.00 held back for Nov 30 – Dec 4" in `small` text. When it's short, the amount is ₱0.00, and "Short by ₱1,240.00 on Fri, Dec 4" is in `--danger` with the `triangle-alert` icon, so it never relies on color alone (SAFE-6). |
 | **`LoanCard`** (Phase 4) | A flat card inside the Loans panel, like a budget card: the name, "E-wallet · 3 of 8 paid", a `ProgressBar` of % paid, "₱5,000.00 left" and the next payment. An overdue next payment is in `--danger` with the `triangle-alert` icon. A paid-off loan has a **Paid off** badge in `--success` (UI_FLOWS §8.5). |
 | **`ForecastRow`** (Phase 4) | A row of the Forecast table, 52 px tall: the window's dates, then Start, Pay in, Bills and Left, right-aligned with tabular digits. The lowest window gets a **lowest** badge in `--muted-foreground`. A window that runs short has the `triangle-alert` icon, and its Left in `--danger` with the word "Short". Opening it shows its movements as flat rows in `--wash` (UI_FLOWS §8.6). |
 

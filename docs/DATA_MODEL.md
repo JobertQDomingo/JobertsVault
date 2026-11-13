@@ -684,7 +684,7 @@ recent(c)     = the nets of the 3 latest payslips whose gross is in category c,
 expected(r)   = the lowest of recent(r.category), plus r.amount while recent has fewer than 3
 ```
 
-- Paydays of the same category share their payslips: a Salary rule on the 3rd and one on the 18th both use the last 3 Salary payslips. Each adds its own estimate until there are 3.
+- Paydays of the same category share their payslips: a Salary rule on the 15th and one on the 30th both use the last 3 Salary payslips. Each adds its own estimate until there are 3.
 - What a payday date `d` of rule `r` adds to the forecast:
 
 | That date's occurrence | Money in |
