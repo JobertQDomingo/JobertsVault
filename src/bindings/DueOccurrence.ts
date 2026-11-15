@@ -2,10 +2,23 @@
 import type { TransactionFields } from "./TransactionFields";
 
 /**
- * A date a Confirm rule queued, waiting for Post, Edit & post or Skip (REC-3, UI_FLOWS F10).
+ * A date a Confirm rule queued, waiting for Post, Edit & post or Skip (REC-3, UI_FLOWS F10),
+ * or a payday 1–3 days ahead that can be recorded early (PAY-4).
  */
-export type DueOccurrence = { id: number, 
+export type DueOccurrence = { 
 /**
- * What Post creates: the rule's template as it is now, dated the day it fell due.
+ * The queued row; none for an early payday, which has no row yet.
+ */
+id: number | null, ruleId: number, 
+/**
+ * Settled with a payslip (`record_payslip`), never Post (DATA_MODEL §4.8).
+ */
+isPayday: boolean, 
+/**
+ * A payday after today, for Record now. The Due banner doesn't count it.
+ */
+early: boolean, 
+/**
+ * What Post creates: the rule's template as it is now, dated the day it falls due.
  */
 transaction: TransactionFields, };

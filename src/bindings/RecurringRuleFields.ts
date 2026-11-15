@@ -22,4 +22,9 @@ endDate: string | null,
 /**
  * 1–9,999 dates in the rule's life, counting those already processed (DATA_MODEL §4.1).
  */
-maxOccurrences: number | null, mode: RecurringMode, };
+maxOccurrences: number | null, mode: RecurringMode, 
+/**
+ * PAY-1: an income rule in Confirm mode into a cash, bank or e-wallet account only. Its
+ * amount is the expected net pay.
+ */
+isPayday: boolean, };

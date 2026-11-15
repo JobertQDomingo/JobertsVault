@@ -68,6 +68,9 @@ pub struct Transaction {
     /// The loan payment it pays, or none (DATA_MODEL §4.6). Its kind can't change.
     #[ts(type = "number | null")]
     pub loan_payment_id: Option<i64>,
+    /// Its payslip's gross row, or none (DATA_MODEL §4.7). It's edited and deleted as a payslip.
+    #[ts(type = "number | null")]
+    pub payslip_id: Option<i64>,
 }
 
 /// The settings key quick-add's default account comes from (DATA_MODEL §5.8).
@@ -347,6 +350,11 @@ pub fn update(
 ) -> Result<Transaction, AppError> {
     let tx = conn.transaction()?;
     let stored = get(&tx, id)?;
+    if stored.payslip_id.is_some() {
+        return Err(AppError::Conflict {
+            message: "This is part of a payslip. Edit it as a payslip.".into(),
+        });
+    }
     // Before the fields are checked, so this is the error a kind change gets.
     if stored.loan_payment_id.is_some() && fields.kind != stored.kind {
         return Err(AppError::Conflict {
@@ -368,8 +376,13 @@ pub fn delete(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result<()
 }
 
 /// Deleting a loan payment's expense makes the payment unpaid (`ON DELETE SET NULL`), so its loan
-/// is unarchived: an archived loan never hides money still owed (DATA_MODEL §4.5–4.6).
+/// is unarchived: an archived loan never hides money still owed (DATA_MODEL §4.5–4.6). Deleting
+/// any row of a payslip deletes its gross row, and the deductions go with it (`ON DELETE
+/// CASCADE`); its payday stays settled (DATA_MODEL §4.7).
 pub(crate) fn delete_in(conn: &Connection, id: i64, now: &str) -> Result<(), AppError> {
+    let id = repo::transactions::find(conn, id)?
+        .and_then(|row| row.payslip_id)
+        .unwrap_or(id);
     let loan = repo::loans::loan_of_transaction(conn, id)?;
     if repo::transactions::delete(conn, id)? == 0 {
         return Err(not_found("transaction", id));
@@ -516,6 +529,7 @@ pub(crate) fn view(row: repo::transactions::Row) -> Result<Transaction, AppError
         payment_method_id: row.payment_method_id,
         note: row.note,
         loan_payment_id: row.loan_payment_id,
+        payslip_id: row.payslip_id,
     })
 }
 
@@ -665,6 +679,7 @@ mod tests {
                 payment_method_id: None,
                 note: Some("weekly shop".into()),
                 loan_payment_id: None,
+                payslip_id: None,
             }
         );
         assert_eq!(get(&conn, saved.id).unwrap(), saved);

@@ -43,7 +43,7 @@ pub fn pause_recurring_rule(
 /// The Due list (UI_FLOWS F10), oldest first.
 #[tauri::command(async)]
 pub fn list_due_occurrences(state: State<'_, AppState>) -> Result<Vec<DueOccurrence>, AppError> {
-    services::recurring::list_due(&*state.conn()?)
+    services::recurring::list_due(&*state.conn()?, chrono::Local::now().date_naive())
         .inspect_err(|err| log::record(&state.log_path, err))
 }
 

@@ -28,6 +28,8 @@ pub struct Row {
     pub next_index: i64,
     pub mode: String,
     pub paused: bool,
+    /// A payday is settled with a payslip (DATA_MODEL §4.8).
+    pub is_payday: bool,
     /// How many dates it has processed: posted, pending or skipped.
     pub done: i64,
     /// The latest date it has processed.
@@ -42,11 +44,12 @@ pub struct Values<'a> {
     pub end_date: Option<&'a str>,
     pub max_occurrences: Option<i64>,
     pub mode: &'a str,
+    pub is_payday: bool,
 }
 
 const SELECT: &str = "SELECT r.id, r.kind, r.amount, r.account_id, r.to_account_id, r.category_id,
             r.payee, r.payment_method_id, r.note, r.frequency, r.interval, r.start_date,
-            r.end_date, r.max_occurrences, r.next_index, r.mode, r.paused,
+            r.end_date, r.max_occurrences, r.next_index, r.mode, r.paused, r.is_payday,
             (SELECT count(*) FROM recurring_occurrences o WHERE o.rule_id = r.id),
             (SELECT max(o.occurrence_date) FROM recurring_occurrences o WHERE o.rule_id = r.id)
      FROM recurring_rules r";
@@ -70,8 +73,9 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
         next_index: r.get(14)?,
         mode: r.get(15)?,
         paused: r.get(16)?,
-        done: r.get(17)?,
-        last_date: r.get(18)?,
+        is_payday: r.get(17)?,
+        done: r.get(18)?,
+        last_date: r.get(19)?,
     })
 }
 
@@ -93,8 +97,9 @@ pub fn insert(conn: &Connection, v: &Values, now: &str) -> rusqlite::Result<i64>
     conn.execute(
         "INSERT INTO recurring_rules (kind, amount, account_id, to_account_id, category_id, payee,
                                       payment_method_id, note, frequency, interval, start_date,
-                                      end_date, max_occurrences, mode, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15)",
+                                      end_date, max_occurrences, mode, is_payday, created_at,
+                                      updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?16)",
         params![
             t.kind,
             t.amount,
@@ -110,6 +115,7 @@ pub fn insert(conn: &Connection, v: &Values, now: &str) -> rusqlite::Result<i64>
             v.end_date,
             v.max_occurrences,
             v.mode,
+            v.is_payday,
             now
         ],
     )?;
@@ -129,7 +135,7 @@ pub fn update(
          SET kind = ?2, amount = ?3, account_id = ?4, to_account_id = ?5, category_id = ?6,
              payee = ?7, payment_method_id = ?8, note = ?9, frequency = ?10, interval = ?11,
              start_date = ?12, end_date = ?13, max_occurrences = ?14, mode = ?15,
-             next_index = ?16, updated_at = ?17
+             next_index = ?16, updated_at = ?17, is_payday = ?18
          WHERE id = ?1",
         params![
             id,
@@ -148,7 +154,8 @@ pub fn update(
             v.max_occurrences,
             v.mode,
             next_index,
-            now
+            now,
+            v.is_payday
         ],
     )?;
     Ok(())
@@ -193,6 +200,27 @@ pub fn insert_occurrence(
         params![rule_id, date, status, now],
     )?;
     Ok((added == 1).then(|| conn.last_insert_rowid()))
+}
+
+/// Every date the rule has processed or recorded early, any status.
+pub fn occurrence_dates(conn: &Connection, rule_id: i64) -> rusqlite::Result<Vec<String>> {
+    conn.prepare("SELECT occurrence_date FROM recurring_occurrences WHERE rule_id = ?1")?
+        .query_map([rule_id], |r| r.get(0))?
+        .collect()
+}
+
+/// The rule's row for `date`, if it has one.
+pub fn occurrence_on(
+    conn: &Connection,
+    rule_id: i64,
+    date: &str,
+) -> rusqlite::Result<Option<Occurrence>> {
+    conn.query_row(
+        &format!("{OCCURRENCE} WHERE rule_id = ?1 AND occurrence_date = ?2"),
+        params![rule_id, date],
+        occurrence,
+    )
+    .optional()
 }
 
 /// One `recurring_occurrences` row (DATA_MODEL §4.2).

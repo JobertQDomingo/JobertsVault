@@ -21,6 +21,8 @@ pub struct Row {
     pub note: Option<String>,
     /// The loan payment it pays, if any (DATA_MODEL §4.6).
     pub loan_payment_id: Option<i64>,
+    /// Its payslip's gross row, if it's on one (DATA_MODEL §4.7).
+    pub payslip_id: Option<i64>,
 }
 
 /// The columns a create or an edit writes.
@@ -38,7 +40,8 @@ pub struct Values<'a> {
 
 const SELECT: &str = "SELECT id, kind, amount, date, account_id, to_account_id, category_id,
             payee, payment_method_id, note,
-            (SELECT p.id FROM loan_payments p WHERE p.transaction_id = transactions.id)
+            (SELECT p.id FROM loan_payments p WHERE p.transaction_id = transactions.id),
+            payslip_id
      FROM transactions";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
@@ -54,6 +57,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
         payment_method_id: r.get(8)?,
         note: r.get(9)?,
         loan_payment_id: r.get(10)?,
+        payslip_id: r.get(11)?,
     })
 }
 
@@ -304,4 +308,58 @@ pub fn export(conn: &Connection, start: &str, end: &str) -> rusqlite::Result<Vec
 /// The number of rows deleted: 0 when there's no such transaction.
 pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<usize> {
     conn.execute("DELETE FROM transactions WHERE id = ?1", [id])
+}
+
+/// Puts the row on the payslip whose gross row is `payslip_id` (DATA_MODEL §4.7).
+pub fn set_payslip(conn: &Connection, id: i64, payslip_id: i64) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE transactions SET payslip_id = ?2 WHERE id = ?1",
+        params![id, payslip_id],
+    )?;
+    Ok(())
+}
+
+/// Every row of the payslip, the gross row first, then its deductions in the order saved.
+pub fn payslip_rows(conn: &Connection, payslip_id: i64) -> rusqlite::Result<Vec<Row>> {
+    conn.prepare(&format!(
+        "{SELECT} WHERE payslip_id = ?1 ORDER BY id <> ?1, id"
+    ))?
+    .query_map([payslip_id], row)?
+    .collect()
+}
+
+/// The payslip's deduction rows go; its gross row stays.
+pub fn delete_deductions(conn: &Connection, payslip_id: i64) -> rusqlite::Result<()> {
+    conn.execute(
+        "DELETE FROM transactions WHERE payslip_id = ?1 AND id <> ?1",
+        [payslip_id],
+    )?;
+    Ok(())
+}
+
+/// The gross row of the latest payslip recorded for the rule's paydays, by date, then id.
+pub fn last_payslip_of_rule(conn: &Connection, rule_id: i64) -> rusqlite::Result<Option<i64>> {
+    conn.query_row(
+        "SELECT t.id FROM transactions t
+         JOIN recurring_occurrences o ON o.transaction_id = t.id
+         WHERE o.rule_id = ?1 AND t.payslip_id = t.id
+         ORDER BY t.date DESC, t.id DESC LIMIT 1",
+        [rule_id],
+        |r| r.get(0),
+    )
+    .optional()
+}
+
+/// The gross row of the latest payslip in the income category, by date, then id.
+pub fn last_payslip_in_category(
+    conn: &Connection,
+    category_id: i64,
+) -> rusqlite::Result<Option<i64>> {
+    conn.query_row(
+        "SELECT id FROM transactions WHERE payslip_id = id AND category_id = ?1
+         ORDER BY date DESC, id DESC LIMIT 1",
+        [category_id],
+        |r| r.get(0),
+    )
+    .optional()
 }
