@@ -271,7 +271,8 @@ pub fn mark_paid(
         id: 0,
         kind: TransactionKind::Expense,
         amount: Money(payment.amount),
-        date: stored_date(&payment.due_date, "payment date", loan.id)?,
+        // The rules don't read the template's date.
+        date: now.date_naive(),
         account_id: loan.account_id,
         to_account_id: None,
         category_id: Some(loan.category_id),

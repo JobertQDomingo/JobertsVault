@@ -146,7 +146,7 @@ const loan: LoanFields = {
   payments: [{ id: null, dueDate: "2026-12-15", amount: 100000 }],
 };
 const settings: Settings = {
-  currencySymbol: "â‚±",
+  currencySymbol: "₱",
   currencyPosition: "before",
   currencyDecimals: 2,
   weekStart: "monday",
@@ -157,7 +157,7 @@ const settings: Settings = {
   comparisonMode: "to_date",
 };
 
-// Every write the app can make (ARCHITECTURE Â§4.5), with the arguments it sends to Rust.
+// Every write the app can make (ARCHITECTURE §4.5), with the arguments it sends to Rust.
 const WRITES = [
   [
     "useCreateAccount",
