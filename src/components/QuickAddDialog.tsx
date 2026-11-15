@@ -20,6 +20,7 @@ import type { TransactionKind } from "@/bindings/TransactionKind";
 import type { WeekStart } from "@/bindings/WeekStart";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useCategories } from "@/hooks/useCategories";
+import { useLoans, useMarkLoanPaymentPaid } from "@/hooks/useLoans";
 import { usePaymentMethods } from "@/hooks/usePaymentMethods";
 import {
   useCreateRecurringRule,
@@ -61,8 +62,9 @@ import { notify } from "./ui/toast";
 
 /**
  * What quick-add was opened for: nothing (add), a row to edit or duplicate, a credit card to
- * pay (CC-9), a due recurring date to Edit & post (UI_FLOWS F10), or a recurring rule, new
- * (`true`) or to edit: the form plus a schedule section (§8.2).
+ * pay (CC-9), a due recurring date to Edit & post (UI_FLOWS F10), a recurring rule, new
+ * (`true`) or to edit: the form plus a schedule section (§8.2), or a loan payment to mark paid
+ * (F13).
  */
 export type QuickAddRequest = {
   edit?: number;
@@ -70,6 +72,7 @@ export type QuickAddRequest = {
   payBill?: number;
   post?: DueOccurrence;
   rule?: RecurringRule | true;
+  markPaid?: number;
 };
 
 type Values = {
@@ -175,11 +178,13 @@ const titleOf = (request: QuickAddRequest) =>
       ? "Pay credit card"
       : request.post
         ? "Edit & post"
-        : request.rule === true
-          ? "New rule"
-          : request.rule
-            ? "Edit rule"
-            : "Add transaction";
+        : request.markPaid !== undefined
+          ? "Mark paid"
+          : request.rule === true
+            ? "New rule"
+            : request.rule
+              ? "Edit rule"
+              : "Add transaction";
 
 /**
  * The quick-add and edit dialog (UI_FLOWS §4). It waits for what the form starts from, then
@@ -196,9 +201,12 @@ export function QuickAddDialog({
   const editingRule = request.rule === true ? undefined : request.rule;
   // What the form starts from, taken once. After that the row isn't watched, so deleting it (or
   // a refresh) can't pull the form away mid-save.
-  const [start, setStart] = useState<{ values: Values; today: string } | null>(
-    null,
-  );
+  const [start, setStart] = useState<{
+    values: Values;
+    today: string;
+    /** The row being edited pays a loan (DATA_MODEL §4.6). */
+    paysLoan: boolean;
+  } | null>(null);
   // A payment starts from its own defaults (they carry today too), so it needs no others.
   const paying = request.payBill !== undefined;
   const defaults = useTransactionDefaults(!paying);
@@ -207,6 +215,7 @@ export function QuickAddDialog({
   const accounts = useAccounts();
   const categories = useCategories();
   const methods = usePaymentMethods();
+  const loans = useLoans(request.markPaid !== undefined);
   const settingsQuery = useSettings();
   const settings = settingsQuery.data;
   const [dirty, setDirty] = useState(false);
@@ -221,9 +230,24 @@ export function QuickAddDialog({
     methods,
     settingsQuery,
     ...(sourceId !== undefined ? [source] : []),
+    ...(request.markPaid !== undefined ? [loans] : []),
   ];
   const failed = queries.filter((q) => q.isError);
   const today = own.data?.today;
+  // The live list the payment was clicked in, so it needs no fresh answer of its own.
+  const loan = loans.data?.loans.find((l) =>
+    l.payments.some((p) => p.id === request.markPaid),
+  );
+  const scheduled = loan?.payments.find(
+    (p) => p.id === request.markPaid && p.status === "unpaid",
+  );
+  // Paid or removed meanwhile: say so rather than wait for it forever.
+  const gone = request.markPaid !== undefined && !!loans.data && !scheduled;
+  useEffect(() => {
+    if (!gone || start) return;
+    notify.error("This payment is no longer unpaid.");
+    onClose();
+  }, [gone, start, onClose]);
   // The cache can be old (an edit elsewhere, or past midnight), so the starting values wait for
   // this opening's own answers. A failed one still leaves the old data, so a failure stops it too.
   if (
@@ -235,7 +259,8 @@ export function QuickAddDialog({
     categories.data &&
     methods.data &&
     settings &&
-    (sourceId === undefined || (source.isFetchedAfterMount && source.data))
+    (sourceId === undefined || (source.isFetchedAfterMount && source.data)) &&
+    (request.markPaid === undefined || scheduled)
   )
     setStart({
       values: source.data
@@ -243,19 +268,30 @@ export function QuickAddDialog({
           fromRow(source.data, request.duplicate !== undefined ? today : null)
         : request.post
           ? fromRow(request.post.transaction, null)
-          : editingRule
-            ? fromRule(editingRule)
-            : paying && payBill.data
-              ? // A transfer to the card for what's owed, from the backend's account (UI_FLOWS F2).
-                {
-                  ...blank(payBill.data.fromAccountId, today),
-                  kind: "transfer",
-                  amount: payBill.data.amount,
-                  toAccountId: text(request.payBill ?? null),
-                  note: "Credit card payment",
-                }
-              : blank(defaults.data?.accountId ?? null, today),
+          : loan && scheduled
+            ? // Today, the scheduled amount, the loan's account and category, its name as payee (F13).
+              {
+                ...blank(loan.accountId, today),
+                amount: scheduled.amount,
+                categoryId: text(loan.categoryId),
+                payee: loan.name,
+              }
+            : editingRule
+              ? fromRule(editingRule)
+              : paying && payBill.data
+                ? // A transfer to the card for what's owed, from the backend's account (UI_FLOWS F2).
+                  {
+                    ...blank(payBill.data.fromAccountId, today),
+                    kind: "transfer",
+                    amount: payBill.data.amount,
+                    toAccountId: text(request.payBill ?? null),
+                    note: "Credit card payment",
+                  }
+                : blank(defaults.data?.accountId ?? null, today),
       today,
+      // A copy is a new row that pays nothing.
+      paysLoan:
+        request.edit !== undefined && source.data?.loanPaymentId != null,
     });
 
   return (
@@ -275,6 +311,8 @@ export function QuickAddDialog({
             <TransactionForm
               editId={request.edit}
               postId={request.post?.id}
+              markPaidId={request.markPaid}
+              paysLoan={start.paysLoan}
               schedule={
                 request.rule
                   ? {
@@ -284,7 +322,10 @@ export function QuickAddDialog({
                     }
                   : undefined
               }
-              payment={paying}
+              // A loan payment's expense stays an expense (DATA_MODEL §4.6).
+              fixedKind={
+                paying || request.markPaid !== undefined || start.paysLoan
+              }
               initial={start.values}
               weekStart={settings.weekStart}
               showMethod={settings.showPaymentMethod}
@@ -392,8 +433,10 @@ function WithUnit({
 function TransactionForm({
   editId,
   postId,
+  markPaidId,
+  paysLoan,
   schedule,
-  payment,
+  fixedKind,
   initial,
   weekStart,
   showMethod,
@@ -407,10 +450,17 @@ function TransactionForm({
   editId?: number;
   /** Edit & post: saving posts this due recurring date, and changes only it (F10). */
   postId?: number;
+  /** Mark paid: saving records this loan payment's expense (F13). */
+  markPaidId?: number;
+  /** The row being edited pays a loan, so deleting it makes that payment unpaid (UI_FLOWS §3). */
+  paysLoan: boolean;
   /** A recurring rule (§8.2): the schedule section, and `ruleId` when editing one. */
   schedule?: { ruleId?: number; restart: string };
-  /** Pay bill: always a transfer, saved once (the mockup has no type switch or Save & add another). */
-  payment: boolean;
+  /**
+   * Pay bill, Mark paid and a loan payment's expense: the type can't change, and it's saved once
+   * (the mockups have no type switch or Save & add another).
+   */
+  fixedKind: boolean;
   initial: Values;
   weekStart: WeekStart;
   showMethod: boolean;
@@ -436,12 +486,13 @@ function TransactionForm({
   const update = useUpdateTransaction();
   const remove = useDeleteTransaction();
   const post = usePostOccurrence();
+  const markPaid = useMarkLoanPaymentPaid();
   const createRule = useCreateRecurringRule();
   const updateRule = useUpdateRecurringRule();
   const [deleting, setDeleting] = useState(false);
   // An edit, a payment, a post and a rule are saved once; a payment's type is fixed too.
   const addAnother =
-    editId === undefined && postId === undefined && !schedule && !payment;
+    editId === undefined && postId === undefined && !schedule && !fixedKind;
   // The ids an archived record may still be offered for: the row being edited or copied. Save &
   // add another starts a new row, which keeps none.
   const [kept, setKept] = useState(initial);
@@ -516,8 +567,16 @@ function TransactionForm({
           await update.mutateAsync({ id: editId, transaction });
         else if (postId !== undefined)
           await post.mutateAsync({ id: postId, transaction });
+        else if (markPaidId !== undefined)
+          await markPaid.mutateAsync({ paymentId: markPaidId, transaction });
         else await create.mutateAsync(transaction);
-        notify.success(postId !== undefined ? "Posted" : "Saved");
+        notify.success(
+          postId !== undefined
+            ? "Posted"
+            : markPaidId !== undefined
+              ? "Marked paid"
+              : "Saved",
+        );
         if (another) {
           // Keeps the type, account and date; clears the rest (UI_FLOWS §4).
           const next = {
@@ -567,7 +626,7 @@ function TransactionForm({
             onChange={field.onChange}
             placeholder="Choose an account"
             // Paying a card: the card it pays stays (UI_FLOWS F2).
-            disabled={payment && name === "toAccountId"}
+            disabled={fixedKind && name === "toAccountId"}
           />
         </Field>
       )}
@@ -612,7 +671,7 @@ function TransactionForm({
             e.preventDefault();
             // Sonner's Alt+T (jump to notifications) listens on the document; this one wins here.
             e.stopPropagation();
-            if (!payment) changeKind(altKind);
+            if (!fixedKind) changeKind(altKind);
           } else if (
             e.key === "Enter" &&
             // An open list takes Enter itself (it picks), and a focused button clicks.
@@ -626,7 +685,7 @@ function TransactionForm({
         }}
       >
         <DialogBody>
-          {!payment && (
+          {!fixedKind && (
             <Controller
               control={control}
               name="kind"
@@ -923,7 +982,11 @@ function TransactionForm({
           open={deleting}
           onOpenChange={setDeleting}
           title="Delete this transaction?"
-          message="This can't be undone."
+          message={
+            paysLoan
+              ? "Its loan payment becomes unpaid again."
+              : "This can't be undone."
+          }
           confirmLabel="Delete"
           destructive
           onConfirm={() =>

@@ -7,6 +7,9 @@ import type { CategoryList } from "@/bindings/CategoryList";
 import type { Comparison } from "@/bindings/Comparison";
 import type { Dashboard } from "@/bindings/Dashboard";
 import type { GoalProgress } from "@/bindings/GoalProgress";
+import type { Loan } from "@/bindings/Loan";
+import type { LoanList } from "@/bindings/LoanList";
+import type { LoanPayment } from "@/bindings/LoanPayment";
 import type { UpcomingDate } from "@/bindings/UpcomingDate";
 import type { PaymentMethod } from "@/bindings/PaymentMethod";
 import type { PeriodView } from "@/bindings/PeriodView";
@@ -408,4 +411,132 @@ export const PAY_BILL_DEFAULTS = {
   fromAccountId: 2,
   amount: 64000,
   today: TODAY,
+};
+
+/** The seeded Loan category (DATA_MODEL §7), next to the other expense categories. */
+export const LOAN_CATEGORIES: CategoryList = {
+  ...CATEGORIES,
+  categories: [
+    ...CATEGORIES.categories,
+    category({ id: 6, name: "Loan", color: "cat-2", icon: "coins" }),
+  ],
+};
+
+const payment = (
+  id: number,
+  dueDate: string,
+  over: Partial<LoanPayment> = {},
+): LoanPayment => ({
+  id,
+  dueDate,
+  amount: 100000,
+  status: "unpaid",
+  overdue: false,
+  transactionId: null,
+  paidAmount: null,
+  paidOn: null,
+  ...over,
+});
+const before = { status: "paidBefore", paidAmount: 100000 } as const;
+
+const ewallet: Loan = {
+  id: 1,
+  name: "E-wallet loan",
+  accountId: 3,
+  categoryId: 6,
+  isNew: false,
+  amountBorrowed: 700000,
+  borrowedOn: "2026-07-01",
+  addedOn: "2026-10-01",
+  archived: false,
+  // 3 of 8 paid: two from before the app, one marked paid in it.
+  payments: [
+    payment(11, "2026-08-28", before),
+    payment(12, "2026-09-28", before),
+    payment(13, "2026-10-28", {
+      status: "paid",
+      transactionId: 50,
+      paidAmount: 100000,
+      paidOn: "2026-10-27",
+    }),
+    ...[
+      "2026-11-28",
+      "2026-12-28",
+      "2027-01-28",
+      "2027-02-28",
+      "2027-03-28",
+    ].map((date, i) => payment(14 + i, date)),
+  ],
+  left: 500000,
+  paid: 300000,
+  percentPaid: 37,
+  next: payment(14, "2026-11-28"),
+  interest: 100000,
+  paidOff: false,
+};
+
+const bank: Loan = {
+  id: 2,
+  name: "Bank loan",
+  accountId: 2,
+  categoryId: 6,
+  isNew: true,
+  amountBorrowed: null,
+  borrowedOn: "2026-09-15",
+  addedOn: "2026-09-15",
+  archived: false,
+  payments: [
+    payment(21, "2026-10-10", { overdue: true }),
+    payment(22, "2026-11-10"),
+    payment(23, "2026-12-10"),
+  ],
+  left: 300000,
+  paid: 0,
+  percentPaid: 0,
+  next: payment(21, "2026-10-10", { overdue: true }),
+  interest: null,
+  paidOff: false,
+};
+
+const phone: Loan = {
+  id: 3,
+  name: "Phone loan",
+  accountId: 3,
+  categoryId: 6,
+  isNew: false,
+  amountBorrowed: null,
+  borrowedOn: null,
+  addedOn: "2026-10-01",
+  archived: true,
+  payments: [
+    payment(31, "2026-06-01", before),
+    payment(32, "2026-07-01", before),
+  ],
+  left: 0,
+  paid: 200000,
+  percentPaid: 100,
+  next: null,
+  interest: null,
+  paidOff: true,
+};
+
+/** Two active loans (one with an overdue payment) and a paid-off one archived (UI_FLOWS §8.5). */
+export const LOANS: LoanList = {
+  loans: [ewallet, bank, phone],
+  summary: {
+    totalLeft: 800000,
+    totalPaid: 500000,
+    percentPaid: 38,
+    debtFreeOn: "2027-03-28",
+    daysToGo: 143,
+    interest: 100000,
+    streakDays: 51,
+    freedUp: [
+      { start: "2026-11-01", end: "2026-11-30", due: 300000, freed: 0 },
+      { start: "2026-12-01", end: "2026-12-31", due: 200000, freed: 100000 },
+      { start: "2027-01-01", end: "2027-01-31", due: 400000, freed: -100000 },
+      { start: "2027-02-01", end: "2027-02-28", due: 300000, freed: 0 },
+      { start: "2027-04-01", end: "2027-04-30", due: 0, freed: 300000 },
+    ],
+  },
 };

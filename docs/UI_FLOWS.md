@@ -565,3 +565,14 @@ Answered on 2026-11-13 (Phase 4):
 25. **Adding a new loan** goes through a "Before you add this loan" confirm whose action is **Add this loan anyway**, styled destructive, so taking on debt is never the easy button (F12, LOAN-10).
 26. **A loan's payments** open in a dialog from its card, rather than on a page of their own, like the recurring dates due (§8.5).
 27. **The Forecast table** opens one row at a time to show its movements, inside the one panel, so nothing new is blurred (§8.6).
+
+Answered on 2026-11-15 (Phase 4, the Debt-free screen):
+
+28. **"Paid Nov 20"** is the date of the expense that paid it, which `list_loans` now returns as each payment's `paidOn`, so it follows an edit to that expense (§8.5, F12, F13).
+29. **The Loans panel is full width** until Before you borrow (F15) arrives beside it. Its cards stay two across (§8.5).
+30. **"A loan I already have" clears an untouched Date borrowed** (today), and switching back to "A new loan" puts today back. Today's date on a loan the user already has would restart the loan-free streak (F12, DATA_MODEL §5.11).
+31. **On the debt-free day itself**, the top panel says "Last payment today" in place of "0 days to go". When everything left is overdue it shows what's overdue instead (§8.5).
+32. **Money freed up** shows "This month" on the first row, then "₱X less than this month", "₱X more than this month" or "Same as this month". The mockup's "The last payment" line is left out, since §8.5 doesn't ask for it (§8.5).
+33. **A payment row's error** shows under the list, and marks the row it names. The backend numbers rows among those sent, which leaves out the locked paid ones, so the form numbers its rows the same way ("Payment 3 date"), leaves the locked ones unnumbered, and maps the number back to the row on screen (F12).
+34. **Editing a transaction that pays a loan** hides the type switch, since it must stay an expense (DATA_MODEL §4.6).
+35. **A card's overdue next payment** reads "Next ₱1,000.00 overdue since Mon, Nov 16", in `--danger` with the icon, so it keeps the amount and matches the "Next ₱1,000.00 due Fri, Nov 20" line it replaces, using DESIGN_SYSTEM §8's "overdue since" phrase (§8.5).
