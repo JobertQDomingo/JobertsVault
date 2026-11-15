@@ -3,6 +3,7 @@ pub mod backup;
 pub mod budgets;
 pub mod categories;
 pub mod dashboard;
+pub mod forecast;
 pub mod goals;
 pub mod loans;
 pub mod payment_methods;

@@ -48,7 +48,7 @@ export const formatLongDate = (iso: string) =>
   format(toDate(iso), "EEE, MMM d, yyyy");
 
 /** `Fri, Nov 20`, with the year when it isn't `today`'s. */
-const weekdayDate = (iso: string, today: string) =>
+export const weekdayDate = (iso: string, today: string) =>
   format(
     toDate(iso),
     iso.slice(0, 4) === today.slice(0, 4) ? "EEE, MMM d" : "EEE, MMM d, yyyy",

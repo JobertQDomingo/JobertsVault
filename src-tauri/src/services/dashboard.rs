@@ -10,6 +10,7 @@ use crate::error::AppError;
 use crate::repo;
 use crate::services::accounts::{self, Account};
 use crate::services::budgets::{self, BudgetProgress};
+use crate::services::forecast::{self, Forecast, ForecastGrain};
 use crate::services::loans;
 use crate::services::period::{self, PeriodQuery, PeriodView};
 use crate::services::recurring::{self, UpcomingDate};
@@ -54,6 +55,9 @@ pub struct Dashboard {
     pub loans_due: Vec<LoanDue>,
     /// What's left across every loan, under the net balance. None once nothing is left (LOAN-11).
     pub loans_left: Option<LoansLeft>,
+    /// Safe to spend for today, whatever the period, as `get_forecast` returns it with no rows
+    /// (SAFE-6).
+    pub safe_to_spend: Forecast,
     pub today: NaiveDate,
 }
 
@@ -198,6 +202,10 @@ pub fn get(
         cards_due,
         loans_due,
         loans_left,
+        safe_to_spend: Forecast {
+            rows: Vec::new(),
+            ..forecast::get(conn, ForecastGrain::Window, today)?
+        },
         period,
         income,
         expense,
@@ -872,6 +880,47 @@ mod tests {
                 total_left: Money(100_000),
                 debt_free_on: d(2026, 11, 20),
                 overdue: true,
+            }
+        );
+    }
+
+    #[test]
+    fn the_dashboard_has_safe_to_spend_without_rows() {
+        let mut conn = db();
+        let cash = id_of(&conn, "accounts", "Cash");
+        loan(&mut conn, "Behind", cash, &[("2026-11-20", 100_000)]);
+        let today = d(2026, 11, 10);
+        let none = get(&conn, &MONTH, today).unwrap().safe_to_spend;
+        assert_eq!(none.safe_to_spend, None, "no payday rule yet");
+
+        let salary = crate::services::recurring::RecurringRuleFields {
+            transaction: TransactionFields {
+                kind: TransactionKind::Income,
+                amount: Money(420_000),
+                date: "2026-11-15".into(),
+                account_id: cash,
+                to_account_id: None,
+                category_id: Some(id_of(&conn, "categories", "Salary")),
+                payee: None,
+                payment_method_id: None,
+                note: None,
+            },
+            frequency: crate::domain::recurrence::Frequency::Monthly,
+            interval: 1,
+            end_date: None,
+            max_occurrences: None,
+            mode: crate::services::recurring::RecurringMode::Confirm,
+            is_payday: true,
+        };
+        crate::services::recurring::create(&mut conn, salary, now()).unwrap();
+        let shown = get(&conn, &MONTH, today).unwrap().safe_to_spend;
+        let full = forecast::get(&conn, ForecastGrain::Window, today).unwrap();
+        assert!(!full.rows.is_empty());
+        assert_eq!(
+            shown,
+            Forecast {
+                rows: Vec::new(),
+                ..full
             }
         );
     }

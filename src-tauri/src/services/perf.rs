@@ -8,6 +8,7 @@ use rusqlite::{Connection, params};
 
 use crate::domain::period::ComparisonMode;
 use crate::services::categories::CategoryKind;
+use crate::services::forecast::{self, ForecastGrain};
 use crate::services::period::PeriodQuery;
 use crate::services::transactions::{self, TransactionFilter, TransactionKind};
 use crate::services::{dashboard, reports};
@@ -104,6 +105,31 @@ fn seed(conn: &mut Connection) {
             }
             .unwrap();
         }
+    }
+    // A year of plans: paydays on the 15th and 30th, a daily, a weekly and a monthly rule, and a
+    // loan with a payment each month (ARCHITECTURE §12).
+    tx.execute_batch(
+        "INSERT INTO recurring_rules (kind, amount, account_id, category_id, frequency, interval, start_date, mode, is_payday, created_at, updated_at) VALUES
+           ('income', 1050000, 2, (SELECT id FROM categories WHERE name = 'Salary'), 'monthly', 1, '2026-11-15', 'confirm', 1, 'x', 'x'),
+           ('income', 1050000, 2, (SELECT id FROM categories WHERE name = 'Salary'), 'monthly', 1, '2026-11-30', 'confirm', 1, 'x', 'x'),
+           ('expense', 15000, 1, (SELECT id FROM categories WHERE kind = 'expense' LIMIT 1), 'daily', 1, '2026-11-04', 'auto', 0, 'x', 'x'),
+           ('expense', 80000, 4, (SELECT id FROM categories WHERE kind = 'expense' LIMIT 1), 'weekly', 1, '2026-11-06', 'auto', 0, 'x', 'x'),
+           ('expense', 260000, 2, (SELECT id FROM categories WHERE kind = 'expense' LIMIT 1), 'monthly', 1, '2026-11-10', 'confirm', 0, 'x', 'x');
+         INSERT INTO loans (name, account_id, category_id, is_new, added_on, created_at, updated_at)
+           VALUES ('Perf loan', 2, (SELECT id FROM categories WHERE name = 'Loan'), 0, '2026-11-01', 'x', 'x');",
+    )
+    .unwrap();
+    for month in 0..12 {
+        let due = NaiveDate::from_ymd_opt(2026, 11, 20)
+            .unwrap()
+            .checked_add_months(chrono::Months::new(month))
+            .unwrap();
+        tx.execute(
+            "INSERT INTO loan_payments (loan_id, due_date, amount, created_at, updated_at)
+             VALUES ((SELECT id FROM loans), ?1, 100000, 'x', 'x')",
+            [due.to_string()],
+        )
+        .unwrap();
     }
     tx.commit().unwrap();
 }
@@ -245,6 +271,22 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
             reports::comparison(&conn, &query, Some(mode), account, today()).unwrap()
         });
     }
+    // Phase 4: the loans, and the forecast both ways; the dashboard above works out Safe to spend.
+    time("list loans", || {
+        crate::services::loans::list(&conn, today()).unwrap()
+    });
+    for (label, grain) in [
+        ("forecast: pay windows", ForecastGrain::Window),
+        ("forecast: months", ForecastGrain::Month),
+    ] {
+        time(label, || forecast::get(&conn, grain, today()).unwrap());
+    }
+    assert!(
+        forecast::get(&conn, ForecastGrain::Window, today())
+            .unwrap()
+            .safe_to_spend
+            .is_some()
+    );
     // TXN-6: one letter matches all 300 payees; "store 12" narrows to 11.
     for (label, prefix) in [("payees: \"s\"", "s"), ("payees: \"store 12\"", "store 12")] {
         time(label, || {

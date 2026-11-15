@@ -732,7 +732,7 @@ money now = Σ balance(a, today) over the counted accounts                    (�
 |---|---|
 | An unpaid payment of an active loan | Out, on its due date, **whatever its account** (the debt is paid from spendable money) |
 | A future-dated transaction (dated after today) | An expense from a counted account is out. An income into one is in. A transfer from a counted account to one that isn't counted is out, and the reverse is in. A transfer between two counted accounts, and **any transfer to or from a credit card**, isn't counted: card bills stand in for those (§5.14). |
-| A recurring rule's dates: `pending` ones (as today) and the dates still to come in the horizon, for a rule that isn't paused and hasn't ended, other than a payday | Its template on that date, counted like a future-dated transaction |
+| A recurring rule's dates, other than a payday: `pending` ones (as today, even while the rule is paused), and the dates still to come in the horizon for a rule that isn't paused and hasn't ended, with any date up to today not yet processed counting as today | Its template on that date, counted like a future-dated transaction |
 | A payday | §5.13 |
 | A card bill | Out, on its due date (§5.14) |
 
@@ -754,8 +754,8 @@ per day       = ⌊safe to spend ÷ days left in the current window, counting to
 - **Safe to spend never looks only to the next payday.** It's the lowest point over the whole 12 months, day by day, so money for a short pay window later is held back now, and so is money for a bill due before other income arrives later in the same window (SAFE-5). Budgets and savings goals don't hold anything back (PRD §3).
 - **A window runs short** when any day in it has `run(d)` below 0, even if money later in the window brings it back.
 - **When it's short**, safe to spend is 0, and the dashboard and Forecast say "Short by ₱X on *date*", using `short`.
-- **With no payday rule**, there are no pay windows: the forecast returns none and says how to set one up (SAFE-6).
-- **A payslip already recorded** in the current window is in `money now`. The Forecast lists it as received, without adding it again.
+- **With no payday rule**, there are no pay windows: the forecast returns none and says how to set one up (SAFE-6). A paused payday rule is still a payday rule: its dates make no window, so there's one window to the horizon's end (§9).
+- **A payslip already recorded** in the current window is in `money now`. The Forecast lists it as received, by its own date, without adding it again. In the Months view, the current month lists what was received since the month's real start, though its row starts today.
 - **The Months view (SAFE-7)** groups the same movements by the app's months (§5.3): from the current month, starting today, to the horizon's end, with the same `start`, `in`, `out` and `left`. Safe to spend always comes from the pay windows.
 
 ### 5.16 Before you borrow (LOAN-9, LOAN-10, Phase 4)
@@ -1014,3 +1014,10 @@ Answered on 2026-11-15, while building the forecast's domain rules (SAFE-1 to SA
 75. **An overdue card statement is due today.** What's still owed on the latest statement once its due date has passed counts as due today, like anything overdue. Someone who doesn't pay in full sees the rest as due today until the next statement closes, because bills assume the statement is paid in full (ADR 0006, §5.14).
 76. **Credit on a card carries forward.** Bills start from `−balance`, not `amount_owed`, so an overpaid card's credit is used up by later charges before anything is billed (§5.14).
 77. **Known limit: a future-dated transfer out of a card**, such as a cash advance, isn't counted, as §5.15 says for every card transfer. Once its date arrives it's in the balance and the next bill picks it up. Until then, a transfer from a card to an account that isn't counted (a goal's) makes the forecast too high by its amount.
+
+Answered on 2026-11-15, while building `get_forecast` and the Safe to spend card (SAFE-6):
+
+78. **A paused payday rule still counts as having a payday rule**, so pausing the only one keeps Safe to spend, over one window to the horizon's end, rather than asking the user to mark a payday they've already marked. Only its dates are left out (§5.12, §5.15).
+79. **Pending dates of a paused rule still count**, a payday's too: they wait in the Due list whatever the rule does next. Only the dates still to come need a rule that isn't paused (§5.13, §5.15).
+80. **A date up to today that processing hasn't reached yet** (the app was open past midnight) counts as due today, once, so the figures don't change when processing runs (§5.15).
+81. **Received pay is listed by the payslip's date.** A payslip recorded early shows in the window it was recorded in, which is where its money already is (§5.15).

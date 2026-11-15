@@ -238,7 +238,7 @@ pub(crate) fn early_dates(
 
 /// The rule's dates after `today` and up to `until` that have no row yet: a payday recorded early
 /// already has one, and counts toward `max_occurrences` (DATA_MODEL §4.1).
-fn dates_ahead(
+pub(crate) fn dates_ahead(
     conn: &Connection,
     row: &repo::recurring::Row,
     today: NaiveDate,

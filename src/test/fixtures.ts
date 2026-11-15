@@ -384,6 +384,21 @@ export const DASHBOARD: Dashboard = {
   cardsDue: [],
   loansDue: [],
   loansLeft: null,
+  // No payday rule yet: the card asks for one.
+  safeToSpend: {
+    today: TODAY,
+    moneyNow: 856075,
+    safeToSpend: null,
+    perDay: null,
+    windowEnd: null,
+    daysLeft: null,
+    heldBack: null,
+    heldFor: null,
+    short: null,
+    nextPayday: null,
+    earlyPayday: null,
+    rows: [],
+  },
   today: TODAY,
 };
 
