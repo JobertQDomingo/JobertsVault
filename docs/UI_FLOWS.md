@@ -576,3 +576,9 @@ Answered on 2026-11-15 (Phase 4, the Debt-free screen):
 33. **A payment row's error** shows under the list, and marks the row it names. The backend numbers rows among those sent, which leaves out the locked paid ones, so the form numbers its rows the same way ("Payment 3 date"), leaves the locked ones unnumbered, and maps the number back to the row on screen (F12).
 34. **Editing a transaction that pays a loan** hides the type switch, since it must stay an expense (DATA_MODEL §4.6).
 35. **A card's overdue next payment** reads "Next ₱1,000.00 overdue since Mon, Nov 16", in `--danger` with the icon, so it keeps the amount and matches the "Next ₱1,000.00 due Fri, Nov 20" line it replaces, using DESIGN_SYSTEM §8's "overdue since" phrase (§8.5).
+
+Answered on 2026-11-15 (Phase 4, paydays and payslips):
+
+36. **The deduction categories listed first** on a payslip line are the six PAY-3 presets, matched by name: SSS, PhilHealth, Pag-IBIG, Withholding tax, Salary loan and Other deductions. It only orders the list, so a renamed preset is listed with the other expense categories (F14).
+37. **A payslip line's error** shows under that line, and an error about the lines as a whole (the net not above 0, more than 30 lines) shows once under Net pay (F14).
+38. **Duplicate on a payslip row** copies just that row as a plain transaction, which belongs to no payslip (§3).
