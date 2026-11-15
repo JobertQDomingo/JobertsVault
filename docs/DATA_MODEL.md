@@ -641,6 +641,7 @@ Across **every loan, archived ones included**:
 ```
 total left   = Σ left
 total paid   = Σ paid
+% paid       = ⌊total paid × 100 ÷ (total paid + total left)⌋  (100 once nothing is left)
 debt-free on = the latest due_date of any unpaid payment, or today when that has passed
                                                                (none once nothing is left)
 days to go   = debt-free on − today
@@ -992,3 +993,7 @@ Answered on 2026-11-15, while building Mark paid (LOAN-3):
 
 66. **Mark paid takes any active account and expense category**, like a new expense, and also keeps the loan's own if they've been archived since. Only an expense is accepted (`Validation` on `kind`). A payment that's paid or paid before is a `Conflict` ("This payment is already paid"), and Mark unpaid on one without a transaction is a `Conflict` ("This payment isn't marked paid") (§4.6).
 67. **Mark paid may be dated after today.** The payment is paid at once, and its expense counts once its date arrives, like any future-dated row (TXN-8, §5.2).
+
+Answered on 2026-11-15, while building the Debt-free figures (LOAN-5 to LOAN-8):
+
+68. **The summary has a `% paid` across every loan**, rounded down like each loan's, because the Debt-free screen's top bar shows the share paid and the frontend never works out money figures (§5.11, UI_FLOWS §8.5).

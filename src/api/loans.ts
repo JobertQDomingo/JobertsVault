@@ -6,7 +6,7 @@ import type { Transaction } from "@/bindings/Transaction";
 import type { TransactionFields } from "@/bindings/TransactionFields";
 import { call } from "./client";
 
-/** Every loan in the order it was added, archived ones included, with its payments' status (LOAN-1). */
+/** Every loan in the order it was added, archived ones included, with its payments' status and figures, and the Debt-free summary (LOAN-1, LOAN-5 to LOAN-8). */
 export const listLoans = () => call<LoanList>("list_loans");
 
 /** On a loan the user already has, rows dated before today are saved as paid before (LOAN-1). */
