@@ -54,8 +54,7 @@ import {
 import { rowTitle } from "@/lib/records";
 import { cn } from "@/lib/utils";
 
-const COLUMNS =
-  "grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] items-start gap-3";
+const COLUMNS = "grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-3";
 
 function CardHeader({
   title,
@@ -193,7 +192,7 @@ function DashboardBody({
         <IncomeExpenseChart series={data.series} height={140} />
       </GlassPanel>
       {/* Stretched, so Recent transactions fills the height of the column beside it. */}
-      <div className={cn(COLUMNS, "items-stretch")}>
+      <div className={COLUMNS}>
         <GlassPanel className="flex flex-col overflow-hidden pb-1.5">
           <CardHeader
             title="Recent transactions"
@@ -203,6 +202,8 @@ function DashboardBody({
           {data.recent.length === 0 ? (
             <EmptyState
               icon={ReceiptText}
+              // Centered in the stretched panel, not left at its top.
+              className="flex-1 content-center"
               message="No transactions yet. Press Ctrl+N to add your first one."
               action={
                 <Button variant="primary" onClick={add}>
@@ -317,6 +318,8 @@ function RecentRows({
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(el);
+    // The rows too: a font swapping in can move them without resizing the area.
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
     return () => observer.disconnect();
   }, [recent]);
 

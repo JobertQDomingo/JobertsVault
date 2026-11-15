@@ -372,7 +372,6 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-10-26 | Dates always use US order (`10/26/2026`, `Oct 26`), whatever the Windows region setting |
 | 2026-10-26 | Category colors are numbered separately for income and expense, so the 12 most common expense categories each have their own color (DATA_MODEL §7) |
 | 2026-10-26 | Logo: **C · Line Door**, a vault door drawn in white lines on an indigo aurora tile (`assets/brand/logo.svg`) |
-| 2026-11-15 | DSH-8 shows as many recent transactions as fit beside the dashboard's right column, from 5 to 10, so the Safe to spend card leaves no gap |
 | 2026-10-26 | Added SET-8: a Reduce transparency switch (Phase 4) |
 | 2026-10-26 | Added ONB-1: a basic first-launch setup in Phase 1, polished in Phase 4 (ONB-2) |
 | 2026-10-26 | A duplicated transaction uses today's date |
@@ -426,6 +425,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-13 | Before you borrow's payments are monthly from the first payment date, so its day of the month is the first payment's (DATA_MODEL §5.16) |
 | 2026-11-13 | PAY-4's early paydays can also be recorded from the Safe to spend card, and the Due banner counts only dates that are due (UI_FLOWS §2, F10) |
 | 2026-11-13 | In the forecast, every unpaid loan payment counts whatever its account, transfers to or from a card don't count (the card's bills stand in for them), and pay counts only into a counted account (DATA_MODEL §5.13–5.15) |
+| 2026-11-15 | DSH-8 shows as many recent transactions as fit beside the dashboard's right column, from 5 to 10, so the Safe to spend card leaves no gap |
 
 ---
 

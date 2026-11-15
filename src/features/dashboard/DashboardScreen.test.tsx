@@ -529,11 +529,13 @@ test("Loans left is hidden when nothing is left (LOAN-11)", async () => {
 });
 
 /** Ten recent rows, each 52 px tall, beside a column that leaves `height` px for them. */
-async function recentFitting(height: number) {
-  const recent = Array.from({ length: 10 }, (_, i) => ({
+async function recentFitting(
+  height: number,
+  recent = Array.from({ length: 10 }, (_, i) => ({
     ...RECENT[0],
     id: 100 + i,
-  }));
+  })),
+) {
   const rect = vi
     .spyOn(HTMLElement.prototype, "getBoundingClientRect")
     .mockImplementation(function (this: HTMLElement) {
@@ -560,4 +562,24 @@ test("Recent transactions shows as many whole rows as fit beside the right colum
 
 test("Recent transactions always shows at least 5 rows (DSH-8)", async () => {
   expect(await recentFitting(100)).toBe(5);
+});
+
+test("a day whose rows don't fit hides its header too (DSH-8)", async () => {
+  // 5 rows today, then 5 yesterday; 300 px fits the first 5.
+  const recent = Array.from({ length: 10 }, (_, i) => ({
+    ...RECENT[0],
+    id: 100 + i,
+    date: i < 5 ? RECENT[0].date : "2026-11-04",
+  }));
+  expect(await recentFitting(300, recent)).toBe(5);
+  expect(
+    screen
+      .getByText("Yesterday", { selector: "h3" })
+      .classList.contains("invisible"),
+  ).toBe(true);
+  expect(
+    screen
+      .getByText("Today", { selector: "h3" })
+      .classList.contains("invisible"),
+  ).toBe(false);
 });
