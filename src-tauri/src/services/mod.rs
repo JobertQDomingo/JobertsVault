@@ -13,6 +13,7 @@ pub mod export;
 pub mod goals;
 pub mod loans;
 pub mod payment_methods;
+pub mod payslips;
 #[cfg(test)]
 mod perf;
 pub mod period;

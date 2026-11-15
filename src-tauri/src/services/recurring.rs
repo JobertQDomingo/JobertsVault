@@ -453,7 +453,7 @@ fn get(conn: &Connection, id: i64) -> Result<RecurringRule, AppError> {
     view(stored(conn, id)?)
 }
 
-fn stored(conn: &Connection, id: i64) -> Result<repo::recurring::Row, AppError> {
+pub(crate) fn stored(conn: &Connection, id: i64) -> Result<repo::recurring::Row, AppError> {
     repo::recurring::find(conn, id)?.ok_or_else(|| not_found("recurring rule", id))
 }
 

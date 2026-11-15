@@ -493,7 +493,7 @@ pub(crate) fn real_date(text: &str) -> Option<NaiveDate> {
 }
 
 /// Trimmed, and `None` when nothing is left (DATA_MODEL §6).
-fn clean(text: Option<String>) -> Option<String> {
+pub(crate) fn clean(text: Option<String>) -> Option<String> {
     text.map(|t| t.trim().to_owned()).filter(|t| !t.is_empty())
 }
 

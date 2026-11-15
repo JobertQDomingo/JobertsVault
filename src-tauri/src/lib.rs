@@ -164,6 +164,11 @@ pub fn run() {
             commands::loans::delete_loan,
             commands::loans::mark_loan_payment_paid,
             commands::loans::mark_loan_payment_unpaid,
+            commands::payslips::get_payslip_defaults,
+            commands::payslips::preview_payslip,
+            commands::payslips::record_payslip,
+            commands::payslips::get_payslip,
+            commands::payslips::update_payslip,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the app")
