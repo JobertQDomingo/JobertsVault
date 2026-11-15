@@ -178,6 +178,38 @@ pub fn payments_of(conn: &Connection, loan_id: i64) -> rusqlite::Result<Vec<Paym
     .collect()
 }
 
+pub fn find_payment(conn: &Connection, id: i64) -> rusqlite::Result<Option<PaymentRow>> {
+    conn.query_row(&format!("{SELECT_PAYMENTS} WHERE p.id = ?1"), [id], payment)
+        .optional()
+}
+
+/// The loan whose payment `transaction_id` pays, if any.
+pub fn loan_of_transaction(
+    conn: &Connection,
+    transaction_id: i64,
+) -> rusqlite::Result<Option<i64>> {
+    conn.query_row(
+        "SELECT loan_id FROM loan_payments WHERE transaction_id = ?1",
+        [transaction_id],
+        |r| r.get(0),
+    )
+    .optional()
+}
+
+/// Mark paid (DATA_MODEL §4.6). The service has checked the payment is unpaid.
+pub fn set_payment_transaction(
+    conn: &Connection,
+    id: i64,
+    transaction_id: i64,
+    now: &str,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE loan_payments SET transaction_id = ?2, updated_at = ?3 WHERE id = ?1",
+        params![id, transaction_id, now],
+    )?;
+    Ok(())
+}
+
 pub fn insert_payment(
     conn: &Connection,
     loan_id: i64,

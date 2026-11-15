@@ -507,6 +507,7 @@ fn template(row: &repo::recurring::Row) -> Result<Transaction, AppError> {
         payee: f.payee,
         payment_method_id: f.payment_method_id,
         note: f.note,
+        loan_payment_id: None,
     })
 }
 
@@ -1162,7 +1163,7 @@ mod tests {
             .id;
         // Deleting a posted transaction keeps its date recorded (DATA_MODEL §4.2).
         let first = occurrences(&conn, id)[0].2.unwrap();
-        transactions::delete(&mut conn, first).unwrap();
+        transactions::delete(&mut conn, first, now()).unwrap();
         // A date ahead that's already recorded: the UNIQUE key passes it over.
         conn.execute(
             "INSERT INTO recurring_occurrences (rule_id, occurrence_date, status, created_at, updated_at) VALUES (?1, '2026-02-28', 'skipped', 'x', 'x')",

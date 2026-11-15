@@ -19,6 +19,8 @@ pub struct Row {
     pub payee: Option<String>,
     pub payment_method_id: Option<i64>,
     pub note: Option<String>,
+    /// The loan payment it pays, if any (DATA_MODEL §4.6).
+    pub loan_payment_id: Option<i64>,
 }
 
 /// The columns a create or an edit writes.
@@ -35,7 +37,8 @@ pub struct Values<'a> {
 }
 
 const SELECT: &str = "SELECT id, kind, amount, date, account_id, to_account_id, category_id,
-            payee, payment_method_id, note
+            payee, payment_method_id, note,
+            (SELECT p.id FROM loan_payments p WHERE p.transaction_id = transactions.id)
      FROM transactions";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
@@ -50,6 +53,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
         payee: r.get(7)?,
         payment_method_id: r.get(8)?,
         note: r.get(9)?,
+        loan_payment_id: r.get(10)?,
     })
 }
 

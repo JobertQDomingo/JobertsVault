@@ -65,6 +65,9 @@ pub struct Transaction {
     #[ts(type = "number | null")]
     pub payment_method_id: Option<i64>,
     pub note: Option<String>,
+    /// The loan payment it pays, or none (DATA_MODEL §4.6). Its kind can't change.
+    #[ts(type = "number | null")]
+    pub loan_payment_id: Option<i64>,
 }
 
 /// The settings key quick-add's default account comes from (DATA_MODEL §5.8).
@@ -344,6 +347,12 @@ pub fn update(
 ) -> Result<Transaction, AppError> {
     let tx = conn.transaction()?;
     let stored = get(&tx, id)?;
+    // Before the fields are checked, so this is the error a kind change gets.
+    if stored.loan_payment_id.is_some() && fields.kind != stored.kind {
+        return Err(AppError::Conflict {
+            message: "This pays a loan. Mark it unpaid to change it.".into(),
+        });
+    }
     validate(&tx, &mut fields, Some(&stored), now.date_naive())?;
     repo::transactions::update(&tx, id, &values(&fields), &stamp(now))?;
     let saved = get(&tx, id)?;
@@ -351,12 +360,23 @@ pub fn update(
     Ok(saved)
 }
 
-pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
+pub fn delete(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result<(), AppError> {
     let tx = conn.transaction()?;
-    if repo::transactions::delete(&tx, id)? == 0 {
+    delete_in(&tx, id, &stamp(now))?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Deleting a loan payment's expense makes the payment unpaid (`ON DELETE SET NULL`), so its loan
+/// is unarchived: an archived loan never hides money still owed (DATA_MODEL §4.5–4.6).
+pub(crate) fn delete_in(conn: &Connection, id: i64, now: &str) -> Result<(), AppError> {
+    let loan = repo::loans::loan_of_transaction(conn, id)?;
+    if repo::transactions::delete(conn, id)? == 0 {
         return Err(not_found("transaction", id));
     }
-    tx.commit()?;
+    if let Some(loan) = loan {
+        repo::loans::unarchive_if_unpaid(conn, loan, now)?;
+    }
     Ok(())
 }
 
@@ -495,6 +515,7 @@ pub(crate) fn view(row: repo::transactions::Row) -> Result<Transaction, AppError
         payee: row.payee,
         payment_method_id: row.payment_method_id,
         note: row.note,
+        loan_payment_id: row.loan_payment_id,
     })
 }
 
@@ -643,6 +664,7 @@ mod tests {
                 payee: Some("Market".into()),
                 payment_method_id: None,
                 note: Some("weekly shop".into()),
+                loan_payment_id: None,
             }
         );
         assert_eq!(get(&conn, saved.id).unwrap(), saved);
@@ -695,7 +717,7 @@ mod tests {
         .unwrap();
         assert_eq!(balance(&conn, bank), 100_000);
         assert_eq!(balance(&conn, cash), -25_000);
-        delete(&mut conn, saved.id).unwrap();
+        delete(&mut conn, saved.id, now()).unwrap();
         assert_eq!(balance(&conn, cash), 0);
         assert!(matches!(
             get(&conn, saved.id),
@@ -956,7 +978,7 @@ mod tests {
             Err(AppError::NotFound { .. })
         ));
         assert!(matches!(
-            delete(&mut conn, 99),
+            delete(&mut conn, 99, now()),
             Err(AppError::NotFound { .. })
         ));
     }

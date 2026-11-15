@@ -68,6 +68,8 @@ import {
   useArchiveLoan,
   useCreateLoan,
   useDeleteLoan,
+  useMarkLoanPaymentPaid,
+  useMarkLoanPaymentUnpaid,
   useUnarchiveLoan,
   useUpdateLoan,
 } from "./useLoans";
@@ -144,7 +146,7 @@ const loan: LoanFields = {
   payments: [{ id: null, dueDate: "2026-12-15", amount: 100000 }],
 };
 const settings: Settings = {
-  currencySymbol: "₱",
+  currencySymbol: "â‚±",
   currencyPosition: "before",
   currencyDecimals: 2,
   weekStart: "monday",
@@ -155,7 +157,7 @@ const settings: Settings = {
   comparisonMode: "to_date",
 };
 
-// Every write the app can make (ARCHITECTURE §4.5), with the arguments it sends to Rust.
+// Every write the app can make (ARCHITECTURE Â§4.5), with the arguments it sends to Rust.
 const WRITES = [
   [
     "useCreateAccount",
@@ -366,6 +368,20 @@ const WRITES = [
   ["useArchiveLoan", useArchiveLoan, 3, "archive_loan", { id: 3 }],
   ["useUnarchiveLoan", useUnarchiveLoan, 3, "unarchive_loan", { id: 3 }],
   ["useDeleteLoan", useDeleteLoan, 3, "delete_loan", { id: 3 }],
+  [
+    "useMarkLoanPaymentPaid",
+    useMarkLoanPaymentPaid,
+    { paymentId: 4, transaction },
+    "mark_loan_payment_paid",
+    { paymentId: 4, transaction },
+  ],
+  [
+    "useMarkLoanPaymentUnpaid",
+    useMarkLoanPaymentUnpaid,
+    4,
+    "mark_loan_payment_unpaid",
+    { paymentId: 4 },
+  ],
   [
     "useUpdateSettings",
     useUpdateSettings,

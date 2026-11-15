@@ -6,4 +6,8 @@ import type { TransactionKind } from "./TransactionKind";
  * One stored transaction (DATA_MODEL §3.4). The screens look names up in the account, category
  * and payment method lists.
  */
-export type Transaction = { id: number, kind: TransactionKind, amount: Money, date: string, accountId: number, toAccountId: number | null, categoryId: number | null, payee: string | null, paymentMethodId: number | null, note: string | null, };
+export type Transaction = { id: number, kind: TransactionKind, amount: Money, date: string, accountId: number, toAccountId: number | null, categoryId: number | null, payee: string | null, paymentMethodId: number | null, note: string | null, 
+/**
+ * The loan payment it pays, or none (DATA_MODEL §4.6). Its kind can't change.
+ */
+loanPaymentId: number | null, };

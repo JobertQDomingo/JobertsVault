@@ -162,6 +162,8 @@ pub fn run() {
             commands::loans::archive_loan,
             commands::loans::unarchive_loan,
             commands::loans::delete_loan,
+            commands::loans::mark_loan_payment_paid,
+            commands::loans::mark_loan_payment_unpaid,
         ])
         .build(tauri::generate_context!())
         .expect("error while building the app")

@@ -605,8 +605,9 @@ test("reopening a row just edited shows the saved values, not cached ones", asyn
       id: number;
       transaction: TransactionFields;
     }) => {
-      rows.set(id, { id, ...transaction });
-      return { id, ...transaction };
+      const saved = { id, ...transaction, loanPaymentId: null };
+      rows.set(id, saved);
+      return saved;
     },
   });
   fireEvent.click(await screen.findByText("Food & Groceries · Market"));

@@ -2,6 +2,7 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::services::loans::{Loan, LoanFields, LoanList, NewLoan};
+use crate::services::transactions::{Transaction, TransactionFields};
 use crate::state::AppState;
 use crate::{log, services};
 
@@ -42,5 +43,29 @@ pub fn unarchive_loan(state: State<'_, AppState>, id: i64) -> Result<(), AppErro
 #[tauri::command(async)]
 pub fn delete_loan(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
     services::loans::delete(&mut *state.conn()?, id)
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+#[tauri::command(async)]
+pub fn mark_loan_payment_paid(
+    state: State<'_, AppState>,
+    payment_id: i64,
+    transaction: TransactionFields,
+) -> Result<Transaction, AppError> {
+    services::loans::mark_paid(
+        &mut *state.conn()?,
+        payment_id,
+        transaction,
+        chrono::Local::now(),
+    )
+    .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+#[tauri::command(async)]
+pub fn mark_loan_payment_unpaid(
+    state: State<'_, AppState>,
+    payment_id: i64,
+) -> Result<(), AppError> {
+    services::loans::mark_unpaid(&mut *state.conn()?, payment_id, chrono::Local::now())
         .inspect_err(|err| log::record(&state.log_path, err))
 }

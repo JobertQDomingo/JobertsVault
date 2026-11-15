@@ -8,7 +8,9 @@ use std::collections::{HashMap, HashSet};
 use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
-use crate::services::transactions::real_date;
+use crate::services::transactions::{
+    self, Transaction, TransactionFields, TransactionKind, real_date,
+};
 use crate::services::{invalid, not_found, stamp};
 
 /// What the add loan form sends (LOAN-1). Whether it's new can't change afterwards, so the edit
@@ -237,6 +239,70 @@ pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
         });
     }
     repo::loans::delete(&tx, id)?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Mark paid (LOAN-3): records the expense the user confirmed and links it, in one change. Only
+/// an unpaid payment. The expense is checked like a new one, but may keep the loan's account and
+/// category though they've been archived since. It leaves `last_used_account_id` alone
+/// (DATA_MODEL §4.6).
+pub fn mark_paid(
+    conn: &mut Connection,
+    payment_id: i64,
+    mut fields: TransactionFields,
+    now: DateTime<Local>,
+) -> Result<Transaction, AppError> {
+    let tx = conn.transaction()?;
+    let payment = repo::loans::find_payment(&tx, payment_id)?
+        .ok_or_else(|| not_found("loan payment", payment_id))?;
+    if payment.transaction_id.is_some() || payment.paid_before {
+        return Err(AppError::Conflict {
+            message: "This payment is already paid".into(),
+        });
+    }
+    if fields.kind != TransactionKind::Expense {
+        return Err(invalid("kind", "A loan payment is an expense"));
+    }
+    let loan = repo::loans::find(&tx, payment.loan_id)?
+        .ok_or_else(|| not_found("loan", payment.loan_id))?;
+    // The loan's picks, in the shape the transaction rules keep archived records from.
+    let template = Transaction {
+        id: 0,
+        kind: TransactionKind::Expense,
+        amount: Money(payment.amount),
+        date: stored_date(&payment.due_date, "payment date", loan.id)?,
+        account_id: loan.account_id,
+        to_account_id: None,
+        category_id: Some(loan.category_id),
+        payee: None,
+        payment_method_id: None,
+        note: None,
+        loan_payment_id: None,
+    };
+    transactions::validate(&tx, &mut fields, Some(&template), now.date_naive())?;
+    let stamp = stamp(now);
+    let txn = repo::transactions::insert(&tx, &transactions::values(&fields), &stamp)?;
+    repo::loans::set_payment_transaction(&tx, payment_id, txn, &stamp)?;
+    let saved = transactions::get(&tx, txn)?;
+    tx.commit()?;
+    Ok(saved)
+}
+
+/// Mark unpaid: deletes the payment's expense, which makes it unpaid and unarchives its loan
+/// (DATA_MODEL §4.5–4.6). Only a payment marked paid.
+pub fn mark_unpaid(
+    conn: &mut Connection,
+    payment_id: i64,
+    now: DateTime<Local>,
+) -> Result<(), AppError> {
+    let tx = conn.transaction()?;
+    let payment = repo::loans::find_payment(&tx, payment_id)?
+        .ok_or_else(|| not_found("loan payment", payment_id))?;
+    let txn = payment.transaction_id.ok_or_else(|| AppError::Conflict {
+        message: "This payment isn't marked paid".into(),
+    })?;
+    transactions::delete_in(&tx, txn, &stamp(now))?;
     tx.commit()?;
     Ok(())
 }
@@ -473,9 +539,11 @@ fn view(
 mod tests {
     use super::*;
     use crate::services::accounts::{self, AccountFields, AccountKind, NewAccount};
+    use crate::services::budgets::{self, BudgetFields, BudgetPeriod};
     use crate::services::categories::{self, CategoryFields, CategoryKind, NewCategory};
-    use crate::services::settings;
-    use crate::services::transactions::{self, TransactionFields, TransactionKind};
+    use crate::services::period::PeriodQuery;
+    use crate::services::transactions::TransactionFilter;
+    use crate::services::{dashboard, goals, payment_methods, reports, settings};
     use crate::test_support::{db, now};
     use LoanPaymentStatus::{Paid, PaidBefore, Unpaid};
     use chrono::TimeZone;
@@ -600,26 +668,39 @@ mod tests {
         categories::create(conn, new, now()).unwrap().id
     }
 
-    /// Links the payment to a new expense, as Mark paid will (task 4), and returns its id.
-    fn mark_paid(conn: &mut Connection, payment_id: i64, amount: i64) -> i64 {
-        let fields = TransactionFields {
+    /// The expense Mark paid starts with (DATA_MODEL §4.6): today, from Cash into Loan.
+    fn expense(amount: i64) -> TransactionFields {
+        TransactionFields {
             kind: TransactionKind::Expense,
             amount: Money(amount),
             date: "2026-11-03".into(),
             account_id: CASH,
             to_account_id: None,
             category_id: Some(LOAN),
-            payee: None,
+            payee: Some("E-wallet loan".into()),
             payment_method_id: None,
             note: None,
-        };
-        let txn = transactions::create(conn, fields, now()).unwrap().id;
-        conn.execute(
-            "UPDATE loan_payments SET transaction_id = ?2 WHERE id = ?1",
-            [payment_id, txn],
-        )
-        .unwrap();
-        txn
+        }
+    }
+
+    /// Marks the payment paid with `amount` and returns its expense's id.
+    fn pay(conn: &mut Connection, payment_id: i64, amount: i64) -> i64 {
+        mark_paid(conn, payment_id, expense(amount), now())
+            .unwrap()
+            .id
+    }
+
+    fn payment(conn: &Connection, loan_id: i64, payment_id: i64) -> LoanPayment {
+        find(conn, loan_id)
+            .payments
+            .into_iter()
+            .find(|p| p.id == payment_id)
+            .unwrap()
+    }
+
+    fn transaction_count(conn: &Connection) -> i64 {
+        conn.query_row("SELECT count(*) FROM transactions", [], |r| r.get(0))
+            .unwrap()
     }
 
     fn statuses(loan: &Loan) -> Vec<(NaiveDate, LoanPaymentStatus, bool)> {
@@ -923,7 +1004,7 @@ mod tests {
         let loan = create(&mut conn, input, now()).unwrap();
         let (paid, unpaid) = (loan.payments[0].id, loan.payments[1].id);
         // A late fee: the paid amount is the transaction's.
-        let txn = mark_paid(&mut conn, paid, 105_000);
+        let txn = pay(&mut conn, paid, 105_000);
 
         // Giving the paid row's id is refused.
         let edit = new_fields("E-wallet loan", vec![kept(paid, "2026-11-20", 1)]);
@@ -1059,7 +1140,7 @@ mod tests {
             "Pay or remove its unpaid payments first"
         );
         assert!(!find(&conn, loan.id).archived);
-        mark_paid(&mut conn, loan.payments[1].id, 1);
+        pay(&mut conn, loan.payments[1].id, 1);
         archive(&mut conn, loan.id, now()).unwrap();
         archive(&mut conn, loan.id, now()).unwrap();
         assert!(find(&conn, loan.id).archived);
@@ -1112,7 +1193,7 @@ mod tests {
             vec![row("2026-10-01", 1), row("2026-12-01", 1)],
         );
         let paid_loan = create(&mut conn, input, now()).unwrap();
-        mark_paid(&mut conn, paid_loan.payments[1].id, 1);
+        pay(&mut conn, paid_loan.payments[1].id, 1);
         conflict(delete(&mut conn, paid_loan.id));
 
         // Paid before and unpaid rows don't stop it, and they go with it.
@@ -1219,5 +1300,401 @@ mod tests {
         assert!(settings::get(&conn).unwrap().decimals_locked);
         delete(&mut conn, loan.id).unwrap();
         assert!(!settings::get(&conn).unwrap().decimals_locked);
+    }
+
+    /// Every figure a screen shows about money this month, as JSON. The dashboard's by name: its
+    /// loan banners and Safe to spend are meant to count unpaid payments (tasks 5–6).
+    fn figures(conn: &mut Connection) -> serde_json::Value {
+        let month = PeriodQuery::Month { anchor: None };
+        let filter = TransactionFilter {
+            period: month,
+            kind: None,
+            account_id: None,
+            category_id: None,
+            payment_method_id: None,
+            search: None,
+        };
+        let board = dashboard::get(conn, &month, today()).unwrap();
+        serde_json::json!({
+            "accounts": accounts::list(conn, today()).unwrap(),
+            "transactions": transactions::list(conn, filter, 0, today()).unwrap(),
+            "budgets": budgets::list(conn, today()).unwrap(),
+            "goals": goals::list(conn, today()).unwrap(),
+            "timeseries": reports::timeseries(conn, &month, None, today()).unwrap(),
+            "breakdown": reports::breakdown(conn, &month, CategoryKind::Expense, None, today()).unwrap(),
+            "comparison": reports::comparison(conn, &month, None, None, today()).unwrap(),
+            "dashboard": [
+                serde_json::json!([board.income, board.expense, board.net, board.net_balance]),
+                serde_json::json!(board.series),
+                serde_json::json!(board.comparison),
+                serde_json::json!(board.accounts),
+                serde_json::json!(board.recent),
+                serde_json::json!(board.budgets),
+            ],
+        })
+    }
+
+    #[test]
+    fn an_unpaid_loan_payment_changes_no_balance_or_total() {
+        let mut conn = db();
+        // Cash already in use, so the loan putting it in use changes nothing on its own.
+        let mut pay_day = expense(300_000);
+        pay_day.kind = TransactionKind::Income;
+        pay_day.category_id = Some(SALARY);
+        transactions::create(&mut conn, pay_day, now()).unwrap();
+        let budget = BudgetFields {
+            category_id: Some(LOAN),
+            period: BudgetPeriod::Monthly,
+            amount: Money(500_000),
+        };
+        budgets::create(&mut conn, budget, now()).unwrap();
+        let goal = goals::GoalFields {
+            name: "Emergency fund".into(),
+            target_amount: Money(1_000_000),
+            target_date: None,
+            account_id: CASH,
+        };
+        goals::create(&mut conn, goal, now()).unwrap();
+        let before = figures(&mut conn);
+
+        // One overdue and one due today: neither is a transaction until it's marked paid.
+        let input = new_loan(
+            "E-wallet loan",
+            vec![row("2026-11-02", 100_000), row("2026-11-03", 100_000)],
+        );
+        let loan = create(&mut conn, input, now()).unwrap();
+        assert_eq!(figures(&mut conn), before);
+
+        pay(&mut conn, loan.payments[0].id, 100_000);
+        assert_ne!(figures(&mut conn), before);
+        let cash = accounts::get(&conn, CASH, today()).unwrap();
+        assert_eq!(cash.balance, Money(200_000));
+        let spent = budgets::list(&conn, today()).unwrap()[0].spent;
+        assert_eq!(spent, Money(100_000));
+    }
+
+    #[test]
+    fn mark_paid_records_the_expense_sent_and_links_it() {
+        let mut conn = db();
+        let input = new_loan(
+            "E-wallet loan",
+            vec![row("2026-11-02", 100_000), row("2026-12-01", 100_000)],
+        );
+        let loan = create(&mut conn, input, now()).unwrap();
+        let (first, second) = (loan.payments[0].id, loan.payments[1].id);
+        assert!(loan.payments[0].overdue);
+
+        let mut sent = expense(100_000);
+        sent.note = Some("  November  ".into());
+        let txn = mark_paid(&mut conn, first, sent, now()).unwrap();
+        assert_eq!(
+            (
+                txn.kind,
+                txn.amount,
+                txn.date,
+                txn.account_id,
+                txn.category_id
+            ),
+            (
+                TransactionKind::Expense,
+                Money(100_000),
+                today(),
+                CASH,
+                Some(LOAN)
+            )
+        );
+        assert_eq!(txn.payee.as_deref(), Some("E-wallet loan"));
+        // Trimmed like any expense.
+        assert_eq!(txn.note.as_deref(), Some("November"));
+        assert_eq!(txn.loan_payment_id, Some(first));
+        assert_eq!(transactions::get(&conn, txn.id).unwrap(), txn);
+        let month = TransactionFilter {
+            period: PeriodQuery::Month { anchor: None },
+            kind: None,
+            account_id: None,
+            category_id: None,
+            payment_method_id: None,
+            search: None,
+        };
+        let listed = transactions::list(&conn, month, 0, today()).unwrap().items;
+        assert_eq!(listed, std::slice::from_ref(&txn));
+
+        // Paid, so no longer overdue, and the other payment is untouched.
+        let p = payment(&conn, loan.id, first);
+        assert_eq!(
+            (p.status, p.overdue, p.transaction_id, p.paid_amount),
+            (Paid, false, Some(txn.id), Some(Money(100_000)))
+        );
+        assert_eq!(payment(&conn, loan.id, second).status, Unpaid);
+
+        // Any other transaction pays no loan.
+        let other = transactions::create(&mut conn, expense(1), now()).unwrap();
+        assert_eq!(other.loan_payment_id, None);
+    }
+
+    #[test]
+    fn a_payment_can_be_paid_before_its_date_and_with_a_late_fee() {
+        let mut conn = db();
+        let input = new_loan(
+            "E-wallet loan",
+            vec![row("2026-11-02", 100_000), row("2026-12-01", 100_000)],
+        );
+        let loan = create(&mut conn, input, now()).unwrap();
+        let (late, early) = (loan.payments[0].id, loan.payments[1].id);
+
+        pay(&mut conn, early, 100_000);
+        let p = payment(&conn, loan.id, early);
+        assert_eq!((p.due_date, p.status), (d(2026, 12, 1), Paid));
+
+        // The scheduled amount stays, and the paid amount is what was paid.
+        pay(&mut conn, late, 105_000);
+        let p = payment(&conn, loan.id, late);
+        assert_eq!(
+            (p.amount, p.paid_amount, p.overdue),
+            (Money(100_000), Some(Money(105_000)), false)
+        );
+    }
+
+    #[test]
+    fn only_an_unpaid_payment_can_be_marked_paid_and_only_a_paid_one_unpaid() {
+        let mut conn = db();
+        let input = existing(
+            "E-wallet loan",
+            vec![row("2026-10-01", 100_000), row("2026-12-01", 100_000)],
+        );
+        let loan = create(&mut conn, input, now()).unwrap();
+        let (before, unpaid) = (loan.payments[0].id, loan.payments[1].id);
+        assert_eq!(loan.payments[0].status, PaidBefore);
+
+        let not_paid = "This payment isn't marked paid";
+        let already = "This payment is already paid";
+        assert_eq!(conflict(mark_unpaid(&mut conn, unpaid, now())), not_paid);
+        assert_eq!(conflict(mark_unpaid(&mut conn, before, now())), not_paid);
+        assert_eq!(
+            conflict(mark_paid(&mut conn, before, expense(1), now())),
+            already
+        );
+        pay(&mut conn, unpaid, 100_000);
+        assert_eq!(
+            conflict(mark_paid(&mut conn, unpaid, expense(1), now())),
+            already
+        );
+        assert!(matches!(
+            mark_paid(&mut conn, 999, expense(1), now()),
+            Err(AppError::NotFound { .. })
+        ));
+        assert!(matches!(
+            mark_unpaid(&mut conn, 999, now()),
+            Err(AppError::NotFound { .. })
+        ));
+        // The refused ones saved nothing.
+        assert_eq!(transaction_count(&conn), 1);
+    }
+
+    #[test]
+    fn mark_paid_checks_the_expense_like_a_new_one_but_keeps_the_loans_archived_picks() {
+        let mut conn = db();
+        let wallet = account(&mut conn, "Wallet", AccountKind::Ewallet);
+        let lender = category(&mut conn, "Lender", CategoryKind::Expense);
+        let gone_account = account(&mut conn, "Old wallet", AccountKind::Ewallet);
+        let gone_category = category(&mut conn, "Old loans", CategoryKind::Expense);
+        let mut input = existing("E-wallet loan", vec![row("2026-12-01", 100_000)]);
+        input.fields.account_id = wallet;
+        input.fields.category_id = lender;
+        let loan = create(&mut conn, input, now()).unwrap();
+        let id = loan.payments[0].id;
+        for archived in [wallet, gone_account] {
+            accounts::archive(&mut conn, archived, false, now()).unwrap();
+        }
+        for archived in [lender, gone_category] {
+            categories::archive(&mut conn, archived, now()).unwrap();
+        }
+        let gone_method = 1;
+        payment_methods::archive(&mut conn, gone_method, now()).unwrap();
+
+        type Change = Box<dyn Fn(&mut TransactionFields)>;
+        let cases: Vec<(&str, Change)> = vec![
+            (
+                "kind",
+                Box::new(|f| {
+                    f.kind = TransactionKind::Income;
+                    f.category_id = Some(SALARY);
+                }),
+            ),
+            (
+                "kind",
+                Box::new(|f| {
+                    f.kind = TransactionKind::Transfer;
+                    f.to_account_id = Some(CASH);
+                    f.category_id = None;
+                    f.payee = None;
+                }),
+            ),
+            ("amount", Box::new(|f| f.amount = Money(0))),
+            ("date", Box::new(|f| f.date = "2026-02-30".into())),
+            ("accountId", Box::new(|f| f.account_id = 999)),
+            ("accountId", Box::new(move |f| f.account_id = gone_account)),
+            ("categoryId", Box::new(|f| f.category_id = Some(SALARY))),
+            ("categoryId", Box::new(|f| f.category_id = None)),
+            (
+                "categoryId",
+                Box::new(move |f| f.category_id = Some(gone_category)),
+            ),
+            ("payee", Box::new(|f| f.payee = Some("x".repeat(101)))),
+            (
+                "paymentMethodId",
+                Box::new(move |f| f.payment_method_id = Some(gone_method)),
+            ),
+        ];
+        for (field, change) in &cases {
+            let mut sent = expense(100_000);
+            sent.account_id = wallet;
+            sent.category_id = Some(lender);
+            change(&mut sent);
+            assert_eq!(field_of(mark_paid(&mut conn, id, sent, now())), *field);
+        }
+        assert_eq!(payment(&conn, loan.id, id).status, Unpaid);
+        assert_eq!(transaction_count(&conn), 0);
+
+        // The loan's own account and category, though archived since.
+        let mut sent = expense(100_000);
+        sent.account_id = wallet;
+        sent.category_id = Some(lender);
+        let txn = mark_paid(&mut conn, id, sent, now()).unwrap();
+        assert_eq!((txn.account_id, txn.category_id), (wallet, Some(lender)));
+
+        // Like any expense, it may come from another active account and category.
+        let input = existing("Bank loan", vec![row("2026-12-01", 100_000)]);
+        let other = create(&mut conn, input, now()).unwrap();
+        let mut sent = expense(100_000);
+        sent.category_id = Some(FOOD);
+        let txn = mark_paid(&mut conn, other.payments[0].id, sent, now()).unwrap();
+        assert_eq!((txn.account_id, txn.category_id), (CASH, Some(FOOD)));
+    }
+
+    #[test]
+    fn mark_paid_leaves_the_last_used_account_alone() {
+        let mut conn = db();
+        let wallet = account(&mut conn, "Wallet", AccountKind::Ewallet);
+        let mut spend = expense(1);
+        spend.account_id = wallet;
+        transactions::create(&mut conn, spend, now()).unwrap();
+        let input = existing("E-wallet loan", vec![row("2026-12-01", 100_000)]);
+        let loan = create(&mut conn, input, now()).unwrap();
+        pay(&mut conn, loan.payments[0].id, 100_000);
+        let defaults = transactions::defaults(&conn, today()).unwrap();
+        assert_eq!(defaults.account_id, Some(wallet));
+    }
+
+    #[test]
+    fn deleting_a_loan_payments_expense_makes_it_unpaid_again() {
+        let mut conn = db();
+        let input = new_loan("E-wallet loan", vec![row("2026-11-02", 100_000)]);
+        let loan = create(&mut conn, input, now()).unwrap();
+        let id = loan.payments[0].id;
+        let txn = pay(&mut conn, id, 105_000);
+
+        transactions::delete(&mut conn, txn, now()).unwrap();
+        let p = payment(&conn, loan.id, id);
+        assert_eq!(
+            (p.status, p.overdue, p.transaction_id, p.paid_amount),
+            (Unpaid, true, None, None)
+        );
+        // It can be paid again.
+        pay(&mut conn, id, 100_000);
+        assert_eq!(payment(&conn, loan.id, id).status, Paid);
+    }
+
+    #[test]
+    fn mark_unpaid_deletes_the_expense() {
+        let mut conn = db();
+        let input = new_loan("E-wallet loan", vec![row("2026-11-02", 100_000)]);
+        let loan = create(&mut conn, input, now()).unwrap();
+        let id = loan.payments[0].id;
+        let txn = pay(&mut conn, id, 100_000);
+
+        mark_unpaid(&mut conn, id, now()).unwrap();
+        assert!(matches!(
+            transactions::get(&conn, txn),
+            Err(AppError::NotFound { .. })
+        ));
+        let p = payment(&conn, loan.id, id);
+        assert_eq!((p.status, p.overdue), (Unpaid, true));
+        assert_eq!(
+            accounts::get(&conn, CASH, today()).unwrap().balance,
+            Money(0)
+        );
+    }
+
+    #[test]
+    fn an_archived_loan_is_unarchived_when_a_payment_becomes_unpaid() {
+        let mut conn = db();
+        let input = existing(
+            "E-wallet loan",
+            vec![row("2026-10-01", 100_000), row("2026-12-01", 100_000)],
+        );
+        let loan = create(&mut conn, input, now()).unwrap();
+        let id = loan.payments[1].id;
+
+        // By Mark unpaid.
+        pay(&mut conn, id, 100_000);
+        archive(&mut conn, loan.id, now()).unwrap();
+        mark_unpaid(&mut conn, id, now()).unwrap();
+        assert!(!find(&conn, loan.id).archived);
+
+        // By deleting its expense from the transaction list.
+        let txn = pay(&mut conn, id, 100_000);
+        archive(&mut conn, loan.id, now()).unwrap();
+        transactions::delete(&mut conn, txn, now()).unwrap();
+        assert!(!find(&conn, loan.id).archived);
+
+        // Deleting any other transaction leaves an archived loan as it is.
+        pay(&mut conn, id, 100_000);
+        archive(&mut conn, loan.id, now()).unwrap();
+        let other = transactions::create(&mut conn, expense(1), now()).unwrap();
+        transactions::delete(&mut conn, other.id, now()).unwrap();
+        assert!(find(&conn, loan.id).archived);
+    }
+
+    #[test]
+    fn a_loan_payments_expense_can_be_edited_but_stays_an_expense() {
+        let mut conn = db();
+        let input = new_loan("E-wallet loan", vec![row("2026-11-02", 100_000)]);
+        let loan = create(&mut conn, input, now()).unwrap();
+        let id = loan.payments[0].id;
+        let txn = pay(&mut conn, id, 100_000);
+
+        // The link stays, and the paid amount follows the edit.
+        let wallet = account(&mut conn, "Wallet", AccountKind::Ewallet);
+        let mut edit = expense(105_000);
+        edit.category_id = Some(FOOD);
+        edit.account_id = wallet;
+        edit.date = "2026-11-01".into();
+        let saved = transactions::update(&mut conn, txn, edit, now()).unwrap();
+        assert_eq!(saved.loan_payment_id, Some(id));
+        let p = payment(&conn, loan.id, id);
+        assert_eq!((p.status, p.paid_amount), (Paid, Some(Money(105_000))));
+
+        let refused = "This pays a loan. Mark it unpaid to change it.";
+        let mut income = expense(100_000);
+        income.kind = TransactionKind::Income;
+        income.category_id = Some(SALARY);
+        assert_eq!(
+            conflict(transactions::update(&mut conn, txn, income, now())),
+            refused
+        );
+        let mut transfer = expense(100_000);
+        transfer.kind = TransactionKind::Transfer;
+        transfer.to_account_id = Some(wallet);
+        // Refused before the fields are checked, so a category left on it doesn't matter.
+        assert_eq!(
+            conflict(transactions::update(&mut conn, txn, transfer, now())),
+            refused
+        );
+        let stored = transactions::get(&conn, txn).unwrap();
+        assert_eq!(
+            (stored.kind, stored.amount),
+            (TransactionKind::Expense, Money(105_000))
+        );
     }
 }
