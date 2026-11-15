@@ -257,8 +257,13 @@ function DashboardBody({
               className="block border-t border-hairline px-[18px] py-2.5 text-small text-muted-foreground transition-colors duration-150 hover:bg-glass-hover"
             >
               Loans left:{" "}
-              <MoneyText amount={data.loansLeft.totalLeft} kind="balance" /> ·
-              debt-free {formatDate(data.loansLeft.debtFreeOn)}
+              <MoneyText amount={data.loansLeft.totalLeft} kind="balance" /> ·{" "}
+              {/* Everything left is overdue: no date already passed (DATA_MODEL §5.11). */}
+              {data.loansLeft.overdue ? (
+                <span className="font-semibold text-danger">all overdue</span>
+              ) : (
+                `debt-free ${formatDate(data.loansLeft.debtFreeOn)}`
+              )}
             </Link>
           )}
         </GlassPanel>

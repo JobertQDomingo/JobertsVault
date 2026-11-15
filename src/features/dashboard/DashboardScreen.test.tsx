@@ -493,7 +493,11 @@ test("Loans left shows under the net balance and links to Debt-free (LOAN-11)", 
     ...ANSWERS,
     get_dashboard: {
       ...DASHBOARD,
-      loansLeft: { totalLeft: 1400000, debtFreeOn: "2027-08-10" },
+      loansLeft: {
+        totalLeft: 1400000,
+        debtFreeOn: "2027-08-10",
+        overdue: false,
+      },
     },
   });
   const line = await screen.findByRole("link", { name: /Loans left/ });
@@ -503,6 +507,18 @@ test("Loans left shows under the net balance and links to Debt-free (LOAN-11)", 
   expect(line.getAttribute("href")).toBe("/debt-free");
   // Right under the net balance, in the Accounts panel.
   expect(line.previousElementSibling!.textContent).toContain("Net balance");
+});
+
+test("Loans left says when everything left is overdue, not a date already passed (LOAN-11)", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: {
+      ...DASHBOARD,
+      loansLeft: { totalLeft: 100000, debtFreeOn: "2026-11-05", overdue: true },
+    },
+  });
+  const line = await screen.findByRole("link", { name: /Loans left/ });
+  expect(line.textContent).toBe("Loans left: ₱1,000.00 · all overdue");
 });
 
 test("Loans left is hidden when nothing is left (LOAN-11)", async () => {

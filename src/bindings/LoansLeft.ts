@@ -4,4 +4,8 @@ import type { Money } from "./Money";
 /**
  * The dashboard line under the net balance (LOAN-11).
  */
-export type LoansLeft = { totalLeft: Money, debtFreeOn: string, };
+export type LoansLeft = { totalLeft: Money, debtFreeOn: string, 
+/**
+ * Everything left is overdue, so the line says so instead of a date already passed.
+ */
+overdue: boolean, };

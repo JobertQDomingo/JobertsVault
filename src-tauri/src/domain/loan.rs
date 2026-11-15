@@ -194,14 +194,15 @@ fn freed_up(
 /// soonest first. Each gets only its own part of what its account's running total lacks against
 /// the balance, so following every banner moves exactly enough. None when it needs nothing.
 pub fn move_first(dues: &[(i64, Money)], balance: impl Fn(i64) -> Money) -> Vec<Option<Money>> {
-    let mut lacking: HashMap<i64, (Money, i64)> = HashMap::new();
+    // Per account: the running total so far, and how much of it the earlier banners asked for.
+    let mut told: HashMap<i64, (i64, i64)> = HashMap::new();
     dues.iter()
         .map(|&(account, amount)| {
-            let (running, lacked) = lacking.entry(account).or_insert((Money::ZERO, 0));
-            *running = total([*running, amount].into_iter());
-            let lacks = running.0.saturating_sub(balance(account).0).max(0);
-            let share = lacks - *lacked;
-            *lacked = lacks;
+            let (running, asked) = told.entry(account).or_insert((0, 0));
+            *running = running.saturating_add(amount.0);
+            let lacks = running.saturating_sub(balance(account).0).max(0);
+            let share = lacks - *asked;
+            *asked = lacks;
             (share > 0).then_some(Money(share))
         })
         .collect()

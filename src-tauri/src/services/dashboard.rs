@@ -89,6 +89,8 @@ pub struct LoanDue {
 pub struct LoansLeft {
     pub total_left: Money,
     pub debt_free_on: NaiveDate,
+    /// Everything left is overdue, so the line says so instead of a date already passed.
+    pub overdue: bool,
 }
 
 /// A card's due-date reminder (CC-7, DATA_MODEL §5.5).
@@ -137,8 +139,14 @@ pub fn get(
         .collect();
     cards_due.sort_by_key(|c| c.days);
     let loans::LoanList { loans, summary } = loans::list(conn, today)?;
+    let all_overdue = loans
+        .iter()
+        .flat_map(|l| &l.payments)
+        .filter(|p| p.status == loans::LoanPaymentStatus::Unpaid)
+        .all(|p| p.overdue);
     let mut loans_due: Vec<LoanDue> = loans
         .into_iter()
+        // Defensive: an archived loan is paid off, so it has no next payment anyway.
         .filter(|l| !l.archived)
         .filter_map(|l| {
             let next = l.next?;
@@ -176,6 +184,7 @@ pub fn get(
     let loans_left = summary.debt_free_on.map(|debt_free_on| LoansLeft {
         total_left: summary.total_left,
         debt_free_on,
+        overdue: all_overdue,
     });
     let recent = repo::transactions::recent(conn, &today.to_string(), 5)?
         .into_iter()
@@ -786,6 +795,7 @@ mod tests {
             Some(LoansLeft {
                 total_left: Money(140_000),
                 debt_free_on: d(2027, 1, 1),
+                overdue: false,
             })
         );
         let loan_category = id_of(&conn, "categories", "Loan");
@@ -840,17 +850,28 @@ mod tests {
     }
 
     #[test]
-    fn loans_left_is_debt_free_today_when_everything_left_is_overdue() {
+    fn loans_left_says_when_everything_left_is_overdue() {
         let mut conn = db();
         let cash = id_of(&conn, "accounts", "Cash");
         loan(&mut conn, "Behind", cash, &[("2026-11-10", 100_000)]);
-        let left = get(&conn, &MONTH, d(2026, 11, 20)).unwrap().loans_left;
+        let left = |today| get(&conn, &MONTH, today).unwrap().loans_left.unwrap();
+        // Due today isn't overdue yet: the last payment is today.
         assert_eq!(
-            left,
-            Some(LoansLeft {
+            left(d(2026, 11, 10)),
+            LoansLeft {
+                total_left: Money(100_000),
+                debt_free_on: d(2026, 11, 10),
+                overdue: false,
+            }
+        );
+        // Once it's passed, the debt-free date is today and the line says it's overdue instead.
+        assert_eq!(
+            left(d(2026, 11, 20)),
+            LoansLeft {
                 total_left: Money(100_000),
                 debt_free_on: d(2026, 11, 20),
-            })
+                overdue: true,
+            }
         );
     }
 }
