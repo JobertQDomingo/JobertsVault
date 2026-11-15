@@ -4,11 +4,13 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::domain::card_cycle;
+use crate::domain::loan;
 use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
 use crate::services::accounts::{self, Account};
 use crate::services::budgets::{self, BudgetProgress};
+use crate::services::loans;
 use crate::services::period::{self, PeriodQuery, PeriodView};
 use crate::services::recurring::{self, UpcomingDate};
 use crate::services::reports::{self, Comparison, Timeseries};
@@ -47,7 +49,46 @@ pub struct Dashboard {
     /// Active cards whose payment is due within 5 days with something owed, soonest first, for
     /// their banners (CC-7).
     pub cards_due: Vec<CardDue>,
+    /// Active loans whose next unpaid payment is due within 5 days or overdue, soonest first, for
+    /// their banners (LOAN-4).
+    pub loans_due: Vec<LoanDue>,
+    /// What's left across every loan, under the net balance. None once nothing is left (LOAN-11).
+    pub loans_left: Option<LoansLeft>,
     pub today: NaiveDate,
+}
+
+/// A loan's reminder: its next unpaid payment (LOAN-4, DATA_MODEL §5.11).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LoanDue {
+    #[ts(type = "number")]
+    pub loan_id: i64,
+    pub name: String,
+    /// The account its payments come from.
+    #[ts(type = "number")]
+    pub account_id: i64,
+    #[ts(type = "number")]
+    pub payment_id: i64,
+    pub amount: Money,
+    pub due_date: NaiveDate,
+    /// 0 when it's due today, below 0 when it's overdue.
+    #[ts(type = "number")]
+    pub days: i64,
+    /// The loan's other overdue payments.
+    #[ts(type = "number")]
+    pub more_overdue: usize,
+    /// This banner's part of what its account lacks, or none (DATA_MODEL §5.11).
+    pub move_first: Option<Money>,
+}
+
+/// The dashboard line under the net balance (LOAN-11).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LoansLeft {
+    pub total_left: Money,
+    pub debt_free_on: NaiveDate,
 }
 
 /// A card's due-date reminder (CC-7, DATA_MODEL §5.5).
@@ -95,6 +136,47 @@ pub fn get(
         })
         .collect();
     cards_due.sort_by_key(|c| c.days);
+    let loans::LoanList { loans, summary } = loans::list(conn, today)?;
+    let mut loans_due: Vec<LoanDue> = loans
+        .into_iter()
+        .filter(|l| !l.archived)
+        .filter_map(|l| {
+            let next = l.next?;
+            let days = (next.due_date - today).num_days();
+            (days <= 5).then(|| LoanDue {
+                loan_id: l.id,
+                account_id: l.account_id,
+                payment_id: next.id,
+                amount: next.amount,
+                due_date: next.due_date,
+                days,
+                more_overdue: l
+                    .payments
+                    .iter()
+                    .filter(|p| p.overdue)
+                    .count()
+                    .saturating_sub(1),
+                move_first: None,
+                name: l.name,
+            })
+        })
+        .collect();
+    loans_due.sort_by_key(|l| (l.due_date, l.loan_id));
+    let dues: Vec<_> = loans_due.iter().map(|l| (l.account_id, l.amount)).collect();
+    let balance = |id| {
+        accounts
+            .iter()
+            .find(|a| a.id == id)
+            .map_or(Money::ZERO, |a| a.balance)
+    };
+    for (due, share) in loans_due.iter_mut().zip(loan::move_first(&dues, balance)) {
+        due.move_first = share;
+    }
+    // None exactly when no payment is unpaid.
+    let loans_left = summary.debt_free_on.map(|debt_free_on| LoansLeft {
+        total_left: summary.total_left,
+        debt_free_on,
+    });
     let recent = repo::transactions::recent(conn, &today.to_string(), 5)?
         .into_iter()
         .map(transactions::view)
@@ -105,6 +187,8 @@ pub fn get(
         budgets: budgets::list(conn, today)?,
         upcoming: recurring::upcoming(conn, today)?,
         cards_due,
+        loans_due,
+        loans_left,
         period,
         income,
         expense,
@@ -125,6 +209,7 @@ mod tests {
     use crate::domain::period::ComparisonMode;
     use crate::services::accounts::{self, AccountFields, AccountKind, NewAccount};
     use crate::services::categories::CategoryKind;
+    use crate::services::loans::{self, Loan};
     use crate::services::period::{self, PeriodQuery};
     use crate::services::settings;
     use crate::services::transactions::{self, TransactionFields, TransactionKind};
@@ -547,5 +632,225 @@ mod tests {
             .map(|c| (c.account_id, c.days))
             .collect();
         assert_eq!(ids, [(sooner, 2), (later, 4)]);
+    }
+
+    /// A new loan borrowed on Nov 1, paid from `account` into Loan, with these payments.
+    fn loan(conn: &mut Connection, name: &str, account: i64, payments: &[(&str, i64)]) -> Loan {
+        use crate::services::loans::{LoanFields, LoanPaymentFields, NewLoan};
+        let fields = LoanFields {
+            name: name.into(),
+            account_id: account,
+            category_id: id_of(conn, "categories", "Loan"),
+            amount_borrowed: None,
+            borrowed_on: Some("2026-11-01".into()),
+            payments: payments
+                .iter()
+                .map(|&(date, amount)| LoanPaymentFields {
+                    id: None,
+                    due_date: date.into(),
+                    amount: Money(amount),
+                })
+                .collect(),
+        };
+        let new = NewLoan {
+            is_new: true,
+            fields,
+        };
+        loans::create(conn, new, now()).unwrap()
+    }
+
+    fn due_dates(dash: &Dashboard) -> Vec<(i64, NaiveDate, i64)> {
+        dash.loans_due
+            .iter()
+            .map(|l| (l.loan_id, l.due_date, l.days))
+            .collect()
+    }
+
+    #[test]
+    fn a_loan_payment_due_within_5_days_or_overdue_gets_a_banner() {
+        let mut conn = db();
+        let cash = id_of(&conn, "accounts", "Cash");
+        let soon = loan(&mut conn, "Soon", cash, &[("2026-11-25", 100_000)]);
+        let later = loan(&mut conn, "Later", cash, &[("2026-11-26", 100_000)]);
+        let today = d(2026, 11, 20);
+        let dash = get(&conn, &MONTH, today).unwrap();
+        assert_eq!(
+            due_dates(&dash),
+            [(soon.id, d(2026, 11, 25), 5)],
+            "6 days out"
+        );
+
+        // Overdue days are below 0, and it stays until it's paid.
+        let dash = get(&conn, &MONTH, d(2026, 11, 28)).unwrap();
+        assert_eq!(
+            due_dates(&dash),
+            [
+                (soon.id, d(2026, 11, 25), -3),
+                (later.id, d(2026, 11, 26), -2)
+            ]
+        );
+        let first = &dash.loans_due[0];
+        assert_eq!(
+            (
+                first.payment_id,
+                first.amount,
+                first.account_id,
+                first.name.as_str()
+            ),
+            (soon.payments[0].id, Money(100_000), cash, "Soon")
+        );
+    }
+
+    #[test]
+    fn a_loan_gets_one_banner_for_its_next_payment_saying_how_many_more_are_overdue() {
+        let mut conn = db();
+        let cash = id_of(&conn, "accounts", "Cash");
+        let dates = [
+            ("2026-11-10", 100_000),
+            ("2026-11-20", 100_000),
+            ("2026-11-30", 100_000),
+            ("2026-12-10", 100_000),
+        ];
+        let l = loan(&mut conn, "E-wallet loan", cash, &dates);
+        let banners = |today| get(&conn, &MONTH, today).unwrap().loans_due;
+        let one = banners(d(2026, 12, 5));
+        assert_eq!(one.len(), 1);
+        assert_eq!(
+            (one[0].payment_id, one[0].more_overdue),
+            (l.payments[0].id, 2)
+        );
+        // Due today isn't overdue yet, and a payment not yet due has no others overdue.
+        assert_eq!(banners(d(2026, 11, 10))[0].more_overdue, 0);
+        assert_eq!(banners(d(2026, 11, 7))[0].more_overdue, 0);
+    }
+
+    #[test]
+    fn archived_loans_get_no_banner() {
+        let mut conn = db();
+        let cash = id_of(&conn, "accounts", "Cash");
+        let l = loan(&mut conn, "Shelved", cash, &[("2026-11-05", 100_000)]);
+        // Only a paid-off loan can be archived, so this one is archived behind the service's back.
+        conn.execute("UPDATE loans SET archived = 1 WHERE id = ?1", [l.id])
+            .unwrap();
+        assert_eq!(get(&conn, &MONTH, d(2026, 11, 5)).unwrap().loans_due, []);
+    }
+
+    #[test]
+    fn loan_banners_come_soonest_first_and_each_says_its_own_part_to_move() {
+        let mut conn = db();
+        let wallet = account(&mut conn, AccountKind::Ewallet, "E-wallet");
+        let salary = Some("Salary");
+        add(
+            &mut conn,
+            TransactionKind::Income,
+            20_000,
+            d(2026, 11, 2),
+            wallet,
+            salary,
+            None,
+        );
+        let second = loan(&mut conn, "Phone loan", wallet, &[("2026-11-24", 50_000)]);
+        let first = loan(
+            &mut conn,
+            "E-wallet loan",
+            wallet,
+            &[("2026-11-22", 100_000)],
+        );
+        let dash = get(&conn, &MONTH, d(2026, 11, 20)).unwrap();
+        let banners: Vec<_> = dash
+            .loans_due
+            .iter()
+            .map(|l| (l.loan_id, l.move_first))
+            .collect();
+        // ₱200 in the account, ₱1,000 then ₱500 due (DATA_MODEL §5.11).
+        assert_eq!(
+            banners,
+            [
+                (first.id, Some(Money(80_000))),
+                (second.id, Some(Money(50_000)))
+            ]
+        );
+    }
+
+    #[test]
+    fn loans_left_shows_what_is_left_and_the_debt_free_date() {
+        use crate::services::loans::mark_paid;
+        let mut conn = db();
+        assert_eq!(get(&conn, &MONTH, d(2026, 11, 3)).unwrap().loans_left, None);
+        let cash = id_of(&conn, "accounts", "Cash");
+        let dates = [("2026-12-01", 100_000), ("2027-01-01", 40_000)];
+        let l = loan(&mut conn, "E-wallet loan", cash, &dates);
+        let left = |conn: &Connection| get(conn, &MONTH, d(2026, 11, 3)).unwrap().loans_left;
+        assert_eq!(
+            left(&conn),
+            Some(LoansLeft {
+                total_left: Money(140_000),
+                debt_free_on: d(2027, 1, 1),
+            })
+        );
+        let loan_category = id_of(&conn, "categories", "Loan");
+        for (p, amount) in l.payments.iter().zip([100_000, 40_000]) {
+            let fields = TransactionFields {
+                kind: TransactionKind::Expense,
+                amount: Money(amount),
+                date: "2026-11-03".into(),
+                account_id: cash,
+                to_account_id: None,
+                category_id: Some(loan_category),
+                payee: None,
+                payment_method_id: None,
+                note: None,
+            };
+            mark_paid(&mut conn, p.id, fields, now()).unwrap();
+        }
+        assert_eq!(left(&conn), None, "hidden once nothing is left");
+    }
+
+    #[test]
+    fn move_first_counts_only_the_payments_the_banners_show() {
+        let mut conn = db();
+        let wallet = account(&mut conn, AccountKind::Ewallet, "E-wallet");
+        let dates = [
+            ("2026-11-05", 100_000),
+            ("2026-11-06", 100_000),
+            ("2026-11-07", 100_000),
+        ];
+        loan(&mut conn, "Behind", wallet, &dates);
+        loan(&mut conn, "Far off", wallet, &[("2026-11-16", 100_000)]);
+        let dash = get(&conn, &MONTH, d(2026, 11, 10)).unwrap();
+        let banners: Vec<_> = dash
+            .loans_due
+            .iter()
+            .map(|l| (l.more_overdue, l.move_first))
+            .collect();
+        // One banner for the earliest; the other overdue ones and the one 6 days out add nothing.
+        assert_eq!(banners, [(2, Some(Money(100_000)))]);
+    }
+
+    #[test]
+    fn overdue_banners_come_before_due_ones_and_a_tie_goes_by_the_order_added() {
+        let mut conn = db();
+        let cash = id_of(&conn, "accounts", "Cash");
+        let a = loan(&mut conn, "A", cash, &[("2026-11-12", 1_000)]);
+        let b = loan(&mut conn, "B", cash, &[("2026-11-12", 1_000)]);
+        let late = loan(&mut conn, "Late", cash, &[("2026-11-08", 1_000)]);
+        let dash = get(&conn, &MONTH, d(2026, 11, 10)).unwrap();
+        let ids: Vec<_> = dash.loans_due.iter().map(|l| l.loan_id).collect();
+        assert_eq!(ids, [late.id, a.id, b.id]);
+    }
+
+    #[test]
+    fn loans_left_is_debt_free_today_when_everything_left_is_overdue() {
+        let mut conn = db();
+        let cash = id_of(&conn, "accounts", "Cash");
+        loan(&mut conn, "Behind", cash, &[("2026-11-10", 100_000)]);
+        let left = get(&conn, &MONTH, d(2026, 11, 20)).unwrap().loans_left;
+        assert_eq!(
+            left,
+            Some(LoansLeft {
+                total_left: Money(100_000),
+                debt_free_on: d(2026, 11, 20),
+            })
+        );
     }
 }

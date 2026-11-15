@@ -997,3 +997,9 @@ Answered on 2026-11-15, while building Mark paid (LOAN-3):
 Answered on 2026-11-15, while building the Debt-free figures (LOAN-5 to LOAN-8):
 
 68. **The summary has a `% paid` across every loan**, rounded down like each loan's, because the Debt-free screen's top bar shows the share paid and the frontend never works out money figures (§5.11, UI_FLOWS §8.5).
+
+Answered on 2026-11-15, while building the dashboard's loan banners (LOAN-4, LOAN-11):
+
+69. **"Move money first" below 0:** what a running total lacks is `max(0, total − balance)`, so an account at −₱100.00 with ₱1,000.00 due says to move ₱1,100.00, enough to pay without going further below 0. The first banner from that account carries the deficit, and following every banner still moves exactly enough (§5.11).
+70. **Banners on the same date** come in the order their loans were added, and the running totals follow the banners' order (§5.11).
+71. **A loan whose account was archived since** still says to move money there. Archived accounts take no new transfers, so the user unarchives it or edits the loan's account (§4.5).

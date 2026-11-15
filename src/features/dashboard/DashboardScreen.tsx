@@ -1,6 +1,7 @@
 import {
   CalendarClock,
   CreditCard,
+  OctagonAlert,
   Plus,
   ReceiptText,
   Repeat,
@@ -13,6 +14,7 @@ import type { CardDue } from "@/bindings/CardDue";
 import type { Category } from "@/bindings/Category";
 import type { Account } from "@/bindings/Account";
 import type { Dashboard } from "@/bindings/Dashboard";
+import type { LoanDue } from "@/bindings/LoanDue";
 import type { UpcomingDate } from "@/bindings/UpcomingDate";
 import { AccountRow } from "@/components/AccountRow";
 import { CategoryChip, TransferChip } from "@/components/CategoryChip";
@@ -39,7 +41,14 @@ import { useBackupNow } from "@/hooks/useBackup";
 import { useCategories } from "@/hooks/useCategories";
 import { useDashboard } from "@/hooks/useDashboard";
 import { usePeriodQuery } from "@/hooks/usePeriodQuery";
-import { formatDayHeader, formatSpan, groupByDate } from "@/lib/dates";
+import {
+  formatDate,
+  formatDayHeader,
+  formatDue,
+  formatOverdue,
+  formatSpan,
+  groupByDate,
+} from "@/lib/dates";
 import { rowTitle } from "@/lib/records";
 import { cn } from "@/lib/utils";
 
@@ -137,6 +146,14 @@ function DashboardBody({
   const vs = formatSpan(c.compareStart, c.compareEnd, data.today);
   return (
     <>
+      {data.loansDue.map((due) => (
+        <LoanDueBanner
+          key={due.loanId}
+          due={due}
+          account={accounts.get(due.accountId)}
+          today={data.today}
+        />
+      ))}
       {data.backupDue && <BackupWarning />}
       {data.cardsDue.map((due) => (
         <CardDueBanner
@@ -234,6 +251,16 @@ function DashboardBody({
             <span>Net balance</span>
             <MoneyText amount={data.netBalance} kind="balance" />
           </div>
+          {data.loansLeft && (
+            <Link
+              to="/debt-free"
+              className="block border-t border-hairline px-[18px] py-2.5 text-small text-muted-foreground transition-colors duration-150 hover:bg-glass-hover"
+            >
+              Loans left:{" "}
+              <MoneyText amount={data.loansLeft.totalLeft} kind="balance" /> ·
+              debt-free {formatDate(data.loansLeft.debtFreeOn)}
+            </Link>
+          )}
         </GlassPanel>
       </div>
       <div className="grid grid-cols-2 items-start gap-3">
@@ -396,6 +423,50 @@ function RecurringDue({ count, today }: { count: number; today: string }) {
         <DueDialog today={today} onClose={() => setReviewing(false)} />
       )}
     </>
+  );
+}
+
+/**
+ * A loan's next unpaid payment, due within 5 days or overdue, with Pay (LOAN-4, F13), and what
+ * to move to its account first when that's short (DATA_MODEL §5.11).
+ */
+function LoanDueBanner({
+  due,
+  account,
+  today,
+}: {
+  due: LoanDue;
+  account?: Account;
+  today: string;
+}) {
+  const { markPaid } = useQuickAdd();
+  const late = due.days < 0;
+  return (
+    <Banner
+      tone={late ? "danger" : "warning"}
+      icon={late ? OctagonAlert : CalendarClock}
+      detail={
+        due.moveFirst !== null &&
+        account && (
+          <>
+            {account.name} has{" "}
+            <MoneyText amount={account.balance} kind="balance" />. Move{" "}
+            <MoneyText amount={due.moveFirst} kind="balance" /> there first.
+          </>
+        )
+      }
+      action={
+        <Button size="sm" onClick={() => markPaid(due.paymentId)}>
+          Pay
+        </Button>
+      }
+    >
+      {due.name}: <MoneyText amount={due.amount} kind="balance" />{" "}
+      {late
+        ? formatOverdue(due.dueDate, today) +
+          (due.moreOverdue > 0 ? `, and ${due.moreOverdue} more overdue` : "")
+        : formatDue(due.dueDate, today)}
+    </Banner>
   );
 }
 

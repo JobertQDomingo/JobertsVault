@@ -249,15 +249,18 @@
 .glass-info {
   --banner: var(--primary);
 }
-:is(.glass-warning, .glass-info) {
+.glass-danger {
+  --banner: var(--danger);
+}
+:is(.glass-warning, .glass-info, .glass-danger) {
   background: color-mix(in srgb, var(--banner) 14%, var(--glass));
 }
 @media (prefers-reduced-transparency: reduce) {
-  :is(.glass-warning, .glass-info) {
+  :is(.glass-warning, .glass-info, .glass-danger) {
     background: color-mix(in srgb, var(--banner) 14%, var(--glass-solid));
   }
 }
-:is(.glass, .glass-raised) :is(.glass-warning, .glass-info) {
+:is(.glass, .glass-raised) :is(.glass-warning, .glass-info, .glass-danger) {
   background: color-mix(in srgb, var(--banner) 14%, transparent);
 }
 

@@ -381,6 +381,8 @@ export const DASHBOARD: Dashboard = {
   budgets: BUDGETS,
   upcoming: UPCOMING,
   cardsDue: [],
+  loansDue: [],
+  loansLeft: null,
   today: TODAY,
 };
 

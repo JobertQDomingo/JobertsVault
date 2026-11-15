@@ -3,6 +3,8 @@ import type { Account } from "./Account";
 import type { BudgetProgress } from "./BudgetProgress";
 import type { CardDue } from "./CardDue";
 import type { Comparison } from "./Comparison";
+import type { LoanDue } from "./LoanDue";
+import type { LoansLeft } from "./LoansLeft";
 import type { Money } from "./Money";
 import type { PeriodView } from "./PeriodView";
 import type { Timeseries } from "./Timeseries";
@@ -56,4 +58,13 @@ upcoming: Array<UpcomingDate>,
  * Active cards whose payment is due within 5 days with something owed, soonest first, for
  * their banners (CC-7).
  */
-cardsDue: Array<CardDue>, today: string, };
+cardsDue: Array<CardDue>, 
+/**
+ * Active loans whose next unpaid payment is due within 5 days or overdue, soonest first, for
+ * their banners (LOAN-4).
+ */
+loansDue: Array<LoanDue>, 
+/**
+ * What's left across every loan, under the net balance. None once nothing is left (LOAN-11).
+ */
+loansLeft: LoansLeft | null, today: string, };
