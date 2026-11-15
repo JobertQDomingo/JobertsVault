@@ -225,7 +225,8 @@ test("editing: paid rows are locked and left out, the rest keep their ids, and T
 
   // A new row counts from the first payment, the paid one included: Aug 28 + 8 months.
   fireEvent.click(dialog().getByRole("button", { name: "Add payment" }));
-  await waitFor(() => expect(value("Payment 9 date")).toBe("04/28/2027"));
+  // It's the 8th editable row: the locked one has no number.
+  await waitFor(() => expect(value("Payment 8 date")).toBe("04/28/2027"));
   fireEvent.click(dialog().getByRole("button", { name: "Save" }));
   await waitFor(() => expect(calls("update_loan")).toHaveLength(1));
   const sent = calls("update_loan")[0] as {
@@ -261,10 +262,10 @@ test("editing: a row's error names it among the rows sent, so it marks the right
   await screen.findByRole("dialog", { name: "Edit loan" });
   fireEvent.click(dialog().getByRole("button", { name: "Save" }));
   await dialog().findByText("Payment 3: enter a real date");
-  // Sent row 3 is the 4th on screen: the paid Oct 28 row isn't sent.
+  // Sent row 3 is the 4th on screen, past the paid Oct 28 row, and its label says 3 too.
   expect(
     dialog()
-      .getByRole("textbox", { name: "Payment 4 date" })
+      .getByRole("textbox", { name: "Payment 3 date" })
       .getAttribute("aria-invalid"),
   ).toBe("true");
 });

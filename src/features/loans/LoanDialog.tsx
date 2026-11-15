@@ -373,7 +373,10 @@ export function LoanDialog({
             >
               {rows.fields.map((row, index) => {
                 const current = payments[index] ?? row;
-                const n = index + 1;
+                // Numbered among the rows sent, as the backend's "Payment n" messages are.
+                const n = payments
+                  .slice(0, index + 1)
+                  .filter((p) => !p.paidOn).length;
                 const invalid = rowsError?.index === index;
                 if (current.paidOn)
                   return (

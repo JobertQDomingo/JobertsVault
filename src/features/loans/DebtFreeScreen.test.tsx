@@ -38,6 +38,15 @@ const ANSWERS: Answers = {
     ...transaction,
   }),
   mark_loan_payment_unpaid: null,
+  create_transaction: ({
+    transaction,
+  }: {
+    transaction: TransactionFields;
+  }) => ({
+    id: 98,
+    loanPaymentId: null,
+    ...transaction,
+  }),
 };
 
 const calls = (command: string) =>
@@ -387,4 +396,71 @@ test("Edit in the payments dialog opens the loan's form", async () => {
   fireEvent.click(dialog.getByRole("button", { name: "Edit" }));
   await screen.findByRole("dialog", { name: "Edit loan" });
   expect(screen.queryByRole("dialog", { name: "E-wallet loan" })).toBeNull();
+});
+
+test("saving any quick-add on this screen refreshes the loans rather than breaking them", async () => {
+  renderRoute("/debt-free", ANSWERS);
+  await screen.findByText("Debt-free on Sun, Mar 28, 2027");
+  fireEvent.keyDown(window, { key: "n", ctrlKey: true });
+  const form = within(
+    await screen.findByRole("dialog", { name: "Add transaction" }),
+  );
+  const amount = await form.findByRole("textbox", { name: "Amount" });
+  fireEvent.change(amount, { target: { value: "5" } });
+  fireEvent.click(form.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(calls("list_loans").length).toBeGreaterThan(1));
+  await screen.findByText("Saved");
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  screen.getByText("Debt-free on Sun, Mar 28, 2027");
+});
+
+test("an archived loan's payments have no Edit, as its card offers only Unarchive", async () => {
+  renderRoute("/debt-free", ANSWERS);
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Show archived (1)" }),
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Open Phone loan" }),
+  );
+  const dialog = within(
+    await screen.findByRole("dialog", { name: "Phone loan" }),
+  );
+  expect(dialog.queryByRole("button", { name: "Edit" })).toBeNull();
+});
+
+test("Mark paid on a payment that's no longer unpaid says so and closes, instead of loading forever", async () => {
+  let paid = false;
+  const paidLoans = () => {
+    const [ewallet, ...rest] = LOANS.loans;
+    return {
+      ...LOANS,
+      loans: [
+        {
+          ...ewallet,
+          payments: ewallet.payments.map((p) =>
+            p.id === 14 && paid
+              ? { ...p, status: "paid", transactionId: 60 }
+              : p,
+          ),
+        },
+        ...rest,
+      ],
+    };
+  };
+  renderRoute("/debt-free", { ...ANSWERS, list_loans: paidLoans });
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Open E-wallet loan" }),
+  );
+  const payments = await screen.findByRole("dialog", { name: "E-wallet loan" });
+  // Paid elsewhere meanwhile (e.g. from the dashboard banner), and the list has caught up.
+  paid = true;
+  fireEvent.click(
+    within(within(payments).getAllByRole("listitem")[3]).getByRole("button", {
+      name: "Mark paid",
+    }),
+  );
+  await screen.findByText("This payment is no longer unpaid.");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Mark paid" })).toBeNull(),
+  );
 });

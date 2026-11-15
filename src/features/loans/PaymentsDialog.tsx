@@ -40,13 +40,16 @@ export function PaymentsDialog({
     <>
       <Dialog open onOpenChange={(open) => !open && onClose()}>
         <DialogContent title={loan.name} size="list">
-          <Button
-            size="sm"
-            className="absolute top-4 right-14"
-            onClick={onEdit}
-          >
-            Edit
-          </Button>
+          {/* An archived loan's card offers only Unarchive, so this does too. */}
+          {!loan.archived && (
+            <Button
+              size="sm"
+              className="absolute top-4 right-14"
+              onClick={onEdit}
+            >
+              Edit
+            </Button>
+          )}
           {/* A long list scrolls inside the dialog, which stays on screen. */}
           <ul className="max-h-[60vh] overflow-y-auto pt-1 pb-3">
             {loan.payments.map((p) => (

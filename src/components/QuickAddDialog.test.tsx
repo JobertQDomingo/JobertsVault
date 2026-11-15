@@ -515,6 +515,23 @@ test("a row that pays a loan keeps its type, and Delete says its payment becomes
   within(confirm).getByText("Its loan payment becomes unpaid again.");
 });
 
+test("a copy of a row that pays a loan is a plain new transaction: its type can change", async () => {
+  renderRoute("/transactions", {
+    ...ANSWERS,
+    get_transaction: ({ id }: { id: number }) => ({
+      ...RECENT.find((t) => t.id === id),
+      loanPaymentId: 14,
+    }),
+  });
+  await screen.findByText("Corner Cafe");
+  const row = screen.getByText("Corner Cafe").closest<HTMLElement>(".group")!;
+  fireEvent.click(within(row).getByRole("button", { name: "Duplicate" }));
+  await screen.findByRole("dialog", { name: "Add transaction" });
+  await waitFor(() => expect(amount().value).toBe("12.50"));
+  dialog().getByRole("radiogroup", { name: "Type" });
+  dialog().getByRole("button", { name: "Save & add another" });
+});
+
 test("Duplicate opens a copy dated today and saves it as a new row", async () => {
   renderRoute("/transactions", ANSWERS);
   await screen.findByText("Corner Cafe");

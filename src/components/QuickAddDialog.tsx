@@ -238,7 +238,16 @@ export function QuickAddDialog({
   const loan = loans.data?.loans.find((l) =>
     l.payments.some((p) => p.id === request.markPaid),
   );
-  const scheduled = loan?.payments.find((p) => p.id === request.markPaid);
+  const scheduled = loan?.payments.find(
+    (p) => p.id === request.markPaid && p.status === "unpaid",
+  );
+  // Paid or removed meanwhile: say so rather than wait for it forever.
+  const gone = request.markPaid !== undefined && !!loans.data && !scheduled;
+  useEffect(() => {
+    if (!gone || start) return;
+    notify.error("This payment is no longer unpaid.");
+    onClose();
+  }, [gone, start, onClose]);
   // The cache can be old (an edit elsewhere, or past midnight), so the starting values wait for
   // this opening's own answers. A failed one still leaves the old data, so a failure stops it too.
   if (
@@ -280,7 +289,9 @@ export function QuickAddDialog({
                   }
                 : blank(defaults.data?.accountId ?? null, today),
       today,
-      paysLoan: source.data?.loanPaymentId != null,
+      // A copy is a new row that pays nothing.
+      paysLoan:
+        request.edit !== undefined && source.data?.loanPaymentId != null,
     });
 
   return (
@@ -481,11 +492,7 @@ function TransactionForm({
   const [deleting, setDeleting] = useState(false);
   // An edit, a payment, a post and a rule are saved once; a payment's type is fixed too.
   const addAnother =
-    editId === undefined &&
-    postId === undefined &&
-    markPaidId === undefined &&
-    !schedule &&
-    !fixedKind;
+    editId === undefined && postId === undefined && !schedule && !fixedKind;
   // The ids an archived record may still be offered for: the row being edited or copied. Save &
   // add another starts a new row, which keeps none.
   const [kept, setKept] = useState(initial);
