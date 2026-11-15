@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use chrono::{DateTime, Days, Local, NaiveDate};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -7,7 +9,7 @@ use crate::domain::money::Money;
 use crate::domain::recurrence::{Frequency, Schedule};
 use crate::error::AppError;
 use crate::repo;
-use crate::services::transactions::{self, Transaction, TransactionFields};
+use crate::services::transactions::{self, Transaction, TransactionFields, TransactionKind};
 use crate::services::{invalid, not_found, stamp};
 
 /// Auto-post creates the transaction; Confirm queues it in the Due list (REC-3).
@@ -36,6 +38,9 @@ pub struct RecurringRuleFields {
     #[ts(type = "number | null")]
     pub max_occurrences: Option<i64>,
     pub mode: RecurringMode,
+    /// PAY-1: an income rule in Confirm mode into a cash, bank or e-wallet account only. Its
+    /// amount is the expected net pay.
+    pub is_payday: bool,
 }
 
 /// One stored rule (DATA_MODEL §4.1).
@@ -54,6 +59,7 @@ pub struct RecurringRule {
     #[ts(type = "number | null")]
     pub max_occurrences: Option<i64>,
     pub mode: RecurringMode,
+    pub is_payday: bool,
     pub paused: bool,
     /// The next date it will post or queue; none once it has ended. An edit that changes the
     /// schedule must start after the last date already processed, which is before this one.
@@ -156,32 +162,101 @@ pub fn delete(conn: &mut Connection, id: i64) -> Result<(), AppError> {
     Ok(())
 }
 
-/// A date a Confirm rule queued, waiting for Post, Edit & post or Skip (REC-3, UI_FLOWS F10).
+/// A date a Confirm rule queued, waiting for Post, Edit & post or Skip (REC-3, UI_FLOWS F10),
+/// or a payday 1–3 days ahead that can be recorded early (PAY-4).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct DueOccurrence {
+    /// The queued row; none for an early payday, which has no row yet.
+    #[ts(type = "number | null")]
+    pub id: Option<i64>,
     #[ts(type = "number")]
-    pub id: i64,
-    /// What Post creates: the rule's template as it is now, dated the day it fell due.
+    pub rule_id: i64,
+    /// Settled with a payslip (`record_payslip`), never Post (DATA_MODEL §4.8).
+    pub is_payday: bool,
+    /// A payday after today, for Record now. The Due banner doesn't count it.
+    pub early: bool,
+    /// What Post creates: the rule's template as it is now, dated the day it falls due.
     pub transaction: TransactionFields,
 }
 
-/// The Due list (F10), oldest first.
-pub fn list_due(conn: &Connection) -> Result<Vec<DueOccurrence>, AppError> {
-    repo::recurring::pending(conn)?
+/// The Due list (F10): the queued dates oldest first, then the paydays that can be recorded early,
+/// soonest first (PAY-4).
+pub fn list_due(conn: &Connection, today: NaiveDate) -> Result<Vec<DueOccurrence>, AppError> {
+    let mut list = repo::recurring::pending(conn)?
         .into_iter()
         .map(|o| {
-            let transaction = TransactionFields {
-                date: o.date,
-                ..fields_of(&stored(conn, o.rule_id)?)?
-            };
+            let rule = stored(conn, o.rule_id)?;
             Ok(DueOccurrence {
-                id: o.id,
-                transaction,
+                id: Some(o.id),
+                rule_id: rule.id,
+                is_payday: rule.is_payday,
+                early: false,
+                transaction: TransactionFields {
+                    date: o.date,
+                    ..fields_of(&rule)?
+                },
             })
         })
-        .collect()
+        .collect::<Result<Vec<_>, AppError>>()?;
+    let mut early = Vec::new();
+    for rule in repo::recurring::all(conn)? {
+        for date in early_dates(conn, &rule, today)? {
+            early.push(DueOccurrence {
+                id: None,
+                rule_id: rule.id,
+                is_payday: true,
+                early: true,
+                transaction: TransactionFields {
+                    date: date.to_string(),
+                    ..fields_of(&rule)?
+                },
+            });
+        }
+    }
+    early.sort_by(|a, b| (&a.transaction.date, a.rule_id).cmp(&(&b.transaction.date, b.rule_id)));
+    list.extend(early);
+    Ok(list)
+}
+
+/// A payday's dates after today and up to 3 days on with no row yet, which can be recorded early
+/// (PAY-4, DATA_MODEL §4.8). None for a rule that isn't a payday, is paused or has ended.
+pub(crate) fn early_dates(
+    conn: &Connection,
+    row: &repo::recurring::Row,
+    today: NaiveDate,
+) -> Result<Vec<NaiveDate>, AppError> {
+    if !row.is_payday || row.paused {
+        return Ok(Vec::new());
+    }
+    let until = today
+        .checked_add_days(Days::new(3))
+        .unwrap_or(NaiveDate::MAX);
+    dates_ahead(conn, row, today, until)
+}
+
+/// The rule's dates after `today` and up to `until` that have no row yet: a payday recorded early
+/// already has one, and counts toward `max_occurrences` (DATA_MODEL §4.1).
+fn dates_ahead(
+    conn: &Connection,
+    row: &repo::recurring::Row,
+    today: NaiveDate,
+    until: NaiveDate,
+) -> Result<Vec<NaiveDate>, AppError> {
+    let schedule = schedule(row)?;
+    let recorded = recorded_from(
+        conn,
+        row.id,
+        schedule.occurrence(index(row, row.next_index)?),
+    )?;
+    Ok(schedule.dates_between(
+        index(row, row.next_index)?,
+        index(row, row.done)?,
+        today,
+        until,
+        |date| recorded.contains(&date.to_string()),
+    ))
 }
 
 /// One date a rule will post or queue in the next 7 days (DSH-7).
@@ -198,7 +273,7 @@ pub struct UpcomingDate {
 }
 
 /// Every date an active rule falls on after today and up to a week on, soonest first, then by
-/// rule (DSH-7). Paused and ended rules have none. One-off future-dated transactions aren't here:
+/// rule (DSH-7). Paused and ended rules have none, and a payday recorded early isn't listed. One-off future-dated transactions aren't here:
 /// they're under Upcoming on the transaction list (TXN-8).
 pub fn upcoming(conn: &Connection, today: NaiveDate) -> Result<Vec<UpcomingDate>, AppError> {
     let until = today
@@ -209,12 +284,7 @@ pub fn upcoming(conn: &Connection, today: NaiveDate) -> Result<Vec<UpcomingDate>
         if row.paused {
             continue;
         }
-        let dates = schedule(&row)?.dates_between(
-            index(&row, row.next_index)?,
-            index(&row, row.done)?,
-            today,
-            until,
-        );
+        let dates = dates_ahead(conn, &row, today, until)?;
         let rule = view(row)?;
         list.extend(dates.into_iter().map(|date| UpcomingDate {
             rule_id: rule.id,
@@ -240,6 +310,11 @@ pub fn post(
 ) -> Result<Transaction, AppError> {
     let tx = conn.transaction()?;
     let (occurrence, rule) = due(&tx, id)?;
+    if rule.is_payday {
+        return Err(AppError::Conflict {
+            message: "Record this payday with its payslip".into(),
+        });
+    }
     let mut posted = match fields {
         Some(fields) => fields,
         None => TransactionFields {
@@ -308,7 +383,7 @@ pub fn process_due(conn: &mut Connection, now: DateTime<Local>) -> Result<u32, A
 /// (ARCHITECTURE §8). A date already recorded is passed over, so none is created twice (REC-4).
 /// The transaction keeps the template's account, category and payment method even once they're
 /// archived, as an edit of the rule may (DATA_MODEL §4.2). How many dates it processed.
-fn catch_up(
+pub(crate) fn catch_up(
     conn: &Connection,
     row: repo::recurring::Row,
     now: DateTime<Local>,
@@ -346,10 +421,33 @@ fn catch_up(
         }
         next += 1;
     }
+    // A payday recorded early already has its row, so the rule's next date is the one after it.
+    let recorded = recorded_from(conn, id, schedule.occurrence(next))?;
+    while schedule
+        .occurrence(next)
+        .is_some_and(|date| recorded.contains(&date.to_string()))
+    {
+        next += 1;
+    }
     if next != first {
         repo::recurring::set_next_index(conn, id, next.into())?;
     }
     Ok(processed)
+}
+
+/// The rule's dates from `from` on that already have a row: only a payday recorded early has one
+/// before processing gets there. None to look at once the rule's dates run out.
+fn recorded_from(
+    conn: &Connection,
+    rule_id: i64,
+    from: Option<NaiveDate>,
+) -> Result<HashSet<String>, AppError> {
+    Ok(match from {
+        Some(from) => repo::recurring::occurrence_dates_from(conn, rule_id, &from.to_string())?
+            .into_iter()
+            .collect(),
+        None => HashSet::new(),
+    })
 }
 
 /// The earliest start date a schedule edit may take (DATA_MODEL §4.1): after the last date
@@ -371,7 +469,7 @@ fn get(conn: &Connection, id: i64) -> Result<RecurringRule, AppError> {
     view(stored(conn, id)?)
 }
 
-fn stored(conn: &Connection, id: i64) -> Result<repo::recurring::Row, AppError> {
+pub(crate) fn stored(conn: &Connection, id: i64) -> Result<repo::recurring::Row, AppError> {
     repo::recurring::find(conn, id)?.ok_or_else(|| not_found("recurring rule", id))
 }
 
@@ -385,6 +483,23 @@ fn validate(
 ) -> Result<(), AppError> {
     let kept = stored.map(template).transpose()?;
     transactions::validate(conn, &mut f.transaction, kept.as_ref(), today)?;
+    if f.is_payday {
+        if f.transaction.kind != TransactionKind::Income {
+            return Err(invalid("isPayday", "Only an income rule can be a payday"));
+        }
+        if f.mode != RecurringMode::Confirm {
+            return Err(invalid("mode", "A payday is always in Confirm mode"));
+        }
+        // The account exists: the transaction rules checked it.
+        if repo::accounts::find(conn, f.transaction.account_id, today)?
+            .is_some_and(|a| a.kind == "credit_card")
+        {
+            return Err(invalid(
+                "accountId",
+                "Choose a cash, bank or e-wallet account",
+            ));
+        }
+    }
     if !(1..=999).contains(&f.interval) {
         return Err(invalid("interval", "Enter a number from 1 to 999"));
     }
@@ -423,6 +538,7 @@ fn values(f: &RecurringRuleFields) -> repo::recurring::Values<'_> {
             RecurringMode::Auto => "auto",
             RecurringMode::Confirm => "confirm",
         },
+        is_payday: f.is_payday,
     }
 }
 
@@ -448,6 +564,7 @@ fn view(row: repo::recurring::Row) -> Result<RecurringRule, AppError> {
         end_date: schedule.end,
         max_occurrences: row.max_occurrences,
         mode,
+        is_payday: row.is_payday,
         paused: row.paused,
         next_date,
     })
@@ -508,6 +625,7 @@ fn template(row: &repo::recurring::Row) -> Result<Transaction, AppError> {
         payment_method_id: f.payment_method_id,
         note: f.note,
         loan_payment_id: None,
+        payslip_id: None,
     })
 }
 
@@ -523,7 +641,6 @@ fn frequency_text(frequency: Frequency) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::transactions::TransactionKind;
     use crate::services::{accounts, categories, payment_methods, settings};
     use crate::test_support::{db, now};
 
@@ -550,6 +667,7 @@ mod tests {
             end_date: None,
             max_occurrences: None,
             mode: RecurringMode::Auto,
+            is_payday: false,
         }
     }
 
@@ -1077,7 +1195,7 @@ mod tests {
                 .iter()
                 .all(|(_, status, txn)| status == "pending" && txn.is_none())
         );
-        assert_eq!(list_due(&conn).unwrap().len(), 15);
+        assert_eq!(list_due(&conn, d("2026-02-28")).unwrap().len(), 15);
         assert_eq!(
             dates(&conn, fortnightly),
             [
@@ -1300,7 +1418,7 @@ mod tests {
         create(&mut conn, water, on("2026-02-28")).unwrap();
         create(&mut conn, rent("2026-02-01"), on("2026-02-28")).unwrap(); // auto: never due
 
-        let due = list_due(&conn).unwrap();
+        let due = list_due(&conn, d("2026-02-28")).unwrap();
         let dated: Vec<_> = due
             .iter()
             .map(|o| (o.transaction.date.as_str(), o.transaction.amount))
@@ -1327,7 +1445,7 @@ mod tests {
     fn post_creates_the_template_on_its_due_date() {
         let mut conn = db();
         let id = queued(&mut conn);
-        let first = list_due(&conn).unwrap()[0].id;
+        let first = list_due(&conn, d("2026-02-28")).unwrap()[0].id.unwrap();
         let posted = post(&mut conn, first, None, now()).unwrap();
         assert_eq!(posted.date, d("2026-01-31"));
         assert_eq!(
@@ -1338,7 +1456,7 @@ mod tests {
             occurrences(&conn, id)[0],
             ("2026-01-31".into(), "posted".into(), Some(posted.id))
         );
-        assert_eq!(list_due(&conn).unwrap().len(), 1);
+        assert_eq!(list_due(&conn, d("2026-02-28")).unwrap().len(), 1);
         let cash = accounts::get(&conn, CASH, now().date_naive()).unwrap();
         assert_eq!(cash.balance, Money(-1_500_000));
     }
@@ -1347,11 +1465,16 @@ mod tests {
     fn edit_and_post_saves_the_edited_fields_for_that_date_only() {
         let mut conn = db();
         let id = queued(&mut conn);
-        let first = list_due(&conn).unwrap()[0].clone();
+        let first = list_due(&conn, d("2026-02-28")).unwrap()[0].clone();
         let mut edited = first.transaction.clone();
         edited.amount = Money(0);
         assert_eq!(
-            field(post(&mut conn, first.id, Some(edited.clone()), now())),
+            field(post(
+                &mut conn,
+                first.id.unwrap(),
+                Some(edited.clone()),
+                now()
+            )),
             "amount"
         );
         assert_eq!(transaction_count(&conn), 0, "a refused edit posts nothing");
@@ -1359,7 +1482,7 @@ mod tests {
         edited.amount = Money(1_450_000);
         edited.date = "2026-02-02".into();
         edited.note = Some("  paid late ".into());
-        let posted = post(&mut conn, first.id, Some(edited), now()).unwrap();
+        let posted = post(&mut conn, first.id.unwrap(), Some(edited), now()).unwrap();
         assert_eq!(posted.date, d("2026-02-02"));
         assert_eq!(posted.amount, Money(1_450_000));
         assert_eq!(posted.note.as_deref(), Some("paid late"));
@@ -1381,15 +1504,20 @@ mod tests {
         queued(&mut conn);
         categories::archive(&mut conn, FOOD, now()).unwrap();
         categories::archive(&mut conn, DINING, now()).unwrap();
-        let [first, second] = list_due(&conn).unwrap().try_into().unwrap();
+        let [first, second] = list_due(&conn, d("2026-02-28"))
+            .unwrap()
+            .try_into()
+            .unwrap();
         assert_eq!(
-            post(&mut conn, first.id, None, now()).unwrap().category_id,
+            post(&mut conn, first.id.unwrap(), None, now())
+                .unwrap()
+                .category_id,
             Some(FOOD)
         );
         let mut dining = second.transaction.clone();
         dining.category_id = Some(DINING);
         assert!(matches!(
-            post(&mut conn, second.id, Some(dining), now()),
+            post(&mut conn, second.id.unwrap(), Some(dining), now()),
             Err(AppError::Validation { field, .. }) if field == "categoryId"
         ));
     }
@@ -1398,14 +1526,18 @@ mod tests {
     fn skip_settles_a_date_without_a_transaction_and_it_never_comes_back() {
         let mut conn = db();
         let id = queued(&mut conn);
-        let first = list_due(&conn).unwrap()[0].id;
+        let first = list_due(&conn, d("2026-02-28")).unwrap()[0].id.unwrap();
         skip(&mut conn, first, now()).unwrap();
         assert_eq!(
             occurrences(&conn, id)[0],
             ("2026-01-31".into(), "skipped".into(), None)
         );
         process_due(&mut conn, on("2026-02-28")).unwrap();
-        assert_eq!(list_due(&conn).unwrap().len(), 1, "only Feb 28 is left");
+        assert_eq!(
+            list_due(&conn, d("2026-02-28")).unwrap().len(),
+            1,
+            "only Feb 28 is left"
+        );
         assert_eq!(transaction_count(&conn), 0);
     }
 
@@ -1413,16 +1545,171 @@ mod tests {
     fn only_a_date_still_due_can_be_posted_or_skipped() {
         let mut conn = db();
         queued(&mut conn);
-        let [first, second] = list_due(&conn).unwrap().try_into().unwrap();
-        post(&mut conn, first.id, None, now()).unwrap();
-        conflict(post(&mut conn, first.id, None, now()));
-        conflict(skip(&mut conn, first.id, now()));
-        skip(&mut conn, second.id, now()).unwrap();
-        conflict(post(&mut conn, second.id, None, now()));
+        let [first, second] = list_due(&conn, d("2026-02-28"))
+            .unwrap()
+            .try_into()
+            .unwrap();
+        post(&mut conn, first.id.unwrap(), None, now()).unwrap();
+        conflict(post(&mut conn, first.id.unwrap(), None, now()));
+        conflict(skip(&mut conn, first.id.unwrap(), now()));
+        skip(&mut conn, second.id.unwrap(), now()).unwrap();
+        conflict(post(&mut conn, second.id.unwrap(), None, now()));
         assert_eq!(transaction_count(&conn), 1);
         assert!(matches!(
             skip(&mut conn, 999, now()),
             Err(AppError::NotFound { .. })
         ));
+    }
+
+    const SALARY: i64 = 1;
+
+    /// Salary on the `start`'s day each month into a new Bank account: a payday (PAY-1).
+    fn payday(conn: &mut Connection, start: &str) -> RecurringRuleFields {
+        let mut fields = rent(start);
+        fields.transaction = TransactionFields {
+            kind: TransactionKind::Income,
+            amount: Money(420_000),
+            account_id: conn
+                .query_row("SELECT id FROM accounts WHERE name = 'Bank'", [], |r| {
+                    r.get(0)
+                })
+                .unwrap_or_else(|_| bank(conn, "Bank")),
+            category_id: Some(SALARY),
+            payee: Some("Employer".into()),
+            payment_method_id: None,
+            note: None,
+            ..fields.transaction
+        };
+        fields.mode = RecurringMode::Confirm;
+        fields.is_payday = true;
+        fields
+    }
+
+    #[test]
+    fn a_payday_must_be_an_income_confirm_rule_into_cash_bank_or_ewallet() {
+        let mut conn = db();
+        let today = on("2026-11-12");
+        let good = payday(&mut conn, "2026-11-15");
+
+        let mut expense = good.clone();
+        expense.transaction.kind = TransactionKind::Expense;
+        expense.transaction.category_id = Some(FOOD);
+        assert_eq!(field(create(&mut conn, expense, today)), "isPayday");
+
+        let mut auto = good.clone();
+        auto.mode = RecurringMode::Auto;
+        assert_eq!(field(create(&mut conn, auto, today)), "mode");
+
+        let card = accounts::create(
+            &mut conn,
+            accounts::NewAccount {
+                kind: accounts::AccountKind::CreditCard,
+                fields: accounts::AccountFields {
+                    name: "Card".into(),
+                    opening_balance: Money(0),
+                    credit_limit: Some(Money(1_000_000)),
+                    statement_day: Some(20),
+                    due_day: Some(5),
+                },
+            },
+            now(),
+        )
+        .unwrap()
+        .id;
+        let mut on_card = good.clone();
+        on_card.transaction.account_id = card;
+        assert_eq!(field(create(&mut conn, on_card, today)), "accountId");
+
+        let saved = create(&mut conn, good, today).unwrap();
+        assert!(saved.is_payday);
+        assert!(rule(&conn, saved.id).is_payday);
+        // Not a payday: a salary rule can still post itself (PAY-1).
+        let mut plain = payday(&mut conn, "2026-11-30");
+        plain.is_payday = false;
+        plain.mode = RecurringMode::Auto;
+        assert!(!create(&mut conn, plain, today).unwrap().is_payday);
+    }
+
+    #[test]
+    fn posting_a_payday_is_a_conflict_but_skip_works() {
+        let mut conn = db();
+        let fields = payday(&mut conn, "2026-11-15");
+        create(&mut conn, fields, on("2026-11-15")).unwrap();
+        let due = list_due(&conn, d("2026-11-15")).unwrap();
+        let id = due[0].id.unwrap();
+        assert!(due[0].is_payday && !due[0].early);
+        conflict(post(&mut conn, id, None, now()));
+        conflict(post(&mut conn, id, Some(due[0].transaction.clone()), now()));
+        assert_eq!(transaction_count(&conn), 0);
+        skip(&mut conn, id, now()).unwrap();
+        assert!(list_due(&conn, d("2026-11-15")).unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_due_list_adds_paydays_1_to_3_days_ahead_after_the_due_dates() {
+        let mut conn = db();
+        let today = on("2026-11-12");
+        let mut water = rent("2026-11-01");
+        water.mode = RecurringMode::Confirm;
+        create(&mut conn, water, today).unwrap();
+        let fields = payday(&mut conn, "2026-10-15");
+        let on_15th = create(&mut conn, fields, today).unwrap().id;
+        let fields = payday(&mut conn, "2026-10-16");
+        create(&mut conn, fields, today).unwrap(); // Nov 16 is 4 days on
+        let mut ended = payday(&mut conn, "2026-10-14");
+        ended.end_date = Some("2026-11-13".into());
+        let ended = create(&mut conn, ended, today).unwrap().id;
+        let fields = payday(&mut conn, "2026-10-13");
+        let paused = create(&mut conn, fields, today).unwrap().id;
+        pause(&mut conn, paused, true, today).unwrap();
+        let mut confirm = payday(&mut conn, "2026-10-15");
+        confirm.is_payday = false;
+        create(&mut conn, confirm, today).unwrap(); // a Confirm rule that isn't a payday
+
+        let due = list_due(&conn, d("2026-11-12")).unwrap();
+        let listed: Vec<_> = due
+            .iter()
+            .map(|o| (o.rule_id, o.transaction.date.as_str(), o.early))
+            .filter(|o| o.2)
+            .collect();
+        // The Nov 14 payday is past its end date, and Nov 16 is 4 days on.
+        assert_eq!(listed, [(on_15th, "2026-11-15", true)]);
+        assert!(due.iter().take_while(|o| !o.early).all(|o| o.id.is_some()));
+        assert!(
+            due.iter()
+                .filter(|o| o.early)
+                .all(|o| o.id.is_none() && o.is_payday)
+        );
+        assert!(!due[0].early, "the due dates come first");
+        assert!(due.iter().filter(|o| o.early).all(|o| o.rule_id != ended));
+    }
+
+    #[test]
+    fn coming_up_and_the_due_list_skip_a_date_already_recorded() {
+        let mut conn = db();
+        let today = on("2026-11-12");
+        let mut fields = payday(&mut conn, "2026-10-15");
+        fields.max_occurrences = Some(3); // Oct 15, Nov 15, Dec 15
+        let id = create(&mut conn, fields, today).unwrap().id;
+        // Nov 15 recorded early (as record_payslip does).
+        repo::recurring::insert_occurrence(&conn, id, "2026-11-15", "posted", "x").unwrap();
+
+        let coming = upcoming(&conn, d("2026-11-12")).unwrap();
+        assert!(coming.iter().all(|u| u.rule_id != id), "{coming:?}");
+        assert!(
+            list_due(&conn, d("2026-11-12"))
+                .unwrap()
+                .iter()
+                .all(|o| !o.early)
+        );
+        // Dec 15 is still the third: the recorded row is counted once.
+        let coming = upcoming(&conn, d("2026-12-10")).unwrap();
+        assert_eq!(coming.len(), 1);
+        assert_eq!(coming[0].transaction.date, "2026-12-15");
+
+        // When Nov 15 arrives, processing passes over it.
+        assert_eq!(process_due(&mut conn, on("2026-11-15")).unwrap(), 0);
+        assert_eq!(dates(&conn, id), ["2026-10-15", "2026-11-15"]);
+        assert!(list_due(&conn, d("2026-11-15")).unwrap()[1..].is_empty());
     }
 }

@@ -226,7 +226,7 @@ function DashboardBody({
                     toAccount={
                       t.toAccountId ? accounts.get(t.toAccountId) : undefined
                     }
-                    onOpen={() => edit(t.id)}
+                    onOpen={() => edit(t.id, t.payslipId)}
                   />
                 ))}
               </section>
@@ -405,8 +405,6 @@ function ComingUp({
 /** Dates Confirm rules queued, with Review (UI_FLOWS F10). */
 function RecurringDue({ count, today }: { count: number; today: string }) {
   const [reviewing, setReviewing] = useState(false);
-  // The review closes once the last one is posted or skipped, so new ones don't reopen it.
-  if (reviewing && count === 0) setReviewing(false);
   return (
     <>
       {count > 0 && (

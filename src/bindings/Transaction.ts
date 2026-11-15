@@ -10,4 +10,8 @@ export type Transaction = { id: number, kind: TransactionKind, amount: Money, da
 /**
  * The loan payment it pays, or none (DATA_MODEL §4.6). Its kind can't change.
  */
-loanPaymentId: number | null, };
+loanPaymentId: number | null, 
+/**
+ * Its payslip's gross row, or none (DATA_MODEL §4.7). It's edited and deleted as a payslip.
+ */
+payslipId: number | null, };

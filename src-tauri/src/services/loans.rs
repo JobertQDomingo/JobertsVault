@@ -325,6 +325,7 @@ pub fn mark_paid(
         payment_method_id: None,
         note: None,
         loan_payment_id: None,
+        payslip_id: None,
     };
     transactions::validate(&tx, &mut fields, Some(&template), now.date_naive())?;
     let stamp = stamp(now);

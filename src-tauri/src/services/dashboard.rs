@@ -550,6 +550,7 @@ mod tests {
             end_date: None,
             max_occurrences: None,
             mode: RecurringMode::Confirm,
+            is_payday: false,
         };
         // now() is Nov 3, 2026: Oct 24 and 31 are due.
         recurring::create(&mut conn, rule, now()).unwrap();

@@ -643,7 +643,12 @@ test("reopening a row just edited shows the saved values, not cached ones", asyn
       id: number;
       transaction: TransactionFields;
     }) => {
-      const saved = { id, ...transaction, loanPaymentId: null };
+      const saved = {
+        id,
+        ...transaction,
+        loanPaymentId: null,
+        payslipId: null,
+      };
       rows.set(id, saved);
       return saved;
     },

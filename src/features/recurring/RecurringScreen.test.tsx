@@ -37,6 +37,7 @@ const rule = (
   endDate: null,
   maxOccurrences: null,
   mode: "confirm",
+  isPayday: false,
   paused: false,
   nextDate: "2026-11-30",
   ...over,
@@ -228,6 +229,7 @@ test("New rule is the transaction form plus a schedule, and saves the rule (REC-
           endDate: null,
           maxOccurrences: 6,
           mode: "confirm",
+          isPayday: false,
         },
       },
     ]),
@@ -254,6 +256,7 @@ test("editing the template keeps the start date, so the rule keeps its place (RE
           endDate: null,
           maxOccurrences: null,
           mode: "confirm",
+          isPayday: false,
         },
       },
     ]),
@@ -304,4 +307,67 @@ test("a schedule's error shows under its field, and the form stays open", async 
   fireEvent.click(form().getByRole("button", { name: "Save" }));
   expect(await form().findByText("Enter a number from 1 to 999")).toBeTruthy();
   expect(text("Every").getAttribute("aria-invalid")).toBe("true");
+});
+
+test("a payday rule shows a Payday badge in place of Confirm (UI_FLOWS §8.2)", async () => {
+  await open({
+    ...ANSWERS,
+    list_recurring_rules: [
+      { ...RULES[0], mode: "confirm", isPayday: true },
+      BUS,
+    ],
+  });
+  expect(screen.getByText("Salary").closest("button")!.textContent).toBe(
+    "SalaryMonthly on the 25th · next Nov 25+₱4,200.00Payday",
+  );
+});
+
+test("This is a payday sets Confirm, locks the mode and relabels the amount; it goes with Income (PAY-1)", async () => {
+  await open();
+  fireEvent.click(screen.getByRole("button", { name: "New rule" }));
+  await screen.findByRole("dialog", { name: "New rule" });
+  await waitFor(() => expect(text("Starts").value).toBe("11/05/2026"));
+  expect(form().queryByRole("switch", { name: "This is a payday" })).toBeNull();
+
+  fireEvent.click(form().getByRole("radio", { name: "Income" }));
+  fireEvent.click(form().getByRole("switch", { name: "This is a payday" }));
+  expect(
+    form().getByRole("radio", { name: "Confirm" }).getAttribute("aria-checked"),
+  ).toBe("true");
+  expect(
+    form().getByRole("radio", { name: "Auto-post" }).hasAttribute("disabled"),
+  ).toBe(true);
+  expect(text("Expected net pay")).toBeTruthy();
+  expect(
+    form().getByText(
+      "Used until 3 payslips are recorded. After that, the lowest of the last 3 counts.",
+    ),
+  ).toBeTruthy();
+
+  type(text("Expected net pay"), "4200");
+  type(form().getByRole("combobox", { name: "Category" }), "sal");
+  fireEvent.keyDown(document.activeElement!, { key: "Enter" });
+  fireEvent.click(form().getByRole("button", { name: "Save" }));
+  await waitFor(() =>
+    expect(calls("create_recurring_rule")).toMatchObject([
+      { rule: { isPayday: true, mode: "confirm" } },
+    ]),
+  );
+});
+
+test("switching a payday rule away from Income turns the payday off", async () => {
+  await open();
+  fireEvent.click(screen.getByRole("button", { name: "New rule" }));
+  await screen.findByRole("dialog", { name: "New rule" });
+  await waitFor(() => expect(text("Starts").value).toBe("11/05/2026"));
+  fireEvent.click(form().getByRole("radio", { name: "Income" }));
+  fireEvent.click(form().getByRole("switch", { name: "This is a payday" }));
+  fireEvent.click(form().getByRole("radio", { name: "Expense" }));
+  expect(text("Amount")).toBeTruthy();
+  fireEvent.click(form().getByRole("radio", { name: "Income" }));
+  expect(
+    form()
+      .getByRole("switch", { name: "This is a payday" })
+      .getAttribute("aria-checked"),
+  ).toBe("false");
 });

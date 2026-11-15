@@ -10,7 +10,7 @@ export type RecurringRule = { id: number,
 /**
  * The template. Its `date` is the start date.
  */
-transaction: TransactionFields, frequency: Frequency, interval: number, endDate: string | null, maxOccurrences: number | null, mode: RecurringMode, paused: boolean, 
+transaction: TransactionFields, frequency: Frequency, interval: number, endDate: string | null, maxOccurrences: number | null, mode: RecurringMode, isPayday: boolean, paused: boolean, 
 /**
  * The next date it will post or queue; none once it has ended. An edit that changes the
  * schedule must start after the last date already processed, which is before this one.

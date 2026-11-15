@@ -33,6 +33,11 @@ const BADGES = {
     label: "Confirm",
     tone: "bg-[color-mix(in_srgb,var(--primary)_var(--tint),transparent)] text-primary",
   },
+  // A payday is a Confirm rule settled with a payslip (UI_FLOWS §8.2).
+  payday: {
+    label: "Payday",
+    tone: "bg-[color-mix(in_srgb,var(--income)_var(--tint),transparent)] text-income",
+  },
   paused: {
     label: "Paused",
     tone: "bg-[color-mix(in_srgb,var(--warning)_var(--tint),transparent)] text-warning",
@@ -192,7 +197,8 @@ function RuleRow({
     : rule.paused
       ? ""
       : ` · next ${formatSpan(rule.nextDate, rule.nextDate, today)}`;
-  const badge = BADGES[rule.paused ? "paused" : rule.mode];
+  const badge =
+    BADGES[rule.paused ? "paused" : rule.isPayday ? "payday" : rule.mode];
   return (
     <button
       type="button"

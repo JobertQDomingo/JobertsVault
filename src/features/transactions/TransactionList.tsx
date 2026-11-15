@@ -111,7 +111,7 @@ export function TransactionList({
           account={accountById.get(t.accountId)}
           toAccount={t.toAccountId ? accountById.get(t.toAccountId) : undefined}
           upcoming={muted}
-          onOpen={() => edit(t.id)}
+          onOpen={() => edit(t.id, t.payslipId)}
           onDuplicate={() => duplicate(t.id)}
         />
       ));

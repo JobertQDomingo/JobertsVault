@@ -105,6 +105,7 @@ const transaction = (over: Partial<Transaction> & Pick<Transaction, "id">) =>
     paymentMethodId: null,
     note: null,
     loanPaymentId: null,
+    payslipId: null,
     ...over,
   }) satisfies Transaction;
 

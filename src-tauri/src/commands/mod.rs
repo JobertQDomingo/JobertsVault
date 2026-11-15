@@ -6,6 +6,7 @@ pub mod dashboard;
 pub mod goals;
 pub mod loans;
 pub mod payment_methods;
+pub mod payslips;
 pub mod period;
 pub mod recurring;
 pub mod reports;

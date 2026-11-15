@@ -1,5 +1,6 @@
 import type { CategoryKind } from "@/bindings/CategoryKind";
 import type { ComparisonMode } from "@/bindings/ComparisonMode";
+import type { PayslipFields } from "@/bindings/PayslipFields";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
 import type { TransactionFilter } from "@/bindings/TransactionFilter";
 
@@ -24,6 +25,12 @@ export const queryKeys = {
   goals: ["ledger", "goals"],
   // A loan payment's expense is a transaction, and a merge moves loans.
   loans: ["ledger", "loans"],
+  // A payslip's rows are transactions; its defaults come from the last payslip (PAY-2).
+  payslip: (id: number) => ["ledger", "payslip", id] as const,
+  payslipDefaults: (ruleId: number, date: string) =>
+    ["ledger", "payslipDefaults", ruleId, date] as const,
+  payslipNet: (payslip: PayslipFields) =>
+    ["ledger", "payslipNet", payslip] as const,
   // A save can add a payee or change its last category.
   payees: (prefix: string, kind: CategoryKind) =>
     ["ledger", "payees", prefix, kind] as const,
