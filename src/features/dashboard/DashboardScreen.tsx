@@ -7,13 +7,14 @@ import {
   Repeat,
   Target,
 } from "lucide-react";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import type { BudgetProgress } from "@/bindings/BudgetProgress";
 import type { CardDue } from "@/bindings/CardDue";
 import type { Category } from "@/bindings/Category";
 import type { Account } from "@/bindings/Account";
 import type { Dashboard } from "@/bindings/Dashboard";
+import type { Transaction } from "@/bindings/Transaction";
 import type { LoanDue } from "@/bindings/LoanDue";
 import type { UpcomingDate } from "@/bindings/UpcomingDate";
 import { AccountRow } from "@/components/AccountRow";
@@ -53,8 +54,7 @@ import {
 import { rowTitle } from "@/lib/records";
 import { cn } from "@/lib/utils";
 
-const COLUMNS =
-  "grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] items-start gap-3";
+const COLUMNS = "grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-3";
 
 function CardHeader({
   title,
@@ -191,8 +191,9 @@ function DashboardBody({
         <h2 className="text-h3">Income vs expense</h2>
         <IncomeExpenseChart series={data.series} height={140} />
       </GlassPanel>
+      {/* Stretched, so Recent transactions fills the height of the column beside it. */}
       <div className={COLUMNS}>
-        <GlassPanel className="overflow-hidden pb-1.5">
+        <GlassPanel className="flex flex-col overflow-hidden pb-1.5">
           <CardHeader
             title="Recent transactions"
             to="/transactions"
@@ -201,6 +202,8 @@ function DashboardBody({
           {data.recent.length === 0 ? (
             <EmptyState
               icon={ReceiptText}
+              // Centered in the stretched panel, not left at its top.
+              className="flex-1 content-center"
               message="No transactions yet. Press Ctrl+N to add your first one."
               action={
                 <Button variant="primary" onClick={add}>
@@ -210,31 +213,16 @@ function DashboardBody({
               }
             />
           ) : (
-            groupByDate(data.recent).map(({ date, items }) => (
-              <section key={date}>
-                <h3 className="px-[18px] pt-2.5 pb-1.5 text-small font-semibold text-muted-foreground">
-                  {formatDayHeader(date, data.today)}
-                </h3>
-                {items.map((t) => (
-                  <TransactionRow
-                    key={t.id}
-                    compact
-                    transaction={t}
-                    category={
-                      t.categoryId ? categories.get(t.categoryId) : undefined
-                    }
-                    account={accounts.get(t.accountId)}
-                    toAccount={
-                      t.toAccountId ? accounts.get(t.toAccountId) : undefined
-                    }
-                    onOpen={() => edit(t.id, t.payslipId)}
-                  />
-                ))}
-              </section>
-            ))
+            <RecentRows
+              recent={data.recent}
+              today={data.today}
+              accounts={accounts}
+              categories={categories}
+              onOpen={(t) => edit(t.id, t.payslipId)}
+            />
           )}
         </GlassPanel>
-        <div className="grid gap-3">
+        <div className="grid content-start gap-3">
           <SafeToSpendCard forecast={data.safeToSpend} />
           <GlassPanel className="overflow-hidden">
             <CardHeader title="Accounts" to="/accounts" link="Manage" />
@@ -282,6 +270,105 @@ function DashboardBody({
         />
       </div>
     </>
+  );
+}
+
+// Recent transactions always shows at least this many, when there are (DSH-8).
+const MIN_RECENT = 5;
+
+/**
+ * The newest transactions, whatever the period (DSH-8), grouped by day: as many whole rows as
+ * fit beside the right column, and at least 5. The rows that don't fit are invisible, so they're
+ * out of sight, focus and screen readers, and never cut in half.
+ */
+function RecentRows({
+  recent,
+  today,
+  accounts,
+  categories,
+  onOpen,
+}: {
+  recent: Transaction[];
+  today: string;
+  accounts: Map<number, Account>;
+  categories: Map<number, Category>;
+  onOpen: (t: Transaction) => void;
+}) {
+  const area = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState({ minHeight: 0, shown: recent.length });
+  useLayoutEffect(() => {
+    const el = area.current;
+    if (!el) return;
+    const measure = () => {
+      const top = el.getBoundingClientRect().top;
+      const bottoms = [
+        ...el.querySelectorAll<HTMLElement>("[data-recent-row]"),
+      ].map((row) => row.getBoundingClientRect().bottom - top);
+      const minHeight = bottoms[Math.min(MIN_RECENT, bottoms.length) - 1] ?? 0;
+      const shown = Math.max(
+        MIN_RECENT,
+        bottoms.filter((bottom) => bottom <= el.clientHeight + 0.5).length,
+      );
+      setFit((was) =>
+        was.minHeight === minHeight && was.shown === shown
+          ? was
+          : { minHeight, shown },
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    // The rows too: a font swapping in can move them without resizing the area.
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    return () => observer.disconnect();
+  }, [recent]);
+
+  // The rows are placed out of the panel's flow, so the right column alone sets its height.
+  return (
+    <div
+      ref={area}
+      className="relative flex-1"
+      style={{ minHeight: fit.minHeight }}
+    >
+      <div className="absolute inset-x-0 top-0">
+        {groupByDate(recent).map(({ date, items }) => {
+          // Its first row's place in the whole list.
+          const first = recent.indexOf(items[0]);
+          return (
+            <section key={date}>
+              <h3
+                className={cn(
+                  "px-[18px] pt-2.5 pb-1.5 text-small font-semibold text-muted-foreground",
+                  first >= fit.shown && "invisible",
+                )}
+              >
+                {formatDayHeader(date, today)}
+              </h3>
+              {items.map((t, i) => (
+                <div
+                  key={t.id}
+                  data-recent-row
+                  className={cn(first + i >= fit.shown && "invisible")}
+                >
+                  <TransactionRow
+                    compact
+                    transaction={t}
+                    category={
+                      t.categoryId ? categories.get(t.categoryId) : undefined
+                    }
+                    account={accounts.get(t.accountId)}
+                    toAccount={
+                      t.toAccountId ? accounts.get(t.toAccountId) : undefined
+                    }
+                    onOpen={() => onOpen(t)}
+                  />
+                </div>
+              ))}
+            </section>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

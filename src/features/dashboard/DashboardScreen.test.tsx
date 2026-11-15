@@ -13,6 +13,7 @@ import {
   PAY_BILL_DEFAULTS,
   PAYMENT_METHODS,
   PERIOD,
+  RECENT,
   UPCOMING,
 } from "@/test/fixtures";
 import { renderRoute, type Answers } from "@/test/render";
@@ -525,4 +526,60 @@ test("Loans left is hidden when nothing is left (LOAN-11)", async () => {
   renderRoute("/", ANSWERS);
   await screen.findByText("Net balance");
   expect(screen.queryByText(/Loans left/)).toBeNull();
+});
+
+/** Ten recent rows, each 52 px tall, beside a column that leaves `height` px for them. */
+async function recentFitting(
+  height: number,
+  recent = Array.from({ length: 10 }, (_, i) => ({
+    ...RECENT[0],
+    id: 100 + i,
+  })),
+) {
+  const rect = vi
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: HTMLElement) {
+      const rows = [...document.querySelectorAll("[data-recent-row]")];
+      return { top: 0, bottom: (rows.indexOf(this) + 1) * 52 } as DOMRect;
+    });
+  const client = vi
+    .spyOn(HTMLElement.prototype, "clientHeight", "get")
+    .mockReturnValue(height);
+  try {
+    renderRoute("/", { ...ANSWERS, get_dashboard: { ...DASHBOARD, recent } });
+    await screen.findByText("Recent transactions");
+    const rows = [...document.querySelectorAll("[data-recent-row]")];
+    return rows.filter((r) => !r.classList.contains("invisible")).length;
+  } finally {
+    rect.mockRestore();
+    client.mockRestore();
+  }
+}
+
+test("Recent transactions shows as many whole rows as fit beside the right column (DSH-8)", async () => {
+  expect(await recentFitting(400)).toBe(7);
+});
+
+test("Recent transactions always shows at least 5 rows (DSH-8)", async () => {
+  expect(await recentFitting(100)).toBe(5);
+});
+
+test("a day whose rows don't fit hides its header too (DSH-8)", async () => {
+  // 5 rows today, then 5 yesterday; 300 px fits the first 5.
+  const recent = Array.from({ length: 10 }, (_, i) => ({
+    ...RECENT[0],
+    id: 100 + i,
+    date: i < 5 ? RECENT[0].date : "2026-11-04",
+  }));
+  expect(await recentFitting(300, recent)).toBe(5);
+  expect(
+    screen
+      .getByText("Yesterday", { selector: "h3" })
+      .classList.contains("invisible"),
+  ).toBe(true);
+  expect(
+    screen
+      .getByText("Today", { selector: "h3" })
+      .classList.contains("invisible"),
+  ).toBe(false);
 });

@@ -148,7 +148,7 @@ Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3**
 | DSH-5 | A credit card summary: amount owed, available credit and due date. | P1 |
 | DSH-6 | Budget progress bars for the current period. | P3 |
 | DSH-7 | Upcoming recurring transactions for the next 7 days. | P3 |
-| DSH-8 | The 5 most recent transactions. | P1 |
+| DSH-8 | The most recent transactions: at least 5, and up to 10 when there's room beside the right column. | P1 |
 
 ### 7.6 Reports
 
@@ -425,6 +425,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-13 | Before you borrow's payments are monthly from the first payment date, so its day of the month is the first payment's (DATA_MODEL §5.16) |
 | 2026-11-13 | PAY-4's early paydays can also be recorded from the Safe to spend card, and the Due banner counts only dates that are due (UI_FLOWS §2, F10) |
 | 2026-11-13 | In the forecast, every unpaid loan payment counts whatever its account, transfers to or from a card don't count (the card's bills stand in for them), and pay counts only into a counted account (DATA_MODEL §5.13–5.15) |
+| 2026-11-15 | DSH-8 shows as many recent transactions as fit beside the dashboard's right column, from 5 to 10, so the Safe to spend card leaves no gap |
 
 ---
 
