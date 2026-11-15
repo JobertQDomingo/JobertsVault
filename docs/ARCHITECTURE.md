@@ -181,7 +181,7 @@ fn horizon_end(today) -> Option<NaiveDate>;                                     
 fn pay_windows(paydays: &[NaiveDate], today, horizon_end: NaiveDate) -> Vec<PayWindow>;  // §5.12
 fn expected_pay(recent_nets: &[Money], estimate: Money) -> Money;                       // §5.13: the lowest
 fn effect(flow: Flow, from: Place) -> Option<Effect>;   // §5.15: what a future row or recurring date does (in, out, a card charge or refund)
-fn first_statement(statement_day, due_day, today) -> Option<(NaiveDate, NaiveDate)>;    // §5.14: D₁ and C(D₁)
+fn first_statement(statement_day, due_day, today) -> Option<(NaiveDate, NaiveDate)>;    // §5.14: D₀ and C₀, the latest statement
 fn card_bills(card: &CardState, charges: &[(NaiveDate, Money)], today, horizon_end) -> Vec<Movement>; // §5.14
 fn rows(money_now, today, spans: &[PayWindow], movements: &[Movement]) -> Vec<Row>;     // start, in, out and left per window or month
 fn forecast(money_now, today, windows: &[PayWindow], movements: &[Movement]) -> Option<Forecast>; // §5.15: safe to spend, per day, held back, short

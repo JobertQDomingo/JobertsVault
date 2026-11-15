@@ -4,6 +4,7 @@
 use chrono::{Datelike, Months, NaiveDate};
 
 use crate::domain::card_cycle::{card_cycle, on_day};
+use crate::domain::loan::total;
 use crate::domain::money::Money;
 
 /// A pay window, or any other span of days the forecast groups by: both ends included.
@@ -73,11 +74,10 @@ pub struct CardState {
     pub account_id: i64,
     pub statement_day: u8,
     pub due_day: u8,
-    /// `amount_owed` today (§5.1).
+    /// −balance today (§5.1): below 0 when the card is in credit, which later charges use up.
     pub owed_now: Money,
-    /// Only read when the statement the next due date pays has closed (see `first_statement`):
-    /// what was owed at the end of its closing date, and the transfers into the card and income
-    /// on it dated after that, up to today.
+    /// For the latest statement (see `first_statement`): what was owed at the end of its closing
+    /// date, and the transfers into the card and income on it dated after that, up to today.
     pub owed_at_close: Money,
     pub paid_since_close: Money,
 }
@@ -153,13 +153,13 @@ pub fn pay_windows(
 /// rule's estimate while there are fewer than 3 (§5.13).
 pub fn expected_pay(recent_nets: &[Money], estimate: Money) -> Money {
     let recent = &recent_nets[..recent_nets.len().min(3)];
-    let estimate = (recent.len() < 3).then_some(estimate);
+    let counted = (recent.len() < 3).then_some(estimate);
     recent
         .iter()
         .copied()
-        .chain(estimate)
+        .chain(counted)
         .min()
-        .unwrap_or(Money::ZERO)
+        .unwrap_or(estimate)
 }
 
 /// What a row from account `from` does in the forecast (§5.15). Transfers to or from a card
@@ -176,16 +176,21 @@ pub fn effect(flow: Flow, from: Place) -> Option<Effect> {
     }
 }
 
-/// The card's next due date D₁ (on or after today) and C(D₁), the closing date of the statement
-/// it pays. When C(D₁) is today or earlier, the service reads `owed_at_close` and
-/// `paid_since_close` for it.
+/// The latest statement: its closing date C₀ (today or earlier) and D₀, the first due date after
+/// it, which pays it. The service reads `owed_at_close` and `paid_since_close` for C₀.
 pub fn first_statement(
     statement_day: u8,
     due_day: u8,
     today: NaiveDate,
 ) -> Option<(NaiveDate, NaiveDate)> {
-    let due = card_cycle(statement_day, due_day, today)?.due;
-    Some((due, closing_before(due, statement_day)?))
+    let cycle = card_cycle(statement_day, due_day, today)?;
+    let close = if cycle.end == today {
+        today
+    } else {
+        cycle.start.pred_opt()?
+    };
+    let due = card_cycle(statement_day, due_day, close.succ_opt()?)?.due;
+    Some((due, close))
 }
 
 /// C(D): the latest closing date before `due`.
@@ -217,9 +222,22 @@ pub fn card_bills(
     let Some(first_month) = first_due.with_day(1) else {
         return bills;
     };
-    let mut billed = 0i64;
-    let mut paid_close = None;
-    for k in 0.. {
+    let mut bill_on = |date: NaiveDate, bill: i64| {
+        if bill > 0 && date <= horizon_end {
+            bills.push(Movement {
+                date,
+                amount: Money(bill),
+                direction: Direction::Out,
+                source: Source::Card(card.account_id),
+            });
+        }
+    };
+    // The latest statement, due today once its due date has passed (anything overdue is).
+    let closed = card.owed_at_close.0.saturating_sub(card.paid_since_close.0);
+    let mut billed = closed.clamp(0, card.owed_now.0.max(0));
+    bill_on(first_due.max(today), billed);
+    let mut paid_close = first_close;
+    for k in 1.. {
         // From each month's 1st, so a due day of 31 never drifts to the 30th.
         let due = first_month
             .checked_add_months(Months::new(k))
@@ -231,32 +249,18 @@ pub fn card_bills(
             break;
         };
         // Statement 30, due 31: Jan 31 and Feb 28 both pay Jan 30's statement, billed once.
-        if paid_close.replace(close) == Some(close) {
+        if std::mem::replace(&mut paid_close, close) == close {
             continue;
         }
-        let bill = if k == 0 && first_close <= today {
-            let left = card.owed_at_close.0.saturating_sub(card.paid_since_close.0);
-            left.clamp(0, card.owed_now.0.max(0))
-        } else {
-            let charged = sum(charges
-                .iter()
-                .filter(|(d, _)| *d <= close)
-                .map(|(_, m)| m.0));
-            card.owed_now
-                .0
-                .saturating_add(charged)
-                .saturating_sub(billed)
-                .max(0)
-        };
-        if bill > 0 {
-            billed = billed.saturating_add(bill);
-            bills.push(Movement {
-                date: due,
-                amount: Money(bill),
-                direction: Direction::Out,
-                source: Source::Card(card.account_id),
-            });
-        }
+        let charged = total(charges.iter().filter(|(d, _)| *d <= close).map(|(_, m)| *m)).0;
+        let bill = card
+            .owed_now
+            .0
+            .saturating_add(charged)
+            .saturating_sub(billed)
+            .max(0);
+        billed = billed.saturating_add(bill);
+        bill_on(due, bill);
     }
     bills
 }
@@ -282,13 +286,15 @@ pub fn rows(
                 .filter(|m| span.start <= m.date && m.date <= span.end)
                 .collect();
             ms.sort_by_key(|m| m.date);
-            let total = |direction| {
-                sum(ms
-                    .iter()
-                    .filter(|m| m.direction == direction)
-                    .map(|m| m.amount.0))
+            let sum = |direction| {
+                total(
+                    ms.iter()
+                        .filter(|m| m.direction == direction)
+                        .map(|m| m.amount),
+                )
+                .0
             };
-            let (money_in, money_out) = (total(Direction::In), total(Direction::Out));
+            let (money_in, money_out) = (sum(Direction::In), sum(Direction::Out));
             let row = Row {
                 start: span.start,
                 end: span.end,
@@ -365,10 +371,6 @@ pub fn forecast(
         short: first_short.map(|(day, i)| (day, Money(lows[i].saturating_neg()))),
         rows,
     })
-}
-
-fn sum(amounts: impl Iterator<Item = i64>) -> i64 {
-    amounts.fold(0, i64::saturating_add)
 }
 
 #[cfg(test)]
@@ -743,17 +745,63 @@ mod tests {
 
     #[test]
     fn a_statement_not_yet_closed_bills_the_projected_balance() {
-        // Today Nov 10: Nov 20's statement is due Dec 5; Nov 5 is already paid or past.
+        // Today Nov 10: Oct 20's statement was due Nov 5 and is paid; Nov 20's is due Dec 5.
         let today = d(2026, 11, 10);
-        assert_eq!(
-            first_statement(20, 5, today),
-            Some((d(2026, 12, 5), d(2026, 11, 20)))
-        );
         let charges = [(d(2026, 11, 8), 500), (d(2026, 11, 15), 1_599)];
         assert_eq!(
             bills(&card(30_000), &charges, today, d(2026, 12, 31)),
             [(d(2026, 12, 5), 32_099)],
             "what's owed now, a pending date (as today) and a future charge"
+        );
+    }
+
+    #[test]
+    fn an_overdue_statement_is_due_today() {
+        // Today Nov 10: Oct 20's statement owed 250.00, due Nov 5, and only 50.00 is paid since.
+        let today = d(2026, 11, 10);
+        assert_eq!(
+            first_statement(20, 5, today),
+            Some((d(2026, 11, 5), d(2026, 10, 20)))
+        );
+        let c = CardState {
+            owed_at_close: Money(25_000),
+            paid_since_close: Money(5_000),
+            ..card(30_000)
+        };
+        assert_eq!(
+            bills(&c, &[(d(2026, 11, 15), 2_099)], today, d(2026, 12, 31)),
+            [(today, 20_000), (d(2026, 12, 5), 12_099)]
+        );
+    }
+
+    #[test]
+    fn a_statement_due_on_the_31st_after_a_february_close_is_billed_once() {
+        // Statement 30, due 31, today Mar 10: Feb 28's statement is due Mar 31, and what's
+        // charged up to Mar 30 is billed Apr 30.
+        let today = d(2027, 3, 10);
+        assert_eq!(
+            first_statement(30, 31, today),
+            Some((d(2027, 3, 31), d(2027, 2, 28)))
+        );
+        let c = CardState {
+            statement_day: 30,
+            due_day: 31,
+            owed_at_close: Money(10_000),
+            ..card(10_000)
+        };
+        assert_eq!(
+            bills(&c, &[(d(2027, 3, 20), 700)], today, d(2027, 4, 30)),
+            [(d(2027, 3, 31), 10_000), (d(2027, 4, 30), 700)]
+        );
+    }
+
+    #[test]
+    fn credit_on_the_card_is_used_up_by_later_charges() {
+        let today = d(2026, 11, 10);
+        let charges = [(d(2026, 11, 12), 300), (d(2026, 11, 25), 800)];
+        assert_eq!(
+            bills(&card(-500), &charges, today, d(2027, 1, 31)),
+            [(d(2027, 1, 5), 600)]
         );
     }
 
