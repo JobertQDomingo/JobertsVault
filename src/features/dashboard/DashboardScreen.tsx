@@ -226,7 +226,7 @@ function DashboardBody({
                     toAccount={
                       t.toAccountId ? accounts.get(t.toAccountId) : undefined
                     }
-                    onOpen={() => edit(t.id)}
+                    onOpen={() => edit(t.id, t.payslipId)}
                   />
                 ))}
               </section>

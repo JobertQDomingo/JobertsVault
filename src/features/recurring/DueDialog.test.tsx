@@ -22,6 +22,9 @@ beforeEach(() => {
 
 const WATER: DueOccurrence = {
   id: 11,
+  ruleId: 1,
+  isPayday: false,
+  early: false,
   transaction: {
     kind: "expense",
     amount: 3240,
@@ -36,6 +39,9 @@ const WATER: DueOccurrence = {
 };
 const SAVINGS: DueOccurrence = {
   id: 12,
+  ruleId: 2,
+  isPayday: false,
+  early: false,
   transaction: {
     ...WATER.transaction,
     kind: "transfer",
@@ -47,6 +53,29 @@ const SAVINGS: DueOccurrence = {
   },
 };
 
+const salary = {
+  ...WATER.transaction,
+  kind: "income",
+  amount: 420000,
+  categoryId: 3,
+  payee: "Employer",
+} as const;
+/** A payday due yesterday, and one 2 days ahead that can be recorded early (PAY-4). */
+const PAYDAY: DueOccurrence = {
+  id: 13,
+  ruleId: 3,
+  isPayday: true,
+  early: false,
+  transaction: { ...salary, date: "2026-11-04" },
+};
+const EARLY: DueOccurrence = {
+  id: null,
+  ruleId: 4,
+  isPayday: true,
+  early: true,
+  transaction: { ...salary, date: "2026-11-07" },
+};
+
 /** The app with `due` waiting; posting or skipping one takes it off the list. */
 function renderDue(due: DueOccurrence[], answers: Answers = {}) {
   let left = [...due];
@@ -55,7 +84,11 @@ function renderDue(due: DueOccurrence[], answers: Answers = {}) {
     return null;
   };
   renderRoute("/", {
-    get_dashboard: () => ({ ...DASHBOARD, recurringDue: left.length }),
+    // The banner counts only the dates due, never the early ones (F10 step 4).
+    get_dashboard: () => ({
+      ...DASHBOARD,
+      recurringDue: left.filter((o) => !o.early).length,
+    }),
     get_period: PERIOD,
     list_categories: CATEGORIES,
     list_accounts: ACCOUNT_LIST,
@@ -185,4 +218,83 @@ test("a date that can't be posted says why in a toast and stays on the list", as
     await screen.findByText("This date was already posted or skipped"),
   ).toBeTruthy();
   expect(review().getByText("Food & Groceries · Market")).toBeTruthy();
+});
+
+test("a payday has Record payslip and Skip, an early one only Record now, and the banner counts the due ones (F10 step 4)", async () => {
+  await openReview([WATER, PAYDAY, EARLY]);
+  expect(screen.getByText("2 recurring transactions are due.")).toBeTruthy();
+  const rows = review().getAllByRole("listitem");
+  expect(rows.map((r) => r.textContent)).toEqual([
+    "Food & Groceries · MarketDue Sat, Oct 24 · Bank−₱32.40PostEdit & postSkip",
+    "Salary · EmployerDue yesterday · Bank+₱4,200.00Record payslipSkip",
+    "Salary · EmployerPayday Sat, Nov 7 · Bank+₱4,200.00Record now",
+  ]);
+  const early = within(rows[2]).getByRole("button", { name: "Record now" });
+  expect(
+    document.getElementById(early.getAttribute("aria-describedby")!)!
+      .textContent,
+  ).toBe("Salary · EmployerPayday Sat, Nov 7 · Bank");
+
+  fireEvent.click(within(rows[1]).getByRole("button", { name: "Skip" }));
+  expect(await screen.findByText("Skipped")).toBeTruthy();
+  expect(calls("skip_occurrence")).toEqual([{ id: 13 }]);
+});
+
+test("Record now opens the payslip for that payday, and saving records it on its date (F14)", async () => {
+  await openReview([WATER, EARLY], {
+    list_categories: {
+      ...CATEGORIES,
+      categories: [
+        ...CATEGORIES.categories,
+        {
+          ...CATEGORIES.categories[0],
+          id: 7,
+          name: "SSS",
+          icon: "shield",
+        },
+      ],
+    },
+    get_payslip_defaults: {
+      accountId: 2,
+      categoryId: 3,
+      date: TODAY,
+      gross: 460000,
+      deductions: [{ categoryId: 7, amount: 18000 }],
+    },
+    // The backend's answer, which the form only shows.
+    preview_payslip: ({ payslip }: { payslip: { gross: number } }) => ({
+      net: payslip.gross === 460000 ? 442000 : 0,
+    }),
+    record_payslip: () => null,
+  });
+  fireEvent.click(review().getByRole("button", { name: "Record now" }));
+  const form = within(
+    await screen.findByRole("dialog", { name: "Payslip · Salary" }),
+  );
+  expect(calls("get_payslip_defaults")).toEqual([
+    { ruleId: 4, date: "2026-11-07" },
+  ]);
+  expect(await form.findByText("₱4,420.00")).toBeTruthy();
+  expect(
+    (
+      form.getByRole("combobox", {
+        name: "Deduction 1 category",
+      }) as HTMLInputElement
+    ).value,
+  ).toBe("SSS");
+  fireEvent.click(form.getByRole("button", { name: "Save" }));
+  expect(await screen.findByText("Payslip saved")).toBeTruthy();
+  expect(calls("record_payslip")).toEqual([
+    {
+      ruleId: 4,
+      date: "2026-11-07",
+      payslip: {
+        date: TODAY,
+        accountId: 2,
+        gross: 460000,
+        deductions: [{ categoryId: 7, amount: 18000 }],
+        note: null,
+      },
+    },
+  ]);
 });

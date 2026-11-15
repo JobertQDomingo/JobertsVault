@@ -58,6 +58,7 @@ import {
 } from "./ui/dialog";
 import { Field, Input } from "./ui/input";
 import { Segmented } from "./ui/segmented";
+import { Switch } from "./ui/switch";
 import { notify } from "./ui/toast";
 
 /**
@@ -92,6 +93,8 @@ type Values = {
   endDate: string;
   maxOccurrences: string;
   mode: RecurringMode;
+  /** PAY-1: an Income rule only, always in Confirm mode. */
+  isPayday: boolean;
 };
 
 /** A new rule's schedule, and what every other form carries unused. */
@@ -102,6 +105,7 @@ const SCHEDULE = {
   endDate: "",
   maxOccurrences: "",
   mode: "auto",
+  isPayday: false,
 } as const;
 
 const FREQUENCIES: { value: Frequency; label: string }[] = [
@@ -169,6 +173,8 @@ const toRule = (v: Values): RecurringRuleFields => ({
   endDate: v.ends === "on" ? v.endDate : null,
   maxOccurrences: v.ends === "after" ? count(v.maxOccurrences) : null,
   mode: v.mode,
+  // The switch is only on Income rules (UI_FLOWS §8.2).
+  isPayday: v.kind === "income" && v.isPayday,
 });
 
 const titleOf = (request: QuickAddRequest) =>
@@ -310,7 +316,7 @@ export function QuickAddDialog({
           ) : start && settings ? (
             <TransactionForm
               editId={request.edit}
-              postId={request.post?.id}
+              postId={request.post?.id ?? undefined}
               markPaidId={request.markPaid}
               paysLoan={start.paysLoan}
               schedule={
@@ -394,6 +400,7 @@ const fromRule = (r: RecurringRule): Values => ({
   endDate: r.endDate ?? "",
   maxOccurrences: r.maxOccurrences ? String(r.maxOccurrences) : "",
   mode: r.mode,
+  isPayday: r.isPayday,
 });
 
 // The mockup's form rows: a 96 px label, the field beside it, its message under the field.
@@ -502,10 +509,11 @@ function TransactionForm({
   const transfer = kind === "transfer";
   const payees =
     usePayeeSuggestions(useWatch({ control, name: "payee" }), kind).data ?? [];
-  const [frequency, interval, ends] = useWatch({
+  const [frequency, interval, ends, isPayday] = useWatch({
     control,
-    name: ["frequency", "interval", "ends"],
+    name: ["frequency", "interval", "ends", "isPayday"],
   });
+  const payday = !!schedule && kind === "income" && isPayday;
 
   // Editing a rule's frequency or interval starts it again (DATA_MODEL §4.1): from its next
   // date, unless another start date was already chosen, so the dates already done stay done.
@@ -532,6 +540,8 @@ function TransactionForm({
     );
     if (next !== "transfer" && category && category.kind !== next)
       setValue("categoryId", null, { shouldDirty: true });
+    // Only an Income rule can be a payday (PAY-1).
+    if (next !== "income") setValue("isPayday", false, { shouldDirty: true });
     setValue("kind", next, { shouldDirty: true });
   };
 
@@ -548,7 +558,14 @@ function TransactionForm({
           "payee",
           ...(showMethod ? (["paymentMethodId"] as const) : []),
         ] as const)),
-    ...(schedule ? (["interval", ...END_FIELDS[ends]] as const) : []),
+    ...(schedule
+      ? ([
+          "interval",
+          "mode",
+          ...(kind === "income" ? (["isPayday"] as const) : []),
+          ...END_FIELDS[ends],
+        ] as const)
+      : []),
   ];
 
   const save = (another: boolean) => {
@@ -705,9 +722,14 @@ function TransactionForm({
             name="amount"
             render={({ field }) => (
               <Field
-                label="Amount"
+                label={payday ? "Expected net pay" : "Amount"}
                 htmlFor="qa-amount"
                 error={errors.amount?.message}
+                help={
+                  payday
+                    ? "Used until 3 payslips are recorded. After that, the lowest of the last 3 counts."
+                    : undefined
+                }
                 className={ROW}
               >
                 <AmountInput
@@ -937,11 +959,47 @@ function TransactionForm({
                       value={field.value}
                       onChange={field.onChange}
                       options={MODES}
+                      disabled={payday}
                       className="justify-self-start"
                     />
                   )}
                 />
               </Labeled>
+              {errors.mode?.message && (
+                <p role="alert" className="text-small text-danger">
+                  {errors.mode.message}
+                </p>
+              )}
+              {kind === "income" && (
+                <Controller
+                  control={control}
+                  name="isPayday"
+                  render={({ field }) => (
+                    <Labeled label="Payday">
+                      <label className="flex items-center gap-2 justify-self-start">
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={(on) => {
+                            field.onChange(on);
+                            // A payday is always in Confirm mode (PAY-1).
+                            if (on)
+                              setValue("mode", "confirm", {
+                                shouldDirty: true,
+                              });
+                          }}
+                          aria-invalid={!!errors.isPayday || undefined}
+                        />
+                        This is a payday
+                      </label>
+                      {errors.isPayday?.message && (
+                        <p role="alert" className="text-small text-danger">
+                          {errors.isPayday.message}
+                        </p>
+                      )}
+                    </Labeled>
+                  )}
+                />
+              )}
             </>
           )}
         </DialogBody>

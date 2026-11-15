@@ -21,7 +21,9 @@ import { rowTitle } from "@/lib/records";
 
 /**
  * Review due items (UI_FLOWS F10): every date a Confirm rule queued, oldest first, each with
- * Post, Edit & post or Skip (REC-3). Edit & post opens the transaction form over it.
+ * Post, Edit & post or Skip (REC-3). Edit & post opens the transaction form over it. A payday has
+ * Record payslip and Skip, and after the due dates come the paydays 1–3 days ahead, with Record
+ * now (PAY-4).
  */
 export function DueDialog({
   today,
@@ -38,7 +40,7 @@ export function DueDialog({
   const skip = useSkipOccurrence();
   // One at a time, so a second click can't settle a date twice.
   const busy = post.isPending || skip.isPending;
-  const { post: editAndPost } = useQuickAdd();
+  const { post: editAndPost, payslip } = useQuickAdd();
   // Awaited rather than mutate's callbacks: settling the last date closes this dialog first.
   const settle = (action: Promise<unknown>, message: string) =>
     void action.then(
@@ -57,24 +59,51 @@ export function DueDialog({
         ) : due.data && accounts.data && categories.data ? (
           // A long list scrolls inside the dialog, which stays on screen.
           <ul className="max-h-[60vh] overflow-y-auto pt-1 pb-3">
-            {due.data.map((o) => (
-              <DueRow
-                key={o.id}
-                due={o}
-                today={today}
-                accounts={accounts.data.accounts}
-                categories={categories.data.categories}
-                busy={busy}
-                onPost={() =>
-                  settle(
-                    post.mutateAsync({ id: o.id, transaction: null }),
-                    "Posted",
-                  )
-                }
-                onEdit={() => editAndPost(o)}
-                onSkip={() => settle(skip.mutateAsync(o.id), "Skipped")}
-              />
-            ))}
+            {due.data.map((o) => {
+              const id = o.id;
+              const record = () =>
+                payslip({ ruleId: o.ruleId, date: o.transaction.date });
+              return (
+                <DueRow
+                  key={`${o.ruleId}-${o.transaction.date}`}
+                  due={o}
+                  today={today}
+                  accounts={accounts.data.accounts}
+                  categories={categories.data.categories}
+                  busy={busy}
+                  actions={
+                    id === null
+                      ? [["Record now", "primary", record]]
+                      : o.isPayday
+                        ? [
+                            ["Record payslip", "primary", record],
+                            [
+                              "Skip",
+                              "ghost",
+                              () => settle(skip.mutateAsync(id), "Skipped"),
+                            ],
+                          ]
+                        : [
+                            [
+                              "Post",
+                              "primary",
+                              () =>
+                                settle(
+                                  post.mutateAsync({ id, transaction: null }),
+                                  "Posted",
+                                ),
+                            ],
+                            ["Edit & post", "ghost", () => editAndPost(o)],
+                            [
+                              "Skip",
+                              "ghost",
+                              () => settle(skip.mutateAsync(id), "Skipped"),
+                            ],
+                          ]
+                  }
+                />
+              );
+            })}
           </ul>
         ) : (
           <Loading className="grid gap-2 px-[22px] py-3">
@@ -94,18 +123,14 @@ function DueRow({
   accounts,
   categories,
   busy,
-  onPost,
-  onEdit,
-  onSkip,
+  actions,
 }: {
   due: DueOccurrence;
   today: string;
   accounts: Account[];
   categories: Category[];
   busy: boolean;
-  onPost: () => void;
-  onEdit: () => void;
-  onSkip: () => void;
+  actions: [string, "primary" | "ghost", () => void][];
 }) {
   const t = due.transaction;
   const category = categories.find((c) => c.id === t.categoryId);
@@ -114,9 +139,14 @@ function DueRow({
   const day = formatDayHeader(t.date, today);
   // "Due today", but "Due Sat, Oct 24".
   const when = day === "Today" || day === "Yesterday" ? day.toLowerCase() : day;
-  const caption = transfer
-    ? `Due ${when}`
-    : `Due ${when} · ${accounts.find((a) => a.id === t.accountId)?.name ?? ""}`;
+  const account = accounts.find((a) => a.id === t.accountId)?.name ?? "";
+  // An early payday: "Payday Mon, Nov 30 · Bank" (F10 step 4).
+  const caption = due.early
+    ? `Payday ${day} · ${account}`
+    : transfer
+      ? `Due ${when}`
+      : `Due ${when} · ${account}`;
+  const rowId = `due-${due.ruleId}-${t.date}`;
   return (
     <li className="grid grid-cols-[32px_minmax(0,1fr)_110px_auto] items-center gap-3 border-t border-hairline px-[22px] py-2.5 first:border-t-0">
       {transfer ? (
@@ -128,26 +158,20 @@ function DueRow({
         />
       )}
       {/* The buttons repeat on every row, so each one points here for which date it settles. */}
-      <div id={`due-${due.id}`} className="min-w-0">
+      <div id={rowId} className="min-w-0">
         <p className="truncate font-semibold">{title}</p>
         <p className="truncate text-small text-muted-foreground">{caption}</p>
       </div>
       <MoneyText amount={t.amount} kind={t.kind} className="justify-self-end" />
       <div className="flex gap-1">
-        {(
-          [
-            ["Post", "primary", onPost],
-            ["Edit & post", "ghost", onEdit],
-            ["Skip", "ghost", onSkip],
-          ] as const
-        ).map(([label, variant, onClick]) => (
+        {actions.map(([label, variant, onClick]) => (
           <Button
             key={label}
             variant={variant}
             size="sm"
             disabled={busy}
             onClick={onClick}
-            aria-describedby={`due-${due.id}`}
+            aria-describedby={rowId}
           >
             {label}
           </Button>

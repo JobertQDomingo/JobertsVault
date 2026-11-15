@@ -64,6 +64,7 @@ const txn = (over: Partial<Transaction>): Transaction => ({
   paymentMethodId: null,
   note: "weekly shop",
   loanPaymentId: null,
+  payslipId: null,
   ...over,
 });
 

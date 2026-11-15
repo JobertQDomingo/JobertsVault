@@ -120,6 +120,7 @@ const transaction: TransactionFields = {
 };
 const rule: RecurringRuleFields = {
   transaction,
+  isPayday: false,
   frequency: "monthly",
   interval: 1,
   endDate: null,
