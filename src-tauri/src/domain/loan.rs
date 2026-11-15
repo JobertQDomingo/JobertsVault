@@ -141,7 +141,7 @@ pub fn summary(
             .iter()
             .filter_map(|l| l.borrowed_on)
             .max()
-            .map(|newest| (today - newest).num_days()),
+            .map(|newest| (today - newest).num_days().max(0)),
         freed_up,
     })
 }
@@ -425,6 +425,10 @@ mod tests {
         let mut same_day = loan(&p);
         same_day.borrowed_on = Some(today());
         assert_eq!(sum(&[same_day]).streak_days, Some(0));
+        // A clock set back after saving never makes it negative.
+        let mut ahead = loan(&p);
+        ahead.borrowed_on = Some(d(2026, 11, 16));
+        assert_eq!(sum(&[ahead]).streak_days, Some(0));
     }
 
     #[test]

@@ -174,7 +174,9 @@ fn inputs(payments: &[LoanPayment]) -> Vec<loan::Payment> {
         .map(|p| loan::Payment {
             due_date: p.due_date,
             amount: p.amount,
-            paid: p.paid_amount,
+            // By status, so a paid row never counts as left.
+            paid: (p.status != LoanPaymentStatus::Unpaid)
+                .then(|| p.paid_amount.unwrap_or(p.amount)),
         })
         .collect()
 }
