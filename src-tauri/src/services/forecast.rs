@@ -68,7 +68,7 @@ pub enum MovementKind {
 }
 
 /// Money due in or out of the counted accounts on a date, today or later (§5.15).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct ForecastMovement {
@@ -80,6 +80,12 @@ pub struct ForecastMovement {
     pub amount: Money,
     /// In, or else out.
     pub money_in: bool,
+    /// The loan's name, "Credit card payment", "Category · Payee", "Transfer to Savings" or
+    /// "Salary (expected)" (UI_FLOWS §8.6).
+    pub label: String,
+    /// The account it moves: the loan's, the card, or the counted side of a transfer.
+    #[ts(type = "number")]
+    pub account_id: i64,
 }
 
 /// A payslip already recorded: it's in `moneyNow`, so it's listed, never added again (§5.15).
@@ -110,6 +116,10 @@ pub struct ForecastRow {
     pub money_out: Money,
     /// What would be left at its end with nothing else spent.
     pub left: Money,
+    /// Some day in it has the running total below 0 (§5.15).
+    pub short: bool,
+    /// It holds the lowest day, the first on a tie, and something is held back for it.
+    pub lowest: bool,
     pub received: Vec<Received>,
     /// Soonest first.
     pub movements: Vec<ForecastMovement>,
@@ -175,6 +185,35 @@ pub fn get(
             .fold(0_i64, |sum, a| sum.saturating_add(a.balance)),
     );
 
+    let account_names: HashMap<i64, &str> =
+        accounts.iter().map(|a| (a.id, a.name.as_str())).collect();
+    let categories: HashMap<i64, String> = repo::categories::all(conn)?
+        .into_iter()
+        .map(|c| (c.id, c.name))
+        .collect();
+    let category = |id: Option<i64>| {
+        id.and_then(|id| categories.get(&id))
+            .cloned()
+            .unwrap_or_default()
+    };
+    // What a row or a rule's date shows, and the counted account it moves (UI_FLOWS §8.6).
+    let titled = |kind: &str, category_id, payee: Option<&str>, from: i64, to: Option<i64>| {
+        if kind == "transfer" {
+            let to = to.unwrap_or(from);
+            let name = |id| account_names.get(&id).copied().unwrap_or_default();
+            return if place(from) == Place::Counted {
+                (format!("Transfer to {}", name(to)), from)
+            } else {
+                (format!("Transfer from {}", name(from)), to)
+            };
+        }
+        let category = category(category_id);
+        match payee.filter(|p| !p.is_empty()) {
+            Some(payee) => (format!("{category} · {payee}"), from),
+            None => (category, from),
+        }
+    };
+    let mut names: HashMap<Source, (String, i64)> = HashMap::new();
     let mut movements = Vec::new();
     let mut charges: HashMap<i64, Vec<(NaiveDate, Money)>> = HashMap::new();
     // A future-dated row or a rule's date: in or out of the counted accounts, or a card's charge.
@@ -212,6 +251,16 @@ pub fn get(
     let today_text = today.to_string();
     for t in repo::transactions::after(conn, &today_text)? {
         let date = stored_date(&t.date)?;
+        names.insert(
+            Source::Transaction(t.id),
+            titled(
+                &t.kind,
+                t.category_id,
+                t.payee.as_deref(),
+                t.account_id,
+                t.to_account_id,
+            ),
+        );
         count(
             &t.kind,
             t.amount,
@@ -247,6 +296,16 @@ pub fn get(
         };
         dates.extend(&ahead);
         if !rule.is_payday {
+            names.insert(
+                Source::Recurring(rule.id),
+                titled(
+                    &rule.kind,
+                    rule.category_id,
+                    rule.payee.as_deref(),
+                    rule.account_id,
+                    rule.to_account_id,
+                ),
+            );
             for date in dates {
                 count(
                     &rule.kind,
@@ -273,6 +332,13 @@ pub fn get(
             );
         }
         if place(rule.account_id) == Place::Counted {
+            names.insert(
+                Source::Payday(rule.id),
+                (
+                    format!("{} (expected)", category(rule.category_id)),
+                    rule.account_id,
+                ),
+            );
             let recent: Vec<Money> = nets
                 .iter()
                 .filter(|n| Some(n.category_id) == rule.category_id)
@@ -290,13 +356,17 @@ pub fn get(
     }
     movements.extend(pay);
 
-    let active_loans: HashSet<i64> = repo::loans::all(conn)?
+    let active_loans: HashMap<i64, repo::loans::Row> = repo::loans::all(conn)?
         .into_iter()
         .filter(|l| !l.archived)
-        .map(|l| l.id)
+        .map(|l| (l.id, l))
         .collect();
     for p in repo::loans::payments(conn)? {
-        if active_loans.contains(&p.loan_id) && p.transaction_id.is_none() && !p.paid_before {
+        let Some(loan) = active_loans.get(&p.loan_id) else {
+            continue;
+        };
+        if p.transaction_id.is_none() && !p.paid_before {
+            names.insert(Source::Loan(p.id), (loan.name.clone(), loan.account_id));
             movements.push(Movement {
                 date: stored_date(&p.due_date)?,
                 amount: Money(p.amount),
@@ -321,6 +391,10 @@ pub fn get(
             owed_at_close: Money(at_close.saturating_neg().max(0)),
             paid_since_close: Money(repo::accounts::paid_into_card(conn, card.id, close, today)?),
         };
+        names.insert(
+            Source::Card(card.id),
+            ("Credit card payment".into(), card.id),
+        );
         let charged = charges.get(&card.id).map_or(&[][..], Vec::as_slice);
         movements.extend(f::card_bills(&state, charged, today, horizon));
     }
@@ -368,11 +442,16 @@ pub fn get(
         }
     }
     let mut received = Some(received);
+    // The window held back for; by month, the month holding the same lowest day.
+    let lowest = (summary.held_back.0 > 0).then(|| f::lowest_row(&rows));
     forecast.rows = rows
         .into_iter()
-        .map(|row| ForecastRow {
+        .enumerate()
+        .map(|(i, row)| ForecastRow {
             received: received.take().unwrap_or_default(),
-            movements: row.movements.iter().map(movement).collect(),
+            movements: row.movements.iter().map(|m| movement(m, &names)).collect(),
+            short: row.short_on.is_some(),
+            lowest: lowest == Some(i),
             start: row.start,
             end: row.end,
             start_amount: row.start_amount,
@@ -425,7 +504,9 @@ fn months(
     Ok((spans, first))
 }
 
-fn movement(m: &Movement) -> ForecastMovement {
+fn movement(m: &Movement, names: &HashMap<Source, (String, i64)>) -> ForecastMovement {
+    // Every source gets its name where its movement is made.
+    let (label, account_id) = names.get(&m.source).cloned().unwrap_or_default();
     let (kind, id) = match m.source {
         Source::Loan(id) => (MovementKind::Loan, id),
         Source::Card(id) => (MovementKind::Card, id),
@@ -439,6 +520,8 @@ fn movement(m: &Movement) -> ForecastMovement {
         id,
         amount: m.amount,
         money_in: m.direction == Direction::In,
+        label,
+        account_id,
     }
 }
 
@@ -641,6 +724,152 @@ mod tests {
             |r| r.get(0),
         )
         .unwrap()
+    }
+
+    /// The (label, account) of the first movement from `kind` and `id`.
+    fn labelled(forecast: &Forecast, kind: MovementKind, id: i64) -> (String, i64) {
+        let m = forecast
+            .rows
+            .iter()
+            .flat_map(|r| &r.movements)
+            .find(|m| m.kind == kind && m.id == id)
+            .expect("a movement");
+        (m.label.clone(), m.account_id)
+    }
+
+    #[test]
+    fn movements_carry_a_label_and_an_account() {
+        let mut conn = db();
+        let bank = account(&mut conn, AccountKind::Bank, "Bank", 1_000_000);
+        let wallet = account(&mut conn, AccountKind::Ewallet, "E-wallet", 0);
+        let savings = goal_account(&mut conn, "Savings", 1_000_000);
+        let card = account(&mut conn, AccountKind::CreditCard, "Card", 0);
+        let salary = payday(&mut conn, bank, "2026-11-30", 420_000, TODAY);
+        let mut water = fields(
+            &conn,
+            TransactionKind::Expense,
+            50_000,
+            "2026-11-20",
+            bank,
+            None,
+        );
+        water.category_id = Some(id_of(&conn, "categories", "Utilities"));
+        water.payee = Some("Water bill".into());
+        let water = rule(&mut conn, water, RecurringMode::Auto, false, TODAY);
+        use TransactionKind::{Expense, Transfer};
+        let food = txn(&mut conn, Expense, 10_000, "2026-11-21", bank, None);
+        let saved = txn(
+            &mut conn,
+            Transfer,
+            30_000,
+            "2026-11-22",
+            bank,
+            Some(savings),
+        );
+        let drawn = txn(
+            &mut conn,
+            Transfer,
+            40_000,
+            "2026-11-23",
+            savings,
+            Some(bank),
+        );
+        // Charged before the Nov 20 close: billed on Dec 5.
+        txn(&mut conn, Expense, 20_000, "2026-11-18", card, None);
+        let category_id = id_of(&conn, "categories", "Loan");
+        let loan = loans::create(
+            &mut conn,
+            NewLoan {
+                is_new: false,
+                fields: LoanFields {
+                    name: "E-wallet loan".into(),
+                    account_id: wallet,
+                    category_id,
+                    amount_borrowed: None,
+                    borrowed_on: None,
+                    payments: vec![LoanPaymentFields {
+                        id: None,
+                        due_date: "2026-12-10".into(),
+                        amount: Money(100_000),
+                    }],
+                },
+            },
+            on(TODAY),
+        )
+        .unwrap();
+
+        let f = windows(&conn);
+        let label = |kind, id| labelled(&f, kind, id);
+        let pair = |text: &str, account| (text.to_string(), account);
+        let payment = loan.payments[0].id;
+        assert_eq!(
+            label(MovementKind::Loan, payment),
+            pair("E-wallet loan", wallet)
+        );
+        assert_eq!(
+            label(MovementKind::Card, card),
+            pair("Credit card payment", card)
+        );
+        assert_eq!(
+            label(MovementKind::Recurring, water),
+            pair("Utilities · Water bill", bank)
+        );
+        assert_eq!(
+            label(MovementKind::Transaction, food),
+            pair("Food & Groceries", bank)
+        );
+        assert_eq!(
+            label(MovementKind::Transaction, saved),
+            pair("Transfer to Savings", bank)
+        );
+        assert_eq!(
+            label(MovementKind::Transaction, drawn),
+            pair("Transfer from Savings", bank)
+        );
+        assert_eq!(
+            label(MovementKind::Payday, salary),
+            pair("Salary (expected)", bank)
+        );
+    }
+
+    #[test]
+    fn rows_mark_the_lowest_and_the_short_ones() {
+        let mut conn = db();
+        let bank = account(&mut conn, AccountKind::Bank, "Bank", 500_000);
+        payday(&mut conn, bank, "2026-11-30", 420_000, TODAY);
+        // Nov 30 pay brings it to 920,000; Dec 10 takes it to −80,000; Dec 30 pay brings it back.
+        txn(
+            &mut conn,
+            TransactionKind::Expense,
+            1_000_000,
+            "2026-12-10",
+            bank,
+            None,
+        );
+        let flags = |f: &Forecast| -> Vec<(bool, bool)> {
+            f.rows.iter().map(|r| (r.short, r.lowest)).take(3).collect()
+        };
+
+        let f = windows(&conn);
+        assert_eq!(flags(&f), [(false, false), (true, true), (false, false)]);
+        assert_eq!(f.held_for.map(|w| w.start), Some(f.rows[1].start));
+        assert_eq!(f.rows.iter().filter(|r| r.lowest).count(), 1);
+
+        // By month: Nov 15–30, then December holds Dec 10.
+        let f = get_on(&conn, ForecastGrain::Month, TODAY);
+        assert_eq!(flags(&f), [(false, false), (true, true), (false, false)]);
+        assert_eq!(f.rows[1].start, d("2026-12-01"));
+    }
+
+    #[test]
+    fn nothing_held_back_marks_no_row_lowest() {
+        let mut conn = db();
+        let bank = account(&mut conn, AccountKind::Bank, "Bank", 500_000);
+        payday(&mut conn, bank, "2026-11-30", 420_000, TODAY);
+        for f in [windows(&conn), get_on(&conn, ForecastGrain::Month, TODAY)] {
+            assert_eq!(f.held_back, Some(Money::ZERO));
+            assert!(f.rows.iter().all(|r| !r.lowest && !r.short));
+        }
     }
 
     #[test]

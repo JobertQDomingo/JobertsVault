@@ -13,4 +13,13 @@ id: number, amount: Money,
 /**
  * In, or else out.
  */
-moneyIn: boolean, };
+moneyIn: boolean, 
+/**
+ * The loan's name, "Credit card payment", "Category · Payee", "Transfer to Savings" or
+ * "Salary (expected)" (UI_FLOWS §8.6).
+ */
+label: string, 
+/**
+ * The account it moves: the loan's, the card, or the counted side of a transfer.
+ */
+accountId: number, };
