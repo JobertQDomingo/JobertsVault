@@ -218,7 +218,7 @@ fn percent_paid(paid: Money, left: Money) -> i64 {
 }
 
 /// Saturates rather than overflowing, which no real set of loans comes near.
-fn total(amounts: impl Iterator<Item = Money>) -> Money {
+pub(crate) fn total(amounts: impl Iterator<Item = Money>) -> Money {
     Money(amounts.fold(0, |sum, m| sum.saturating_add(m.0)))
 }
 

@@ -706,13 +706,15 @@ Each credit card, archived ones included, gets a **bill on each due date** in th
 
 ```
 closing dates = min(statement_day, the month's last day), every month         (§5.5)
-due dates     = min(due_day, the month's last day), from the next due date (§5.5) to the horizon's end
+C₀            = the latest closing date on or before today: the latest statement
+D₀            = the first due date after C₀ (min(due_day, the month's last day)): the date that pays it
+due dates     = min(due_day, the month's last day), every month from D₀ to the horizon's end
 C(D)          = the latest closing date before the due date D: the statement that D pays
 ```
 
-Walk forward from today, starting from what's owed now (`amount_owed`, §5.1):
-- **On the next due date D₁:** if C(D₁) is today or earlier, the statement has already closed. The bill is what was owed at the end of C(D₁) (`max(0, −balance as of C(D₁))`), less the transfers into the card and the income on it dated after C(D₁) up to today, never below 0 and never more than what's owed now. If C(D₁) is after today, the bill is what's projected to be owed at the end of C(D₁).
-- **On every later due date D:** the bill is what's projected to be owed at the end of C(D).
+Walk forward from today, starting from what's owed now (`−balance`, §5.1, so below 0 when the card is in credit, which later charges use up):
+- **The latest statement** is billed what was owed at the end of C₀ (`max(0, −balance as of C₀)`), less the transfers into the card and the income on it dated after C₀ up to today, never below 0 and never more than what's owed now. It's due on D₀, or today once D₀ has passed (anything overdue counts as due today, §5.15).
+- **On every later due date D:** the bill is what's projected to be owed at the end of C(D). A due date whose C(D) is the one before it already paid bills nothing.
 - **Projected owed:** a future-dated expense on the card, or a coming recurring expense date on it (a pending one counts as today), adds its amount on its date. A future-dated or recurring income on the card (a refund) takes its amount off. Each bill takes its own amount off on its due date.
 - The bill is money out of the counted accounts on its due date (§5.15). A card with nothing owed and nothing projected has no bills.
 
@@ -1004,3 +1006,11 @@ Answered on 2026-11-15, while building the dashboard's loan banners (LOAN-4, LOA
 70. **Banners on the same date** come in the order their loans were added, and the running totals follow the banners' order (§5.11).
 71. **A loan whose account was archived since** still says to move money there. Archived accounts take no new transfers, so the user unarchives it or edits the loan's account (§4.5).
 72. **The dashboard's Loans left line says "all overdue"** when everything left is overdue, rather than "debt-free" and today's date, which would read as if nothing were owed. `loansLeft` carries `overdue` for it (§5.11, UI_FLOWS §2).
+
+Answered on 2026-11-15, while building the forecast's domain rules (SAFE-1 to SAFE-5):
+
+73. **Two due dates that pay the same statement bill it once.** With a statement day of 30 and a due day of 31, Jan 31 and Feb 28 both pay the Jan 30 statement: Jan 31 bills it, Feb 28 bills nothing, and what's bought after Jan 30 waits for the next statement (§5.14).
+74. **A payday rule with no date in the horizon** (it starts after it) still has a current window, from today to the horizon's end. Only having no payday rule at all means no windows (§5.12, §5.15).
+75. **An overdue card statement is due today.** What's still owed on the latest statement once its due date has passed counts as due today, like anything overdue. Someone who doesn't pay in full sees the rest as due today until the next statement closes, because bills assume the statement is paid in full (ADR 0006, §5.14).
+76. **Credit on a card carries forward.** Bills start from `−balance`, not `amount_owed`, so an overpaid card's credit is used up by later charges before anything is billed (§5.14).
+77. **Known limit: a future-dated transfer out of a card**, such as a cash advance, isn't counted, as §5.15 says for every card transfer. Once its date arrives it's in the balance and the next bill picks it up. Until then, a transfer from a card to an account that isn't counted (a goal's) makes the forecast too high by its amount.
