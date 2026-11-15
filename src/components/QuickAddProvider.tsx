@@ -20,6 +20,8 @@ type QuickAdd = {
   post: (due: DueOccurrence) => void;
   /** A new recurring rule, or one to edit: the form plus a schedule (UI_FLOWS §8.2). */
   rule: (rule?: RecurringRule) => void;
+  /** Mark paid: the form starts as that loan payment's expense, and saving records it (F13). */
+  markPaid: (paymentId: number) => void;
 };
 
 const QuickAddContext = createContext<QuickAdd>({
@@ -29,11 +31,12 @@ const QuickAddContext = createContext<QuickAdd>({
   payBill: () => {},
   post: () => {},
   rule: () => {},
+  markPaid: () => {},
 });
 
 /**
  * Opens quick-add (UI_FLOWS §4) from any screen: + Add and Ctrl+N, a row to edit or copy it, a
- * card's Pay bill, a due recurring date's Edit & post, or a recurring rule.
+ * card's Pay bill, a due recurring date's Edit & post, a recurring rule, or a loan's Mark paid.
  */
 export const useQuickAdd = () => useContext(QuickAddContext);
 
@@ -49,6 +52,7 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
       payBill: (cardId) => setOpen({ payBill: cardId }),
       post: (due) => setOpen({ post: due }),
       rule: (rule) => setOpen({ rule: rule ?? true }),
+      markPaid: (paymentId) => setOpen({ markPaid: paymentId }),
     }),
     [],
   );

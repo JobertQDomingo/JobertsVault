@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import {
   archiveLoan,
   createLoan,
@@ -12,8 +12,12 @@ import {
 import { queryKeys } from "@/lib/queryKeys";
 import { useLedgerMutation } from "./useLedgerMutation";
 
-export const useLoans = () =>
-  useQuery({ queryKey: queryKeys.loans, queryFn: listLoans });
+/** Quick-add asks for them only to mark a payment paid. */
+export const useLoans = (enabled = true) =>
+  useQuery({
+    queryKey: queryKeys.loans,
+    queryFn: enabled ? listLoans : skipToken,
+  });
 
 // Ledger writes: a loan's amounts lock the decimals and put its account and category in use.
 export const useCreateLoan = () => useLedgerMutation(createLoan);

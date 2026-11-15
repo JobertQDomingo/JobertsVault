@@ -1,6 +1,12 @@
 // Dates cross the Rust boundary as 'YYYY-MM-DD' strings. This file is the only place that turns
 // them into Date objects (for the date picker) or display text (ARCHITECTURE §2, DESIGN_SYSTEM §8).
-import { addDays as addDaysToDate, format, isValid, parse } from "date-fns";
+import {
+  addDays as addDaysToDate,
+  addMonths as addMonthsToDate,
+  format,
+  isValid,
+  parse,
+} from "date-fns";
 import type { Grain } from "@/bindings/Grain";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
 
@@ -29,6 +35,35 @@ export function parseInputDate(text: string): string | null {
 
 export const addDays = (iso: string, days: number) =>
   toIso(addDaysToDate(toDate(iso), days));
+
+/**
+ * `n` months on, the day clamped to the month's end (Jan 31 → Feb 28). A new loan payment row's
+ * default counts from the first row, so month ends don't drift (UI_FLOWS F12).
+ */
+export const addMonths = (iso: string, n: number) =>
+  toIso(addMonthsToDate(toDate(iso), n));
+
+/** `Tue, Aug 10, 2027`: the debt-free date and a loan's payment rows. */
+export const formatLongDate = (iso: string) =>
+  format(toDate(iso), "EEE, MMM d, yyyy");
+
+/** `Fri, Nov 20`, with the year when it isn't `today`'s. */
+const weekdayDate = (iso: string, today: string) =>
+  format(
+    toDate(iso),
+    iso.slice(0, 4) === today.slice(0, 4) ? "EEE, MMM d" : "EEE, MMM d, yyyy",
+  );
+
+/** A payment due (DESIGN_SYSTEM §8): `due today`, `due tomorrow` or `due Fri, Nov 20`. */
+export function formatDue(iso: string, today: string) {
+  if (iso === today) return "due today";
+  if (iso === addDays(today, 1)) return "due tomorrow";
+  return `due ${weekdayDate(iso, today)}`;
+}
+
+/** An overdue payment (DESIGN_SYSTEM §8): `overdue since Mon, Nov 16`. */
+export const formatOverdue = (iso: string, today: string) =>
+  `overdue since ${weekdayDate(iso, today)}`;
 
 /** A local date and time from Rust (`YYYY-MM-DDTHH:MM`), e.g. `Oct 20, 2026 9:30 AM` (DESIGN_SYSTEM §8). */
 export const formatDateTime = (local: string) =>

@@ -1,6 +1,10 @@
 import { expect, test } from "vitest";
 import {
   addDays,
+  addMonths,
+  formatDue,
+  formatLongDate,
+  formatOverdue,
   formatBarDates,
   formatBarLabel,
   formatDateTime,
@@ -130,4 +134,28 @@ test("a backup's time reads in US order with a 12-hour clock", () => {
   expect(formatDateTime("2026-10-20T09:30")).toBe("Oct 20, 2026 9:30 AM");
   expect(formatDateTime("2026-01-05T00:05")).toBe("Jan 5, 2026 12:05 AM");
   expect(formatDateTime("2026-12-31T23:59")).toBe("Dec 31, 2026 11:59 PM");
+});
+
+test("a payment row n months after the first keeps its day, clamped to the month's end (F12)", () => {
+  expect(addMonths("2026-01-31", 1)).toBe("2026-02-28");
+  expect(addMonths("2026-01-31", 2)).toBe("2026-03-31");
+  expect(addMonths("2028-01-31", 1)).toBe("2028-02-29");
+  expect(addMonths("2026-11-30", 3)).toBe("2027-02-28");
+  expect(addMonths("2026-12-15", 1)).toBe("2027-01-15");
+});
+
+test("the debt-free date and payment rows carry the weekday and year", () => {
+  expect(formatLongDate("2027-08-10")).toBe("Tue, Aug 10, 2027");
+});
+
+test("a payment due or overdue says when, with the year only when it isn't this year (DESIGN_SYSTEM §8)", () => {
+  const today = "2026-11-15";
+  expect(formatDue("2026-11-15", today)).toBe("due today");
+  expect(formatDue("2026-11-16", today)).toBe("due tomorrow");
+  expect(formatDue("2026-11-20", today)).toBe("due Fri, Nov 20");
+  expect(formatDue("2027-01-04", today)).toBe("due Mon, Jan 4, 2027");
+  expect(formatOverdue("2026-11-09", today)).toBe("overdue since Mon, Nov 9");
+  expect(formatOverdue("2025-12-30", today)).toBe(
+    "overdue since Tue, Dec 30, 2025",
+  );
 });

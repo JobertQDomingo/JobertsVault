@@ -90,6 +90,8 @@ pub struct LoanPayment {
     /// Its transaction's amount when paid (a late fee included), its scheduled amount when paid
     /// before, and none when unpaid.
     pub paid_amount: Option<Money>,
+    /// Its transaction's date when paid ("Paid Nov 20"), and none otherwise.
+    pub paid_on: Option<NaiveDate>,
 }
 
 /// One stored loan with its payments, by due date, then id. The screens look the account and
@@ -550,6 +552,12 @@ fn view(
                 LoanPaymentStatus::PaidBefore => Some(Money(p.amount)),
                 LoanPaymentStatus::Unpaid => None,
             };
+            let paid_on = match (status, &p.paid_on) {
+                (LoanPaymentStatus::Paid, Some(date)) => {
+                    Some(stored_date(date, "paid date", row.id)?)
+                }
+                _ => None,
+            };
             Ok(LoanPayment {
                 id: p.id,
                 due_date,
@@ -558,6 +566,7 @@ fn view(
                 overdue: status == LoanPaymentStatus::Unpaid && due_date < today,
                 transaction_id: p.transaction_id,
                 paid_amount,
+                paid_on,
             })
         })
         .collect::<Result<Vec<_>, AppError>>()?;
@@ -817,7 +826,11 @@ mod tests {
                 (d(2026, 12, 1), Unpaid, false)
             ]
         );
-        assert!(loan.payments.iter().all(|p| p.paid_amount.is_none()));
+        assert!(
+            loan.payments
+                .iter()
+                .all(|p| p.paid_amount.is_none() && p.paid_on.is_none())
+        );
         assert_eq!(list(&conn, today()).unwrap().loans, [loan]);
     }
 
@@ -1788,6 +1801,8 @@ mod tests {
         assert_eq!(saved.loan_payment_id, Some(id));
         let p = payment(&conn, loan.id, id);
         assert_eq!((p.status, p.paid_amount), (Paid, Some(Money(105_000))));
+        // "Paid Nov 1": the paid date is the expense's date, and follows its edit.
+        assert_eq!(p.paid_on, Some(d(2026, 11, 1)));
 
         let refused = "This pays a loan. Mark it unpaid to change it.";
         let mut income = expense(100_000);

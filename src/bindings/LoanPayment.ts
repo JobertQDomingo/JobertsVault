@@ -15,4 +15,8 @@ overdue: boolean, transactionId: number | null,
  * Its transaction's amount when paid (a late fee included), its scheduled amount when paid
  * before, and none when unpaid.
  */
-paidAmount: Money | null, };
+paidAmount: Money | null, 
+/**
+ * Its transaction's date when paid ("Paid Nov 20"), and none otherwise.
+ */
+paidOn: string | null, };

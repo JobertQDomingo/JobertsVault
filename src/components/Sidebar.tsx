@@ -1,6 +1,7 @@
 import {
   ChartPie,
   Flag,
+  HandCoins,
   LayoutDashboard,
   Landmark,
   List,
@@ -23,7 +24,7 @@ function Item({
   to: string;
   icon: LucideIcon;
   label: string;
-  /** The key after Ctrl (UI_FLOWS §10); AppShell handles it. The planning screens have none. */
+  /** The key after Ctrl (UI_FLOWS §10); AppShell handles it. The planning and loan screens have none. */
   shortcut?: string;
 }) {
   return (
@@ -68,6 +69,7 @@ export function Sidebar() {
         <Item to="/recurring" icon={Repeat} label="Recurring" />
         <Item to="/budgets" icon={Target} label="Budgets" />
         <Item to="/goals" icon={Flag} label="Goals" />
+        <Item to="/debt-free" icon={HandCoins} label="Debt-free" />
         <div className="flex-1" />
         <hr className="mx-1 my-2 border-hairline" />
         <Item to="/settings" icon={Settings} label="Settings" shortcut="," />

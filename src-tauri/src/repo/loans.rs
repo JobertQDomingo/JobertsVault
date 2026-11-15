@@ -22,6 +22,8 @@ pub struct PaymentRow {
     pub paid_before: bool,
     pub transaction_id: Option<i64>,
     pub paid_amount: Option<i64>,
+    /// Its transaction's date once paid.
+    pub paid_on: Option<String>,
 }
 
 /// The columns a create or an edit writes. `is_new` and `added_on` are written once, on insert.
@@ -146,7 +148,7 @@ pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<()> {
 }
 
 const SELECT_PAYMENTS: &str =
-    "SELECT p.id, p.loan_id, p.due_date, p.amount, p.paid_before, p.transaction_id, t.amount
+    "SELECT p.id, p.loan_id, p.due_date, p.amount, p.paid_before, p.transaction_id, t.amount, t.date
      FROM loan_payments p LEFT JOIN transactions t ON t.id = p.transaction_id";
 
 fn payment(r: &rusqlite::Row) -> rusqlite::Result<PaymentRow> {
@@ -158,6 +160,7 @@ fn payment(r: &rusqlite::Row) -> rusqlite::Result<PaymentRow> {
         paid_before: r.get(4)?,
         transaction_id: r.get(5)?,
         paid_amount: r.get(6)?,
+        paid_on: r.get(7)?,
     })
 }
 
