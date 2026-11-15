@@ -3,7 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use chrono::NaiveDate;
+use chrono::{Days, NaiveDate};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -226,6 +226,11 @@ pub fn get(
     let pending = repo::recurring::pending(conn)?;
     let rules = repo::recurring::all(conn)?;
     let mut paydays: Vec<(NaiveDate, i64)> = Vec::new();
+    // Paydays 1–3 days ahead with no row yet can be recorded early (PAY-4, DATA_MODEL §4.8).
+    let early_until = today
+        .checked_add_days(Days::new(3))
+        .unwrap_or(NaiveDate::MAX);
+    let mut early = Vec::new();
     let mut pay = Vec::new();
     for rule in &rules {
         // Waiting in the Due list, even while paused, then the dates still to come (or not yet
@@ -260,6 +265,12 @@ pub fn get(
                 paydays.push((stored_date(&date)?, rule.id));
             }
             paydays.extend(ahead.iter().map(|d| (*d, rule.id)));
+            early.extend(
+                ahead
+                    .iter()
+                    .filter(|d| today < **d && **d <= early_until)
+                    .map(|d| (*d, rule.id)),
+            );
         }
         if place(rule.account_id) == Place::Counted {
             let recent: Vec<Money> = nets
@@ -337,51 +348,39 @@ pub fn get(
     let summary = f::forecast(money_now, today, &windows, &movements).ok_or_else(out_of_range)?;
     let current = windows[0];
     // The Months view lists the pay received since the current month's real start.
-    let (spans, rows, received_from) = match grain {
-        ForecastGrain::Window => (windows.clone(), summary.rows, current.start),
+    let (rows, received_from) = match grain {
+        ForecastGrain::Window => (summary.rows, current.start),
         ForecastGrain::Month => {
             let (spans, month_start) = months(conn, today, horizon)?;
-            let rows = f::rows(money_now, today, &spans, &movements);
-            (spans, rows, month_start)
+            (f::rows(money_now, today, &spans, &movements), month_start)
         }
     };
+    // Only payslips dated up to today are recorded, so only the first row holds any.
+    let mut received = Vec::new();
+    for n in nets.iter().rev() {
+        let date = stored_date(&n.date)?;
+        if date >= received_from {
+            received.push(Received {
+                payslip_id: n.id,
+                date,
+                net: Money(n.net),
+            });
+        }
+    }
+    let mut received = Some(received);
     forecast.rows = rows
         .into_iter()
-        .zip(&spans)
-        .enumerate()
-        .map(|(i, (row, span))| {
-            let from = if i == 0 { received_from } else { span.start };
-            ForecastRow {
-                received: nets
-                    .iter()
-                    .rev()
-                    .filter_map(|n| {
-                        let date = transactions::real_date(&n.date)?;
-                        (from <= date && date <= span.end).then_some(Received {
-                            payslip_id: n.id,
-                            date,
-                            net: Money(n.net),
-                        })
-                    })
-                    .collect(),
-                movements: row.movements.iter().map(movement).collect(),
-                start: row.start,
-                end: row.end,
-                start_amount: row.start_amount,
-                money_in: row.money_in,
-                money_out: row.money_out,
-                left: row.left,
-            }
+        .map(|row| ForecastRow {
+            received: received.take().unwrap_or_default(),
+            movements: row.movements.iter().map(movement).collect(),
+            start: row.start,
+            end: row.end,
+            start_amount: row.start_amount,
+            money_in: row.money_in,
+            money_out: row.money_out,
+            left: row.left,
         })
         .collect();
-    let mut early = Vec::new();
-    for rule in &rules {
-        early.extend(
-            recurring::early_dates(conn, rule, today)?
-                .into_iter()
-                .map(|d| (d, rule.id)),
-        );
-    }
     let payday = |(date, rule_id): (NaiveDate, i64)| PaydayDate { rule_id, date };
     forecast.next_payday = paydays
         .into_iter()
@@ -392,7 +391,7 @@ pub fn get(
     forecast.safe_to_spend = Some(summary.safe_to_spend);
     forecast.per_day = Some(summary.per_day);
     forecast.window_end = Some(current.end);
-    forecast.days_left = Some((current.end - today).num_days() + 1);
+    forecast.days_left = Some(summary.days_left);
     forecast.held_back = Some(summary.held_back);
     forecast.held_for = summary.held_for.map(|w| Span {
         start: w.start,
