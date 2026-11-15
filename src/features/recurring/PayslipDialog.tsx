@@ -101,25 +101,28 @@ export function PayslipDialog({
   onClose: () => void;
 }) {
   const editId = "id" in request ? request.id : undefined;
+  // Taken once, so a refresh can't pull the form away mid-save.
+  const [start, setStart] = useState<{
+    values: Values;
+    /** The payslip's gross row, when editing. */
+    id?: number;
+    categoryId: number;
+    /** The records an edit may keep though they're archived. */
+    kept: { accountId: number | null; categoryIds: number[] };
+  } | null>(null);
+  // Not watched once the form starts, so deleting the payslip doesn't refetch it (NotFound).
   const defaults = usePayslipDefaults(
     "ruleId" in request ? request.ruleId : 0,
     "ruleId" in request ? request.date : "",
-    editId === undefined,
+    editId === undefined && !start,
   );
-  const stored = usePayslip(editId);
+  const stored = usePayslip(start ? undefined : editId);
   const accounts = useAccounts();
   const categories = useCategories();
   const settings = useSettings();
   const own = editId === undefined ? defaults : stored;
   const queries = [own, accounts, categories, settings];
   const failed = queries.filter((q) => q.isError);
-  // Taken once, so a refresh can't pull the form away mid-save.
-  const [start, setStart] = useState<{
-    values: Values;
-    categoryId: number;
-    /** The records an edit may keep though they're archived. */
-    kept: { accountId: number | null; categoryIds: number[] };
-  } | null>(null);
   if (!start && !failed.length && own.isFetchedAfterMount && own.data) {
     const p = own.data;
     setStart({
@@ -130,6 +133,7 @@ export function PayslipDialog({
         deductions: toLines(p.deductions),
         note: stored.data?.note ?? "",
       },
+      id: stored.data?.id,
       categoryId: p.categoryId,
       kept: stored.data
         ? {
@@ -161,7 +165,7 @@ export function PayslipDialog({
           <PayslipForm
             ruleId={"ruleId" in request ? request.ruleId : undefined}
             payday={"ruleId" in request ? request.date : undefined}
-            editId={stored.data?.id}
+            editId={start.id}
             initial={start.values}
             kept={start.kept}
             accounts={accounts.data.accounts}

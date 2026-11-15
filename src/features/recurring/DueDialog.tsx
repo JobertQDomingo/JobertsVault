@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { Account } from "@/bindings/Account";
 import type { Category } from "@/bindings/Category";
 import type { DueOccurrence } from "@/bindings/DueOccurrence";
@@ -41,6 +42,11 @@ export function DueDialog({
   // One at a time, so a second click can't settle a date twice.
   const busy = post.isPending || skip.isPending;
   const { post: editAndPost, payslip } = useQuickAdd();
+  // It closes once nothing is left, early paydays included, so new dates don't reopen it (F10).
+  const empty = due.data?.length === 0;
+  useEffect(() => {
+    if (empty) onClose();
+  }, [empty, onClose]);
   // Awaited rather than mutate's callbacks: settling the last date closes this dialog first.
   const settle = (action: Promise<unknown>, message: string) =>
     void action.then(

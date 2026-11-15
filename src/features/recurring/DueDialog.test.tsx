@@ -298,3 +298,13 @@ test("Record now opens the payslip for that payday, and saving records it on its
     },
   ]);
 });
+
+test("the review stays open while an early payday is left, though nothing is due (F10)", async () => {
+  await openReview([WATER, EARLY]);
+  fireEvent.click(review().getByRole("button", { name: "Post" }));
+  await waitFor(() => expect(calls("post_occurrence")).toHaveLength(1));
+  await waitFor(() =>
+    expect(screen.queryByRole("button", { name: "Review" })).toBeNull(),
+  );
+  expect(review().getByRole("button", { name: "Record now" })).toBeTruthy();
+});

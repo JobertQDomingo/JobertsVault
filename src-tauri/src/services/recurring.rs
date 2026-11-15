@@ -244,10 +244,13 @@ fn dates_ahead(
     today: NaiveDate,
     until: NaiveDate,
 ) -> Result<Vec<NaiveDate>, AppError> {
-    let recorded: HashSet<String> = repo::recurring::occurrence_dates(conn, row.id)?
-        .into_iter()
-        .collect();
-    Ok(schedule(row)?.dates_between(
+    let schedule = schedule(row)?;
+    let recorded = recorded_from(
+        conn,
+        row.id,
+        schedule.occurrence(index(row, row.next_index)?),
+    )?;
+    Ok(schedule.dates_between(
         index(row, row.next_index)?,
         index(row, row.done)?,
         today,
@@ -419,9 +422,7 @@ pub(crate) fn catch_up(
         next += 1;
     }
     // A payday recorded early already has its row, so the rule's next date is the one after it.
-    let recorded: HashSet<String> = repo::recurring::occurrence_dates(conn, id)?
-        .into_iter()
-        .collect();
+    let recorded = recorded_from(conn, id, schedule.occurrence(next))?;
     while schedule
         .occurrence(next)
         .is_some_and(|date| recorded.contains(&date.to_string()))
@@ -432,6 +433,21 @@ pub(crate) fn catch_up(
         repo::recurring::set_next_index(conn, id, next.into())?;
     }
     Ok(processed)
+}
+
+/// The rule's dates from `from` on that already have a row: only a payday recorded early has one
+/// before processing gets there. None to look at once the rule's dates run out.
+fn recorded_from(
+    conn: &Connection,
+    rule_id: i64,
+    from: Option<NaiveDate>,
+) -> Result<HashSet<String>, AppError> {
+    Ok(match from {
+        Some(from) => repo::recurring::occurrence_dates_from(conn, rule_id, &from.to_string())?
+            .into_iter()
+            .collect(),
+        None => HashSet::new(),
+    })
 }
 
 /// The earliest start date a schedule edit may take (DATA_MODEL §4.1): after the last date

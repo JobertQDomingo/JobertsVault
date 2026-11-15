@@ -202,11 +202,19 @@ pub fn insert_occurrence(
     Ok((added == 1).then(|| conn.last_insert_rowid()))
 }
 
-/// Every date the rule has processed or recorded early, any status.
-pub fn occurrence_dates(conn: &Connection, rule_id: i64) -> rusqlite::Result<Vec<String>> {
-    conn.prepare("SELECT occurrence_date FROM recurring_occurrences WHERE rule_id = ?1")?
-        .query_map([rule_id], |r| r.get(0))?
-        .collect()
+/// The rule's dates on or after `from` that already have a row, any status: a payday recorded
+/// early has one before processing reaches it (DATA_MODEL §4.8).
+pub fn occurrence_dates_from(
+    conn: &Connection,
+    rule_id: i64,
+    from: &str,
+) -> rusqlite::Result<Vec<String>> {
+    conn.prepare(
+        "SELECT occurrence_date FROM recurring_occurrences
+         WHERE rule_id = ?1 AND occurrence_date >= ?2",
+    )?
+    .query_map(params![rule_id, from], |r| r.get(0))?
+    .collect()
 }
 
 /// The rule's row for `date`, if it has one.
