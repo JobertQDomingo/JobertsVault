@@ -456,13 +456,13 @@ The backend's message shows under the field it names.
 ```
 ┌─ Safe to spend ─────────────────────────────────────────────────────────────────┐
 │ ₱8,400.00 until Sun, Nov 29 · ₱560.00 a day                                     │
-│ ₱1,500.00 held back for Nov 30 – Dec 4, whose bills are more than its pay       │
+│ ₱1,500.00 held back for Nov 30 – Dec 4                                          │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ╭─ [ Pay windows │ Months ] ─╮
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │ Window            Start         Pay in        Bills          Left               │
 │ Nov 15–29         ₱12,500.00    —             ₱2,600.00      ₱9,900.00          │
-│                   ₱10,500.00 received                                           │
+│                   ₱10,500.00 received Nov 15                                    │
 │ Nov 30 – Dec 4    ₱9,900.00     ₱10,500.00    ₱12,000.00     ₱8,400.00  lowest  │
 │ ▾ Dec 5–14        ₱8,400.00     ₱6,000.00     ₱4,000.00      ₱10,400.00         │
 │     Sat, Dec 5    Bonus (expected)                   Bank      +₱6,000.00       │
@@ -476,7 +476,7 @@ Today in this sketch is Sun, Nov 15, a payday whose payslip is already recorded.
 
 - **The top panel** is the dashboard's Safe to spend card at full width (SAFE-5, SAFE-6): the amount, the amount per day, and what's held back and for which window, or "Short by ₱X on *date*" in `--danger`. When a payday is 1–3 days away, it also has "Paid early? **Record now**" (F14).
 - **The toolbar's segmented control** switches between **Pay windows** and **Months**, kept in the URL (`?view=months`) (SAFE-7).
-- **The table** has one row per pay window, or per month, over the next 12 months. Each row shows its dates (the current one starting today), what it starts with, the pay and other money coming in, the bills, and what's left at its end if nothing else is spent (DATA_MODEL §5.15). A payslip already recorded shows as "₱10,500.00 received" in muted text, without being added again. The window money is held back for is marked **lowest**. A window that would run short on any day has a triangle icon and its Left in `--danger` with "Short".
+- **The table** has one row per pay window, or per month, over the next 12 months. Each row shows its dates (the current one starting today), what it starts with, the pay and other money coming in, the bills, and what's left at its end if nothing else is spent (DATA_MODEL §5.15). A payslip already recorded shows as "₱10,500.00 received Nov 15" in muted text, by its own date, without being added again. The window money is held back for is marked **lowest** (in the Months view, the month holding that window's lowest day). A window that would run short on any day has a triangle icon and its Left in `--danger` with "Short".
 - **Clicking a row** opens it in place to list its movements, by date: each loan payment (by loan name), card bill ("Credit card payment"), recurring date ("Utilities · Water bill"), future-dated row, and payday ("Salary (expected)"), with its account and a signed amount. Only one row is open at a time.
 - **With no payday rule,** the screen is one empty state: "Mark your pay as a payday to see what's safe to spend." with **Open Recurring**.
 
@@ -586,3 +586,12 @@ Answered on 2026-11-15 (Phase 4, paydays and payslips):
 Answered on 2026-11-15 (Phase 4, the Safe to spend card):
 
 39. **Recent transactions fills its column.** The Safe to spend card made the right column taller than 5 recent rows, which left a gap. The panel now stretches to the right column's height and shows as many whole rows as fit, from 5 to 10 (`get_dashboard` returns 10). The rows that don't fit are invisible, never cut in half (§2, DSH-8).
+
+Answered on 2026-11-16 (Phase 4, the Forecast screen):
+
+40. **Which rows run short or are lowest** comes from `get_forecast`, as each row's `short` and `lowest`. A row can run short and recover by its end, so the frontend can't tell from its figures without adding up its movements (§8.6, DATA_MODEL §5.15).
+41. **The Months view's lowest** is the month holding the lowest day, the same day the window held back for holds. Nothing is marked when nothing is held back (§8.6).
+42. **Each movement's label and account** come from `get_forecast` too, rather than from four more lookups on the frontend. A transfer to or from an account that isn't counted, such as a goal's, reads "Transfer to Savings" or "Transfer from Savings", on the counted account (§8.6).
+43. **Received pay shows its date** ("₱10,500.00 received Nov 15"), since one row can hold two payslips: one recorded early, or two paydays in the Months view's first month (§8.6, DATA_MODEL §9 item 81).
+44. **The current row starts today** in the Pay windows view too, though its window started on the last payday (§8.6).
+45. **"Whose bills are more than its pay"** is left out of the held-back line. Money can also be held back for a bill due before the pay in the same window, where the clause isn't true. The Forecast's top panel is the dashboard's card as it is, without its View forecast link (§8.6).

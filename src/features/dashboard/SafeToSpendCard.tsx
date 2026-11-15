@@ -14,13 +14,20 @@ import { formatMoney } from "@/lib/money";
  * What's safe to spend today until the next payday, the lowest point over the next 12 months
  * (SAFE-5, SAFE-6, UI_FLOWS §2), from `get_forecast`'s summary. It never works out a figure.
  */
-export function SafeToSpendCard({ forecast }: { forecast: Forecast }) {
+export function SafeToSpendCard({
+  forecast,
+  viewLink = true,
+}: {
+  forecast: Forecast;
+  /** Off on the Forecast screen itself. */
+  viewLink?: boolean;
+}) {
   const { payslip } = useQuickAdd();
   const { data: settings } = useSettings();
   if (!settings) return null;
   const money = (amount: number) => formatMoney(amount, settings);
   const { today, safeToSpend, windowEnd, short, earlyPayday } = forecast;
-  const viewForecast = (
+  const viewForecast = viewLink && (
     <Link to="/forecast" className="font-semibold text-primary hover:underline">
       View forecast
     </Link>
