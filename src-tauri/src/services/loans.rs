@@ -5,9 +5,11 @@ use ts_rs::TS;
 
 use std::collections::{HashMap, HashSet};
 
+use crate::domain::loan::{self, LoanSummary};
 use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
+use crate::services::period;
 use crate::services::transactions::{
     self, Transaction, TransactionFields, TransactionKind, real_date,
 };
@@ -111,31 +113,72 @@ pub struct Loan {
     /// Only a paid-off loan is archived.
     pub archived: bool,
     pub payments: Vec<LoanPayment>,
+    // Its figures (LOAN-5, LOAN-6, DATA_MODEL §5.11).
+    /// Σ of its unpaid payments.
+    pub left: Money,
+    /// Σ of its paid amounts.
+    pub paid: Money,
+    /// Whole percent rounded down, so 100 means it's really paid off.
+    #[ts(type = "number")]
+    pub percent_paid: i64,
+    /// Its earliest unpaid payment.
+    pub next: Option<LoanPayment>,
+    /// Every payment less the amount borrowed. None without one, or when that's below 0.
+    pub interest: Option<Money>,
+    pub paid_off: bool,
 }
 
-/// What `list_loans` returns. An object, so the figures can join it (ARCHITECTURE §4.5).
+/// What `list_loans` returns (ARCHITECTURE §4.5).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct LoanList {
     /// In the order they were added, archived ones included.
     pub loans: Vec<Loan>,
+    /// Across every loan, archived ones included (LOAN-5 to LOAN-8).
+    pub summary: LoanSummary,
 }
 
-/// Every loan, archived ones included, with its payments as of `today`.
+/// Every loan, archived ones included, with its payments and figures as of `today`, and the
+/// summary in the app's months (DATA_MODEL §5.3, §5.11).
 pub fn list(conn: &Connection, today: NaiveDate) -> Result<LoanList, AppError> {
     let mut payments: HashMap<i64, Vec<repo::loans::PaymentRow>> = HashMap::new();
     for p in repo::loans::payments(conn)? {
         payments.entry(p.loan_id).or_default().push(p);
     }
-    let loans = repo::loans::all(conn)?
+    let loans: Vec<Loan> = repo::loans::all(conn)?
         .into_iter()
         .map(|row| {
             let mine = payments.remove(&row.id).unwrap_or_default();
             view(row, mine, today)
         })
         .collect::<Result<_, _>>()?;
-    Ok(LoanList { loans })
+    let inputs: Vec<Vec<loan::Payment>> = loans.iter().map(|l| inputs(&l.payments)).collect();
+    let all: Vec<loan::LoanInput> = loans
+        .iter()
+        .zip(&inputs)
+        .map(|(l, payments)| loan::LoanInput {
+            payments,
+            amount_borrowed: l.amount_borrowed,
+            borrowed_on: l.borrowed_on,
+        })
+        .collect();
+    let summary = loan::summary(&all, today, &period::period_settings(conn)?)
+        .ok_or_else(period::out_of_range)?;
+    Ok(LoanList { loans, summary })
+}
+
+fn inputs(payments: &[LoanPayment]) -> Vec<loan::Payment> {
+    payments
+        .iter()
+        .map(|p| loan::Payment {
+            due_date: p.due_date,
+            amount: p.amount,
+            // By status, so a paid row never counts as left.
+            paid: (p.status != LoanPaymentStatus::Unpaid)
+                .then(|| p.paid_amount.unwrap_or(p.amount)),
+        })
+        .collect()
 }
 
 /// Adds the loan and its payments as one change. It's added today, so on a loan the user
@@ -517,8 +560,16 @@ fn view(
                 paid_amount,
             })
         })
-        .collect::<Result<_, AppError>>()?;
+        .collect::<Result<Vec<_>, AppError>>()?;
+    let amount_borrowed = row.amount_borrowed.map(Money);
+    let f = loan::figures(&inputs(&payments), amount_borrowed);
     Ok(Loan {
+        left: f.left,
+        paid: f.paid,
+        percent_paid: f.percent_paid,
+        next: f.next.and_then(|i| payments.get(i)).cloned(),
+        interest: f.interest,
+        paid_off: f.paid_off,
         borrowed_on: row
             .borrowed_on
             .as_deref()
@@ -530,7 +581,7 @@ fn view(
         account_id: row.account_id,
         category_id: row.category_id,
         is_new: row.is_new,
-        amount_borrowed: row.amount_borrowed.map(Money),
+        amount_borrowed,
         archived: row.archived,
         payments,
     })
@@ -1155,6 +1206,68 @@ mod tests {
         ] {
             assert!(matches!(result, Err(AppError::NotFound { .. })));
         }
+    }
+
+    #[test]
+    fn the_list_gives_each_loans_figures_and_a_summary_with_archived_loans_counted() {
+        let mut conn = db();
+        let mut s = settings::stored(&conn).unwrap();
+        s.month_start_day = 25;
+        settings::update(&mut conn, s).unwrap();
+        let mut old = existing(
+            "E-wallet loan",
+            vec![row("2026-10-01", 100_000), row("2026-11-10", 100_000)],
+        );
+        old.fields.amount_borrowed = Some(Money(200_000));
+        let old = create(&mut conn, old, now()).unwrap();
+        // Paid with a ₱50 late fee, then archived once paid off.
+        pay(&mut conn, old.payments[1].id, 105_000);
+        archive(&mut conn, old.id, now()).unwrap();
+        let bank = new_loan(
+            "Bank loan",
+            vec![row("2026-12-01", 300_000), row("2027-01-01", 300_000)],
+        );
+        let bank = create(&mut conn, bank, now()).unwrap();
+
+        let LoanList { loans, summary } = list(&conn, today()).unwrap();
+        let figures = |l: &Loan| (l.left, l.paid, l.percent_paid, l.interest, l.paid_off);
+        assert!(loans[0].archived);
+        assert_eq!(
+            figures(&loans[0]),
+            (Money::ZERO, Money(205_000), 100, Some(Money(5_000)), true)
+        );
+        assert_eq!(loans[0].next, None);
+        assert_eq!(
+            figures(&loans[1]),
+            (Money(600_000), Money::ZERO, 0, Some(Money(100_000)), false)
+        );
+        assert_eq!(loans[1].next.as_ref(), Some(&bank.payments[0]));
+        // A save returns the figures too.
+        assert_eq!(bank.left, Money(600_000));
+
+        assert_eq!(summary.total_left, Money(600_000));
+        assert_eq!(summary.total_paid, Money(205_000));
+        assert_eq!(summary.percent_paid, 25);
+        assert_eq!(summary.debt_free_on, Some(d(2027, 1, 1)));
+        assert_eq!(summary.days_to_go, Some(59));
+        assert_eq!(summary.interest, Some(Money(105_000)));
+        // The Bank loan was borrowed on Nov 1.
+        assert_eq!(summary.streak_days, Some(2));
+        // The app's months start on the 25th.
+        let months: Vec<_> = summary
+            .freed_up
+            .iter()
+            .map(|m| (m.start, m.end, m.due.0, m.freed.0))
+            .collect();
+        assert_eq!(
+            months,
+            [
+                (d(2026, 10, 25), d(2026, 11, 24), 100_000, 0),
+                (d(2026, 11, 25), d(2026, 12, 24), 300_000, -200_000),
+                (d(2026, 12, 25), d(2027, 1, 24), 300_000, -200_000),
+                (d(2027, 1, 25), d(2027, 2, 24), 0, 100_000),
+            ]
+        );
     }
 
     #[test]

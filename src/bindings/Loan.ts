@@ -14,4 +14,24 @@ addedOn: string,
 /**
  * Only a paid-off loan is archived.
  */
-archived: boolean, payments: Array<LoanPayment>, };
+archived: boolean, payments: Array<LoanPayment>, 
+/**
+ * Σ of its unpaid payments.
+ */
+left: Money, 
+/**
+ * Σ of its paid amounts.
+ */
+paid: Money, 
+/**
+ * Whole percent rounded down, so 100 means it's really paid off.
+ */
+percentPaid: number, 
+/**
+ * Its earliest unpaid payment.
+ */
+next: LoanPayment | null, 
+/**
+ * Every payment less the amount borrowed. None without one, or when that's below 0.
+ */
+interest: Money | null, paidOff: boolean, };

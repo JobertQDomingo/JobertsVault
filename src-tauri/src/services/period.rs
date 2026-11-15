@@ -101,7 +101,7 @@ fn resolve_with(
     Period::containing(kind, anchor.unwrap_or(today), settings).ok_or_else(out_of_range)
 }
 
-fn out_of_range() -> AppError {
+pub(crate) fn out_of_range() -> AppError {
     invalid("period", "That date is outside the supported range")
 }
 
