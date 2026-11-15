@@ -3,6 +3,7 @@ import type { Account } from "./Account";
 import type { BudgetProgress } from "./BudgetProgress";
 import type { CardDue } from "./CardDue";
 import type { Comparison } from "./Comparison";
+import type { Forecast } from "./Forecast";
 import type { LoanDue } from "./LoanDue";
 import type { LoansLeft } from "./LoansLeft";
 import type { Money } from "./Money";
@@ -67,4 +68,9 @@ loansDue: Array<LoanDue>,
 /**
  * What's left across every loan, under the net balance. None once nothing is left (LOAN-11).
  */
-loansLeft: LoansLeft | null, today: string, };
+loansLeft: LoansLeft | null, 
+/**
+ * Safe to spend for today, whatever the period, as `get_forecast` returns it with no rows
+ * (SAFE-6).
+ */
+safeToSpend: Forecast, today: string, };

@@ -37,6 +37,7 @@ import {
   periodLabel,
 } from "@/features/budgets/BudgetName";
 import { DueDialog } from "@/features/recurring/DueDialog";
+import { SafeToSpendCard } from "./SafeToSpendCard";
 import { useBackupNow } from "@/hooks/useBackup";
 import { useCategories } from "@/hooks/useCategories";
 import { useDashboard } from "@/hooks/useDashboard";
@@ -233,40 +234,43 @@ function DashboardBody({
             ))
           )}
         </GlassPanel>
-        <GlassPanel className="overflow-hidden">
-          <CardHeader title="Accounts" to="/accounts" link="Manage" />
-          {/* Archived accounts are hidden here but still in the net balance (ACC-5). */}
-          {data.accounts
-            .filter((a) => !a.archived)
-            .map((a) => (
+        <div className="grid gap-3">
+          <SafeToSpendCard forecast={data.safeToSpend} />
+          <GlassPanel className="overflow-hidden">
+            <CardHeader title="Accounts" to="/accounts" link="Manage" />
+            {/* Archived accounts are hidden here but still in the net balance (ACC-5). */}
+            {data.accounts
+              .filter((a) => !a.archived)
+              .map((a) => (
+                <Link
+                  key={a.id}
+                  to={`/accounts/${a.id}`}
+                  className="block border-t border-hairline transition-colors duration-150 hover:bg-glass-hover"
+                >
+                  <AccountRow account={a} />
+                </Link>
+              ))}
+            <div className="flex items-center justify-between border-t border-hairline bg-wash px-[18px] py-3 font-semibold">
+              <span>Net balance</span>
+              <MoneyText amount={data.netBalance} kind="balance" />
+            </div>
+            {data.loansLeft && (
               <Link
-                key={a.id}
-                to={`/accounts/${a.id}`}
-                className="block border-t border-hairline transition-colors duration-150 hover:bg-glass-hover"
+                to="/debt-free"
+                className="block border-t border-hairline px-[18px] py-2.5 text-small text-muted-foreground transition-colors duration-150 hover:bg-glass-hover"
               >
-                <AccountRow account={a} />
+                Loans left:{" "}
+                <MoneyText amount={data.loansLeft.totalLeft} kind="balance" /> ·{" "}
+                {/* Everything left is overdue: no date already passed (DATA_MODEL §5.11). */}
+                {data.loansLeft.overdue ? (
+                  <span className="font-semibold text-danger">all overdue</span>
+                ) : (
+                  `debt-free ${formatDate(data.loansLeft.debtFreeOn)}`
+                )}
               </Link>
-            ))}
-          <div className="flex items-center justify-between border-t border-hairline bg-wash px-[18px] py-3 font-semibold">
-            <span>Net balance</span>
-            <MoneyText amount={data.netBalance} kind="balance" />
-          </div>
-          {data.loansLeft && (
-            <Link
-              to="/debt-free"
-              className="block border-t border-hairline px-[18px] py-2.5 text-small text-muted-foreground transition-colors duration-150 hover:bg-glass-hover"
-            >
-              Loans left:{" "}
-              <MoneyText amount={data.loansLeft.totalLeft} kind="balance" /> ·{" "}
-              {/* Everything left is overdue: no date already passed (DATA_MODEL §5.11). */}
-              {data.loansLeft.overdue ? (
-                <span className="font-semibold text-danger">all overdue</span>
-              ) : (
-                `debt-free ${formatDate(data.loansLeft.debtFreeOn)}`
-              )}
-            </Link>
-          )}
-        </GlassPanel>
+            )}
+          </GlassPanel>
+        </div>
       </div>
       <div className="grid grid-cols-2 items-start gap-3">
         <Budgets budgets={data.budgets} categories={categoryList} />

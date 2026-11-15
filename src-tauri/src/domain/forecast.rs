@@ -101,6 +101,8 @@ pub struct Forecast {
     pub rows: Vec<Row>,
     pub safe_to_spend: Money,
     pub per_day: Money,
+    /// The current window's days from today, today included: what `per_day` divides by.
+    pub days_left: i64,
     /// `left` of the current window less safe to spend, or 0.
     pub held_back: Money,
     /// The window holding the lowest day, when something is held back.
@@ -366,6 +368,7 @@ pub fn forecast(
     Some(Forecast {
         safe_to_spend: Money(safe),
         per_day: Money(safe / days_left.max(1)),
+        days_left,
         held_back: Money(held_back),
         held_for: (held_back > 0).then_some(windows[lowest_at]),
         short: first_short.map(|(day, i)| (day, Money(lows[i].saturating_neg()))),
@@ -1024,6 +1027,7 @@ mod tests {
         let windows = [w(d(2026, 11, 1), d(2026, 11, 14))];
         let f = forecast(Money(1_000), today, &windows, &[]).expect("windows");
         assert_eq!(f.per_day, Money(333), "1,000 over Nov 12–14");
+        assert_eq!(f.days_left, 3);
         let f = forecast(Money(1_000), d(2026, 11, 14), &windows, &[]).expect("windows");
         assert_eq!(f.per_day, Money(1_000), "the window's last day");
     }

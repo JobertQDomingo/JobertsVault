@@ -105,6 +105,23 @@ pub fn update(conn: &Connection, id: i64, v: &Values, now: &str) -> rusqlite::Re
     Ok(())
 }
 
+/// What paid the card dated after `after` through `until`: transfers into it and income on it
+/// (DATA_MODEL §5.14).
+pub fn paid_into_card(
+    conn: &Connection,
+    id: i64,
+    after: NaiveDate,
+    until: NaiveDate,
+) -> rusqlite::Result<i64> {
+    conn.query_row(
+        "SELECT COALESCE(SUM(amount), 0) FROM transactions
+         WHERE ((kind = 'transfer' AND to_account_id = ?1) OR (kind = 'income' AND account_id = ?1))
+           AND date > ?2 AND date <= ?3",
+        params![id, after.to_string(), until.to_string()],
+        |r| r.get(0),
+    )
+}
+
 /// The number of rows changed: 0 when there's no such account.
 pub fn set_sort_order(
     conn: &Connection,

@@ -251,6 +251,42 @@ pub fn recent(conn: &Connection, as_of: &str, limit: u32) -> rusqlite::Result<Ve
     .collect()
 }
 
+/// Every transaction dated after `today`, soonest first (TXN-8): the forecast counts them.
+pub fn after(conn: &Connection, today: &str) -> rusqlite::Result<Vec<Row>> {
+    conn.prepare(&format!("{SELECT} WHERE date > ?1 ORDER BY date, id"))?
+        .query_map([today], row)?
+        .collect()
+}
+
+/// One payslip dated `as_of` or earlier: its gross row's id, date and category, and its net.
+pub struct PayslipNet {
+    pub id: i64,
+    pub date: String,
+    pub category_id: i64,
+    pub net: i64,
+}
+
+/// Every payslip dated `as_of` or earlier, newest first by date, then id (DATA_MODEL §5.13).
+pub fn payslip_nets(conn: &Connection, as_of: &str) -> rusqlite::Result<Vec<PayslipNet>> {
+    conn.prepare(
+        "SELECT g.id, g.date, g.category_id,
+                g.amount - COALESCE((SELECT SUM(d.amount) FROM transactions d
+                                     WHERE d.payslip_id = g.id AND d.id <> g.id), 0)
+         FROM transactions g
+         WHERE g.payslip_id = g.id AND g.date <= ?1
+         ORDER BY g.date DESC, g.id DESC",
+    )?
+    .query_map([as_of], |r| {
+        Ok(PayslipNet {
+            id: r.get(0)?,
+            date: r.get(1)?,
+            category_id: r.get(2)?,
+            net: r.get(3)?,
+        })
+    })?
+    .collect()
+}
+
 /// The source account of the latest transaction dated `as_of` or earlier whose source is an
 /// active non-card account.
 pub fn latest_non_card_source(conn: &Connection, as_of: &str) -> rusqlite::Result<Option<i64>> {

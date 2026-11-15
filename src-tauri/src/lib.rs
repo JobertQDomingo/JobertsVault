@@ -93,6 +93,7 @@ pub fn run() {
             commands::updates::install_update,
             commands::period::get_period,
             commands::dashboard::get_dashboard,
+            commands::forecast::get_forecast,
             commands::reports::get_timeseries,
             commands::reports::get_category_breakdown,
             commands::reports::get_comparison,
