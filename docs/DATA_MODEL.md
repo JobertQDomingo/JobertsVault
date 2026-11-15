@@ -1004,3 +1004,8 @@ Answered on 2026-11-15, while building the dashboard's loan banners (LOAN-4, LOA
 70. **Banners on the same date** come in the order their loans were added, and the running totals follow the banners' order (§5.11).
 71. **A loan whose account was archived since** still says to move money there. Archived accounts take no new transfers, so the user unarchives it or edits the loan's account (§4.5).
 72. **The dashboard's Loans left line says "all overdue"** when everything left is overdue, rather than "debt-free" and today's date, which would read as if nothing were owed. `loansLeft` carries `overdue` for it (§5.11, UI_FLOWS §2).
+
+Answered on 2026-11-15, while building the forecast's domain rules (SAFE-1 to SAFE-5):
+
+73. **Two due dates that pay the same statement bill it once.** With a statement day of 30 and a due day of 31, Jan 31 and Feb 28 both pay the Jan 30 statement: Jan 31 bills it, Feb 28 bills nothing, and what's bought after Jan 30 waits for the next statement (§5.14).
+74. **A payday rule with no date in the horizon** (it starts after it) still has a current window, from today to the horizon's end. Only having no payday rule at all means no windows (§5.12, §5.15).

@@ -33,7 +33,7 @@ pub fn reminder_days(due: NaiveDate, owed: Money, today: NaiveDate) -> Option<i6
 }
 
 /// That day of `d`'s month, or the month's last day when it's shorter.
-fn on_day(d: NaiveDate, day: u8) -> Option<NaiveDate> {
+pub(crate) fn on_day(d: NaiveDate, day: u8) -> Option<NaiveDate> {
     // The accounts table only allows 1–31 (DATA_MODEL §3.1); clamping keeps a 0 from panicking.
     d.with_day(u32::from(day).clamp(1, d.num_days_in_month().into()))
 }

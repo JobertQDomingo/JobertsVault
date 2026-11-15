@@ -177,10 +177,14 @@ fn slices(ranked: &[(i64, Money)]) -> Option<Vec<(Option<i64>, Money)>>;  // the
 
 // Phase 4 (a sketch: the names can change, the rules are DATA_MODEL §5.11–5.16)
 fn loan_figures(payments: &[LoanPayment], amount_borrowed: Option<Money>) -> LoanFigures; // left, paid, % paid, next, interest
+fn horizon_end(today) -> Option<NaiveDate>;                                              // §5.12: the day before the same date a year on
 fn pay_windows(paydays: &[NaiveDate], today, horizon_end: NaiveDate) -> Vec<PayWindow>;  // §5.12
-fn expected_pay(recent_nets: &[Money], estimate: Option<Money>) -> Money;              // §5.13: the lowest
-fn card_bills(card: &CardState, charges: &[(NaiveDate, Money)], today, horizon_end) -> Vec<(NaiveDate, Money)>; // §5.14
-fn forecast(money_now: Money, windows: &[PayWindow], movements: &[Movement]) -> Forecast; // §5.15: left per window, safe to spend, held back, short
+fn expected_pay(recent_nets: &[Money], estimate: Money) -> Money;                       // §5.13: the lowest
+fn effect(flow: Flow, from: Place) -> Option<Effect>;   // §5.15: what a future row or recurring date does (in, out, a card charge or refund)
+fn first_statement(statement_day, due_day, today) -> Option<(NaiveDate, NaiveDate)>;    // §5.14: D₁ and C(D₁)
+fn card_bills(card: &CardState, charges: &[(NaiveDate, Money)], today, horizon_end) -> Vec<Movement>; // §5.14
+fn rows(money_now, today, spans: &[PayWindow], movements: &[Movement]) -> Vec<Row>;     // start, in, out and left per window or month
+fn forecast(money_now, today, windows: &[PayWindow], movements: &[Movement]) -> Option<Forecast>; // §5.15: safe to spend, per day, held back, short
 ```
 
 ### 4.3 Database access
