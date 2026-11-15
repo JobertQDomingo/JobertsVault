@@ -148,7 +148,7 @@ Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3**
 | DSH-5 | A credit card summary: amount owed, available credit and due date. | P1 |
 | DSH-6 | Budget progress bars for the current period. | P3 |
 | DSH-7 | Upcoming recurring transactions for the next 7 days. | P3 |
-| DSH-8 | The 5 most recent transactions. | P1 |
+| DSH-8 | The most recent transactions: at least 5, and up to 10 when there's room beside the right column. | P1 |
 
 ### 7.6 Reports
 
@@ -372,6 +372,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-10-26 | Dates always use US order (`10/26/2026`, `Oct 26`), whatever the Windows region setting |
 | 2026-10-26 | Category colors are numbered separately for income and expense, so the 12 most common expense categories each have their own color (DATA_MODEL §7) |
 | 2026-10-26 | Logo: **C · Line Door**, a vault door drawn in white lines on an indigo aurora tile (`assets/brand/logo.svg`) |
+| 2026-11-15 | DSH-8 shows as many recent transactions as fit beside the dashboard's right column, from 5 to 10, so the Safe to spend card leaves no gap |
 | 2026-10-26 | Added SET-8: a Reduce transparency switch (Phase 4) |
 | 2026-10-26 | Added ONB-1: a basic first-launch setup in Phase 1, polished in Phase 4 (ONB-2) |
 | 2026-10-26 | A duplicated transaction uses today's date |

@@ -72,7 +72,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
 | Period switcher | Changes every number on the page. The choice is saved in the URL (`?period=month&anchor=2026-10-26`, or `?period=custom&start=…&end=…`). It's a glass toolbar of its own. | DSH-1 |
 | Stat cards | Income, expense and net cashflow for the period. Transfers aren't included. From Phase 2, each card shows its % change from the previous period, compared by the Settings choice (SET-7), and the dates compared with: `▲ 3.1% vs Oct 1–6`. The change is green when the direction is good (DESIGN_SYSTEM §7), or "—" when there's nothing to compare with. The net cashflow card is the only one tinted with the accent. | DSH-2, DSH-3 |
 | Income vs expense (Phase 2) | A small version of the Reports chart (§8.1) for the period, under the stat cards. Its bars come with the rest of the dashboard from `get_dashboard`. | RPT-1 |
-| Recent transactions | The 5 newest transactions **regardless of the selected period**. Clicking a row opens it for editing. "View all" goes to `/transactions`. | DSH-8 |
+| Recent transactions | The newest transactions **regardless of the selected period**: the panel stretches to the right column's height and shows as many whole rows as fit, at least 5 and up to 10. Clicking a row opens it for editing. "View all" goes to `/transactions`. | DSH-8 |
 | Accounts | Current balances (as of today), with the credit card summary and the net balance. Clicking an account opens its details. | DSH-4, DSH-5 |
 
 **Added later:**
@@ -582,3 +582,7 @@ Answered on 2026-11-15 (Phase 4, paydays and payslips):
 36. **The deduction categories listed first** on a payslip line are the six PAY-3 presets, matched by name: SSS, PhilHealth, Pag-IBIG, Withholding tax, Salary loan and Other deductions. It only orders the list, so a renamed preset is listed with the other expense categories (F14).
 37. **A payslip line's error** shows under that line, and an error about the lines as a whole (the net not above 0, more than 30 lines) shows once under Net pay (F14).
 38. **Duplicate on a payslip row** copies just that row as a plain transaction, which belongs to no payslip (§3).
+
+Answered on 2026-11-15 (Phase 4, the Safe to spend card):
+
+39. **Recent transactions fills its column.** The Safe to spend card made the right column taller than 5 recent rows, which left a gap. The panel now stretches to the right column's height and shows as many whole rows as fit, from 5 to 10 (`get_dashboard` returns 10). The rows that don't fit are invisible, never cut in half (§2, DSH-8).

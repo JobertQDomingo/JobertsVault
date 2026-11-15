@@ -39,7 +39,8 @@ pub struct Dashboard {
     /// Every account, archived included, with balances and card summaries as of today (DSH-4, DSH-5).
     pub accounts: Vec<Account>,
     pub net_balance: Money,
-    /// The 5 newest transactions, whatever the period (DSH-8).
+    /// The 10 newest transactions, whatever the period. The dashboard shows as many as fit, and
+    /// at least 5 (DSH-8).
     pub recent: Vec<Transaction>,
     /// Every budget's own current period, whatever the period shown, as `list_budgets` returns
     /// them (DSH-6).
@@ -190,7 +191,7 @@ pub fn get(
         debt_free_on,
         overdue: all_overdue,
     });
-    let recent = repo::transactions::recent(conn, &today.to_string(), 5)?
+    let recent = repo::transactions::recent(conn, &today.to_string(), 10)?
         .into_iter()
         .map(transactions::view)
         .collect::<Result<_, _>>()?;
@@ -494,10 +495,10 @@ mod tests {
     }
 
     #[test]
-    fn recent_is_the_five_newest_whatever_the_period() {
+    fn recent_is_the_ten_newest_whatever_the_period() {
         let mut conn = db();
         let cash = id_of(&conn, "accounts", "Cash");
-        let ids: Vec<i64> = [1, 2, 3, 4, 4, 5, 5]
+        let ids: Vec<i64> = [1, 2, 3, 4, 4, 5, 5, 6, 7, 8, 9, 10]
             .into_iter()
             .map(|day| spend(&mut conn, 100, d(2026, 10, day), cash))
             .collect();
@@ -508,7 +509,12 @@ mod tests {
         let dash = get(&conn, &empty_day, d(2026, 11, 3)).unwrap();
         let recent: Vec<i64> = dash.recent.iter().map(|t| t.id).collect();
         // Newest date first; on the same date, the later entry first.
-        assert_eq!(recent, [ids[6], ids[5], ids[4], ids[3], ids[2]]);
+        assert_eq!(
+            recent,
+            [
+                ids[11], ids[10], ids[9], ids[8], ids[7], ids[6], ids[5], ids[4], ids[3], ids[2]
+            ]
+        );
         assert_eq!(
             (dash.income, dash.expense, dash.net),
             (Money(0), Money(0), Money(0))

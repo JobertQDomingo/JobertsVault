@@ -42,7 +42,8 @@ recurringDue: number,
  */
 accounts: Array<Account>, netBalance: Money, 
 /**
- * The 5 newest transactions, whatever the period (DSH-8).
+ * The 10 newest transactions, whatever the period. The dashboard shows as many as fit, and
+ * at least 5 (DSH-8).
  */
 recent: Array<Transaction>, 
 /**
