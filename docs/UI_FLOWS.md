@@ -94,7 +94,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
     - from 3 days before a payday: "Payday Mon, Nov 30. Paid early? **Record now**" (PAY-4, F14)
     - **View forecast** in its header, to `/forecast`
     - With no payday rule: "Mark your pay as a payday to see what's safe to spend." with **Open Recurring**
-  - **"Loans left: ₱14,000.00 · debt-free Aug 10, 2027"** under the net balance in Accounts, linking to `/debt-free`. It's hidden when nothing is left (LOAN-11).
+  - **"Loans left: ₱14,000.00 · debt-free Aug 10, 2027"** under the net balance in Accounts, linking to `/debt-free`. When everything left is overdue, it says "Loans left: ₱1,000.00 · all overdue" in `--danger` instead of a date already passed, like the Debt-free screen (§8.5). It's hidden when nothing is left (LOAN-11).
 
 ---
 

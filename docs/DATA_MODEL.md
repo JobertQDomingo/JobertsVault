@@ -659,7 +659,7 @@ streak       = today − the latest borrowed_on of any loan      (in days; none 
   freed(m) = due(current month) − due(m)
   ```
   The current month counts its paid payments too, so the starting point doesn't move as the user pays. `freed` is below 0 when a later month is heavier than this one.
-- **The dashboard line (LOAN-11)** shows `total left` and `debt-free on`, and is hidden when nothing is left.
+- **The dashboard line (LOAN-11)** shows `total left` and `debt-free on`, and is hidden when nothing is left. When everything left is overdue, it says so instead of the date.
 - **Reminder banners (LOAN-4):** for each active loan, its `next` payment when that's due within 5 days or is overdue (`due_date ≤ today + 5`), soonest first. `days = due_date − today`, below 0 when it's overdue, and the banner also gives the number of other overdue payments that loan has. **"Move money first"** goes by account. In date order, the payments these banners show from the same account are added up, and each banner gives only its own part of what that running total lacks against the account's balance today (§5.1). So following every banner moves exactly enough: with ₱200 in the account and ₱1,000 then ₱500 due, the banners say ₱800, then ₱500.
 
 ### 5.12 Pay windows (SAFE-1, Phase 4)
@@ -997,3 +997,10 @@ Answered on 2026-11-15, while building Mark paid (LOAN-3):
 Answered on 2026-11-15, while building the Debt-free figures (LOAN-5 to LOAN-8):
 
 68. **The summary has a `% paid` across every loan**, rounded down like each loan's, because the Debt-free screen's top bar shows the share paid and the frontend never works out money figures (§5.11, UI_FLOWS §8.5).
+
+Answered on 2026-11-15, while building the dashboard's loan banners (LOAN-4, LOAN-11):
+
+69. **"Move money first" below 0:** what a running total lacks is `max(0, total − balance)`, so an account at −₱100.00 with ₱1,000.00 due says to move ₱1,100.00, enough to pay without going further below 0. The first banner from that account carries the deficit, and following every banner still moves exactly enough (§5.11).
+70. **Banners on the same date** come in the order their loans were added, and the running totals follow the banners' order (§5.11).
+71. **A loan whose account was archived since** still says to move money there. Archived accounts take no new transfers, so the user unarchives it or edits the loan's account (§4.5).
+72. **The dashboard's Loans left line says "all overdue"** when everything left is overdue, rather than "debt-free" and today's date, which would read as if nothing were owed. `loansLeft` carries `overdue` for it (§5.11, UI_FLOWS §2).

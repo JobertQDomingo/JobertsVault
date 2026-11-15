@@ -6,21 +6,24 @@ import { GlassPanel } from "./GlassPanel";
 const TONES = {
   warning: { glass: "glass-warning", icon: "text-warning" },
   info: { glass: "glass-info", icon: "text-primary" },
+  danger: { glass: "glass-danger", icon: "text-danger" },
 };
 
 /**
- * A banner (DESIGN_SYSTEM §9.1): Level 1 glass tinted with its meaning color (`--warning`, or
- * `--primary` for info), an icon, the message and an optional action. Inside another panel it's
- * a flat tint (§2.3).
+ * A banner (DESIGN_SYSTEM §9.1): Level 1 glass tinted with its meaning color (`--warning`,
+ * `--danger`, or `--primary` for info), an icon, the message, an optional second line in small
+ * text and an optional action. Inside another panel it's a flat tint (§2.3).
  */
 export function Banner({
   children,
+  detail,
   action,
   tone = "warning",
   icon: Icon = TriangleAlert,
   className,
 }: {
   children: ReactNode;
+  detail?: ReactNode;
   action?: ReactNode;
   tone?: keyof typeof TONES;
   icon?: LucideIcon;
@@ -36,7 +39,10 @@ export function Banner({
       )}
     >
       <Icon className={cn("size-4 shrink-0", TONES[tone].icon)} aria-hidden />
-      <p className="min-w-0 flex-1">{children}</p>
+      <div className="min-w-0 flex-1">
+        <p>{children}</p>
+        {detail && <p className="text-small">{detail}</p>}
+      </div>
       {action}
     </GlassPanel>
   );

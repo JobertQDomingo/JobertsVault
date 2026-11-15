@@ -190,6 +190,24 @@ fn freed_up(
     }
 }
 
+/// "Move money first" (LOAN-4, DATA_MODEL §5.11): `dues` are each banner's account and amount,
+/// soonest first. Each gets only its own part of what its account's running total lacks against
+/// the balance, so following every banner moves exactly enough. None when it needs nothing.
+pub fn move_first(dues: &[(i64, Money)], balance: impl Fn(i64) -> Money) -> Vec<Option<Money>> {
+    // Per account: the running total so far, and how much of it the earlier banners asked for.
+    let mut told: HashMap<i64, (i64, i64)> = HashMap::new();
+    dues.iter()
+        .map(|&(account, amount)| {
+            let (running, asked) = told.entry(account).or_insert((0, 0));
+            *running = running.saturating_add(amount.0);
+            let lacks = running.saturating_sub(balance(account).0).max(0);
+            let share = lacks - *asked;
+            *asked = lacks;
+            (share > 0).then_some(Money(share))
+        })
+        .collect()
+}
+
 /// Whole percent rounded down, 100 once nothing is left.
 fn percent_paid(paid: Money, left: Money) -> i64 {
     if left == Money::ZERO {
@@ -540,5 +558,48 @@ mod tests {
             (nov_25.start, nov_25.end, nov_25.due),
             (d(2026, 11, 25), d(2026, 12, 24), Money(190_000))
         );
+    }
+
+    fn shares(balances: &[(i64, i64)], dues: &[(i64, i64)]) -> Vec<Option<i64>> {
+        let dues: Vec<(i64, Money)> = dues.iter().map(|&(a, m)| (a, Money(m))).collect();
+        let balance = |id| Money(balances.iter().find(|b| b.0 == id).map_or(0, |b| b.1));
+        move_first(&dues, balance)
+            .into_iter()
+            .map(|m| m.map(|m| m.0))
+            .collect()
+    }
+
+    #[test]
+    fn move_first_gives_each_banner_only_its_own_share() {
+        // DATA_MODEL §5.11: ₱200 in the account, ₱1,000 then ₱500 due.
+        let dues = [(1, 100_000), (1, 50_000)];
+        assert_eq!(shares(&[(1, 20_000)], &dues), [Some(80_000), Some(50_000)]);
+    }
+
+    #[test]
+    fn move_first_is_none_while_the_account_covers_it() {
+        let dues = [(1, 100_000), (1, 50_000)];
+        assert_eq!(shares(&[(1, 200_000)], &dues), [None, None]);
+        assert_eq!(
+            shares(&[(1, 150_000)], &dues),
+            [None, None],
+            "exactly enough"
+        );
+        assert_eq!(shares(&[(1, 120_000)], &dues), [None, Some(30_000)]);
+    }
+
+    #[test]
+    fn move_first_keeps_a_running_total_per_account() {
+        let dues = [(1, 10_000), (2, 5_000), (1, 30_000)];
+        assert_eq!(
+            shares(&[(1, 20_000), (2, 0)], &dues),
+            [None, Some(5_000), Some(20_000)]
+        );
+    }
+
+    #[test]
+    fn move_first_below_zero_also_covers_what_the_account_lacks() {
+        // Moving ₱1,100 pays ₱1,000 without taking the account further below 0.
+        assert_eq!(shares(&[(1, -10_000)], &[(1, 100_000)]), [Some(110_000)]);
     }
 }

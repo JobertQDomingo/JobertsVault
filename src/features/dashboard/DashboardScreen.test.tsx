@@ -1,11 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
+import type { LoanDue } from "@/bindings/LoanDue";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
 import {
   ACCOUNT_LIST,
   CATEGORIES,
   DASHBOARD,
+  DEFAULTS,
+  LOAN_CATEGORIES,
+  LOANS,
   PAY_BILL_DEFAULTS,
   PAYMENT_METHODS,
   PERIOD,
@@ -365,4 +369,160 @@ test("the card banner says today and tomorrow (CC-7)", async () => {
   });
   expect(await screen.findByText(/payment due today/)).toBeTruthy();
   expect(screen.getByText(/payment due tomorrow/)).toBeTruthy();
+});
+
+// Today is Thu, Nov 5, 2026. The E-wallet (account 3) holds ₱150.00.
+const loanDue = (over: Partial<LoanDue> = {}): LoanDue => ({
+  loanId: 1,
+  name: "E-wallet loan",
+  accountId: 3,
+  paymentId: 14,
+  amount: 100000,
+  dueDate: "2026-11-07",
+  days: 2,
+  moreOverdue: 0,
+  moveFirst: null,
+  ...over,
+});
+
+const overdue = loanDue({
+  loanId: 2,
+  name: "Bank loan",
+  accountId: 2,
+  paymentId: 21,
+  dueDate: "2026-10-10",
+  days: -26,
+  moreOverdue: 1,
+});
+
+const banners = () => screen.getAllByRole("status");
+
+test("a loan payment due soon has a warning banner with Pay, before every other banner (LOAN-4)", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: {
+      ...DASHBOARD,
+      backupDue: true,
+      cardsDue: [cardDue(3)],
+      loansDue: [loanDue()],
+    },
+    list_loans: LOANS,
+    list_accounts: ACCOUNT_LIST,
+    list_categories: LOAN_CATEGORIES,
+    list_payment_methods: PAYMENT_METHODS,
+    get_transaction_defaults: DEFAULTS,
+    suggest_payees: [],
+  });
+  await screen.findByText(/E-wallet loan:/);
+  const [first, ...rest] = banners();
+  expect(first.textContent).toBe("E-wallet loan: ₱1,000.00 due Sat, Nov 7Pay");
+  expect(first.className).toContain("glass-warning");
+  expect(rest.map((b) => b.textContent)).toEqual([
+    "No backup in the last 7 days.Back up now",
+    "Credit card payment due in 3 days: ₱640.00 owedPay bill",
+  ]);
+  fireEvent.click(within(first).getByRole("button", { name: "Pay" }));
+  const form = within(await screen.findByRole("dialog", { name: "Mark paid" }));
+  await waitFor(() =>
+    expect(
+      (form.getByRole("textbox", { name: "Amount" }) as HTMLInputElement).value,
+    ).toBe("1,000.00"),
+  );
+});
+
+test("the loan banner says due today and due tomorrow (LOAN-4)", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: {
+      ...DASHBOARD,
+      loansDue: [
+        loanDue({ dueDate: "2026-11-05", days: 0 }),
+        loanDue({
+          loanId: 2,
+          name: "Bank loan",
+          dueDate: "2026-11-06",
+          days: 1,
+        }),
+      ],
+    },
+  });
+  await screen.findAllByRole("button", { name: "Pay" });
+  expect(banners().map((b) => b.textContent)).toEqual([
+    "E-wallet loan: ₱1,000.00 due todayPay",
+    "Bank loan: ₱1,000.00 due tomorrowPay",
+  ]);
+});
+
+test("an overdue loan payment has a danger banner saying how many more are overdue (LOAN-4)", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: {
+      ...DASHBOARD,
+      loansDue: [overdue, { ...overdue, loanId: 3, moreOverdue: 0 }],
+    },
+  });
+  await screen.findAllByText(/Bank loan:/);
+  const [many, one] = banners();
+  expect(many.textContent).toBe(
+    "Bank loan: ₱1,000.00 overdue since Sat, Oct 10, and 1 more overduePay",
+  );
+  expect(many.className).toContain("glass-danger");
+  expect(one.textContent).toBe(
+    "Bank loan: ₱1,000.00 overdue since Sat, Oct 10Pay",
+  );
+});
+
+test("a loan banner says what to move first when its account is short (LOAN-4)", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: {
+      ...DASHBOARD,
+      loansDue: [loanDue({ moveFirst: 85000 }), loanDue({ loanId: 2 })],
+    },
+  });
+  await screen.findAllByRole("button", { name: "Pay" });
+  const [short, covered] = banners();
+  expect(short.textContent).toBe(
+    "E-wallet loan: ₱1,000.00 due Sat, Nov 7E-wallet has ₱150.00. Move ₱850.00 there first.Pay",
+  );
+  expect(covered.textContent).not.toContain("there first");
+});
+
+test("Loans left shows under the net balance and links to Debt-free (LOAN-11)", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: {
+      ...DASHBOARD,
+      loansLeft: {
+        totalLeft: 1400000,
+        debtFreeOn: "2027-08-10",
+        overdue: false,
+      },
+    },
+  });
+  const line = await screen.findByRole("link", { name: /Loans left/ });
+  expect(line.textContent).toBe(
+    "Loans left: ₱14,000.00 · debt-free Aug 10, 2027",
+  );
+  expect(line.getAttribute("href")).toBe("/debt-free");
+  // Right under the net balance, in the Accounts panel.
+  expect(line.previousElementSibling!.textContent).toContain("Net balance");
+});
+
+test("Loans left says when everything left is overdue, not a date already passed (LOAN-11)", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: {
+      ...DASHBOARD,
+      loansLeft: { totalLeft: 100000, debtFreeOn: "2026-11-05", overdue: true },
+    },
+  });
+  const line = await screen.findByRole("link", { name: /Loans left/ });
+  expect(line.textContent).toBe("Loans left: ₱1,000.00 · all overdue");
+});
+
+test("Loans left is hidden when nothing is left (LOAN-11)", async () => {
+  renderRoute("/", ANSWERS);
+  await screen.findByText("Net balance");
+  expect(screen.queryByText(/Loans left/)).toBeNull();
 });
