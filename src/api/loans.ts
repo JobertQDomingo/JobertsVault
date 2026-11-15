@@ -2,6 +2,8 @@ import type { Loan } from "@/bindings/Loan";
 import type { LoanFields } from "@/bindings/LoanFields";
 import type { LoanList } from "@/bindings/LoanList";
 import type { NewLoan } from "@/bindings/NewLoan";
+import type { Transaction } from "@/bindings/Transaction";
+import type { TransactionFields } from "@/bindings/TransactionFields";
 import { call } from "./client";
 
 /** Every loan in the order it was added, archived ones included, with its payments' status (LOAN-1). */
@@ -23,3 +25,16 @@ export const unarchiveLoan = (id: number) =>
 
 /** Only a loan with no payment marked paid (LOAN-2). */
 export const deleteLoan = (id: number) => call<null>("delete_loan", { id });
+
+/** Records the expense confirmed and links it: only an unpaid payment (LOAN-3). */
+export const markLoanPaymentPaid = ({
+  paymentId,
+  transaction,
+}: {
+  paymentId: number;
+  transaction: TransactionFields;
+}) => call<Transaction>("mark_loan_payment_paid", { paymentId, transaction });
+
+/** Deletes the payment's expense, so it's unpaid again (LOAN-3). */
+export const markLoanPaymentUnpaid = (paymentId: number) =>
+  call<null>("mark_loan_payment_unpaid", { paymentId });

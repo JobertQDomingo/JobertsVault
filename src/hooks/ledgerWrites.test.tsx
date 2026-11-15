@@ -68,6 +68,8 @@ import {
   useArchiveLoan,
   useCreateLoan,
   useDeleteLoan,
+  useMarkLoanPaymentPaid,
+  useMarkLoanPaymentUnpaid,
   useUnarchiveLoan,
   useUpdateLoan,
 } from "./useLoans";
@@ -366,6 +368,20 @@ const WRITES = [
   ["useArchiveLoan", useArchiveLoan, 3, "archive_loan", { id: 3 }],
   ["useUnarchiveLoan", useUnarchiveLoan, 3, "unarchive_loan", { id: 3 }],
   ["useDeleteLoan", useDeleteLoan, 3, "delete_loan", { id: 3 }],
+  [
+    "useMarkLoanPaymentPaid",
+    useMarkLoanPaymentPaid,
+    { paymentId: 4, transaction },
+    "mark_loan_payment_paid",
+    { paymentId: 4, transaction },
+  ],
+  [
+    "useMarkLoanPaymentUnpaid",
+    useMarkLoanPaymentUnpaid,
+    4,
+    "mark_loan_payment_unpaid",
+    { paymentId: 4 },
+  ],
   [
     "useUpdateSettings",
     useUpdateSettings,

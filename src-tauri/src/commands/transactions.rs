@@ -67,7 +67,7 @@ pub fn update_transaction(
 
 #[tauri::command(async)]
 pub fn delete_transaction(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
-    services::transactions::delete(&mut *state.conn()?, id)
+    services::transactions::delete(&mut *state.conn()?, id, chrono::Local::now())
         .inspect_err(|err| log::record(&state.log_path, err))
 }
 

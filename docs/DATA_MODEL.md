@@ -987,3 +987,8 @@ Answered on 2026-11-13, while building loans (LOAN-1, LOAN-2):
 
 64. **A payment row's error names it by its place in the rows sent**, from 1 ("Payment 3: enter a real date"). A paid row isn't sent, so an error about one names it by its date (§6).
 65. **A new loan's paid rows can't come before its date borrowed either.** An edit that moves the date borrowed past a paid payment is refused, and the message says to change the date borrowed (§4.6, §6).
+
+Answered on 2026-11-15, while building Mark paid (LOAN-3):
+
+66. **Mark paid takes any active account and expense category**, like a new expense, and also keeps the loan's own if they've been archived since. Only an expense is accepted (`Validation` on `kind`). A payment that's paid or paid before is a `Conflict` ("This payment is already paid"), and Mark unpaid on one without a transaction is a `Conflict` ("This payment isn't marked paid") (§4.6).
+67. **Mark paid may be dated after today.** The payment is paid at once, and its expense counts once its date arrives, like any future-dated row (TXN-8, §5.2).

@@ -4,6 +4,8 @@ import {
   createLoan,
   deleteLoan,
   listLoans,
+  markLoanPaymentPaid,
+  markLoanPaymentUnpaid,
   unarchiveLoan,
   updateLoan,
 } from "@/api/loans";
@@ -19,3 +21,7 @@ export const useUpdateLoan = () => useLedgerMutation(updateLoan);
 export const useArchiveLoan = () => useLedgerMutation(archiveLoan);
 export const useUnarchiveLoan = () => useLedgerMutation(unarchiveLoan);
 export const useDeleteLoan = () => useLedgerMutation(deleteLoan);
+export const useMarkLoanPaymentPaid = () =>
+  useLedgerMutation(markLoanPaymentPaid);
+export const useMarkLoanPaymentUnpaid = () =>
+  useLedgerMutation(markLoanPaymentUnpaid);
