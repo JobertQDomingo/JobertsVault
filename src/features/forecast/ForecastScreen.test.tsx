@@ -220,6 +220,28 @@ test("Months is kept in the URL and asks for months", async () => {
   expect(router.state.location.search).toBe("?view=months");
 });
 
+test("switching views keeps the card and the switch while the other view loads", async () => {
+  renderRoute("/forecast", {
+    // Months never answers, so the switch stays mid-load.
+    get_forecast: ({ grain }: { grain: string }) =>
+      grain === "month" ? new Promise(() => {}) : WINDOWS,
+    list_accounts: ACCOUNT_LIST,
+  });
+  await rowButton(/^Nov 5–14/);
+  fireEvent.click(screen.getByRole("radio", { name: "Months" }));
+  expect(
+    await screen.findByRole("radio", { name: "Months", checked: true }),
+  ).toBeTruthy();
+  expect(screen.getByText("Safe to spend until Sat, Nov 14")).toBeTruthy();
+  // The windows' rows aren't shown under the Month header.
+  expect(screen.queryByRole("button", { name: /^Nov 5–14/ })).toBeNull();
+});
+
+test("the lowest badge is a separate word to a screen reader", async () => {
+  show();
+  expect(await rowButton(/^Dec 15–29 lowest$/)).toBeTruthy();
+});
+
 test("an unknown view shows the pay windows", async () => {
   show("/forecast?view=weeks");
   await rowButton(/^Nov 5–14/);

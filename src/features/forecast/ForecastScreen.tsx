@@ -79,21 +79,30 @@ export function ForecastScreen() {
             value={grain}
             options={VIEWS}
             onChange={(next) =>
-              setParams(next === "month" ? { view: "months" } : {})
+              setParams(next === "month" ? { view: "months" } : {}, {
+                replace: true,
+              })
             }
           />
         </GlassPanel>
       </div>
-      <GlassPanel className="overflow-hidden">
-        {/* Keyed by view, so the other view starts with nothing open. */}
-        <ForecastTable
-          key={grain}
-          forecast={forecast.data}
-          grain={grain}
-          accounts={accounts.data.accounts}
-          settings={settings.data}
-        />
-      </GlassPanel>
+      {/* The other view's rows never show under this view's header. */}
+      {forecast.isPlaceholderData ? (
+        <Loading>
+          <Skeleton className="h-[480px]" />
+        </Loading>
+      ) : (
+        <GlassPanel className="overflow-hidden">
+          {/* Keyed by view, so the other view starts with nothing open. */}
+          <ForecastTable
+            key={grain}
+            forecast={forecast.data}
+            grain={grain}
+            accounts={accounts.data.accounts}
+            settings={settings.data}
+          />
+        </GlassPanel>
+      )}
     </div>
   );
 }
@@ -158,6 +167,7 @@ function ForecastTable({
                     />
                     {/* The current row starts today (UI_FLOWS §8.6). */}
                     {formatSpan(i === 0 ? today : row.start, row.end, today)}
+                    {/* Not laid out in the flex row, but keeps "lowest" a separate word. */}{" "}
                     {row.lowest && (
                       <span className="rounded-pill bg-wash px-2 text-small font-semibold text-muted-foreground">
                         lowest
