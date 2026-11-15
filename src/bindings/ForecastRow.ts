@@ -10,7 +10,15 @@ export type ForecastRow = { start: string, end: string, startAmount: Money, in: 
 /**
  * What would be left at its end with nothing else spent.
  */
-left: Money, received: Array<Received>, 
+left: Money, 
+/**
+ * Some day in it has the running total below 0 (§5.15).
+ */
+short: boolean, 
+/**
+ * It holds the lowest day, the first on a tie, and something is held back for it.
+ */
+lowest: boolean, received: Array<Received>, 
 /**
  * Soonest first.
  */

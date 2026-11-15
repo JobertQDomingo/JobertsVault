@@ -7,6 +7,7 @@ import { SettingsScreen } from "./features/settings/SettingsScreen";
 import { WelcomeScreen } from "./features/onboarding/WelcomeScreen";
 import { DashboardScreen } from "./features/dashboard/DashboardScreen";
 import { GoalsScreen } from "./features/goals/GoalsScreen";
+import { ForecastScreen } from "./features/forecast/ForecastScreen";
 import { DebtFreeScreen } from "./features/loans/DebtFreeScreen";
 import { RecurringScreen } from "./features/recurring/RecurringScreen";
 import { ReportsScreen } from "./features/reports/ReportsScreen";
@@ -63,6 +64,11 @@ export const routes: RouteObject[] = [
         path: "debt-free",
         element: <DebtFreeScreen />,
         handle: { title: "Debt-free" },
+      },
+      {
+        path: "forecast",
+        element: <ForecastScreen />,
+        handle: { title: "Forecast" },
       },
       {
         path: "settings",

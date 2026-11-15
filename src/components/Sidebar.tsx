@@ -1,4 +1,5 @@
 import {
+  CalendarRange,
   ChartPie,
   Flag,
   HandCoins,
@@ -70,6 +71,7 @@ export function Sidebar() {
         <Item to="/budgets" icon={Target} label="Budgets" />
         <Item to="/goals" icon={Flag} label="Goals" />
         <Item to="/debt-free" icon={HandCoins} label="Debt-free" />
+        <Item to="/forecast" icon={CalendarRange} label="Forecast" />
         <div className="flex-1" />
         <hr className="mx-1 my-2 border-hairline" />
         <Item to="/settings" icon={Settings} label="Settings" shortcut="," />

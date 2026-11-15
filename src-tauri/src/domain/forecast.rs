@@ -22,7 +22,7 @@ pub enum Direction {
 
 /// What a movement comes from, by id: a loan payment, a card (its account), a recurring rule, a
 /// future-dated transaction, or a payday rule.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Source {
     Loan(i64),
     Card(i64),
@@ -92,6 +92,10 @@ pub struct Row {
     pub money_out: Money,
     /// What would be left at its end with nothing else spent.
     pub left: Money,
+    /// The lowest running total over its days (from today in the first row).
+    pub low: Money,
+    /// Its first day with the running total below 0: it runs short (§5.15).
+    pub short_on: Option<NaiveDate>,
     /// Soonest first, dated today or later.
     pub movements: Vec<Movement>,
 }
@@ -267,8 +271,9 @@ pub fn card_bills(
     bills
 }
 
-/// Groups the movements by span, carrying each span's `left` into the next one's start. Dates
-/// before today count as today, and movements after the last span are left out.
+/// Groups the movements by span, carrying each span's `left` into the next one's start, and walks
+/// the running total day by day for each span's `low` and `short_on`. Dates before today count
+/// as today, and movements after the last span are left out.
 pub fn rows(
     money_now: Money,
     today: NaiveDate,
@@ -278,7 +283,8 @@ pub fn rows(
     let mut start_amount = money_now;
     spans
         .iter()
-        .map(|span| {
+        .enumerate()
+        .map(|(i, span)| {
             let mut ms: Vec<Movement> = movements
                 .iter()
                 .map(|m| Movement {
@@ -297,7 +303,30 @@ pub fn rows(
                 .0
             };
             let (money_in, money_out) = (sum(Direction::In), sum(Direction::Out));
+            let first_day = if i == 0 { today } else { span.start };
+            let mut run = start_amount.0;
+            let mut low = i64::MAX;
+            let mut short_on = None;
+            let mut see = |run: i64, day: NaiveDate| {
+                low = low.min(run);
+                if run < 0 && short_on.is_none() {
+                    short_on = Some(day);
+                }
+            };
+            // A first day with nothing due keeps the total it starts with.
+            if ms.first().is_none_or(|m| m.date > first_day) {
+                see(run, first_day);
+            }
+            for day in ms.chunk_by(|a, b| a.date == b.date) {
+                run = day.iter().fold(run, |run, m| match m.direction {
+                    Direction::In => run.saturating_add(m.amount.0),
+                    Direction::Out => run.saturating_sub(m.amount.0),
+                });
+                see(run, day[0].date);
+            }
             let row = Row {
+                low: Money(low),
+                short_on,
                 start: span.start,
                 end: span.end,
                 start_amount,
@@ -327,42 +356,8 @@ pub fn forecast(
 ) -> Option<Forecast> {
     let current = *windows.first()?;
     let rows = rows(money_now, today, windows, movements);
-    let mut run = money_now.0;
-    // The lowest run(d) of each window, and the first day below 0 with its window.
-    let mut lows: Vec<i64> = Vec::with_capacity(rows.len());
-    let mut first_short: Option<(NaiveDate, usize)> = None;
-    for (i, row) in rows.iter().enumerate() {
-        let first_day = if i == 0 { today } else { row.start };
-        let mut low = i64::MAX;
-        let mut see = |run: i64, day: NaiveDate| {
-            low = low.min(run);
-            if run < 0 && first_short.is_none() {
-                first_short = Some((day, i));
-            }
-        };
-        // A first day with nothing due keeps the total it starts with.
-        if row.movements.first().is_none_or(|m| m.date > first_day) {
-            see(run, first_day);
-        }
-        for day in row.movements.chunk_by(|a, b| a.date == b.date) {
-            run = day.iter().fold(run, |run, m| match m.direction {
-                Direction::In => run.saturating_add(m.amount.0),
-                Direction::Out => run.saturating_sub(m.amount.0),
-            });
-            see(run, day[0].date);
-        }
-        lows.push(low);
-    }
-    // The first window on a tie.
-    let (lowest_at, lowest) =
-        lows.iter()
-            .copied()
-            .enumerate()
-            .fold(
-                (0, i64::MAX),
-                |best, (i, low)| if low < best.1 { (i, low) } else { best },
-            );
-    let safe = lowest.max(0);
+    let lowest_at = lowest_row(&rows);
+    let safe = rows[lowest_at].low.0.max(0);
     let held_back = rows[0].left.0.saturating_sub(safe).max(0);
     let days_left = (current.end - today).num_days() + 1;
     Some(Forecast {
@@ -371,9 +366,21 @@ pub fn forecast(
         days_left,
         held_back: Money(held_back),
         held_for: (held_back > 0).then_some(windows[lowest_at]),
-        short: first_short.map(|(day, i)| (day, Money(lows[i].saturating_neg()))),
+        short: rows
+            .iter()
+            .find_map(|r| r.short_on.map(|day| (day, Money(r.low.0.saturating_neg())))),
         rows,
     })
+}
+
+/// The row holding the lowest day: the first one on a tie (0 with no rows).
+pub fn lowest_row(rows: &[Row]) -> usize {
+    rows.iter()
+        .enumerate()
+        .fold((0, i64::MAX), |best, (i, r)| {
+            if r.low.0 < best.1 { (i, r.low.0) } else { best }
+        })
+        .0
 }
 
 #[cfg(test)]
@@ -1004,6 +1011,24 @@ mod tests {
             (f.held_back, f.held_for),
             (Money(100_000), Some(windows[2]))
         );
+    }
+
+    #[test]
+    fn each_row_has_its_lowest_day_and_first_short_day() {
+        let today = d(2026, 11, 1);
+        let spans = [
+            w(d(2026, 10, 30), d(2026, 11, 14)),
+            w(d(2026, 11, 15), d(2026, 11, 29)),
+        ];
+        let movements = [out(d(2026, 11, 2), 150_000), pay(d(2026, 11, 5), 200_000)];
+        let rows = rows(Money(100_000), today, &spans, &movements);
+        // Below 0 on Nov 2, back above by its end: still short.
+        assert_eq!(
+            (rows[0].low, rows[0].short_on, rows[0].left),
+            (Money(-50_000), Some(d(2026, 11, 2)), Money(150_000))
+        );
+        // Nothing due keeps the total it starts with.
+        assert_eq!((rows[1].low, rows[1].short_on), (Money(150_000), None));
     }
 
     #[test]
