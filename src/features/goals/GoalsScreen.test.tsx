@@ -88,6 +88,24 @@ test("an achieved goal gets the badge and no monthly amount; a passed date says 
   expect(car.queryByText("Achieved")).toBeNull();
 });
 
+test("a goal that's behind says so in place of its monthly amount (GOL-7)", async () => {
+  renderRoute("/goals", {
+    ...ANSWERS,
+    list_goals: [
+      { ...GOALS[0], behind: { earliestDate: "2027-07-05" } },
+      { ...GOALS[2], behind: { earliestDate: null } },
+    ],
+  });
+  const trip = await card("Edit Japan trip");
+  expect(
+    trip.getByText("Behind: the earliest realistic date is now Jul 5, 2027"),
+  ).toMatchObject({ className: expect.stringContaining("text-warning") });
+  expect(trip.queryByText(/Save .*\/month/)).toBeNull();
+  const car = await card("Edit Car");
+  car.getByText("Behind: nothing can be set aside right now");
+  expect(car.queryByText("Target date passed")).toBeNull();
+});
+
 test("a goal without a target date names only its account", async () => {
   renderRoute("/goals", {
     ...ANSWERS,

@@ -1,6 +1,7 @@
 import type { DueOccurrence } from "@/bindings/DueOccurrence";
 import type { RecurringRule } from "@/bindings/RecurringRule";
 import type { RecurringRuleFields } from "@/bindings/RecurringRuleFields";
+import type { Saved } from "@/bindings/Saved";
 import type { Transaction } from "@/bindings/Transaction";
 import type { TransactionFields } from "@/bindings/TransactionFields";
 import { call } from "./client";
@@ -11,7 +12,7 @@ export const listRecurringRules = () =>
 
 /** The template's `date` is the start date (REC-1). */
 export const createRecurringRule = (rule: RecurringRuleFields) =>
-  call<RecurringRule>("create_recurring_rule", { rule });
+  call<Saved<RecurringRule>>("create_recurring_rule", { rule });
 
 /** A new frequency, interval or start date starts again from that start date (REC-5). */
 export const updateRecurringRule = ({
@@ -20,7 +21,7 @@ export const updateRecurringRule = ({
 }: {
   id: number;
   rule: RecurringRuleFields;
-}) => call<RecurringRule>("update_recurring_rule", { id, rule });
+}) => call<Saved<RecurringRule>>("update_recurring_rule", { id, rule });
 
 /** Resuming skips the dates it was paused for (REC-5). */
 export const pauseRecurringRule = ({
