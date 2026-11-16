@@ -786,21 +786,22 @@ How much the user could set aside each month for a goal, and so the earliest rea
 saving dates = today + k months, for k = 1, 2, …   (the day clamped to the month's end, as §5.7 counts months)
 n(d)         = the number of saving dates on or before day d
 others(d)    = Σ over every other active goal that isn't achieved and has a target date:
-               its monthly_needed (§5.7) × the saving dates on or before d, and before its target date
+               its monthly_needed (§5.7) × min(n(d), its months left (§5.7))
 run(d)       = the forecast's running total (§5.15), day by day over the horizon
-monthly room = max(0, the lowest of ⌊(run(d) − others(d)) ÷ n(d)⌋ over every day d with n(d) ≥ 1)
+monthly room = 0 when any day of the horizon has run(d) < 0, else
+               max(0, the lowest of ⌊(run(d) − others(d)) ÷ n(d)⌋ over every day d with n(d) ≥ 1)
 left to save = target_amount − max(0, the account's balance today)
 earliest     = today + ⌈left to save ÷ monthly room⌉ months   (the day clamped to the month's end)
 ```
 
-- **The monthly room** is the most the user could move into the goal's account on every saving date for the next 12 months without any day's running total going below 0. Other goals with a date are already taking their monthly amount, so two goals never count on the same money. A goal saved before Phase 4 without a date asks for nothing, so it takes nothing.
+- **The monthly room** is the most the user could move into the goal's account on every saving date for the next 12 months without any day's running total going below 0. Other goals with a date are already taking their monthly amount on their first months-left saving dates, as many as §5.7 divides by, so two goals never count on the same money. A goal saved before Phase 4 without a date asks for nothing, so it takes nothing.
 - **The earliest date** is when saving the monthly room reaches the target. Saving §5.7's `monthly_needed` for that date is then never more than the monthly room. Past the 12-month horizon, the same monthly room is assumed to continue.
 - **The suggestion** is the earliest date. A new goal's date field starts on it once the target and account are chosen, and the user may pick a later one.
 - **A target date is required (GOL-6).** A goal with none is refused on add and on every edit (`targetDate`: "Enter a target date"), clearing it included. The column stays nullable only for goals saved before Phase 4, which keep working until they're edited.
 - **The check (GOL-6):** a target date before the earliest is refused (`targetDate`: "That's too soon. The earliest you can reach this is Mar 5, 2027, saving about ₱433.34 a month."). It runs when a goal is added, and when an edit changes the date. An edit that keeps the date it already has is never refused, so a goal can't become unsaveable by itself as bills change.
 - **No payday rule:** there's no forecast (§5.15), so the date can't be judged. Adding a goal, and an edit that changes its date, are refused (`targetDate`: "Mark your pay as a payday first, so the app can work out a realistic date."). A paused payday rule still counts (§5.15). An edit that keeps its date, or changes only the name or target, isn't refused for this.
 - **Order of the checks:** no date, then no payday rule, then too soon, so the message names the first thing to fix.
-- **A monthly room of 0** (some window already runs short, or every peso is spoken for) makes every date too soon while there's something left to save, so the goal can't be added yet: "You can't set anything aside each month right now, so no date is realistic yet. Free up money first."
+- **A monthly room of 0** (some window already runs short, even before the first saving date, or every peso is spoken for) makes every date too soon while there's something left to save, so the goal can't be added yet: "You can't set anything aside each month right now, so no date is realistic yet. Free up money first."
 - **Nothing left to save** (the account already holds the target): any date today or later is allowed, and the suggestion is today. It still needs a date and a payday rule.
 - Budgets still don't hold anything back, and Safe to spend doesn't set money aside for goals (PRD §3). The monthly room is advice for the goal only.
 
@@ -863,7 +864,7 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | Credit card fields are present if and only if the account is a credit card | the card fields |
 | `currency_decimals` can't change once any amount is stored: a transaction, a recurring rule, a budget, a goal, a loan, or an account's non-zero opening balance or credit limit (§1) | settings |
 | A budget's category is an expense category, and a goal's account isn't a credit card | category / account |
-| A goal's name is 1–50 characters and unique, ignoring case; its target amount is > 0 and ≤ the maximum; its target date, if any, is a real date (past dates are allowed); a new goal can't use an archived account, but an edit may keep the one it has | name / targetAmount / targetDate / accountId |
+| A goal's name is 1–50 characters and unique, ignoring case; its target amount is > 0 and ≤ the maximum; its target date, if any, is a real date (past dates are allowed until Phase 4's check below); a new goal can't use an archived account, but an edit may keep the one it has | name / targetAmount / targetDate / accountId |
 | Phase 4 (GOL-6): a goal has a target date, on add and on every edit; adding one, or changing its date, needs a payday rule; and the date isn't before the earliest realistic date (§5.17), checked on add and when an edit changes the date | targetDate |
 | Phase 4 (CC-10): a card's spending levels are each > 0 and ≤ the maximum, with soft < mid < hard; every other kind of account has none | spendSoft / spendMid / spendHard |
 | A new budget can't use an archived category, but an edit may keep the one it has. A category, or all spending, has at most one budget per period. | categoryId / period |
@@ -1118,4 +1119,10 @@ Answered on 2026-11-16, planning the smart goal date and the card spending level
 93. **What moves goals:** saving an expense or a transfer, a recurring rule or a loan, the changes that add spending to the forecast. Processing, payslips and deletes don't move them, and a goal a delete leaves behind is shown as behind instead (§5.17).
 94. **No room at all keeps the date**, since no date would be realistic, and the goal shows as behind until money frees up (§5.17).
 95. **Oldest goal first** when one save affects several, each worked out with the goals before it at their new dates (§5.17).
+
+Answered on 2026-11-16, building the smart goal date (GOL-5, GOL-6):
+
+96. **Another goal takes its monthly amount on its first months-left saving dates** (the owner, 2026-11-16), not only on the saving dates before its target date. `monthly_needed` divides what's left by the months left, so counting one date fewer would leave its last month's money free for another goal to plan on (§5.7, §5.17).
+97. **Any short day in the 12 months makes the monthly room 0**, even one before the first saving date, so the definition ("without any day's running total going below 0") and the room-0 bullet agree. A short window has to be fixed before a goal can count on money (§5.15, §5.17).
+98. **The too-soon message's "saving about" amount is the monthly room**, the same figure as the line under the date, not the smaller `monthly_needed` for the earliest date (§5.17).
 

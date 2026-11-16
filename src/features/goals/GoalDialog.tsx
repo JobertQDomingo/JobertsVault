@@ -1,8 +1,10 @@
-import { useRef } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { useEffect, useRef } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import { Link } from "react-router";
 import type { Account } from "@/bindings/Account";
 import type { GoalProgress } from "@/bindings/GoalProgress";
-import type { WeekStart } from "@/bindings/WeekStart";
+import type { GoalSuggestion } from "@/bindings/GoalSuggestion";
+import type { SettingsView } from "@/bindings/SettingsView";
 import { AmountInput } from "@/components/AmountInput";
 import { ACCOUNT_ICONS } from "@/components/AccountRow";
 import { Button } from "@/components/ui/button";
@@ -16,14 +18,20 @@ import {
 } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/input";
 import { notify } from "@/components/ui/toast";
-import { useCreateGoal, useUpdateGoal } from "@/hooks/useGoals";
+import {
+  useCreateGoal,
+  useGoalSuggestion,
+  useUpdateGoal,
+} from "@/hooks/useGoals";
+import { formatDate } from "@/lib/dates";
+import { formatMoney } from "@/lib/money";
 import { named, offered } from "@/lib/records";
 import { showSaveError } from "@/lib/saveError";
 
 type Values = {
   name: string;
   targetAmount: number | null;
-  /** `YYYY-MM-DD`, or empty for no target date. */
+  /** `YYYY-MM-DD`, or empty: only a goal from before Phase 4 opens without one (GOL-6). */
   targetDate: string;
   /** An account's id, or empty before one is chosen. */
   accountId: string;
@@ -35,22 +43,23 @@ const ROW =
   "grid-cols-[96px_minmax(0,1fr)] items-center gap-x-3 [&>p]:col-start-2";
 
 /**
- * New and edit goal (UI_FLOWS §8.4): a name, the target, an optional date, and the account whose
- * balance is the progress (GOL-1, GOL-2). The backend checks every field, and its message shows
- * under the field it names.
+ * New and edit goal (UI_FLOWS §8.4): a name, the target, a target date, and the account whose
+ * balance is the progress (GOL-1, GOL-2). Under the date, the backend's suggestion: what can be set
+ * aside each month and the earliest realistic date, where a new goal's date starts (GOL-5). The
+ * backend checks every field, and its message shows under the field it names (GOL-6).
  */
 export function GoalDialog({
   goal,
   accounts,
-  weekStart,
+  settings,
   onClose,
 }: {
   goal?: GoalProgress;
   accounts: Account[];
-  weekStart: WeekStart;
+  settings: SettingsView;
   onClose: () => void;
 }) {
-  const { control, register, handleSubmit, setError, formState } =
+  const { control, register, handleSubmit, setError, setValue, formState } =
     useForm<Values>({
       defaultValues: goal
         ? {
@@ -62,6 +71,30 @@ export function GoalDialog({
         : { name: "", targetAmount: null, targetDate: "", accountId: "" },
     });
   const { errors } = formState;
+  const [targetAmount, accountId] = useWatch({
+    control,
+    name: ["targetAmount", "accountId"],
+  });
+  const draft =
+    targetAmount !== null && targetAmount > 0 && Number(accountId) > 0
+      ? {
+          targetAmount,
+          accountId: Number(accountId),
+          goalId: goal?.id ?? null,
+        }
+      : null;
+  const suggestion = useGoalSuggestion(draft);
+  // A new goal's date follows the suggestion until the user picks one (UI_FLOWS §11 item 53).
+  const picked = useRef(goal !== undefined);
+  // Only a settled answer: placeholder data is the previous target's or account's.
+  const followed =
+    suggestion.isPlaceholderData || suggestion.data === undefined
+      ? undefined
+      : (suggestion.data?.earliestDate ?? "");
+  useEffect(() => {
+    if (followed !== undefined && !picked.current)
+      setValue("targetDate", followed);
+  }, [followed, setValue]);
   const create = useCreateGoal();
   const update = useUpdateGoal();
   const saving = useRef(false);
@@ -152,14 +185,25 @@ export function GoalDialog({
                   label="Target date"
                   htmlFor="goal-date"
                   error={errors.targetDate?.message}
-                  help="Optional. With a date, the goal says how much to save each month."
+                  help={
+                    draft &&
+                    suggestion.data !== undefined && (
+                      <SuggestionLine
+                        suggestion={suggestion.data}
+                        settings={settings}
+                      />
+                    )
+                  }
                   className={ROW}
                 >
                   <DatePicker
                     id="goal-date"
                     value={field.value}
-                    onChange={field.onChange}
-                    weekStart={weekStart}
+                    onChange={(date) => {
+                      picked.current = true;
+                      field.onChange(date);
+                    }}
+                    weekStart={settings.weekStart}
                   />
                 </Field>
               )}
@@ -199,4 +243,30 @@ export function GoalDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+/** The line under the date: the backend's monthly room and earliest date, or why there's none. */
+function SuggestionLine({
+  suggestion,
+  settings,
+}: {
+  suggestion: GoalSuggestion | null;
+  settings: SettingsView;
+}) {
+  if (suggestion === null)
+    return (
+      <>
+        Mark your pay as a payday first, so the app can suggest a realistic
+        date.{" "}
+        <Link
+          to="/recurring"
+          className="font-semibold text-primary hover:underline"
+        >
+          Open Recurring
+        </Link>
+      </>
+    );
+  if (suggestion.earliestDate === null)
+    return "You can't set anything aside each month right now, so no date is realistic yet.";
+  return `You can set aside about ${formatMoney(suggestion.monthlyRoom, settings)} a month. The earliest realistic date is ${formatDate(suggestion.earliestDate)}.`;
 }

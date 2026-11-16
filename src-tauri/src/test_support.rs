@@ -15,6 +15,35 @@ pub fn db() -> rusqlite::Connection {
     conn
 }
 
+/// A monthly Salary payday rule into `account` from 2026-11-15, expecting `net` each time (PAY-1).
+/// Smart goal dates need one (GOL-6).
+pub fn payday(conn: &mut rusqlite::Connection, account: i64, net: i64) -> i64 {
+    use crate::domain::{money::Money, recurrence::Frequency};
+    use crate::services::recurring::{self, RecurringMode, RecurringRuleFields};
+    use crate::services::transactions::{TransactionFields, TransactionKind};
+    let transaction = TransactionFields {
+        kind: TransactionKind::Income,
+        amount: Money(net),
+        date: "2026-11-15".into(),
+        account_id: account,
+        to_account_id: None,
+        category_id: Some(1), // Salary, from the seed
+        payee: None,
+        payment_method_id: None,
+        note: None,
+    };
+    let rule = RecurringRuleFields {
+        transaction,
+        frequency: Frequency::Monthly,
+        interval: 1,
+        end_date: None,
+        max_occurrences: None,
+        mode: RecurringMode::Confirm,
+        is_payday: true,
+    };
+    recurring::create(conn, rule, now()).unwrap().id
+}
+
 /// A folder under the system temp dir, wiped when created and when dropped.
 pub struct TempDir(PathBuf);
 

@@ -154,6 +154,7 @@ pub fn run() {
             commands::goals::list_goals,
             commands::goals::create_goal,
             commands::goals::update_goal,
+            commands::goals::suggest_goal,
             commands::goals::archive_goal,
             commands::goals::unarchive_goal,
             commands::goals::delete_goal,
