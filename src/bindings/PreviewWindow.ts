@@ -3,6 +3,6 @@ import type { Money } from "./Money";
 
 export type PreviewWindow = { start: string, end: string, leftBefore: Money, leftAfter: Money, 
 /**
- * With the loan, it runs short by this (§5.15), and lower than it would without it.
+ * With the loan, it runs short by this (§5.15). None when it doesn't, or does anyway.
  */
 shortBy: Money | null, };

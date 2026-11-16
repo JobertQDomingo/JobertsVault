@@ -121,13 +121,14 @@ pub fn summary(
         .iter()
         .any(|f| f.interest.is_some())
         .then(|| total(each.iter().filter_map(|f| f.interest)));
-    let debt_free_on = loans
-        .iter()
-        .flat_map(|l| l.payments)
-        .filter(|p| p.paid.is_none())
-        .map(|p| p.due_date)
-        .max()
-        .map(|last| last.max(today));
+    let debt_free_on = debt_free_on(
+        loans
+            .iter()
+            .flat_map(|l| l.payments)
+            .filter(|p| p.paid.is_none())
+            .map(|p| p.due_date),
+        today,
+    );
     let freed_up = match debt_free_on {
         Some(last) => freed_up(loans, today, last, settings)?,
         None => Vec::new(),
@@ -236,7 +237,7 @@ pub struct PreviewWindow {
     pub end: NaiveDate,
     pub left_before: Money,
     pub left_after: Money,
-    /// With the loan, it runs short by this (§5.15), and lower than it would without it.
+    /// With the loan, it runs short by this (§5.15). None when it doesn't, or does anyway.
     pub short_by: Option<Money>,
 }
 
@@ -272,13 +273,10 @@ pub fn preview(
     windows: &[PayWindow],
     movements: &[Movement],
 ) -> LoanPreview {
-    // Never before today, as `summary`'s date isn't (an overdue payment is due today).
-    let debt_free_after = draft
-        .iter()
-        .map(|p| p.due_date)
-        .chain(debt_free_before)
-        .max()
-        .map(|last| last.max(today));
+    let debt_free_after = debt_free_on(
+        draft.iter().map(|p| p.due_date).chain(debt_free_before),
+        today,
+    );
     let mut with_loan = movements.to_vec();
     with_loan.extend(draft.iter().map(|p| Movement {
         date: p.due_date,
@@ -307,11 +305,17 @@ pub fn preview(
                 end: a.end,
                 left_before: b.left,
                 left_after: a.left,
-                short_by: (a.short_on.is_some() && a.low < b.low)
+                // Only a window the loan makes short: one short anyway isn't blamed on it.
+                short_by: (a.short_on.is_some() && b.short_on.is_none())
                     .then(|| Money(a.low.0.saturating_neg())),
             })
             .collect(),
     }
+}
+
+/// The latest unpaid due date, or today when that has passed (an overdue payment is due today).
+fn debt_free_on(unpaid: impl Iterator<Item = NaiveDate>, today: NaiveDate) -> Option<NaiveDate> {
+    unpaid.max().map(|last| last.max(today))
 }
 
 /// Whole percent rounded down, 100 once nothing is left.
@@ -841,6 +845,14 @@ mod tests {
                 (3_000, 2_000, None)
             ]
         );
+    }
+
+    #[test]
+    fn preview_never_names_a_window_short_without_the_loan_even_when_it_gets_shorter() {
+        // ₱120.00 due Nov 20 runs Nov 15–29 short by ₱20.00; ₱50.00 on Nov 25 makes it ₱70.00.
+        let bill = [moving(d(2026, 11, 20), 12_000, Direction::Out)];
+        let p = try_it(None, &[unpaid(d(2026, 11, 25), 5_000)], &bill);
+        assert_eq!(lefts(&p)[0], (-2_000, -7_000, None));
     }
 
     #[test]

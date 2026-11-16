@@ -557,3 +557,41 @@ test("with no loans the screen is one empty state, without Before you borrow (§
   await screen.findByText("No loans. Keep it that way.");
   expect(screen.queryByText("Before you borrow")).toBeNull();
 });
+
+test("changing a field after Try it clears the result and its error, so nothing shown is for other values", async () => {
+  renderRoute("/debt-free", {
+    ...ANSWERS,
+    preview_loan: () => {
+      throw {
+        code: "validation",
+        field: "count",
+        message: "Enter 1 to 600 payments",
+      };
+    },
+  });
+  const p = await panel();
+  fireEvent.click(p.getByRole("button", { name: "Try it" }));
+  await p.findByText("Enter 1 to 600 payments");
+  fireEvent.change(p.getByRole("textbox", { name: "How many" }), {
+    target: { value: "6" },
+  });
+  expect(p.queryByText("Enter 1 to 600 payments")).toBeNull();
+});
+
+test("Try it again with the same values asks again, so a failure can be retried", async () => {
+  let fail = true;
+  renderRoute("/debt-free", {
+    ...ANSWERS,
+    preview_loan: () => {
+      if (fail) throw { code: "database", message: "The database is busy" };
+      return LOAN_PREVIEW;
+    },
+  });
+  const p = await panel();
+  fireEvent.click(p.getByRole("button", { name: "Try it" }));
+  await p.findByText(/Something went wrong with the database/);
+  fail = false;
+  fireEvent.click(p.getByRole("button", { name: "Try it" }));
+  await p.findByText("Mar 28, 2027 → May 5, 2027");
+  expect(calls("preview_loan")).toHaveLength(2);
+});

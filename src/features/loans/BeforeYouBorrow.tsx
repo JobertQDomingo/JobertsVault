@@ -34,6 +34,14 @@ export function BeforeYouBorrow({
   const [firstDate, setFirstDate] = useState(() => addMonths(today, 1));
   const [asked, setAsked] = useState<LoanDraft | null>(null);
   const result = useLoanPreview(asked);
+  // A change clears the result and its errors, so nothing shown is for other values.
+  const edit =
+    <T,>(set: (value: T) => void, current: T) =>
+    (value: T) => {
+      if (value === current) return;
+      set(value);
+      setAsked(null);
+    };
   const detail = result.error instanceof ApiError ? result.error.detail : null;
   const fieldError = (field: (typeof FIELDS)[number]) =>
     detail?.code === "validation" && detail.field === field
@@ -55,11 +63,15 @@ export function BeforeYouBorrow({
         onSubmit={(e) => {
           e.preventDefault();
           // Blank fields go as 0 and "", for the backend to name.
-          setAsked({
+          const draft = {
             amount: amount ?? 0,
             count: Number.parseInt(count, 10) || 0,
             firstDate,
-          });
+          };
+          // The same draft has the same key, so ask again, say after a failure.
+          if (JSON.stringify(draft) === JSON.stringify(asked))
+            void result.refetch();
+          else setAsked(draft);
         }}
       >
         <div className="grid grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)] items-start gap-2">
@@ -71,7 +83,7 @@ export function BeforeYouBorrow({
             <AmountInput
               id="borrow-amount"
               value={amount}
-              onChange={setAmount}
+              onChange={edit(setAmount, amount)}
             />
           </Field>
           <Field
@@ -85,7 +97,8 @@ export function BeforeYouBorrow({
               autoComplete="off"
               value={count}
               onChange={(e) =>
-                /^\d{0,3}$/.test(e.target.value) && setCount(e.target.value)
+                /^\d{0,3}$/.test(e.target.value) &&
+                edit(setCount, count)(e.target.value)
               }
             />
           </Field>
@@ -97,7 +110,7 @@ export function BeforeYouBorrow({
             <DatePicker
               id="borrow-first"
               value={firstDate}
-              onChange={setFirstDate}
+              onChange={edit(setFirstDate, firstDate)}
               weekStart={weekStart}
             />
           </Field>

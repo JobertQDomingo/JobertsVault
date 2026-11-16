@@ -766,12 +766,12 @@ The draft's payments are added as unpaid payments of an active loan, and nothing
 - the **debt-free date** before and after (§5.11), and how many days later it is: after − before, counting from today when nothing is left
 - **safe to spend** before and after (§5.15), none with no payday rule
 - **each pay window's** `left` before and after, so the screen can say which windows it hurts and which would run short
-- **short by**, on each window the draft makes short: it runs short with the draft (§5.15), and its lowest running total is lower than without it. It's `−(that lowest total)`.
+- **short by**, on each window the draft makes short: it runs short with the draft (§5.15) and doesn't without it. It's `−(its lowest running total with the draft)`.
 
 ```
 debt-free after = max(debt-free before (today when none), the draft's latest date)
 days later      = debt-free after − (debt-free before, or today)
-short by(k)     = −low_after(k)   when window k runs short with the draft and low_after(k) < low_before(k)
+short by(k)     = −low_after(k)   when window k runs short with the draft and not without it
 ```
 
 ---
@@ -1031,5 +1031,5 @@ Answered on 2026-11-15, while building `get_forecast` and the Safe to spend card
 
 Answered on 2026-11-16, while building Before you borrow (LOAN-9, LOAN-10):
 
-82. **A window already short isn't blamed on the loan.** `short by` is set only when the draft lowers the window's lowest running total and it runs short with it, so a window that runs short anyway, before the draft's first payment, isn't named (§5.16).
+82. **A window already short isn't blamed on the loan.** `short by` is set only on a window that runs short with the draft and not without it ("any window it would make short", UI_FLOWS F15). A window that runs short anyway isn't named, even when the draft makes it shorter; the panel still lists its `left` before and after (§5.16).
 83. **The draft's typed rows are checked like a new loan's payments**, without a date borrowed, since the preview doesn't have one: 1–600 rows, real dates, amounts above 0. The other loan fields are checked when the loan is saved, after the confirm (§5.16, §6).
