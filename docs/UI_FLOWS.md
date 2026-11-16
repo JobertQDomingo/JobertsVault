@@ -348,7 +348,7 @@ Welcome to Jobert's Vault
    - **Note**
    - **Net pay**, shown under the rows. It comes from the backend as the user types (`preview_payslip`), and it's in `--danger` with "Deductions can't add up to the gross pay or more" when it isn't above 0.
 3. **Save** records the gross as income and each deduction as an expense (DATA_MODEL §4.7), with a "Payslip saved" toast, and settles the payday.
-4. **Editing:** clicking any of its rows on Transactions opens it again as "Edit payslip". **Delete** (bottom left) asks "Delete this payslip? Its gross pay and 4 deductions are deleted." The payday stays settled.
+4. **Editing:** clicking any of its rows on Transactions opens it again as "Edit payslip". **Delete** (bottom left) asks "Delete this payslip? Its gross pay and 4 deductions are deleted. Its payday won't be offered again, so to fix a mistake, edit the payslip instead.", since the payday stays settled (DATA_MODEL §4.7).
 
 ### F15: Before you borrow (Phase 4, LOAN-9)
 1. On Debt-free, the **Before you borrow** panel asks for the **Payment** amount, **How many** payments and the **First payment** date. The payments are monthly, on the first payment's day of the month.
@@ -630,3 +630,7 @@ Answered on 2026-11-16 (Phase 4, building card spending levels):
 
 58. **The level is its own row under This cycle** on the card's details ("Spending level · Past your ₱3,000.00 soft level"), since the This cycle row already says what's spent. The Accounts list and the dashboard add "· Soft level" to the card's line (§5.3, F16 step 5).
 59. **The level warning is its own toast**, in `--warning` with the `triangle-alert` icon, after "Saved", and stays 8 s like the goal-moved note. Edit & post and the Due dialog's Post never ask (DATA_MODEL §9 items 104–105).
+
+Answered on 2026-11-16 (Phase 4, testing on a copy of the owner's data):
+
+60. **Deleting a payslip says its payday won't come back.** The payday stays settled (DATA_MODEL §4.7), so the pay it recorded leaves the forecast for good, which can make a window run short, and Review or Record now never offers it again. The confirm says so and points to editing instead; the rule itself is unchanged (F14 step 4).

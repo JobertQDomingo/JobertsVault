@@ -498,11 +498,12 @@ function PayslipForm({
           open={deleting}
           onOpenChange={setDeleting}
           title="Delete this payslip?"
-          message={
+          // The payday stays settled (DATA_MODEL §4.7), so its pay leaves the forecast for good.
+          message={`${
             count === 0
               ? "Its gross pay is deleted."
               : `Its gross pay and ${count} ${count === 1 ? "deduction" : "deductions"} are deleted.`
-          }
+          } Its payday won't be offered again, so to fix a mistake, edit the payslip instead.`}
           confirmLabel="Delete"
           destructive
           onConfirm={() =>
