@@ -423,8 +423,8 @@ Clicking a card edits it. Its ⋯ menu has **Edit**, **Archive** and **Delete** 
 **+ New goal** opens a small dialog, "New goal" (or "Edit goal"):
 - **Name:** 1–50 characters, unique.
 - **Target:** the amount to reach.
-- **Target date:** optional. With one, the card says how much to save each month.
-  - **Phase 4 (GOL-5, GOL-6):** once the target and account are chosen, a line under the date says "You can set aside about ₱433.34 a month. The earliest realistic date is Mar 5, 2027." (`suggest_goal`, asked as the user types, like the payslip's net). On a new goal the date starts on that suggestion. A sooner date is refused when saving, with the backend's message under the field. With no payday rule, the line says "Mark your pay as a payday to get a suggested date." and any date is allowed. A goal with no date is always allowed.
+- **Target date:** required from Phase 4 (optional before). The card says how much to save each month.
+  - **Phase 4 (GOL-5, GOL-6):** once the target and account are chosen, a line under the date says "You can set aside about ₱433.34 a month. The earliest realistic date is Mar 5, 2027." (`suggest_goal`, asked as the user types, like the payslip's net). On a new goal the date starts on that suggestion. A missing or sooner date is refused when saving, with the backend's message under the field. With no payday rule, the line says "Mark your pay as a payday first, so the app can suggest a realistic date." with **Open Recurring**, and saving a new goal (or a new date) is refused with the same message. A monthly room of 0 says "You can't set anything aside each month right now, so no date is realistic yet."
 - **Account:** an active account that isn't a credit card. An edit keeps its own account even if it's been archived. A note says the account's balance is the goal's progress (GOL-2).
 
 The backend's message shows under the field it names.
@@ -618,5 +618,5 @@ Answered on 2026-11-16 (Phase 4, Before you borrow):
 Answered on 2026-11-16 (Phase 4, planning smart goals and card spending levels):
 
 52. **The goal dialog asks `suggest_goal` as the user types**, after 250 ms, like the payslip's net (item 23). The frontend never works out the monthly room or the date (§8.4, DATA_MODEL §5.17).
-53. **A new goal's date starts on the suggestion** once there is one, and the user may change it or clear it. An edit keeps its date, and the line shows the suggestion beside it (§8.4).
+53. **A new goal's date starts on the suggestion** once there is one, and the user may change it but not clear it. An edit keeps its date, and the line shows the suggestion beside it. A goal from before Phase 4 with no date opens with an empty date, which must be filled in to save (§8.4, DATA_MODEL §9 items 90–91).
 54. **The card spending confirm** is a ConfirmDialog over the transaction form, as "Before you add this loan" is over the loan form (item 51), so Go back returns to the form as it was (F16).

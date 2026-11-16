@@ -187,12 +187,12 @@ Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3**
 
 | ID | Requirement | Priority |
 |---|---|---|
-| GOL-1 | The user can create a goal with a name, target amount and optional target date. | P3 |
+| GOL-1 | The user can create a goal with a name, target amount and optional target date. From Phase 4 the target date is required (GOL-6). | P3 |
 | GOL-2 | Every goal is linked to one account, e.g. a dedicated savings account, and progress is that account's balance. Manual contributions aren't supported. | P3 |
 | GOL-3 | Each goal shows % complete, the amount remaining and, if it has a target date, how much must be saved per month to reach it. | P3 |
 | GOL-4 | A completed goal is marked as achieved and can be archived. | P3 |
 | GOL-5 | **Smart target date:** while a goal is being added or edited, the app works out how much the user could set aside each month, from the forecast (recurring bills, card bills, loan payments, future-dated expenses and expected pay over the next 12 months), and suggests the earliest realistic target date. The date field starts on that suggestion, and the user can pick another. | P4 |
-| GOL-6 | A target date sooner than the suggested one is refused, with the earliest realistic date in the message. This is checked when a goal is added and when an edit changes its date. A goal with no target date is always allowed, and with no payday rule there's no suggestion, so any date is allowed. | P4 |
+| GOL-6 | A goal needs a realistic target date. A goal with no target date is refused, and so is adding one, or changing its date, while there's no payday rule, since the app then can't judge the date (the message says to mark the pay as a payday first). A date sooner than the suggested one is refused, with the earliest realistic date in the message. The dates are checked when a goal is added and when an edit changes its date; an edit that keeps a realistic date it already has is never refused. Goals saved before Phase 4 without a date keep showing their progress, and need a date when next edited. | P4 |
 
 ### 7.10 Backup, restore and export
 
@@ -430,7 +430,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-13 | PAY-4's early paydays can also be recorded from the Safe to spend card, and the Due banner counts only dates that are due (UI_FLOWS §2, F10) |
 | 2026-11-13 | In the forecast, every unpaid loan payment counts whatever its account, transfers to or from a card don't count (the card's bills stand in for them), and pay counts only into a counted account (DATA_MODEL §5.13–5.15) |
 | 2026-11-15 | DSH-8 shows as many recent transactions as fit beside the dashboard's right column, from 5 to 10, so the Safe to spend card leaves no gap |
-| 2026-11-16 | GOL-5 and GOL-6 added to Phase 4: the monthly amount a goal can count on is the forecast-safe amount (the most that can be set aside every month for 12 months without any pay window running short), and a sooner date is refused on add and on a date edit (DATA_MODEL §5.17) |
+| 2026-11-16 | GOL-5 and GOL-6 added to Phase 4: the monthly amount a goal can count on is the forecast-safe amount (the most that can be set aside every month for 12 months without any pay window running short); a goal needs a target date and a payday rule, and a sooner date is refused on add and on a date edit (DATA_MODEL §5.17) |
 | 2026-11-16 | CC-10 and CC-11 added to Phase 4: spending levels per card, for the current statement cycle, that warn and ask to confirm at the hard level but never block (DATA_MODEL §5.18) |
 
 ---
