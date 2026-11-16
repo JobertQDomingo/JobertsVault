@@ -39,7 +39,7 @@ import {
   useTransactionDefaults,
   useUpdateTransaction,
 } from "@/hooks/useTransactions";
-import { formatDue } from "@/lib/dates";
+import { formatDue, formatOverdue } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { named, offered } from "@/lib/records";
 import { unitOf } from "@/lib/recurrence";
@@ -49,7 +49,7 @@ import { AmountInput } from "./AmountInput";
 import { CategoryChip } from "./CategoryChip";
 import { ErrorState } from "./ErrorState";
 import { Loading, Skeleton } from "./Loading";
-import { LEVEL_RANK, levelAmount } from "./SpendLevel";
+import { LEVEL_RANK, levelAmount, reachedOrPast } from "./SpendLevel";
 import { Autocomplete } from "./ui/autocomplete";
 import { Button } from "./ui/button";
 import { Combobox } from "./ui/combobox";
@@ -312,7 +312,7 @@ export function QuickAddDialog({
           title={
             // Mark paid names the payment once the loans are here (UI_FLOWS F13).
             loan && scheduled && today
-              ? `Mark paid: ${loan.name}, ${formatDue(scheduled.dueDate, today)}`
+              ? `Mark paid: ${loan.name}, ${(scheduled.overdue ? formatOverdue : formatDue)(scheduled.dueDate, today)}`
               : titleOf(request)
           }
           // The form puts the cursor in Amount itself.
@@ -602,8 +602,7 @@ function TransactionForm({
   const pastLevel = (p: CardSpendPreview, card: Account) => {
     if (p.levelAfter === "none") return "";
     const level = levelAmount(card, p.levelAfter);
-    const verb = p.spent === level ? "reached" : "past";
-    return `${money(p.spent)} this cycle, ${verb} your ${money(level)} ${p.levelAfter} level`;
+    return `${money(p.spent)} this cycle, ${reachedOrPast(p.spent, level)} your ${money(level)} ${p.levelAfter} level`;
   };
 
   // An expense on a card asks the backend first (DATA_MODEL §5.18). A rule's form saves no

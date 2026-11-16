@@ -279,7 +279,13 @@ test("an overdue payment says so in red, with Mark paid", async () => {
   );
   const first = within(dialog.getAllByRole("listitem")[0]);
   expect(first.getByText("Overdue").className).toContain("text-danger");
-  first.getByRole("button", { name: "Mark paid" });
+  fireEvent.click(first.getByRole("button", { name: "Mark paid" }));
+  // Its title says it's overdue, as the banner does (UI_FLOWS F13).
+  expect(
+    await screen.findByRole("dialog", {
+      name: "Mark paid: Bank loan, overdue since Sat, Oct 10",
+    }),
+  ).toBeTruthy();
 });
 
 test("Mark paid opens the transaction form filled in, fixed to Expense, and records it (F13)", async () => {

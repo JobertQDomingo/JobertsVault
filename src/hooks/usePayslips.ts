@@ -43,6 +43,9 @@ export function usePayslipNet(payslip: PayslipFields) {
   return useQuery({
     queryKey: queryKeys.payslipNet(asked),
     queryFn: () => previewPayslip(asked),
+    // An empty gross goes as 0 and has no net worth asking about; its ₱0.00 answer would show,
+    // with its error, while the first gross is typed.
+    enabled: asked.gross > 0,
     placeholderData: keepPreviousData,
   });
 }

@@ -263,6 +263,14 @@ test("the first payslip starts with no gross, no net and no error (F14)", async 
   expect(gross.value).toBe("");
   expect(form.getByTestId("payslip-net").textContent).toBe("");
   expect(form.queryByRole("alert")).toBeNull();
+  // An empty gross isn't asked about, so typing one never flashes a stale ₱0.00 and its error.
+  expect(calls("preview_payslip")).toEqual([]);
+  fireEvent.change(gross, { target: { value: "4" } });
+  expect(form.queryByRole("alert")).toBeNull();
+  expect(
+    await form.findByText("₱4.00", { selector: "[data-testid=payslip-net]" }),
+  ).toBeTruthy();
+  expect(form.queryByRole("alert")).toBeNull();
 });
 
 test("Record now opens the payslip for that payday, and saving records it on its date (F14)", async () => {

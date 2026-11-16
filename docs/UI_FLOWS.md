@@ -335,7 +335,7 @@ Welcome to Jobert's Vault
 
 ### F13: Pay a loan payment (Phase 4, LOAN-3, LOAN-4)
 1. Click **Pay** on the dashboard's loan banner, or open the loan on Debt-free and click **Mark paid** on an unpaid row.
-2. The transaction form (§4) opens, titled with the payment it pays, "Mark paid: E-wallet loan, due Fri, Nov 20" (plain "Mark paid" while the loans load), with the type fixed to Expense and these fields filled in: the scheduled amount, the loan's account and category, today's date, and the loan's name as the payee. Change the amount for a late fee. **Save** records the expense, with a "Marked paid" toast. The balances go down, and the row says "Paid Nov 20".
+2. The transaction form (§4) opens, titled with the payment it pays, "Mark paid: E-wallet loan, due Fri, Nov 20", or "overdue since Mon, Nov 16" like its banner (plain "Mark paid" while the loans load), with the type fixed to Expense and these fields filled in: the scheduled amount, the loan's account and category, today's date, and the loan's name as the payee. Change the amount for a late fee. **Save** records the expense, with a "Marked paid" toast. The balances go down, and the row says "Paid Nov 20".
 3. **To undo it**, open the paid row's ⋯ menu in the payments dialog and choose **Mark unpaid**. It confirms first: "Mark this payment unpaid? The expense recorded for it is deleted." Deleting that expense on the Transactions screen does the same.
 
 ### F14: Record a payslip (Phase 4, PAY-2, PAY-4)
@@ -634,7 +634,7 @@ Answered on 2026-11-16 (Phase 4, building card spending levels):
 Answered on 2026-11-16 (Phase 4, testing on a copy of the owner's data):
 
 60. **Deleting a payslip says its payday won't come back.** The payday stays settled (DATA_MODEL §4.7), so the pay it recorded leaves the forecast for good, which can make a window run short, and Review or Record now never offers it again. The confirm says so and points to editing instead; the rule itself is unchanged (F14 step 4).
-61. **Mark paid names the payment** in its title, "Mark paid: E-wallet loan, due Fri, Nov 20", so paying early or from a banner says which payment it records (F13).
+61. **Mark paid names the payment** in its title, "Mark paid: E-wallet loan, due Fri, Nov 20" (or "overdue since …"), so paying early or from a banner says which payment it records (F13).
 62. **Exactly at a level says "reached"**, not "past": "Reached means equal or more" (DATA_MODEL §5.18), and "past" read wrong at the boundary. Above it, "past" stays (F16, §5.3).
 63. **The first payslip starts with no gross**, rather than the rule's amount, which is the expected **net** and looked like a gross with nothing deducted. The net shows nothing until a gross is typed (F14).
 64. **"Safe to spend until today"** when the current window ends today, instead of today's own date (§2).
