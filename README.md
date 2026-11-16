@@ -2,7 +2,7 @@
 
 A private desktop app for Windows that tracks personal cashflow (income and expenses) by **day, week, month or year**. You enter every transaction yourself, and all data stays in a local SQLite file on your computer. Your financial data is never sent over the internet. The only network use is checking GitHub for app updates, which you can turn off, and the app works fully offline.
 
-> **Status:** in development. `v0.3.0` has everything from Phases 1–3 below. Phase 4 (Loans & forecast, `v0.4.0`) is next, then Phase 5 (Polish, ending in `v1.0.0`). See [ROADMAP.md](ROADMAP.md) for progress.
+> **Status:** in development. `v0.4.0` has everything from Phases 1–4 below. Phase 5 (Polish, ending in `v1.0.0`) is next. See [ROADMAP.md](ROADMAP.md) for progress.
 
 ## Features
 
