@@ -361,7 +361,7 @@ Welcome to Jobert's Vault
 1. The user saves an expense on a card, dated in its current cycle. The form asks `preview_card_spend` first.
 2. **Hard level:** a confirm, "Spend anyway?", says "This takes Credit card to ₱5,120.00 this cycle, past your ₱5,000.00 hard level." ("reached your" when the spending is exactly the level) with **Go back** and **Spend anyway** (destructive). Go back returns to the form.
 3. **Soft or mid level, reached by this expense:** it saves, and a warning toast says "Credit card: ₱3,240.00 this cycle, past your ₱3,000.00 soft level." (exactly ₱3,000.00: "reached your ₱3,000.00 soft level")
-4. Below the soft level, or already past the level it reaches: it saves as usual.
+4. Below the soft level, or at a soft or mid level the card had already reached: it saves as usual. The hard level asks every time, even when the card is already past it.
 5. The card's details show the level under "This cycle" (soft in the muted text color, mid in `--warning` and hard in `--danger`, each with the level's name, and an icon from mid up), and so do its row in the Accounts list and the dashboard's card summary.
 
 ### F11: Update the app (Phase 1)
