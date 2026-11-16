@@ -9,6 +9,7 @@ use crate::domain::loan::{self, LoanPreview, LoanSummary};
 use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
+use crate::services::goals::{self, Saved};
 use crate::services::transactions::{
     self, Transaction, TransactionFields, TransactionKind, real_date,
 };
@@ -208,7 +209,7 @@ pub fn create(
     conn: &mut Connection,
     input: NewLoan,
     now: DateTime<Local>,
-) -> Result<Loan, AppError> {
+) -> Result<Saved<Loan>, AppError> {
     let NewLoan { is_new, mut fields } = input;
     let today = now.date_naive();
     let tx = conn.transaction()?;
@@ -218,7 +219,10 @@ pub fn create(
     let stamp = stamp(now);
     let id = repo::loans::insert(&tx, &values(&fields), is_new, &added_on, &stamp)?;
     save_payments(&tx, id, &fields.payments, is_new, &added_on, &stamp)?;
-    let loan = get(&tx, id, today)?;
+    let loan = Saved {
+        saved: get(&tx, id, today)?,
+        goals_moved: goals::follow_forecast(&tx, now)?,
+    };
     tx.commit()?;
     Ok(loan)
 }
@@ -231,7 +235,7 @@ pub fn update(
     id: i64,
     mut fields: LoanFields,
     now: DateTime<Local>,
-) -> Result<Loan, AppError> {
+) -> Result<Saved<Loan>, AppError> {
     let today = now.date_naive();
     let tx = conn.transaction()?;
     let stored = repo::loans::find(&tx, id)?.ok_or_else(|| not_found("loan", id))?;
@@ -254,7 +258,10 @@ pub fn update(
         &stamp,
     )?;
     repo::loans::unarchive_if_unpaid(&tx, id, &stamp)?;
-    let loan = get(&tx, id, today)?;
+    let loan = Saved {
+        saved: get(&tx, id, today)?,
+        goals_moved: goals::follow_forecast(&tx, now)?,
+    };
     tx.commit()?;
     Ok(loan)
 }
@@ -316,7 +323,7 @@ pub fn mark_paid(
     payment_id: i64,
     mut fields: TransactionFields,
     now: DateTime<Local>,
-) -> Result<Transaction, AppError> {
+) -> Result<Saved<Transaction>, AppError> {
     let tx = conn.transaction()?;
     let payment = repo::loans::find_payment(&tx, payment_id)?
         .ok_or_else(|| not_found("loan payment", payment_id))?;
@@ -350,7 +357,10 @@ pub fn mark_paid(
     let stamp = stamp(now);
     let txn = repo::transactions::insert(&tx, &transactions::values(&fields), &stamp)?;
     repo::loans::set_payment_transaction(&tx, payment_id, txn, &stamp)?;
-    let saved = transactions::get(&tx, txn)?;
+    let saved = Saved {
+        saved: transactions::get(&tx, txn)?,
+        goals_moved: goals::follow_forecast(&tx, now)?,
+    };
     tx.commit()?;
     Ok(saved)
 }
@@ -822,6 +832,7 @@ mod tests {
     fn pay(conn: &mut Connection, payment_id: i64, amount: i64) -> i64 {
         mark_paid(conn, payment_id, expense(amount), now())
             .unwrap()
+            .saved
             .id
     }
 
@@ -884,7 +895,7 @@ mod tests {
             "  E-wallet loan  ",
             vec![row("2026-12-01", 100_000), row("2026-11-02", 100_000)],
         );
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         assert_eq!(loan.name, "E-wallet loan");
         assert!(loan.is_new);
         assert_eq!((loan.account_id, loan.category_id), (CASH, LOAN));
@@ -920,7 +931,7 @@ mod tests {
                 row("2026-12-03", 100_000),
             ],
         );
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         assert!(!loan.is_new);
         assert_eq!(loan.borrowed_on, None);
         // A row on the day it's added is unpaid.
@@ -947,7 +958,7 @@ mod tests {
     fn paid_before_goes_by_the_day_the_loan_was_added_not_today() {
         let mut conn = db();
         let input = existing("E-wallet loan", vec![row("2026-11-01", 100_000)]);
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let first = loan.payments[0].id;
 
         // A week later: a row dated after the day it was added is unpaid, and overdue.
@@ -959,7 +970,7 @@ mod tests {
                 row("2026-11-05", 100_000),
             ],
         );
-        let loan = update(&mut conn, loan.id, edit, later).unwrap();
+        let loan = update(&mut conn, loan.id, edit, later).unwrap().saved;
         assert_eq!(loan.added_on, today());
         assert_eq!(
             statuses(&loan),
@@ -978,7 +989,7 @@ mod tests {
                 kept(second, "2026-11-02", 100_000),
             ],
         );
-        let loan = update(&mut conn, loan.id, edit, later).unwrap();
+        let loan = update(&mut conn, loan.id, edit, later).unwrap().saved;
         assert_eq!(
             statuses(&loan),
             [
@@ -1001,7 +1012,7 @@ mod tests {
             existing("Bank loan", vec![row("2026-12-01", 1)]),
             now(),
         );
-        let theirs = bank.unwrap().payments[0].id;
+        let theirs = bank.unwrap().saved.payments[0].id;
 
         type Change = Box<dyn Fn(&mut LoanFields)>;
         let cases: Vec<(&str, Change)> = vec![
@@ -1101,7 +1112,7 @@ mod tests {
                 row("2027-02-01", 100_000),
             ],
         );
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let ids: Vec<i64> = loan.payments.iter().map(|p| p.id).collect();
         let wallet = account(&mut conn, "Wallet", AccountKind::Ewallet);
         let mut edit = new_fields(
@@ -1115,7 +1126,7 @@ mod tests {
         edit.account_id = wallet;
         edit.amount_borrowed = None;
         edit.borrowed_on = Some("2026-10-15".into());
-        let saved = update(&mut conn, loan.id, edit, now()).unwrap();
+        let saved = update(&mut conn, loan.id, edit, now()).unwrap().saved;
         assert_eq!(saved.name, "Shop loan");
         assert_eq!(saved.account_id, wallet);
         assert_eq!(saved.amount_borrowed, None);
@@ -1140,7 +1151,7 @@ mod tests {
             "E-wallet loan",
             vec![row("2026-11-02", 100_000), row("2026-12-01", 100_000)],
         );
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let (paid, unpaid) = (loan.payments[0].id, loan.payments[1].id);
         // A late fee: the paid amount is the transaction's.
         let txn = pay(&mut conn, paid, 105_000);
@@ -1151,7 +1162,7 @@ mod tests {
 
         // Leaving it out keeps it as it is, and every unpaid row may go.
         let edit = new_fields("E-wallet loan", vec![]);
-        let saved = update(&mut conn, loan.id, edit, now()).unwrap();
+        let saved = update(&mut conn, loan.id, edit, now()).unwrap().saved;
         assert_eq!(saved.payments.len(), 1);
         let p = &saved.payments[0];
         assert_eq!(
@@ -1183,7 +1194,7 @@ mod tests {
     fn a_loan_with_nothing_paid_still_needs_a_row() {
         let mut conn = db();
         let input = existing("E-wallet loan", vec![row("2026-10-01", 1)]);
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let edit = fields("E-wallet loan", vec![]);
         assert_eq!(
             field_of(update(&mut conn, loan.id, edit, now())),
@@ -1195,13 +1206,13 @@ mod tests {
     fn an_edit_only_takes_the_loans_own_unpaid_rows_once_and_a_free_name() {
         let mut conn = db();
         let input = existing("E-wallet loan", vec![row("2026-12-01", 1)]);
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let other = create(
             &mut conn,
             existing("Bank loan", vec![row("2026-12-01", 1)]),
             now(),
         );
-        let theirs = other.unwrap().payments[0].id;
+        let theirs = other.unwrap().saved.payments[0].id;
 
         let edit = fields("E-wallet loan", vec![kept(theirs, "2026-12-01", 1)]);
         assert_eq!(
@@ -1242,7 +1253,7 @@ mod tests {
         let mut input = existing("E-wallet loan", vec![row("2026-12-01", 1)]);
         input.fields.account_id = wallet;
         input.fields.category_id = mine;
-        let loan = create(&mut conn, input.clone(), now()).unwrap();
+        let loan = create(&mut conn, input.clone(), now()).unwrap().saved;
         accounts::archive(&mut conn, wallet, false, now()).unwrap();
         accounts::archive(&mut conn, other_wallet, false, now()).unwrap();
         categories::archive(&mut conn, mine, now()).unwrap();
@@ -1273,7 +1284,7 @@ mod tests {
             "E-wallet loan",
             vec![row("2026-10-01", 1), row("2026-12-01", 1)],
         );
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         assert_eq!(
             conflict(archive(&mut conn, loan.id, now())),
             "Pay or remove its unpaid payments first"
@@ -1306,7 +1317,7 @@ mod tests {
             vec![row("2026-10-01", 100_000), row("2026-11-10", 100_000)],
         );
         old.fields.amount_borrowed = Some(Money(200_000));
-        let old = create(&mut conn, old, now()).unwrap();
+        let old = create(&mut conn, old, now()).unwrap().saved;
         // Paid with a ₱50 late fee, then archived once paid off.
         pay(&mut conn, old.payments[1].id, 105_000);
         archive(&mut conn, old.id, now()).unwrap();
@@ -1314,7 +1325,7 @@ mod tests {
             "Bank loan",
             vec![row("2026-12-01", 300_000), row("2027-01-01", 300_000)],
         );
-        let bank = create(&mut conn, bank, now()).unwrap();
+        let bank = create(&mut conn, bank, now()).unwrap().saved;
 
         let LoanList { loans, summary } = list(&conn, today()).unwrap();
         let figures = |l: &Loan| (l.left, l.paid, l.percent_paid, l.interest, l.paid_off);
@@ -1361,27 +1372,37 @@ mod tests {
     fn an_edit_that_leaves_an_unpaid_row_unarchives_the_loan() {
         let mut conn = db();
         let input = existing("E-wallet loan", vec![row("2026-10-01", 1)]);
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         archive(&mut conn, loan.id, now()).unwrap();
         let first = loan.payments[0].id;
 
         // An edit that leaves it paid off keeps it archived.
         let edit = fields("Old loan", vec![kept(first, "2026-10-01", 1)]);
-        assert!(update(&mut conn, loan.id, edit, now()).unwrap().archived);
+        assert!(
+            update(&mut conn, loan.id, edit, now())
+                .unwrap()
+                .saved
+                .archived
+        );
 
         // Adding a row.
         let edit = fields(
             "Old loan",
             vec![kept(first, "2026-10-01", 1), row("2026-12-01", 1)],
         );
-        assert!(!update(&mut conn, loan.id, edit, now()).unwrap().archived);
+        assert!(
+            !update(&mut conn, loan.id, edit, now())
+                .unwrap()
+                .saved
+                .archived
+        );
 
         // Moving a paid-before row to on or after the day the loan was added.
         let edit = fields("Old loan", vec![kept(first, "2026-10-01", 1)]);
         update(&mut conn, loan.id, edit, now()).unwrap();
         archive(&mut conn, loan.id, now()).unwrap();
         let edit = fields("Old loan", vec![kept(first, "2026-11-03", 1)]);
-        let saved = update(&mut conn, loan.id, edit, now()).unwrap();
+        let saved = update(&mut conn, loan.id, edit, now()).unwrap().saved;
         assert_eq!(statuses(&saved), [(today(), Unpaid, false)]);
         assert!(!saved.archived);
     }
@@ -1393,7 +1414,7 @@ mod tests {
             "E-wallet loan",
             vec![row("2026-10-01", 1), row("2026-12-01", 1)],
         );
-        let paid_loan = create(&mut conn, input, now()).unwrap();
+        let paid_loan = create(&mut conn, input, now()).unwrap().saved;
         pay(&mut conn, paid_loan.payments[1].id, 1);
         conflict(delete(&mut conn, paid_loan.id));
 
@@ -1402,7 +1423,7 @@ mod tests {
             "Bank loan",
             vec![row("2026-10-01", 1), row("2026-12-01", 1)],
         );
-        let other = create(&mut conn, input, now()).unwrap();
+        let other = create(&mut conn, input, now()).unwrap().saved;
         delete(&mut conn, other.id).unwrap();
         let rows: i64 = conn
             .query_row(
@@ -1435,11 +1456,11 @@ mod tests {
                 row("2026-12-01", 4),
             ],
         );
-        let alpha = create(&mut conn, input, now()).unwrap();
+        let alpha = create(&mut conn, input, now()).unwrap().saved;
         let loans = list(&conn, d(2026, 12, 2)).unwrap().loans;
         assert_eq!(
             loans.iter().map(|l| l.id).collect::<Vec<_>>(),
-            [zeta.unwrap().id, alpha.id]
+            [zeta.unwrap().saved.id, alpha.id]
         );
         // Two rows on one date keep the order they were typed in; overdue follows today.
         let rows: Vec<(i64, bool)> = loans[1]
@@ -1470,7 +1491,7 @@ mod tests {
         let mine = category(&mut conn, "Lender", CategoryKind::Expense);
         let mut input = existing("E-wallet loan", vec![row("2026-12-01", 1)]);
         input.fields.category_id = mine;
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let in_use = |conn: &Connection, id: i64| {
             categories::list(conn)
                 .unwrap()
@@ -1497,7 +1518,7 @@ mod tests {
         let mut conn = db();
         assert!(!settings::get(&conn).unwrap().decimals_locked);
         let input = existing("E-wallet loan", vec![row("2026-10-01", 1)]);
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         assert!(settings::get(&conn).unwrap().decimals_locked);
         delete(&mut conn, loan.id).unwrap();
         assert!(!settings::get(&conn).unwrap().decimals_locked);
@@ -1564,7 +1585,7 @@ mod tests {
             "E-wallet loan",
             vec![row("2026-11-02", 100_000), row("2026-11-03", 100_000)],
         );
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         assert_eq!(figures(&mut conn), before);
 
         pay(&mut conn, loan.payments[0].id, 100_000);
@@ -1582,13 +1603,13 @@ mod tests {
             "E-wallet loan",
             vec![row("2026-11-02", 100_000), row("2026-12-01", 100_000)],
         );
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let (first, second) = (loan.payments[0].id, loan.payments[1].id);
         assert!(loan.payments[0].overdue);
 
         let mut sent = expense(100_000);
         sent.note = Some("  November  ".into());
-        let txn = mark_paid(&mut conn, first, sent, now()).unwrap();
+        let txn = mark_paid(&mut conn, first, sent, now()).unwrap().saved;
         assert_eq!(
             (
                 txn.kind,
@@ -1630,7 +1651,9 @@ mod tests {
         assert_eq!(payment(&conn, loan.id, second).status, Unpaid);
 
         // Any other transaction pays no loan.
-        let other = transactions::create(&mut conn, expense(1), now()).unwrap();
+        let other = transactions::create(&mut conn, expense(1), now())
+            .unwrap()
+            .saved;
         assert_eq!(other.loan_payment_id, None);
     }
 
@@ -1641,7 +1664,7 @@ mod tests {
             "E-wallet loan",
             vec![row("2026-11-02", 100_000), row("2026-12-01", 100_000)],
         );
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let (late, early) = (loan.payments[0].id, loan.payments[1].id);
 
         pay(&mut conn, early, 100_000);
@@ -1664,7 +1687,7 @@ mod tests {
             "E-wallet loan",
             vec![row("2026-10-01", 100_000), row("2026-12-01", 100_000)],
         );
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let (before, unpaid) = (loan.payments[0].id, loan.payments[1].id);
         assert_eq!(loan.payments[0].status, PaidBefore);
 
@@ -1703,7 +1726,7 @@ mod tests {
         let mut input = existing("E-wallet loan", vec![row("2026-12-01", 100_000)]);
         input.fields.account_id = wallet;
         input.fields.category_id = lender;
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let id = loan.payments[0].id;
         for archived in [wallet, gone_account] {
             accounts::archive(&mut conn, archived, false, now()).unwrap();
@@ -1762,15 +1785,17 @@ mod tests {
         let mut sent = expense(100_000);
         sent.account_id = wallet;
         sent.category_id = Some(lender);
-        let txn = mark_paid(&mut conn, id, sent, now()).unwrap();
+        let txn = mark_paid(&mut conn, id, sent, now()).unwrap().saved;
         assert_eq!((txn.account_id, txn.category_id), (wallet, Some(lender)));
 
         // Like any expense, it may come from another active account and category.
         let input = existing("Bank loan", vec![row("2026-12-01", 100_000)]);
-        let other = create(&mut conn, input, now()).unwrap();
+        let other = create(&mut conn, input, now()).unwrap().saved;
         let mut sent = expense(100_000);
         sent.category_id = Some(FOOD);
-        let txn = mark_paid(&mut conn, other.payments[0].id, sent, now()).unwrap();
+        let txn = mark_paid(&mut conn, other.payments[0].id, sent, now())
+            .unwrap()
+            .saved;
         assert_eq!((txn.account_id, txn.category_id), (CASH, Some(FOOD)));
     }
 
@@ -1782,7 +1807,7 @@ mod tests {
         spend.account_id = wallet;
         transactions::create(&mut conn, spend, now()).unwrap();
         let input = existing("E-wallet loan", vec![row("2026-12-01", 100_000)]);
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         pay(&mut conn, loan.payments[0].id, 100_000);
         let defaults = transactions::defaults(&conn, today()).unwrap();
         assert_eq!(defaults.account_id, Some(wallet));
@@ -1792,7 +1817,7 @@ mod tests {
     fn deleting_a_loan_payments_expense_makes_it_unpaid_again() {
         let mut conn = db();
         let input = new_loan("E-wallet loan", vec![row("2026-11-02", 100_000)]);
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let id = loan.payments[0].id;
         let txn = pay(&mut conn, id, 105_000);
 
@@ -1811,7 +1836,7 @@ mod tests {
     fn mark_unpaid_deletes_the_expense() {
         let mut conn = db();
         let input = new_loan("E-wallet loan", vec![row("2026-11-02", 100_000)]);
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let id = loan.payments[0].id;
         let txn = pay(&mut conn, id, 100_000);
 
@@ -1835,7 +1860,7 @@ mod tests {
             "E-wallet loan",
             vec![row("2026-10-01", 100_000), row("2026-12-01", 100_000)],
         );
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let id = loan.payments[1].id;
 
         // By Mark unpaid.
@@ -1853,7 +1878,9 @@ mod tests {
         // Deleting any other transaction leaves an archived loan as it is.
         pay(&mut conn, id, 100_000);
         archive(&mut conn, loan.id, now()).unwrap();
-        let other = transactions::create(&mut conn, expense(1), now()).unwrap();
+        let other = transactions::create(&mut conn, expense(1), now())
+            .unwrap()
+            .saved;
         transactions::delete(&mut conn, other.id, now()).unwrap();
         assert!(find(&conn, loan.id).archived);
     }
@@ -1862,7 +1889,7 @@ mod tests {
     fn a_loan_payments_expense_can_be_edited_but_stays_an_expense() {
         let mut conn = db();
         let input = new_loan("E-wallet loan", vec![row("2026-11-02", 100_000)]);
-        let loan = create(&mut conn, input, now()).unwrap();
+        let loan = create(&mut conn, input, now()).unwrap().saved;
         let id = loan.payments[0].id;
         let txn = pay(&mut conn, id, 100_000);
 
@@ -1872,7 +1899,9 @@ mod tests {
         edit.category_id = Some(FOOD);
         edit.account_id = wallet;
         edit.date = "2026-11-01".into();
-        let saved = transactions::update(&mut conn, txn, edit, now()).unwrap();
+        let saved = transactions::update(&mut conn, txn, edit, now())
+            .unwrap()
+            .saved;
         assert_eq!(saved.loan_payment_id, Some(id));
         let p = payment(&conn, loan.id, id);
         assert_eq!((p.status, p.paid_amount), (Paid, Some(Money(105_000))));

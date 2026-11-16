@@ -7,6 +7,9 @@ export function Toaster() {
     <Sonner
       position="bottom-right"
       duration={4000}
+      // One above the other, not piled up, so no toast hides another: a goal-moved note comes
+      // just before a form's "Saved" (GOL-7, DESIGN_SYSTEM §9.1).
+      expand
       // Sonner's own stylesheet sets a system font, and it outranks Tailwind's classes.
       style={{ fontFamily: "inherit" }}
       icons={{
@@ -34,6 +37,9 @@ export const notify = {
   /** With an `action` (e.g. Open folder), it stays 10 s, so there's time to reach it. */
   success: (message: string, action?: { label: string; onClick: () => void }) =>
     toast.success(message, action && { action, duration: 10_000 }),
+  /** No icon, one line per `\n`, and 8 s, as a note can run to several lines. */
+  info: (message: string) =>
+    toast(message, { duration: 8_000, className: "whitespace-pre-line" }),
   // Errors stay until closed, so they can't be missed.
   error: (message: string) =>
     toast.error(message, { duration: Infinity, closeButton: true }),

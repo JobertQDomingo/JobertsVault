@@ -1,6 +1,7 @@
 import type { CategoryKind } from "@/bindings/CategoryKind";
 import type { PayBillDefaults } from "@/bindings/PayBillDefaults";
 import type { PayeeSuggestion } from "@/bindings/PayeeSuggestion";
+import type { Saved } from "@/bindings/Saved";
 import type { Transaction } from "@/bindings/Transaction";
 import type { TransactionDefaults } from "@/bindings/TransactionDefaults";
 import type { TransactionFields } from "@/bindings/TransactionFields";
@@ -25,7 +26,7 @@ export const getTransaction = (id: number) =>
   call<Transaction>("get_transaction", { id });
 
 export const createTransaction = (transaction: TransactionFields) =>
-  call<Transaction>("create_transaction", { transaction });
+  call<Saved<Transaction>>("create_transaction", { transaction });
 
 export const updateTransaction = ({
   id,
@@ -33,7 +34,7 @@ export const updateTransaction = ({
 }: {
   id: number;
   transaction: TransactionFields;
-}) => call<Transaction>("update_transaction", { id, transaction });
+}) => call<Saved<Transaction>>("update_transaction", { id, transaction });
 
 export const deleteTransaction = (id: number) =>
   call<null>("delete_transaction", { id });

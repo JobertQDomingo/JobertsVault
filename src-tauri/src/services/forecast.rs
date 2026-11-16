@@ -158,6 +158,9 @@ pub(crate) struct Gathered {
     /// The pay windows: none with no payday rule (§5.12).
     pub windows: Vec<PayWindow>,
     pub movements: Vec<Movement>,
+    /// Transfers from the counted accounts into a dated goal's account: that goal's own deposits,
+    /// which its monthly amount already asks for, so the goal room leaves them out (§5.17).
+    pub goal_deposits: HashSet<Source>,
     horizon: NaiveDate,
     names: HashMap<Source, (String, i64)>,
     nets: Vec<repo::transactions::PayslipNet>,
@@ -179,6 +182,7 @@ pub fn get(
         nets,
         paydays,
         early,
+        ..
     } = gather(conn, today, None)?;
     let mut forecast = Forecast {
         today,
@@ -275,9 +279,19 @@ pub(crate) fn gather(
 ) -> Result<Gathered, AppError> {
     let horizon = f::horizon_end(today).ok_or_else(out_of_range)?;
     let accounts = repo::accounts::all(conn, today)?;
-    let goal_accounts: HashSet<i64> = repo::goals::all(conn)?
-        .into_iter()
-        .filter(|g| !g.archived && as_goal.is_none_or(|a| a.id != Some(g.id)))
+    let goals = repo::goals::all(conn)?;
+    let mine = |g: &&repo::goals::Row| !g.archived && as_goal.is_none_or(|a| a.id != Some(g.id));
+    let goal_accounts: HashSet<i64> = goals
+        .iter()
+        .filter(mine)
+        .map(|g| g.account_id)
+        .chain(as_goal.map(|a| a.account_id))
+        .collect();
+    // Only a goal with a date that isn't achieved saves on a schedule.
+    let saving_into: HashSet<i64> = goals
+        .iter()
+        .filter(mine)
+        .filter(|g| g.achieved_at.is_none() && g.target_date.is_some())
         .map(|g| g.account_id)
         .chain(as_goal.map(|a| a.account_id))
         .collect();
@@ -333,9 +347,16 @@ pub(crate) fn gather(
     let mut names: HashMap<Source, (String, i64)> = HashMap::new();
     let mut movements = Vec::new();
     let mut charges: HashMap<i64, Vec<(NaiveDate, Money)>> = HashMap::new();
+    let mut goal_deposits = HashSet::new();
     // A future-dated row or a rule's date: in or out of the counted accounts, or a card's charge.
     let mut count =
         |kind: &str, amount: i64, date: NaiveDate, from: i64, to: Option<i64>, source| {
+            if kind == "transfer"
+                && place(from) == Place::Counted
+                && to.is_some_and(|to| saving_into.contains(&to))
+            {
+                goal_deposits.insert(source);
+            }
             let flow = match kind {
                 "income" => Flow::Income,
                 "expense" => Flow::Expense,
@@ -527,6 +548,7 @@ pub(crate) fn gather(
         money_now,
         windows,
         movements,
+        goal_deposits,
         horizon,
         names,
         nets,
@@ -685,7 +707,7 @@ mod tests {
         to: Option<i64>,
     ) -> i64 {
         let f = fields(conn, kind, amount, date, account, to);
-        transactions::create(conn, f, now()).unwrap().id
+        transactions::create(conn, f, now()).unwrap().saved.id
     }
 
     /// A monthly rule from `start`, created (and processed) on `created`.
@@ -705,7 +727,7 @@ mod tests {
             mode,
             is_payday,
         };
-        recurring::create(conn, f, on(created)).unwrap().id
+        recurring::create(conn, f, on(created)).unwrap().saved.id
     }
 
     /// Salary each month from `start`, a payday with an estimate of `estimate` net.
@@ -851,7 +873,8 @@ mod tests {
             },
             on(TODAY),
         )
-        .unwrap();
+        .unwrap()
+        .saved;
 
         let f = windows(&conn);
         let label = |kind, id| labelled(&f, kind, id);
@@ -1085,7 +1108,8 @@ mod tests {
             },
             on("2026-11-01"),
         )
-        .unwrap();
+        .unwrap()
+        .saved;
         let [_, nov, dec, jan] = [0, 1, 2, 3].map(|i| loan.payments[i].id);
         // Paid with an expense dated Nov 20: it counts once, as that transaction.
         let paid = fields(
@@ -1098,6 +1122,7 @@ mod tests {
         );
         let paid = loans::mark_paid(&mut conn, dec, paid, on(TODAY))
             .unwrap()
+            .saved
             .id;
 
         let forecast = windows(&conn);

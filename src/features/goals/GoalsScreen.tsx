@@ -211,6 +211,11 @@ function Card({
   const money = (amount: number) => formatMoney(amount, settings);
   const account = accounts.find((a) => a.id === goal.accountId)?.name ?? "";
   const next = plan(goal, money);
+  const behind =
+    goal.behind &&
+    (goal.behind.earliestDate
+      ? `Behind: the earliest realistic date is now ${formatDate(goal.behind.earliestDate)}`
+      : "Behind: nothing can be set aside right now");
   return (
     // The name's button stretches over the whole card, so the progress bar stays outside it.
     <li className="relative grid content-start gap-2.5 rounded-control bg-wash p-4 pt-3 transition-colors duration-150 hover:bg-glass-hover">
@@ -261,7 +266,12 @@ function Card({
       <p className="text-small text-muted-foreground tabular-nums">
         {`${money(goal.progress)} of ${money(goal.targetAmount)} · ${money(goal.remaining)} left`}
       </p>
-      {next && <p className="text-small font-semibold tabular-nums">{next}</p>}
+      {/* GOL-7: in place of the monthly amount, on the card only (UI_FLOWS §11 item 56). */}
+      {behind ? (
+        <p className="text-small font-semibold text-warning">{behind}</p>
+      ) : (
+        next && <p className="text-small font-semibold tabular-nums">{next}</p>
+      )}
     </li>
   );
 }

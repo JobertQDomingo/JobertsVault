@@ -279,6 +279,7 @@ const goal = (
     percent: 0,
     monthsLeft: null,
     monthlyNeeded: null,
+    behind: null,
     ...over,
   }) satisfies GoalProgress;
 

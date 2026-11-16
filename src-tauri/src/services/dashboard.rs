@@ -290,7 +290,7 @@ mod tests {
             payment_method_id: None,
             note: None,
         };
-        transactions::create(conn, fields, now()).unwrap().id
+        transactions::create(conn, fields, now()).unwrap().saved.id
     }
 
     fn spend(conn: &mut Connection, amount: i64, date: NaiveDate, account: i64) -> i64 {
@@ -680,7 +680,7 @@ mod tests {
             is_new: true,
             fields,
         };
-        loans::create(conn, new, now()).unwrap()
+        loans::create(conn, new, now()).unwrap().saved
     }
 
     fn due_dates(dash: &Dashboard) -> Vec<(i64, NaiveDate, i64)> {
