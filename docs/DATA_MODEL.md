@@ -821,7 +821,7 @@ earliest     = today + ⌈left to save ÷ monthly room⌉ months   (the day clam
 
 **Goals follow the forecast (GOL-7).** After these saves, in the same database transaction:
 - a transaction created or updated as an expense or a transfer, whatever screen it comes from (quick-add, Edit, Duplicate, Mark paid)
-- a recurring rule created or updated
+- a recurring rule created or updated as an expense or a transfer (an income rule, a payday included, only adds money, §9 item 107)
 - a loan created or updated
 
 each active goal that isn't achieved and has a target date and something left to save is checked again, newest first:
@@ -838,10 +838,10 @@ else if late(goal)  → its target_date becomes earliest(goal), §5.17's earlies
 - **Only a date that's no longer realistic moves**, and only later. A save that leaves every goal on track changes nothing, and a goal never moves earlier by itself.
 - **Judged by month, not by day.** The earliest date moves a day later every day, so comparing it with the target date would make a goal at its suggested date late the next day. A goal is on track while its monthly amount fits in the monthly room; on the day a date is set this is the same test as the date being no sooner than the earliest (§9 item 99).
 - **Newest first**, so a goal added earlier keeps its claim on the monthly room: the newest goal gives way first, and moving it later lowers its monthly amount, which leaves more room for the older goals checked after it (§9 item 100).
-- **Behind** (`list_goals`' `behind`): there's a payday rule, something left to save, and either the monthly room is 0 or the goal is late (`late` above, with every other goal at its date now). Time passing, a payslip below the estimate, or a deleted income can do this without a save that moves it. The card says so; nothing else changes.
+- **Behind** (`list_goals`' `behind`): there's a payday rule, something left to save, and either the monthly room is 0 or the goal is late (`late` above, with every other goal at its date now). Time passing, a payslip below the estimate, a deleted income, or an income rule lowered, ended or moved to an account that isn't counted can do this without a save that moves it. The card says so; nothing else changes.
 - With no payday rule, nothing is checked or moved.
 - **A goal's own deposits aren't spending.** A future-dated transfer, or a transfer rule's dates, from the counted accounts into the account of a goal with a date (or the goal being added) is the saving its monthly amount already asks for, so the monthly room leaves it out rather than counting it twice. Safe to spend still sees the money leave (§9 item 102).
-- Recurring dates posted by processing (Post and Edit & post included) and payslips aren't saves that move goals: their dates were already in the forecast. Deleting a row never moves a goal either; a goal it leaves behind shows as behind.
+- Recurring dates posted by processing (Post and Edit & post included) and payslips aren't saves that move goals: their dates were already in the forecast. Income isn't either, as a transaction or as a rule. Deleting a row never moves a goal either; a goal it leaves behind shows as behind.
 
 ### 5.18 Card spending levels (CC-10, CC-11, Phase 4)
 
@@ -1157,3 +1157,7 @@ Answered on 2026-11-16, building card spending levels (CC-10, CC-11):
 104. **A save that doesn't raise this cycle's spending asks nothing**, even past the hard level: an edit of only the note, or one that lowers the amount, takes nothing further, so "Spend anyway?" would only be noise. A new expense past hard still asks (§5.18).
 105. **Edit & post doesn't ask**, like Post: both are processing a date the rule already scheduled, as §5.17 treats them (§5.18).
 106. **A card sent without a level keeps the one it has**, and a new card gets the default, so a caller that leaves them out never resets the user's levels. The form always sends all three, and an empty one as 0, for the backend to name (§6).
+
+Answered on 2026-11-16, testing Phase 4 on a copy of the owner's data (GOL-7):
+
+107. **An income rule never moves a goal**, like an income transaction. Setting up paydays one at a time showed why: with only some paydays saved, a goal can't be reached (room 0) and stays put, then the next payday rule gives a little room and the goal moved months later, never to come back once the last payday was added. Adding pay can't make a date less realistic, so only expense and transfer rules are checked. An income rule edited lower leaves a goal Behind instead (§5.17).

@@ -375,11 +375,7 @@ fn followed(
     saved: Transaction,
     now: DateTime<Local>,
 ) -> Result<Saved<Transaction>, AppError> {
-    let goals_moved = if saved.kind == TransactionKind::Income {
-        Vec::new()
-    } else {
-        goals::follow_forecast(conn, now)?
-    };
+    let goals_moved = goals::follow_save(conn, saved.kind, now)?;
     Ok(Saved { saved, goals_moved })
 }
 
