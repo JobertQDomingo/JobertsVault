@@ -17,4 +17,9 @@ creditLimit: Money | null,
  * 1–31; a shorter month uses its last day. Any integer arrives, so validation can name the
  * field instead of the argument decoding failing.
  */
-statementDay: number | null, dueDay: number | null, };
+statementDay: number | null, dueDay: number | null, 
+/**
+ * Credit card only (CC-10): the levels for a statement cycle's spending. A card sent
+ * without one keeps the one it has, or a new card gets the default (DATA_MODEL §2).
+ */
+spendSoft: Money | null, spendMid: Money | null, spendHard: Money | null, };

@@ -7,7 +7,9 @@ import {
   type ReactNode,
 } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
+import { previewCardSpend } from "@/api/accounts";
 import type { Account } from "@/bindings/Account";
+import type { CardSpendPreview } from "@/bindings/CardSpendPreview";
 import type { Category } from "@/bindings/Category";
 import type { DueOccurrence } from "@/bindings/DueOccurrence";
 import type { Frequency } from "@/bindings/Frequency";
@@ -37,6 +39,7 @@ import {
   useTransactionDefaults,
   useUpdateTransaction,
 } from "@/hooks/useTransactions";
+import { formatMoney } from "@/lib/money";
 import { named, offered } from "@/lib/records";
 import { unitOf } from "@/lib/recurrence";
 import { showSaveError } from "@/lib/saveError";
@@ -45,6 +48,7 @@ import { AmountInput } from "./AmountInput";
 import { CategoryChip } from "./CategoryChip";
 import { ErrorState } from "./ErrorState";
 import { Loading, Skeleton } from "./Loading";
+import { LEVEL_RANK, levelAmount } from "./SpendLevel";
 import { Autocomplete } from "./ui/autocomplete";
 import { Button } from "./ui/button";
 import { Combobox } from "./ui/combobox";
@@ -335,6 +339,7 @@ export function QuickAddDialog({
               initial={start.values}
               weekStart={settings.weekStart}
               showMethod={settings.showPaymentMethod}
+              money={(amount) => formatMoney(amount, settings)}
               accounts={accounts.data?.accounts ?? []}
               categories={categories.data?.categories ?? []}
               methods={methods.data ?? []}
@@ -447,6 +452,7 @@ function TransactionForm({
   initial,
   weekStart,
   showMethod,
+  money,
   accounts,
   categories,
   methods,
@@ -471,6 +477,7 @@ function TransactionForm({
   initial: Values;
   weekStart: WeekStart;
   showMethod: boolean;
+  money: (amount: number) => string;
   accounts: Account[];
   categories: Category[];
   methods: PaymentMethod[];
@@ -497,6 +504,13 @@ function TransactionForm({
   const createRule = useCreateRecurringRule();
   const updateRule = useUpdateRecurringRule();
   const [deleting, setDeleting] = useState(false);
+  // An expense that takes a card to its hard level, waiting for Spend anyway (CC-11, F16).
+  const [confirming, setConfirming] = useState<{
+    values: Values;
+    another: boolean;
+    preview: CardSpendPreview;
+    card: Account;
+  } | null>(null);
   // An edit, a payment, a post and a rule are saved once; a payment's type is fixed too.
   const addAnother =
     editId === undefined && postId === undefined && !schedule && !fixedKind;
@@ -568,49 +582,102 @@ function TransactionForm({
       : []),
   ];
 
-  const save = (another: boolean) => {
+  // One save at a time, so a second Enter in the same moment can't save twice.
+  const guarded = (step: () => Promise<void>) => {
     if (saving.current) return;
     saving.current = true;
-    void handleSubmit(async (values) => {
-      try {
-        const transaction = toFields(values);
-        if (schedule?.ruleId !== undefined)
-          await updateRule.mutateAsync({
-            id: schedule.ruleId,
-            rule: toRule(values),
-          });
-        else if (schedule) await createRule.mutateAsync(toRule(values));
-        else if (editId !== undefined)
-          await update.mutateAsync({ id: editId, transaction });
-        else if (postId !== undefined)
-          await post.mutateAsync({ id: postId, transaction });
-        else if (markPaidId !== undefined)
-          await markPaid.mutateAsync({ paymentId: markPaidId, transaction });
-        else await create.mutateAsync(transaction);
-        notify.success(
-          postId !== undefined
-            ? "Posted"
-            : markPaidId !== undefined
-              ? "Marked paid"
-              : "Saved",
-        );
-        if (another) {
-          // Keeps the type, account and date; clears the rest (UI_FLOWS §4).
-          const next = {
-            ...blank(num(values.accountId), values.date),
-            kind: values.kind,
-          };
-          reset(next);
-          setKept(next);
-          // The same input stays, so it can take the cursor straight away.
-          document.getElementById("qa-amount")?.focus();
-        } else onDone();
-      } catch (error) {
-        showSaveError(error, shown, setError);
-      }
-    })().finally(() => {
+    void step().finally(() => {
       saving.current = false;
     });
+  };
+
+  // "Credit card: ₱5,120.00 this cycle, past your ₱5,000.00 hard level" (UI_FLOWS F16).
+  const pastLevel = (p: CardSpendPreview, card: Account) =>
+    p.levelAfter === "none"
+      ? ""
+      : `${money(p.spent)} this cycle, past your ${money(levelAmount(card, p.levelAfter))} ${p.levelAfter} level`;
+
+  // An expense on a card asks the backend first (DATA_MODEL §5.18). A rule's form saves no
+  // expense, and Edit & post is processing, which never asks (§5.17); Mark paid's and Pay bill's
+  // accounts aren't cards. An empty amount saves straight away, for the backend to name.
+  const checkSpend = async (v: Values) => {
+    const card = accounts.find(
+      (a) => String(a.id) === v.accountId && a.kind === "credit_card",
+    );
+    if (schedule || postId !== undefined || v.kind !== "expense") return null;
+    if (!card || v.amount === null) return null;
+    const preview = await previewCardSpend({
+      accountId: card.id,
+      amount: v.amount,
+      date: v.date,
+      transactionId: editId ?? null,
+    });
+    return preview && { preview, card };
+  };
+
+  const save = (another: boolean) =>
+    guarded(() =>
+      handleSubmit(async (values) => {
+        try {
+          const check = await checkSpend(values);
+          if (check?.preview.levelAfter === "hard")
+            setConfirming({ values, another, ...check });
+          else await commit(values, another, check);
+        } catch (error) {
+          showSaveError(error, shown, setError);
+        }
+      })(),
+    );
+
+  const commit = async (
+    values: Values,
+    another: boolean,
+    check: { preview: CardSpendPreview; card: Account } | null,
+  ) => {
+    try {
+      const transaction = toFields(values);
+      if (schedule?.ruleId !== undefined)
+        await updateRule.mutateAsync({
+          id: schedule.ruleId,
+          rule: toRule(values),
+        });
+      else if (schedule) await createRule.mutateAsync(toRule(values));
+      else if (editId !== undefined)
+        await update.mutateAsync({ id: editId, transaction });
+      else if (postId !== undefined)
+        await post.mutateAsync({ id: postId, transaction });
+      else if (markPaidId !== undefined)
+        await markPaid.mutateAsync({ paymentId: markPaidId, transaction });
+      else await create.mutateAsync(transaction);
+      notify.success(
+        postId !== undefined
+          ? "Posted"
+          : markPaidId !== undefined
+            ? "Marked paid"
+            : "Saved",
+      );
+      // A soft or mid level reached by this save (F16 step 3); hard was asked about already.
+      const p = check?.preview;
+      if (
+        p &&
+        p.levelAfter !== "hard" &&
+        LEVEL_RANK[p.levelAfter] > LEVEL_RANK[p.levelBefore]
+      )
+        notify.warning(`${check.card.name}: ${pastLevel(p, check.card)}.`);
+      if (another) {
+        // Keeps the type, account and date; clears the rest (UI_FLOWS §4).
+        const next = {
+          ...blank(num(values.accountId), values.date),
+          kind: values.kind,
+        };
+        reset(next);
+        setKept(next);
+        // The same input stays, so it can take the cursor straight away.
+        document.getElementById("qa-amount")?.focus();
+      } else onDone();
+    } catch (error) {
+      showSaveError(error, shown, setError);
+    }
   };
 
   const accountOptions = offered(
@@ -1034,7 +1101,25 @@ function TransactionForm({
           </Button>
         </DialogFooter>
       </form>
-      {/* Outside the form: React events cross portals, and the form's keys mustn't act on it. */}
+      {/* Outside the form: React events cross portals, and the form's keys mustn't act on them. */}
+      <ConfirmDialog
+        open={confirming !== null}
+        onOpenChange={(open) => !open && setConfirming(null)}
+        title="Spend anyway?"
+        message={
+          confirming &&
+          `This takes ${confirming.card.name} to ${pastLevel(confirming.preview, confirming.card)}.`
+        }
+        cancelLabel="Go back"
+        confirmLabel="Spend anyway"
+        destructive
+        onConfirm={() =>
+          confirming &&
+          guarded(() =>
+            commit(confirming.values, confirming.another, confirming),
+          )
+        }
+      />
       {editId !== undefined && (
         <ConfirmDialog
           open={deleting}

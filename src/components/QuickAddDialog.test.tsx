@@ -21,6 +21,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 beforeEach(() => {
   vi.mocked(invoke).mockReset();
+  vi.restoreAllMocks();
 });
 
 const saved = (fields: TransactionFields) => ({ id: 99, ...fields });
@@ -40,6 +41,8 @@ const ANSWERS: Answers = {
   get_period: PERIOD,
   list_transactions: LIST,
   suggest_payees: [],
+  // The card's spending level check asks nothing unless a test says so (CC-11).
+  preview_card_spend: null,
 };
 
 // Corner Cafe last went to Dining Out; Cinema's category is archived now (TXN-6).
@@ -805,4 +808,136 @@ test("after Save & add another, an archived category isn't offered any more", as
   expect(
     screen.queryByRole("option", { name: "Snacks (archived)" }),
   ).toBeNull();
+});
+
+// CC-11, UI_FLOWS F16: the card's levels are 3,000.00, 4,000.00 and 5,000.00.
+const spending = (
+  spent: number,
+  levelBefore: string,
+  levelAfter: string,
+): Answers => ({
+  ...ANSWERS,
+  preview_card_spend: { spent, levelBefore, levelAfter },
+});
+
+async function saveDining(answers: Answers, button = "Save") {
+  await openQuickAdd(answers);
+  type(amount(), "250");
+  type(field("Category"), "din");
+  key("Enter");
+  fireEvent.click(dialog().getByRole("button", { name: button }));
+  await waitFor(() => expect(calls("preview_card_spend")).toHaveLength(1));
+}
+
+test("an expense on a card asks the spending level check first", async () => {
+  await saveDining(ANSWERS);
+  expect(calls("preview_card_spend")).toEqual([
+    {
+      spend: {
+        accountId: 4,
+        amount: 25000,
+        date: TODAY,
+        transactionId: null,
+      },
+    },
+  ]);
+  await waitFor(() => expect(calls("create_transaction")).toHaveLength(1));
+});
+
+test("at the hard level it asks Spend anyway?, and Go back keeps the form", async () => {
+  await saveDining(spending(512000, "mid", "hard"));
+  const confirm = await screen.findByRole("dialog", {
+    name: "Spend anyway?",
+  });
+  expect(
+    within(confirm).getByText(
+      "This takes Credit card to ₱5,120.00 this cycle, past your ₱5,000.00 hard level.",
+    ),
+  ).toBeTruthy();
+  fireEvent.click(within(confirm).getByRole("button", { name: "Go back" }));
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Spend anyway?" })).toBeNull(),
+  );
+  expect(calls("create_transaction")).toEqual([]);
+  expect(amount().value).toBe("250.00");
+  // The form can be saved again, and asks again.
+  fireEvent.click(dialog().getByRole("button", { name: "Save" }));
+  await screen.findByRole("dialog", { name: "Spend anyway?" });
+  expect(calls("preview_card_spend")).toHaveLength(2);
+});
+
+test("Spend anyway saves, with no level warning after it", async () => {
+  const warning = vi.spyOn(notify, "warning");
+  await saveDining(spending(512000, "mid", "hard"));
+  const confirm = await screen.findByRole("dialog", {
+    name: "Spend anyway?",
+  });
+  fireEvent.click(
+    within(confirm).getByRole("button", { name: "Spend anyway" }),
+  );
+  await waitFor(() => expect(calls("create_transaction")).toHaveLength(1));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(warning).not.toHaveBeenCalled();
+});
+
+test("Save & add another goes through Spend anyway and starts the next row", async () => {
+  await saveDining(spending(512000, "hard", "hard"), "Save & add another");
+  const confirm = await screen.findByRole("dialog", {
+    name: "Spend anyway?",
+  });
+  fireEvent.click(
+    within(confirm).getByRole("button", { name: "Spend anyway" }),
+  );
+  await waitFor(() => expect(calls("create_transaction")).toHaveLength(1));
+  await waitFor(() => expect(amount().value).toBe(""));
+  expect(screen.getByRole("dialog", { name: "Add transaction" })).toBeTruthy();
+});
+
+test("a soft or mid level reached by the save shows a warning", async () => {
+  await saveDining(spending(324000, "none", "soft"));
+  await waitFor(() => expect(calls("create_transaction")).toHaveLength(1));
+  expect(
+    await screen.findByText(
+      "Credit card: ₱3,240.00 this cycle, past your ₱3,000.00 soft level.",
+    ),
+  ).toBeTruthy();
+});
+
+test("a level already reached before the save shows no warning", async () => {
+  const warning = vi.spyOn(notify, "warning");
+  await saveDining(spending(330000, "soft", "soft"));
+  await waitFor(() => expect(calls("create_transaction")).toHaveLength(1));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(warning).not.toHaveBeenCalled();
+});
+
+test("an expense on another kind of account, or income on a card, never asks", async () => {
+  await openQuickAdd();
+  type(amount(), "250");
+  type(field("Category"), "din");
+  key("Enter");
+  type(field("Account"), "Cash");
+  key("Enter");
+  fireEvent.click(dialog().getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(calls("create_transaction")).toHaveLength(1));
+  expect(calls("preview_card_spend")).toEqual([]);
+});
+
+test("editing an expense on a card sends its id, so its old amount comes off", async () => {
+  renderRoute("/transactions", ANSWERS);
+  fireEvent.click(await screen.findByText("Corner Cafe"));
+  await screen.findByRole("dialog", { name: "Edit transaction" });
+  await waitFor(() => expect(amount().value).toBe("12.50"));
+  fireEvent.click(dialog().getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(calls("update_transaction")).toHaveLength(1));
+  expect(calls("preview_card_spend")).toEqual([
+    {
+      spend: {
+        accountId: 4,
+        amount: 1250,
+        date: "2026-11-04",
+        transactionId: 5,
+      },
+    },
+  ]);
 });

@@ -569,6 +569,9 @@ mod tests {
                 credit_limit: None,
                 statement_day: None,
                 due_day: None,
+                spend_soft: None,
+                spend_mid: None,
+                spend_hard: None,
             },
         };
         let bank = accounts::create(&mut conn, bank, now()).unwrap().id;

@@ -107,6 +107,19 @@ CREATE TABLE accounts (
 ) STRICT;
 ```
 
+Phase 4's migration `0004` adds the spending levels. `ADD COLUMN` can't add a table CHECK, so the whole rule sits on the last column, whose CHECK may name the others. They stay nullable even for a card, since the CHECK is tested on the existing rows as the column is added; the service always writes all three for a card.
+
+```sql
+ALTER TABLE accounts ADD COLUMN spend_soft INTEGER;
+ALTER TABLE accounts ADD COLUMN spend_mid INTEGER;
+ALTER TABLE accounts ADD COLUMN spend_hard INTEGER CHECK (
+  (spend_soft IS NULL AND spend_mid IS NULL AND spend_hard IS NULL)
+  OR (kind = 'credit_card' AND spend_soft IS NOT NULL AND spend_mid IS NOT NULL
+      AND spend_hard IS NOT NULL AND 0 < spend_soft AND spend_soft < spend_mid
+      AND spend_mid < spend_hard)
+);
+```
+
 ### 3.2 `categories`
 
 | Column | Type | Null | Notes |
@@ -842,7 +855,7 @@ level = hard  when spent ≥ spend_hard
 
 - **"Reached" means equal or more.** Exactly ₱3,000.00 spent is the soft level.
 - **Archived cards** show no level; they take no new spending.
-- **The check before saving (CC-11):** for a new or edited expense on a card, dated in the card's current cycle and up to today, the backend works out the level **after** the save: `spent` plus the new amount, less the old amount when an edit keeps it on the same card. When that's `hard`, the form asks "Spend anyway?" first. When it reaches `soft` or `mid` for the first time (the level after is higher than before), it saves and shows a warning toast. A future-dated expense, one dated in an earlier cycle, and recurring dates posted by processing are never asked about.
+- **The check before saving (CC-11):** for a new or edited expense on a card, dated in the card's current cycle and up to today, the backend works out the level **after** the save: `spent` plus the new amount, less the old amount when an edit keeps it on the same card. When that's `hard`, the form asks "Spend anyway?" first. When it reaches `soft` or `mid` for the first time (the level after is higher than before), it saves and shows a warning toast. A future-dated expense, one dated in an earlier cycle, a save that doesn't raise this cycle's spending (an edit of only the note, or one that lowers the amount), and recurring dates posted by processing (Post and Edit & post included, as in §5.17) are never asked about. `preview_card_spend` returns none for those, and for an amount of 0 or less, a missing account or one that isn't an active card, so the save names any error.
 - The levels are warnings only: like the credit limit, they never block a save (CLAUDE.md).
 - They're amounts, but every card already has a credit limit, which locks `currency_decimals` (§1), so they add nothing to that lock.
 
@@ -870,7 +883,7 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | A budget's category is an expense category, and a goal's account isn't a credit card | category / account |
 | A goal's name is 1–50 characters and unique, ignoring case; its target amount is > 0 and ≤ the maximum; its target date, if any, is a real date (past dates are allowed until Phase 4's check below); a new goal can't use an archived account, but an edit may keep the one it has | name / targetAmount / targetDate / accountId |
 | Phase 4 (GOL-6): a goal has a target date, on add and on every edit; adding one, or changing its date, needs a payday rule; and the date isn't before the earliest realistic date (§5.17), checked on add and when an edit changes the date | targetDate |
-| Phase 4 (CC-10): a card's spending levels are each > 0 and ≤ the maximum, with soft < mid < hard; every other kind of account has none | spendSoft / spendMid / spendHard |
+| Phase 4 (CC-10): a card's spending levels are each > 0 and ≤ the maximum, with soft < mid < hard; every other kind of account has none. A card sent without a level keeps the one it has, and a new card gets the default (§2) | spendSoft / spendMid / spendHard |
 | A new budget can't use an archived category, but an edit may keep the one it has. A category, or all spending, has at most one budget per period. | categoryId / period |
 | A recurring rule's template follows the transaction rules above: its date is the start date (§4.1) | that field |
 | A rule's interval is 1–999, its number of times is 1–9,999, and its end date is a real date on or after the start date. A rule ends on a date or after a number of times, not both. | interval / maxOccurrences / endDate |
@@ -1138,3 +1151,9 @@ Answered on 2026-11-16, building goals that follow the forecast (GOL-7):
 102. **A goal's own scheduled deposits don't count against it** (the owner, 2026-11-16): a future transfer from the counted accounts into a dated, unachieved goal's account is left out of the goal forecast, for the suggestion (GOL-5) and the GOL-7 check. Counting it as money out while the goal also asks for its monthly amount counted the saving twice, so scheduling a goal's own deposit moved it later. A deposit bigger than its goal's monthly amount slightly overstates the room the other goals see, which errs toward keeping dates (§5.17).
 103. **Post and Edit & post on a due date are processing**, so they don't move goals, even with an edited amount: the date was already in the forecast, and a goal it leaves late shows as behind and moves on the next save that does (§5.17, item 93).
 
+
+Answered on 2026-11-16, building card spending levels (CC-10, CC-11):
+
+104. **A save that doesn't raise this cycle's spending asks nothing**, even past the hard level: an edit of only the note, or one that lowers the amount, takes nothing further, so "Spend anyway?" would only be noise. A new expense past hard still asks (§5.18).
+105. **Edit & post doesn't ask**, like Post: both are processing a date the rule already scheduled, as §5.17 treats them (§5.18).
+106. **A card sent without a level keeps the one it has**, and a new card gets the default, so a caller that leaves them out never resets the user's levels. The form always sends all three, and an empty one as 0, for the backend to name (§6).

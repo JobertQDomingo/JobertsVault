@@ -113,6 +113,9 @@ test("+ Bank adds a bank account, listed straight away", async () => {
       creditLimit: null,
       statementDay: null,
       dueDay: null,
+      spendSoft: null,
+      spendMid: null,
+      spendHard: null,
     },
   });
 });

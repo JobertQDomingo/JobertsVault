@@ -16,6 +16,9 @@ const account = (over: Partial<Account>): Account => ({
   creditLimit: null,
   statementDay: null,
   dueDay: null,
+  spendSoft: null,
+  spendMid: null,
+  spendHard: null,
   sortOrder: 0,
   archived: false,
   balance: 32000,
@@ -38,6 +41,7 @@ const CARD = account({
     cycleStart: "2026-10-21",
     cycleEnd: "2026-11-20",
     cycleSpending: 41230,
+    spendLevel: "none",
     dueDate: "2026-11-05",
   },
 });
@@ -234,4 +238,25 @@ test("a compact row's button holds only inline content", () => {
     />,
   );
   expect(screen.getByRole("button").querySelector("p, div")).toBeNull();
+});
+
+test("a card's row names the spending level reached, with an icon from mid up (F16)", () => {
+  const level = (spendLevel: "none" | "soft" | "mid" | "hard") =>
+    renderWithSettings(
+      <AccountRow account={{ ...CARD, card: { ...CARD.card!, spendLevel } }} />,
+    ).container;
+  expect(level("none").textContent).not.toContain("level");
+  for (const [name, color, icon] of [
+    ["soft", "text-muted-foreground", false],
+    ["mid", "text-warning", true],
+    ["hard", "text-danger", true],
+  ] as const) {
+    const row = level(name);
+    const tag = within(row).getByText(
+      `${name[0].toUpperCase()}${name.slice(1)} level`,
+    );
+    expect(row.textContent).toContain("Due Nov 5 · ");
+    expect(tag.className).toContain(color);
+    expect(tag.querySelector("svg") !== null).toBe(icon);
+  }
 });

@@ -46,6 +46,7 @@ const rows = () =>
 test("lists the active accounts in order, with the net balance", async () => {
   renderRoute("/accounts", ANSWERS);
   await screen.findByText("Net balance");
+  expect(screen.queryByText(/level/)).toBeNull();
   expect(rows().map((r) => r?.split("₱")[0])).toEqual([
     "CashCash",
     "BankBank",
@@ -95,6 +96,19 @@ test("New account creates a credit card with its limit and days", async () => {
     dialog().getByRole("textbox", { name: "Amount owed now" }),
   ).toBeTruthy();
   type(dialog().getByRole("textbox", { name: "Credit limit" }), "10000");
+  // CC-10: a new card starts at 3,000.00, 4,000.00 and 5,000.00.
+  expect(
+    ["Soft", "Mid", "Hard"].map(
+      (name) =>
+        (dialog().getByRole("textbox", { name }) as HTMLInputElement).value,
+    ),
+  ).toEqual(["3,000.00", "4,000.00", "5,000.00"]);
+  expect(
+    dialog().getByText(
+      "Warnings for each statement cycle's spending. They never block a purchase.",
+    ),
+  ).toBeTruthy();
+  type(dialog().getByRole("textbox", { name: "Hard" }), "6000");
   pick("Statement closes", "Day 20");
   pick("Payment due", "Day 5");
   fireEvent.click(dialog().getByRole("button", { name: "Create account" }));
@@ -108,6 +122,9 @@ test("New account creates a credit card with its limit and days", async () => {
           creditLimit: 1000000,
           statementDay: 20,
           dueDay: 5,
+          spendSoft: 300000,
+          spendMid: 400000,
+          spendHard: 600000,
         },
       },
     ]),
@@ -143,7 +160,51 @@ test("a cash account sends no card fields, and a backend error shows under its f
         creditLimit: null,
         statementDay: null,
         dueDay: null,
+        spendSoft: null,
+        spendMid: null,
+        spendHard: null,
       },
     },
+  ]);
+});
+
+test("a card's row shows the spending level it has reached (CC-10)", async () => {
+  const card = ACCOUNTS[3];
+  const accounts = ACCOUNTS.map((a) =>
+    a === card ? { ...a, card: { ...a.card!, spendLevel: "mid" as const } } : a,
+  );
+  renderRoute("/accounts", {
+    ...ANSWERS,
+    list_accounts: { ...ACCOUNT_LIST, accounts },
+  });
+  await screen.findByText("Net balance");
+  expect(rows()[3]).toContain("Credit card · 6% of limit · Mid level");
+});
+
+test("a card's levels that don't rise get the backend's message under them", async () => {
+  renderRoute("/accounts", {
+    ...ANSWERS,
+    create_account: () => {
+      throw {
+        code: "validation",
+        field: "spendMid",
+        message: "Make it more than the soft level",
+      };
+    },
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "New account" }));
+  type(dialog().getByRole("textbox", { name: "Name" }), "Visa");
+  pick("Type", "Credit card");
+  type(dialog().getByRole("textbox", { name: "Credit limit" }), "10000");
+  pick("Statement closes", "Day 20");
+  pick("Payment due", "Day 5");
+  type(dialog().getByRole("textbox", { name: "Mid" }), "");
+  fireEvent.click(dialog().getByRole("button", { name: "Create account" }));
+  expect(
+    await dialog().findByText("Make it more than the soft level"),
+  ).toBeTruthy();
+  // An empty level goes as 0, for the backend to name.
+  expect(calls("create_account")).toMatchObject([
+    { account: { spendSoft: 300000, spendMid: 0, spendHard: 500000 } },
   ]);
 });

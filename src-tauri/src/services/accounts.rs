@@ -3,11 +3,12 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::domain::account::card_figures;
+use crate::domain::account::{SpendLevel, SpendLevels, card_figures, spend_level};
 use crate::domain::card_cycle::card_cycle;
 use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
+use crate::services::transactions::parse_date;
 use crate::services::{invalid, new_order, stamp};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -36,6 +37,11 @@ pub struct AccountFields {
     pub statement_day: Option<i64>,
     #[ts(type = "number | null")]
     pub due_day: Option<i64>,
+    /// Credit card only (CC-10): the levels for a statement cycle's spending. A card sent
+    /// without one keeps the one it has, or a new card gets the default (DATA_MODEL §2).
+    pub spend_soft: Option<Money>,
+    pub spend_mid: Option<Money>,
+    pub spend_hard: Option<Money>,
 }
 
 #[derive(Clone, Debug, Deserialize, TS)]
@@ -61,6 +67,10 @@ pub struct Account {
     pub credit_limit: Option<Money>,
     pub statement_day: Option<u8>,
     pub due_day: Option<u8>,
+    /// Credit card only (CC-10).
+    pub spend_soft: Option<Money>,
+    pub spend_mid: Option<Money>,
+    pub spend_hard: Option<Money>,
     #[ts(type = "number")]
     pub sort_order: i64,
     pub archived: bool,
@@ -89,7 +99,35 @@ pub struct CardSummary {
     pub cycle_end: NaiveDate,
     /// Expenses on the card from the cycle start through today.
     pub cycle_spending: Money,
+    /// The level `cycle_spending` has reached; none on an archived card (DATA_MODEL §5.18).
+    pub spend_level: SpendLevel,
     pub due_date: NaiveDate,
+}
+
+/// The expense the transaction form is about to save (CC-11).
+#[derive(Clone, Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CardSpend {
+    #[ts(type = "number")]
+    pub account_id: i64,
+    pub amount: Money,
+    /// `YYYY-MM-DD`, as the form has it; one that isn't a date asks nothing.
+    pub date: String,
+    /// The row being edited, whose old amount comes off.
+    #[ts(type = "number | null")]
+    pub transaction_id: Option<i64>,
+}
+
+/// What the save would do to the card's spending this cycle (DATA_MODEL §5.18).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CardSpendPreview {
+    /// This cycle's spending after the save.
+    pub spent: Money,
+    pub level_before: SpendLevel,
+    pub level_after: SpendLevel,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
@@ -133,8 +171,11 @@ pub fn create(
     mut input: NewAccount,
     now: DateTime<Local>,
 ) -> Result<Account, AppError> {
-    validate(input.kind, &mut input.fields)?;
     let tx = conn.transaction()?;
+    if input.kind == AccountKind::CreditCard {
+        fill_levels(&mut input.fields, default_levels(&tx)?);
+    }
+    validate(input.kind, &mut input.fields)?;
     check_name_free(&tx, &input.fields.name, None)?;
     let id = repo::accounts::insert(
         &tx,
@@ -154,7 +195,15 @@ pub fn update(
     now: DateTime<Local>,
 ) -> Result<Account, AppError> {
     let tx = conn.transaction()?;
-    let kind = kind_of(&stored(&tx, id, now.date_naive())?)?;
+    let row = stored(&tx, id, now.date_naive())?;
+    let kind = kind_of(&row)?;
+    if kind == AccountKind::CreditCard {
+        let kept = match levels_of(&row) {
+            Some(levels) => levels,
+            None => default_levels(&tx)?,
+        };
+        fill_levels(&mut input, kept);
+    }
     validate(kind, &mut input)?;
     check_name_free(&tx, &input.name, Some(id))?;
     repo::accounts::update(&tx, id, &values(kind, &input), &stamp(now))?;
@@ -297,7 +346,103 @@ fn validate(kind: AccountKind, fields: &mut AccountFields) -> Result<(), AppErro
             return Err(invalid(field, "Choose a day from 1 to 31"));
         }
     }
+    let levels = [
+        ("spendSoft", fields.spend_soft),
+        ("spendMid", fields.spend_mid),
+        ("spendHard", fields.spend_hard),
+    ];
+    for (field, level) in levels {
+        match level {
+            Some(_) if !card => return Err(invalid(field, "Only a credit card has this field")),
+            Some(amount) if amount <= Money::ZERO => {
+                return Err(invalid(field, "Enter an amount above 0"));
+            }
+            Some(amount) if amount > Money::MAX => {
+                return Err(invalid(field, "That amount is too large"));
+            }
+            _ => {}
+        }
+    }
+    if let (Some(soft), Some(mid), Some(hard)) =
+        (fields.spend_soft, fields.spend_mid, fields.spend_hard)
+    {
+        if mid <= soft {
+            return Err(invalid("spendMid", "Make it more than the soft level"));
+        }
+        if hard <= mid {
+            return Err(invalid("spendHard", "Make it more than the mid level"));
+        }
+    }
     Ok(())
+}
+
+/// 3,000, 4,000 and 5,000 in the main currency unit (DATA_MODEL §2).
+fn default_levels(conn: &Connection) -> Result<SpendLevels, AppError> {
+    let unit = 10_i64.pow(u32::from(super::settings::stored(conn)?.currency_decimals));
+    Ok(SpendLevels {
+        soft: Money(3_000 * unit),
+        mid: Money(4_000 * unit),
+        hard: Money(5_000 * unit),
+    })
+}
+
+/// A card's levels left out of the form take `levels`.
+fn fill_levels(fields: &mut AccountFields, levels: SpendLevels) {
+    fields.spend_soft.get_or_insert(levels.soft);
+    fields.spend_mid.get_or_insert(levels.mid);
+    fields.spend_hard.get_or_insert(levels.hard);
+}
+
+/// A card's stored levels; a row from before them, or a hand-made one, may have none.
+fn levels_of(row: &repo::accounts::Row) -> Option<SpendLevels> {
+    match row.spend_levels {
+        [Some(soft), Some(mid), Some(hard)] => Some(SpendLevels {
+            soft: Money(soft),
+            mid: Money(mid),
+            hard: Money(hard),
+        }),
+        _ => None,
+    }
+}
+
+/// The check before saving an expense on a card (CC-11, DATA_MODEL §5.18). None when it asks
+/// nothing: not an active card, an amount the save will refuse, a date outside the current cycle
+/// or after today, or a save that doesn't raise this cycle's spending (an edit of its note, say).
+pub fn preview_spend(
+    conn: &Connection,
+    spend: CardSpend,
+    today: NaiveDate,
+) -> Result<Option<CardSpendPreview>, AppError> {
+    let Some(row) = repo::accounts::find(conn, spend.account_id, today)? else {
+        return Ok(None);
+    };
+    let (Some(levels), Some(statement_day), Some(due_day), Some(date)) = (
+        levels_of(&row),
+        row.statement_day,
+        row.due_day,
+        parse_date(&spend.date),
+    ) else {
+        return Ok(None);
+    };
+    let Some(cycle) = card_cycle(statement_day, due_day, today) else {
+        return Ok(None);
+    };
+    let end = cycle.end.min(today);
+    if row.archived || spend.amount <= Money::ZERO || date < cycle.start || date > end {
+        return Ok(None);
+    }
+    let before = repo::accounts::expenses_between(conn, row.id, cycle.start, end, None)?;
+    let others =
+        repo::accounts::expenses_between(conn, row.id, cycle.start, end, spend.transaction_id)?;
+    let spent = others.saturating_add(spend.amount.0);
+    if spent <= before {
+        return Ok(None);
+    }
+    Ok(Some(CardSpendPreview {
+        spent: Money(spent),
+        level_before: spend_level(Money(before), levels),
+        level_after: spend_level(Money(spent), levels),
+    }))
 }
 
 /// The row to store: a card keeps its amount owed as a negative opening balance (DATA_MODEL §3.1).
@@ -313,6 +458,8 @@ fn values(kind: AccountKind, fields: &AccountFields) -> repo::accounts::Values<'
         credit_limit: fields.credit_limit.map(|limit| limit.0),
         statement_day: fields.statement_day,
         due_day: fields.due_day,
+        spend_levels: [fields.spend_soft, fields.spend_mid, fields.spend_hard]
+            .map(|l| l.map(|l| l.0)),
     }
 }
 
@@ -346,6 +493,8 @@ fn view(
                 credit_limit: Money(limit),
                 statement_day,
                 due_day,
+                // An archived card takes no new spending, so it shows no level (§5.18).
+                levels: levels_of(&row).filter(|_| !row.archived),
             };
             Some(card_summary(conn, row.id, balance, terms, today)?)
         }
@@ -359,6 +508,9 @@ fn view(
         credit_limit: row.credit_limit.map(Money),
         statement_day: row.statement_day,
         due_day: row.due_day,
+        spend_soft: row.spend_levels[0].map(Money),
+        spend_mid: row.spend_levels[1].map(Money),
+        spend_hard: row.spend_levels[2].map(Money),
         sort_order: row.sort_order,
         archived: row.archived,
         balance,
@@ -385,6 +537,7 @@ struct CardTerms {
     credit_limit: Money,
     statement_day: u8,
     due_day: u8,
+    levels: Option<SpendLevels>,
 }
 
 fn card_summary(
@@ -401,7 +554,8 @@ fn card_summary(
     })?;
     let figures = card_figures(balance, terms.credit_limit);
     // Through today, so a future-dated purchase waits for its date (TXN-8).
-    let spent = repo::accounts::expenses_between(conn, id, cycle.start, cycle.end.min(today))?;
+    let spent =
+        repo::accounts::expenses_between(conn, id, cycle.start, cycle.end.min(today), None)?;
     Ok(CardSummary {
         amount_owed: figures.amount_owed,
         available_credit: figures.available_credit,
@@ -409,6 +563,9 @@ fn card_summary(
         cycle_start: cycle.start,
         cycle_end: cycle.end,
         cycle_spending: Money(spent),
+        spend_level: terms
+            .levels
+            .map_or(SpendLevel::None, |levels| spend_level(Money(spent), levels)),
         due_date: cycle.due,
     })
 }
@@ -477,6 +634,9 @@ mod tests {
             credit_limit: None,
             statement_day: None,
             due_day: None,
+            spend_soft: None,
+            spend_mid: None,
+            spend_hard: None,
         }
     }
 
@@ -518,6 +678,9 @@ mod tests {
                 credit_limit: None,
                 statement_day: None,
                 due_day: None,
+                spend_soft: None,
+                spend_mid: None,
+                spend_hard: None,
                 sort_order: 1,
                 archived: false,
                 balance: Money(100_000),
@@ -1081,5 +1244,250 @@ mod tests {
             })
             .unwrap();
         assert_eq!(updated, "before");
+    }
+    fn levels(account: &Account) -> [Option<i64>; 3] {
+        [account.spend_soft, account.spend_mid, account.spend_hard].map(|l| l.map(|l| l.0))
+    }
+
+    fn with_levels(name: &str, soft: i64, mid: i64, hard: i64) -> NewAccount {
+        let mut new = card(name, 0);
+        new.fields.spend_soft = Some(Money(soft));
+        new.fields.spend_mid = Some(Money(mid));
+        new.fields.spend_hard = Some(Money(hard));
+        new
+    }
+
+    #[test]
+    fn a_new_card_starts_at_3000_4000_and_5000_in_the_main_unit() {
+        let mut conn = db();
+        let visa = create(&mut conn, card("Visa", 0), now()).unwrap();
+        assert_eq!(levels(&visa), [Some(300_000), Some(400_000), Some(500_000)]);
+        assert_eq!(
+            levels(&get(&conn, 1, today()).unwrap()),
+            [None; 3],
+            "Cash has none"
+        );
+
+        let mut conn = db();
+        repo::settings::set(&conn, "currency_decimals", "0").unwrap();
+        let visa = create(&mut conn, card("Visa", 0), now()).unwrap();
+        assert_eq!(levels(&visa), [Some(3_000), Some(4_000), Some(5_000)]);
+    }
+
+    #[test]
+    fn a_cards_levels_are_saved_and_an_edit_without_them_keeps_them() {
+        let mut conn = db();
+        let visa = create(&mut conn, with_levels("Visa", 100, 200, 300), now()).unwrap();
+        assert_eq!(levels(&visa), [Some(100), Some(200), Some(300)]);
+        let mut edit = with_levels("Visa", 150, 250, 350).fields;
+        let edited = update(&mut conn, visa.id, edit.clone(), now()).unwrap();
+        assert_eq!(levels(&edited), [Some(150), Some(250), Some(350)]);
+        edit.spend_mid = None;
+        let kept = update(&mut conn, visa.id, edit, now()).unwrap();
+        assert_eq!(levels(&kept), [Some(150), Some(250), Some(350)]);
+    }
+
+    #[test]
+    fn each_level_is_above_0_and_they_rise_from_soft_to_hard() {
+        let mut conn = db();
+        for (soft, mid, hard, field) in [
+            (0, 200, 300, "spendSoft"),
+            (-1, 200, 300, "spendSoft"),
+            (100, 200, Money::MAX.0 + 1, "spendHard"),
+            (100, 100, 300, "spendMid"),
+            (100, 50, 300, "spendMid"),
+            (100, 200, 200, "spendHard"),
+        ] {
+            assert_eq!(
+                field_of(create(
+                    &mut conn,
+                    with_levels("Visa", soft, mid, hard),
+                    now()
+                )),
+                field,
+                "{soft} {mid} {hard}"
+            );
+        }
+        let visa = create(&mut conn, with_levels("Visa", 100, 200, 300), now()).unwrap();
+        let edit = with_levels("Visa", 100, 300, 300).fields;
+        assert_eq!(
+            field_of(update(&mut conn, visa.id, edit, now())),
+            "spendHard"
+        );
+    }
+
+    #[test]
+    fn only_a_card_has_levels() {
+        let mut conn = db();
+        for field in ["spendSoft", "spendMid", "spendHard"] {
+            let mut bank = new("Bank", AccountKind::Bank, 0);
+            let level = Some(Money(100));
+            match field {
+                "spendSoft" => bank.fields.spend_soft = level,
+                "spendMid" => bank.fields.spend_mid = level,
+                _ => bank.fields.spend_hard = level,
+            }
+            assert_eq!(field_of(create(&mut conn, bank.clone(), now())), field);
+            let cash = bank.fields;
+            assert_eq!(field_of(update(&mut conn, 1, cash, now())), field);
+        }
+    }
+
+    fn level_now(conn: &Connection, id: i64) -> SpendLevel {
+        get(conn, id, today()).unwrap().card.unwrap().spend_level
+    }
+
+    #[test]
+    fn the_card_summary_shows_the_level_reached_at_exactly_its_amount() {
+        let mut conn = db();
+        let visa = create(&mut conn, card("Visa", 0), now()).unwrap().id;
+        // This cycle is Oct 21 – Nov 20; today is Nov 3.
+        txn(&conn, "expense", 299_999, d(2026, 10, 21), visa, None);
+        assert_eq!(level_now(&conn, visa), SpendLevel::None);
+        for (add, level) in [
+            (1, SpendLevel::Soft),
+            (99_999, SpendLevel::Soft),
+            (1, SpendLevel::Mid),
+            (100_000, SpendLevel::Hard),
+        ] {
+            txn(&conn, "expense", add, today(), visa, None);
+            assert_eq!(level_now(&conn, visa), level);
+        }
+    }
+
+    #[test]
+    fn a_refund_doesnt_lower_the_level_and_an_archived_card_shows_none() {
+        let mut conn = db();
+        let visa = create(&mut conn, card("Visa", 0), now()).unwrap().id;
+        txn(&conn, "expense", 300_000, today(), visa, None);
+        // Refunds are income: they offset the balance, not the spending (DATA_MODEL §5.2).
+        txn(&conn, "income", 100_000, today(), visa, None);
+        assert_eq!(level_now(&conn, visa), SpendLevel::Soft);
+        let preview = preview_spend(&conn, spend(visa, 1, today(), None), today()).unwrap();
+        assert_eq!(preview.unwrap().level_before, SpendLevel::Soft);
+        archive(&mut conn, visa, true, now()).unwrap();
+        assert_eq!(level_now(&conn, visa), SpendLevel::None);
+    }
+
+    #[test]
+    fn a_card_without_levels_shows_none_and_asks_nothing() {
+        let mut conn = db();
+        let visa = create(&mut conn, card("Visa", 0), now()).unwrap().id;
+        conn.execute(
+            "UPDATE accounts SET spend_soft = NULL, spend_mid = NULL, spend_hard = NULL",
+            [],
+        )
+        .unwrap();
+        txn(&conn, "expense", 600_000, today(), visa, None);
+        assert_eq!(level_now(&conn, visa), SpendLevel::None);
+        assert_eq!(
+            preview_spend(&conn, spend(visa, 1, today(), None), today()).unwrap(),
+            None
+        );
+    }
+
+    fn spend(account_id: i64, amount: i64, date: NaiveDate, edit: Option<i64>) -> CardSpend {
+        CardSpend {
+            account_id,
+            amount: Money(amount),
+            date: date.to_string(),
+            transaction_id: edit,
+        }
+    }
+
+    fn preview(
+        conn: &Connection,
+        account: i64,
+        amount: i64,
+        edit: Option<i64>,
+    ) -> Option<(i64, SpendLevel, SpendLevel)> {
+        preview_spend(conn, spend(account, amount, today(), edit), today())
+            .unwrap()
+            .map(|p| (p.spent.0, p.level_before, p.level_after))
+    }
+
+    #[test]
+    fn the_preview_gives_the_level_before_and_after_reached_at_exactly_its_amount() {
+        let mut conn = db();
+        let visa = create(&mut conn, card("Visa", 0), now()).unwrap().id;
+        txn(&conn, "expense", 200_000, today(), visa, None);
+        use SpendLevel::{Hard, Mid, None as Below, Soft};
+        assert_eq!(
+            preview(&conn, visa, 99_999, None),
+            Some((299_999, Below, Below))
+        );
+        assert_eq!(
+            preview(&conn, visa, 100_000, None),
+            Some((300_000, Below, Soft))
+        );
+        assert_eq!(
+            preview(&conn, visa, 200_000, None),
+            Some((400_000, Below, Mid))
+        );
+        assert_eq!(
+            preview(&conn, visa, 300_000, None),
+            Some((500_000, Below, Hard))
+        );
+        txn(&conn, "expense", 300_000, today(), visa, None);
+        // Already past hard, a new expense still asks.
+        assert_eq!(preview(&conn, visa, 1, None), Some((500_001, Hard, Hard)));
+    }
+
+    #[test]
+    fn an_edit_takes_its_old_amount_off_only_when_it_stays_on_the_card() {
+        let mut conn = db();
+        let visa = create(&mut conn, card("Visa", 0), now()).unwrap().id;
+        txn(&conn, "expense", 200_000, today(), visa, None);
+        txn(&conn, "expense", 100_000, today(), visa, None);
+        let on_card = conn.last_insert_rowid();
+        txn(&conn, "expense", 100_000, today(), 1, None);
+        let on_cash = conn.last_insert_rowid();
+        use SpendLevel::{Mid, Soft};
+        assert_eq!(
+            preview(&conn, visa, 150_000, Some(on_card)),
+            Some((350_000, Soft, Soft))
+        );
+        assert_eq!(
+            preview(&conn, visa, 200_000, Some(on_card)),
+            Some((400_000, Soft, Mid))
+        );
+        assert_eq!(
+            preview(&conn, visa, 100_000, Some(on_cash)),
+            Some((400_000, Soft, Mid))
+        );
+        // An edit that doesn't raise this cycle's spending, such as a new note, asks nothing.
+        assert_eq!(preview(&conn, visa, 100_000, Some(on_card)), None);
+        assert_eq!(preview(&conn, visa, 50_000, Some(on_card)), None);
+    }
+
+    #[test]
+    fn the_preview_asks_only_about_this_cycle_up_to_today_on_an_active_card() {
+        let mut conn = db();
+        let visa = create(&mut conn, card("Visa", 0), now()).unwrap().id;
+        let other = create(&mut conn, card("Other", 0), now()).unwrap().id;
+        txn(&conn, "expense", 600_000, today(), visa, None);
+        let at = |id, amount, date: &str| {
+            let spend = CardSpend {
+                account_id: id,
+                amount: Money(amount),
+                date: date.into(),
+                transaction_id: None,
+            };
+            preview_spend(&conn, spend, today()).unwrap()
+        };
+        assert!(at(visa, 1, "2026-10-21").is_some(), "the cycle's first day");
+        for (id, amount, date, why) in [
+            (visa, 1, "2026-11-04", "future-dated (TXN-8)"),
+            (visa, 1, "2026-10-20", "an earlier cycle"),
+            (visa, 0, "2026-11-03", "an amount the save refuses"),
+            (visa, 1, "2026-13-01", "not a date"),
+            (1, 1, "2026-11-03", "Cash isn't a card"),
+            (999, 1, "2026-11-03", "no such account"),
+        ] {
+            assert_eq!(at(id, amount, date), None, "{why}");
+        }
+        archive(&mut conn, other, true, now()).unwrap();
+        let archived = preview_spend(&conn, spend(other, 600_000, today(), None), today());
+        assert_eq!(archived.unwrap(), None, "an archived card");
     }
 }

@@ -653,6 +653,9 @@ mod tests {
             credit_limit: card.then_some(Money(5_000_000)),
             statement_day: card.then_some(20),
             due_day: card.then_some(5),
+            spend_soft: None,
+            spend_mid: None,
+            spend_hard: None,
         };
         accounts::create(conn, NewAccount { kind, fields }, now())
             .unwrap()

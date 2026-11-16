@@ -10,6 +10,8 @@ pub struct Row {
     pub credit_limit: Option<i64>,
     pub statement_day: Option<u8>,
     pub due_day: Option<u8>,
+    /// Card only: soft, mid and hard (DATA_MODEL §5.18).
+    pub spend_levels: [Option<i64>; 3],
     pub sort_order: i64,
     pub archived: bool,
     /// Calculated as of the date asked for, never stored (DATA_MODEL §5.1).
@@ -26,12 +28,13 @@ pub struct Values<'a> {
     pub credit_limit: Option<i64>,
     pub statement_day: Option<i64>,
     pub due_day: Option<i64>,
+    pub spend_levels: [Option<i64>; 3],
 }
 
 /// `?1` is the as-of date: later transactions don't count.
 const SELECT: &str =
     "SELECT a.id, a.name, a.kind, a.opening_balance, a.credit_limit, a.statement_day,
-            a.due_day, a.sort_order, a.archived,
+            a.due_day, a.sort_order, a.archived, a.spend_soft, a.spend_mid, a.spend_hard,
             a.opening_balance
             + COALESCE((SELECT SUM(CASE t.kind WHEN 'income' THEN t.amount ELSE -t.amount END)
                         FROM transactions t WHERE t.account_id = a.id AND t.date <= ?1), 0)
@@ -56,8 +59,9 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
         due_day: r.get(6)?,
         sort_order: r.get(7)?,
         archived: r.get(8)?,
-        balance: r.get(9)?,
-        in_use: r.get(10)?,
+        spend_levels: [r.get(9)?, r.get(10)?, r.get(11)?],
+        balance: r.get(12)?,
+        in_use: r.get(13)?,
     })
 }
 
@@ -89,9 +93,20 @@ pub fn name_taken(conn: &Connection, name: &str, except: Option<i64>) -> rusqlit
 /// Adds the account after every other one and returns its id.
 pub fn insert(conn: &Connection, kind: &str, v: &Values, now: &str) -> rusqlite::Result<i64> {
     conn.execute(
-        "INSERT INTO accounts (name, kind, opening_balance, credit_limit, statement_day, due_day, sort_order, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, (SELECT COALESCE(MAX(sort_order) + 1, 0) FROM accounts), ?7, ?7)",
-        params![v.name, kind, v.opening_balance, v.credit_limit, v.statement_day, v.due_day, now],
+        "INSERT INTO accounts (name, kind, opening_balance, credit_limit, statement_day, due_day, spend_soft, spend_mid, spend_hard, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?8, ?9, ?10, (SELECT COALESCE(MAX(sort_order) + 1, 0) FROM accounts), ?7, ?7)",
+        params![
+            v.name,
+            kind,
+            v.opening_balance,
+            v.credit_limit,
+            v.statement_day,
+            v.due_day,
+            now,
+            v.spend_levels[0],
+            v.spend_levels[1],
+            v.spend_levels[2]
+        ],
     )?;
     Ok(conn.last_insert_rowid())
 }
@@ -99,8 +114,19 @@ pub fn insert(conn: &Connection, kind: &str, v: &Values, now: &str) -> rusqlite:
 pub fn update(conn: &Connection, id: i64, v: &Values, now: &str) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE accounts SET name = ?2, opening_balance = ?3, credit_limit = ?4, statement_day = ?5,
-         due_day = ?6, updated_at = ?7 WHERE id = ?1",
-        params![id, v.name, v.opening_balance, v.credit_limit, v.statement_day, v.due_day, now],
+         due_day = ?6, updated_at = ?7, spend_soft = ?8, spend_mid = ?9, spend_hard = ?10 WHERE id = ?1",
+        params![
+            id,
+            v.name,
+            v.opening_balance,
+            v.credit_limit,
+            v.statement_day,
+            v.due_day,
+            now,
+            v.spend_levels[0],
+            v.spend_levels[1],
+            v.spend_levels[2]
+        ],
     )?;
     Ok(())
 }
@@ -135,17 +161,19 @@ pub fn set_sort_order(
     )
 }
 
-/// The account's expenses dated `start` through `end`, both included.
+/// The account's expenses dated `start` through `end`, both included, leaving out the
+/// transaction `except` (one being edited, DATA_MODEL §5.18).
 pub fn expenses_between(
     conn: &Connection,
     id: i64,
     start: NaiveDate,
     end: NaiveDate,
+    except: Option<i64>,
 ) -> rusqlite::Result<i64> {
     conn.query_row(
         "SELECT COALESCE(SUM(amount), 0) FROM transactions
-         WHERE kind = 'expense' AND account_id = ?1 AND date BETWEEN ?2 AND ?3",
-        params![id, start.to_string(), end.to_string()],
+         WHERE kind = 'expense' AND account_id = ?1 AND date BETWEEN ?2 AND ?3 AND id IS NOT ?4",
+        params![id, start.to_string(), end.to_string(), except],
         |r| r.get(0),
     )
 }

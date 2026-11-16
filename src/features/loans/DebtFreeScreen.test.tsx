@@ -20,6 +20,8 @@ beforeEach(() => {
 });
 
 const ANSWERS: Answers = {
+  // Quick-add's card spending level check (CC-11) asks nothing here.
+  preview_card_spend: null,
   list_loans: LOANS,
   list_accounts: ACCOUNT_LIST,
   list_categories: LOAN_CATEGORIES,

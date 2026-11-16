@@ -1,7 +1,9 @@
 use tauri::State;
 
 use crate::error::AppError;
-use crate::services::accounts::{Account, AccountFields, AccountList, NewAccount};
+use crate::services::accounts::{
+    Account, AccountFields, AccountList, CardSpend, CardSpendPreview, NewAccount,
+};
 use crate::state::AppState;
 use crate::{log, services};
 
@@ -66,5 +68,15 @@ pub fn unarchive_account(state: State<'_, AppState>, id: i64) -> Result<(), AppE
 #[tauri::command(async)]
 pub fn delete_account(state: State<'_, AppState>, id: i64) -> Result<(), AppError> {
     services::accounts::delete(&mut *state.conn()?, id, chrono::Local::now())
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+/// The spending level check before saving an expense on a card (CC-11); none when it asks nothing.
+#[tauri::command(async)]
+pub fn preview_card_spend(
+    state: State<'_, AppState>,
+    spend: CardSpend,
+) -> Result<Option<CardSpendPreview>, AppError> {
+    services::accounts::preview_spend(&*state.conn()?, spend, chrono::Local::now().date_naive())
         .inspect_err(|err| log::record(&state.log_path, err))
 }

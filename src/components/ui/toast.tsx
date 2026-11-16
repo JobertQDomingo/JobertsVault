@@ -1,4 +1,4 @@
-import { CircleAlert, CircleCheck } from "lucide-react";
+import { CircleAlert, CircleCheck, TriangleAlert } from "lucide-react";
 import { Toaster as Sonner, toast } from "sonner";
 
 /** Rendered once. Toasts are Level 2 glass at the bottom right and close after 4 s (DESIGN_SYSTEM §9.1). */
@@ -15,6 +15,7 @@ export function Toaster() {
       icons={{
         success: <CircleCheck className="size-4 text-success" />,
         error: <CircleAlert className="size-4 text-danger" />,
+        warning: <TriangleAlert className="size-4 text-warning" />,
       }}
       toastOptions={{
         unstyled: true,
@@ -40,6 +41,8 @@ export const notify = {
   /** No icon, one line per `\n`, and 8 s, as a note can run to several lines. */
   info: (message: string) =>
     toast(message, { duration: 8_000, className: "whitespace-pre-line" }),
+  /** Something to know about a save that went ahead, such as a card spending level (CC-11). */
+  warning: (message: string) => toast.warning(message, { duration: 8_000 }),
   // Errors stay until closed, so they can't be missed.
   error: (message: string) =>
     toast.error(message, { duration: Infinity, closeButton: true }),

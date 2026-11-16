@@ -10,7 +10,11 @@ export type Account = { id: number, name: string, kind: AccountKind,
 /**
  * As the form shows it: 0 or more, and the amount owed for a credit card.
  */
-openingBalance: Money, creditLimit: Money | null, statementDay: number | null, dueDay: number | null, sortOrder: number, archived: boolean, 
+openingBalance: Money, creditLimit: Money | null, statementDay: number | null, dueDay: number | null, 
+/**
+ * Credit card only (CC-10).
+ */
+spendSoft: Money | null, spendMid: Money | null, spendHard: Money | null, sortOrder: number, archived: boolean, 
 /**
  * Signed and calculated as of today: card debt is negative (DATA_MODEL §5.1).
  */
