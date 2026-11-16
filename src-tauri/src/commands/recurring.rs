@@ -1,6 +1,7 @@
 use tauri::State;
 
 use crate::error::AppError;
+use crate::services::goals::Saved;
 use crate::services::recurring::{DueOccurrence, RecurringRule, RecurringRuleFields};
 use crate::services::transactions::{Transaction, TransactionFields};
 use crate::state::AppState;
@@ -15,7 +16,7 @@ pub fn list_recurring_rules(state: State<'_, AppState>) -> Result<Vec<RecurringR
 pub fn create_recurring_rule(
     state: State<'_, AppState>,
     rule: RecurringRuleFields,
-) -> Result<RecurringRule, AppError> {
+) -> Result<Saved<RecurringRule>, AppError> {
     services::recurring::create(&mut *state.conn()?, rule, chrono::Local::now())
         .inspect_err(|err| log::record(&state.log_path, err))
 }
@@ -25,7 +26,7 @@ pub fn update_recurring_rule(
     state: State<'_, AppState>,
     id: i64,
     rule: RecurringRuleFields,
-) -> Result<RecurringRule, AppError> {
+) -> Result<Saved<RecurringRule>, AppError> {
     services::recurring::update(&mut *state.conn()?, id, rule, chrono::Local::now())
         .inspect_err(|err| log::record(&state.log_path, err))
 }

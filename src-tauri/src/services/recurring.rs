@@ -9,6 +9,7 @@ use crate::domain::money::Money;
 use crate::domain::recurrence::{Frequency, Schedule};
 use crate::error::AppError;
 use crate::repo;
+use crate::services::goals::{self, Saved};
 use crate::services::transactions::{self, Transaction, TransactionFields, TransactionKind};
 use crate::services::{invalid, not_found, stamp};
 
@@ -75,12 +76,15 @@ pub fn create(
     conn: &mut Connection,
     mut fields: RecurringRuleFields,
     now: DateTime<Local>,
-) -> Result<RecurringRule, AppError> {
+) -> Result<Saved<RecurringRule>, AppError> {
     let tx = conn.transaction()?;
     validate(&tx, &mut fields, None, now.date_naive())?;
     let id = repo::recurring::insert(&tx, &values(&fields), &stamp(now))?;
     catch_up(&tx, self::stored(&tx, id)?, now)?;
-    let saved = get(&tx, id)?;
+    let saved = Saved {
+        saved: get(&tx, id)?,
+        goals_moved: goals::follow_forecast(&tx, now)?,
+    };
     tx.commit()?;
     Ok(saved)
 }
@@ -92,7 +96,7 @@ pub fn update(
     id: i64,
     mut fields: RecurringRuleFields,
     now: DateTime<Local>,
-) -> Result<RecurringRule, AppError> {
+) -> Result<Saved<RecurringRule>, AppError> {
     let tx = conn.transaction()?;
     let stored = stored(&tx, id)?;
     validate(&tx, &mut fields, Some(&stored), now.date_naive())?;
@@ -121,7 +125,10 @@ pub fn update(
     };
     repo::recurring::update(&tx, id, &values(&fields), next_index, &stamp(now))?;
     catch_up(&tx, self::stored(&tx, id)?, now)?;
-    let saved = get(&tx, id)?;
+    let saved = Saved {
+        saved: get(&tx, id)?,
+        goals_moved: goals::follow_forecast(&tx, now)?,
+    };
     tx.commit()?;
     Ok(saved)
 }
@@ -734,17 +741,17 @@ mod tests {
     fn upcoming_lists_each_active_rules_dates_in_the_next_7_days() {
         let mut conn = db();
         let today = on("2026-11-12");
-        let monthly = create(&mut conn, rent("2026-11-15"), today).unwrap();
+        let monthly = create(&mut conn, rent("2026-11-15"), today).unwrap().saved;
         let mut every_3 = rent("2026-11-10");
         every_3.frequency = Frequency::Daily;
         every_3.interval = 3;
         every_3.mode = RecurringMode::Confirm;
-        let daily = create(&mut conn, every_3, today).unwrap();
+        let daily = create(&mut conn, every_3, today).unwrap().saved;
         // Nov 10 is already in the Due list, so it isn't coming up.
         assert_eq!(dates(&conn, daily.id), ["2026-11-10"]);
         let mut weekly = rent("2026-11-14");
         weekly.frequency = Frequency::Weekly;
-        let paused = create(&mut conn, weekly, today).unwrap();
+        let paused = create(&mut conn, weekly, today).unwrap().saved;
         pause(&mut conn, paused.id, true, today).unwrap();
         create(&mut conn, rent("2026-11-20"), today).unwrap();
         let shown: Vec<_> = upcoming(&conn, d("2026-11-12"))
@@ -770,7 +777,7 @@ mod tests {
     #[test]
     fn a_new_rule_is_saved_trimmed_and_starts_on_its_start_date() {
         let mut conn = db();
-        let saved = create(&mut conn, rent("2026-11-30"), now()).unwrap();
+        let saved = create(&mut conn, rent("2026-11-30"), now()).unwrap().saved;
         assert_eq!(saved.transaction.payee.as_deref(), Some("Landlord"));
         assert_eq!(saved.transaction.note, None);
         assert_eq!(saved.next_date, Some(d("2026-11-30")));
@@ -782,10 +789,10 @@ mod tests {
     #[test]
     fn a_start_date_may_be_in_the_past_or_the_future() {
         let mut conn = db();
-        let later = create(&mut conn, rent("2027-03-15"), now()).unwrap();
+        let later = create(&mut conn, rent("2027-03-15"), now()).unwrap().saved;
         assert_eq!(later.next_date, Some(d("2027-03-15")));
         // now() is Nov 3, 2026: Jun 1, 2025 to Nov 1, 2026 are filled in on save.
-        let past = create(&mut conn, rent("2025-06-01"), now()).unwrap();
+        let past = create(&mut conn, rent("2025-06-01"), now()).unwrap().saved;
         assert_eq!(past.next_date, Some(d("2026-12-01")));
         assert_eq!(dates(&conn, past.id).len(), 18);
         assert_eq!(transaction_count(&conn), 18);
@@ -835,7 +842,7 @@ mod tests {
         let mut same_day = rent("2026-01-31");
         same_day.end_date = Some("2026-01-31".into());
         assert_eq!(
-            create(&mut conn, same_day, now()).unwrap().end_date,
+            create(&mut conn, same_day, now()).unwrap().saved.end_date,
             Some(d("2026-01-31"))
         );
         assert!(list(&conn).unwrap().len() == 1, "nothing else was saved");
@@ -844,7 +851,10 @@ mod tests {
     #[test]
     fn an_archived_category_can_be_kept_but_not_chosen() {
         let mut conn = db();
-        let id = create(&mut conn, rent("2026-01-31"), now()).unwrap().id;
+        let id = create(&mut conn, rent("2026-01-31"), now())
+            .unwrap()
+            .saved
+            .id;
         categories::archive(&mut conn, FOOD, now()).unwrap();
         assert_eq!(
             field(create(&mut conn, rent("2026-01-31"), now())),
@@ -855,6 +865,7 @@ mod tests {
         assert_eq!(
             update(&mut conn, id, cheaper, now())
                 .unwrap()
+                .saved
                 .transaction
                 .amount,
             Money(1_200_000)
@@ -865,12 +876,15 @@ mod tests {
     fn a_template_edit_changes_future_dates_only() {
         let mut conn = db();
         let feb_28 = on("2026-02-28");
-        let id = create(&mut conn, rent("2026-01-31"), feb_28).unwrap().id;
+        let id = create(&mut conn, rent("2026-01-31"), feb_28)
+            .unwrap()
+            .saved
+            .id;
         let mut edit = rent("2026-01-31");
         edit.transaction.amount = Money(1_600_000);
         edit.mode = RecurringMode::Confirm;
         edit.max_occurrences = Some(5);
-        let saved = update(&mut conn, id, edit, feb_28).unwrap();
+        let saved = update(&mut conn, id, edit, feb_28).unwrap().saved;
         assert_eq!(saved.next_date, Some(d("2026-03-31")), "the place is kept");
         assert_eq!(saved.mode, RecurringMode::Confirm);
         assert_eq!(occurrences(&conn, id)[1].1, "posted", "Feb 28 stays posted");
@@ -882,7 +896,7 @@ mod tests {
         let feb_28 = on("2026-02-28");
         let mut fields = rent("2026-01-31");
         fields.max_occurrences = Some(4);
-        let id = create(&mut conn, fields, feb_28).unwrap().id;
+        let id = create(&mut conn, fields, feb_28).unwrap().saved.id;
         assert_eq!(dates(&conn, id), ["2026-01-31", "2026-02-28"]);
 
         let mut too_early = rent("2026-02-28");
@@ -893,7 +907,7 @@ mod tests {
         let mut every_2 = rent("2026-03-31");
         every_2.interval = 2;
         every_2.max_occurrences = Some(4);
-        let saved = update(&mut conn, id, every_2, feb_28).unwrap();
+        let saved = update(&mut conn, id, every_2, feb_28).unwrap().saved;
         assert_eq!(saved.next_date, Some(d("2026-03-31")));
         process_due(&mut conn, on("2026-03-31")).unwrap();
         assert_eq!(rule(&conn, id).next_date, Some(d("2026-05-31")));
@@ -911,6 +925,7 @@ mod tests {
         let mut conn = db();
         let id = create(&mut conn, rent("2026-01-31"), on("2026-01-31"))
             .unwrap()
+            .saved
             .id;
         pause(&mut conn, id, true, now()).unwrap();
         pause(&mut conn, id, false, now()).unwrap();
@@ -921,7 +936,10 @@ mod tests {
         let mut from_today = rent("2026-11-03");
         from_today.interval = 2;
         assert_eq!(
-            update(&mut conn, id, from_today, now()).unwrap().next_date,
+            update(&mut conn, id, from_today, now())
+                .unwrap()
+                .saved
+                .next_date,
             Some(d("2027-01-03"))
         );
         assert_eq!(dates(&conn, id), ["2026-01-31", "2026-11-03"]);
@@ -933,10 +951,10 @@ mod tests {
         // now() is Nov 3, 2026: both end after Feb 28.
         let mut twice = rent("2026-01-31");
         twice.max_occurrences = Some(2);
-        let twice = create(&mut conn, twice, now()).unwrap().id;
+        let twice = create(&mut conn, twice, now()).unwrap().saved.id;
         let mut until = rent("2026-01-31");
         until.end_date = Some("2026-03-15".into());
-        let until = create(&mut conn, until, now()).unwrap().id;
+        let until = create(&mut conn, until, now()).unwrap().saved.id;
         assert_eq!(rule(&conn, twice).next_date, None);
 
         let mut more = rent("2026-01-31");
@@ -944,7 +962,7 @@ mod tests {
         let mut later = rent("2026-01-31");
         later.end_date = Some("2026-12-31".into());
         for (id, edit) in [(twice, more), (until, later)] {
-            let saved = update(&mut conn, id, edit, now()).unwrap();
+            let saved = update(&mut conn, id, edit, now()).unwrap().saved;
             assert_eq!(saved.next_date, Some(d("2026-11-30")), "Mar–Oct never come");
             assert_eq!(dates(&conn, id), ["2026-01-31", "2026-02-28"]);
         }
@@ -953,10 +971,14 @@ mod tests {
     #[test]
     fn a_rule_not_started_yet_can_start_earlier_but_not_in_the_past() {
         let mut conn = db();
-        let id = create(&mut conn, rent("2027-01-31"), now()).unwrap().id;
+        let id = create(&mut conn, rent("2027-01-31"), now())
+            .unwrap()
+            .saved
+            .id;
         assert_eq!(
             update(&mut conn, id, rent("2026-12-15"), now())
                 .unwrap()
+                .saved
                 .next_date,
             Some(d("2026-12-15"))
         );
@@ -971,6 +993,7 @@ mod tests {
         let mut conn = db();
         let id = create(&mut conn, rent("2026-01-31"), on("2026-01-31"))
             .unwrap()
+            .saved
             .id;
         let paused = pause(&mut conn, id, true, now()).unwrap();
         assert!(paused.paused);
@@ -998,7 +1021,10 @@ mod tests {
         let mut conn = db();
         let mut fields = rent("2026-01-31");
         fields.max_occurrences = Some(2);
-        let id = create(&mut conn, fields, on("2026-01-31")).unwrap().id;
+        let id = create(&mut conn, fields, on("2026-01-31"))
+            .unwrap()
+            .saved
+            .id;
         pause(&mut conn, id, true, now()).unwrap();
         let resumed = pause(&mut conn, id, false, now()).unwrap();
         assert_eq!(resumed.next_date, Some(d("2026-11-30")), "one time left");
@@ -1009,6 +1035,7 @@ mod tests {
         let mut conn = db();
         let id = create(&mut conn, rent("2026-01-31"), on("2026-01-31"))
             .unwrap()
+            .saved
             .id;
         let txn = occurrences(&conn, id)[0].2.unwrap();
         delete(&mut conn, id).unwrap();
@@ -1073,7 +1100,10 @@ mod tests {
     #[test]
     fn merging_categories_moves_their_rules() {
         let mut conn = db();
-        let id = create(&mut conn, rent("2026-01-31"), now()).unwrap().id;
+        let id = create(&mut conn, rent("2026-01-31"), now())
+            .unwrap()
+            .saved
+            .id;
         categories::merge(&mut conn, FOOD, DINING, now()).unwrap();
         assert_eq!(rule(&conn, id).transaction.category_id, Some(DINING));
     }
@@ -1083,6 +1113,7 @@ mod tests {
         let mut conn = db();
         let id = create(&mut conn, rent("2026-01-31"), on("2026-01-01"))
             .unwrap()
+            .saved
             .id;
         assert!(dates(&conn, id).is_empty(), "not due yet");
 
@@ -1127,7 +1158,8 @@ mod tests {
         let mut conn = db();
         let savings = bank(&mut conn, "Savings");
         let last_open = on("2026-08-10");
-        let make = |conn: &mut Connection, fields| create(conn, fields, last_open).unwrap().id;
+        let make =
+            |conn: &mut Connection, fields| create(conn, fields, last_open).unwrap().saved.id;
 
         let mut daily = rent("2026-08-01");
         daily.frequency = Frequency::Daily;
@@ -1264,7 +1296,7 @@ mod tests {
         let mut conn = db();
         let mut fields = rent("2026-10-31");
         fields.mode = RecurringMode::Confirm;
-        let id = create(&mut conn, fields, now()).unwrap().id;
+        let id = create(&mut conn, fields, now()).unwrap().saved.id;
         assert_eq!(
             occurrences(&conn, id),
             [("2026-10-31".into(), "pending".into(), None)]
@@ -1278,6 +1310,7 @@ mod tests {
         let mut conn = db();
         let id = create(&mut conn, rent("2026-01-31"), on("2026-01-31"))
             .unwrap()
+            .saved
             .id;
         // Deleting a posted transaction keeps its date recorded (DATA_MODEL §4.2).
         let first = occurrences(&conn, id)[0].2.unwrap();
@@ -1311,6 +1344,7 @@ mod tests {
         let mut conn = db();
         let id = create(&mut conn, rent("2026-01-31"), on("2026-01-01"))
             .unwrap()
+            .saved
             .id;
         pause(&mut conn, id, true, on("2026-01-01")).unwrap();
         assert_eq!(process_due(&mut conn, on("2026-03-31")).unwrap(), 0);
@@ -1322,10 +1356,10 @@ mod tests {
         let mut conn = db();
         let mut until = rent("2026-01-31");
         until.end_date = Some("2026-03-15".into());
-        let until = create(&mut conn, until, on("2026-01-01")).unwrap().id;
+        let until = create(&mut conn, until, on("2026-01-01")).unwrap().saved.id;
         let mut times = rent("2026-01-31");
         times.max_occurrences = Some(3);
-        let times = create(&mut conn, times, on("2026-01-01")).unwrap().id;
+        let times = create(&mut conn, times, on("2026-01-01")).unwrap().saved.id;
 
         assert_eq!(process_due(&mut conn, on("2026-12-31")).unwrap(), 5);
         assert_eq!(dates(&conn, until), ["2026-01-31", "2026-02-28"]);
@@ -1337,10 +1371,15 @@ mod tests {
     #[test]
     fn saving_or_resuming_a_rule_processes_it_at_once() {
         let mut conn = db();
-        let id = create(&mut conn, rent("2026-12-01"), now()).unwrap().id;
+        let id = create(&mut conn, rent("2026-12-01"), now())
+            .unwrap()
+            .saved
+            .id;
         assert!(dates(&conn, id).is_empty());
         // now() is Nov 3, 2026.
-        let saved = update(&mut conn, id, rent("2026-11-03"), now()).unwrap();
+        let saved = update(&mut conn, id, rent("2026-11-03"), now())
+            .unwrap()
+            .saved;
         assert_eq!(
             saved.next_date,
             Some(d("2026-12-03")),
@@ -1363,7 +1402,10 @@ mod tests {
         let bank = bank(&mut conn, "Bank");
         let mut fields = rent("2026-01-31");
         fields.transaction.account_id = bank;
-        let id = create(&mut conn, fields, on("2026-01-01")).unwrap().id;
+        let id = create(&mut conn, fields, on("2026-01-01"))
+            .unwrap()
+            .saved
+            .id;
         accounts::archive(&mut conn, bank, false, now()).unwrap();
         categories::archive(&mut conn, FOOD, now()).unwrap();
         payment_methods::archive(&mut conn, CASH_METHOD, now()).unwrap();
@@ -1380,8 +1422,8 @@ mod tests {
     fn a_broken_rule_does_not_hold_back_the_others() {
         let mut conn = db();
         let jan = on("2026-01-01");
-        let broken = create(&mut conn, rent("2026-01-31"), jan).unwrap().id;
-        let fine = create(&mut conn, rent("2026-01-31"), jan).unwrap().id;
+        let broken = create(&mut conn, rent("2026-01-31"), jan).unwrap().saved.id;
+        let fine = create(&mut conn, rent("2026-01-31"), jan).unwrap().saved.id;
         conn.execute(
             "UPDATE recurring_rules SET start_date = 'soon' WHERE id = ?1",
             [broken],
@@ -1398,7 +1440,7 @@ mod tests {
     fn queued(conn: &mut Connection) -> i64 {
         let mut fields = rent("2026-01-31");
         fields.mode = RecurringMode::Confirm;
-        create(conn, fields, on("2026-02-28")).unwrap().id
+        create(conn, fields, on("2026-02-28")).unwrap().saved.id
     }
 
     fn conflict<T: std::fmt::Debug>(result: Result<T, AppError>) {
@@ -1620,14 +1662,14 @@ mod tests {
         on_card.transaction.account_id = card;
         assert_eq!(field(create(&mut conn, on_card, today)), "accountId");
 
-        let saved = create(&mut conn, good, today).unwrap();
+        let saved = create(&mut conn, good, today).unwrap().saved;
         assert!(saved.is_payday);
         assert!(rule(&conn, saved.id).is_payday);
         // Not a payday: a salary rule can still post itself (PAY-1).
         let mut plain = payday(&mut conn, "2026-11-30");
         plain.is_payday = false;
         plain.mode = RecurringMode::Auto;
-        assert!(!create(&mut conn, plain, today).unwrap().is_payday);
+        assert!(!create(&mut conn, plain, today).unwrap().saved.is_payday);
     }
 
     #[test]
@@ -1653,14 +1695,14 @@ mod tests {
         water.mode = RecurringMode::Confirm;
         create(&mut conn, water, today).unwrap();
         let fields = payday(&mut conn, "2026-10-15");
-        let on_15th = create(&mut conn, fields, today).unwrap().id;
+        let on_15th = create(&mut conn, fields, today).unwrap().saved.id;
         let fields = payday(&mut conn, "2026-10-16");
         create(&mut conn, fields, today).unwrap(); // Nov 16 is 4 days on
         let mut ended = payday(&mut conn, "2026-10-14");
         ended.end_date = Some("2026-11-13".into());
-        let ended = create(&mut conn, ended, today).unwrap().id;
+        let ended = create(&mut conn, ended, today).unwrap().saved.id;
         let fields = payday(&mut conn, "2026-10-13");
-        let paused = create(&mut conn, fields, today).unwrap().id;
+        let paused = create(&mut conn, fields, today).unwrap().saved.id;
         pause(&mut conn, paused, true, today).unwrap();
         let mut confirm = payday(&mut conn, "2026-10-15");
         confirm.is_payday = false;
@@ -1690,7 +1732,7 @@ mod tests {
         let today = on("2026-11-12");
         let mut fields = payday(&mut conn, "2026-10-15");
         fields.max_occurrences = Some(3); // Oct 15, Nov 15, Dec 15
-        let id = create(&mut conn, fields, today).unwrap().id;
+        let id = create(&mut conn, fields, today).unwrap().saved.id;
         // Nov 15 recorded early (as record_payslip does).
         repo::recurring::insert_occurrence(&conn, id, "2026-11-15", "posted", "x").unwrap();
 

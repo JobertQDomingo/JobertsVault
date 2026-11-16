@@ -7,6 +7,7 @@ use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
 use crate::services::categories::{self, CategoryKind};
+use crate::services::goals::{self, Saved};
 use crate::services::period::{self, PeriodQuery};
 use crate::services::reports;
 use crate::services::{accounts, invalid, not_found, stamp};
@@ -332,12 +333,12 @@ pub fn create(
     conn: &mut Connection,
     mut fields: TransactionFields,
     now: DateTime<Local>,
-) -> Result<Transaction, AppError> {
+) -> Result<Saved<Transaction>, AppError> {
     let tx = conn.transaction()?;
     validate(&tx, &mut fields, None, now.date_naive())?;
     let id = repo::transactions::insert(&tx, &values(&fields), &stamp(now))?;
     repo::settings::set(&tx, LAST_USED_ACCOUNT, &fields.account_id.to_string())?;
-    let saved = get(&tx, id)?;
+    let saved = followed(&tx, get(&tx, id)?, now)?;
     tx.commit()?;
     Ok(saved)
 }
@@ -347,7 +348,7 @@ pub fn update(
     id: i64,
     mut fields: TransactionFields,
     now: DateTime<Local>,
-) -> Result<Transaction, AppError> {
+) -> Result<Saved<Transaction>, AppError> {
     let tx = conn.transaction()?;
     let stored = get(&tx, id)?;
     if stored.payslip_id.is_some() {
@@ -363,9 +364,23 @@ pub fn update(
     }
     validate(&tx, &mut fields, Some(&stored), now.date_naive())?;
     repo::transactions::update(&tx, id, &values(&fields), &stamp(now))?;
-    let saved = get(&tx, id)?;
+    let saved = followed(&tx, get(&tx, id)?, now)?;
     tx.commit()?;
     Ok(saved)
+}
+
+/// GOL-7: an expense or a transfer moves any goal it leaves unrealistic; income never does.
+fn followed(
+    conn: &Connection,
+    saved: Transaction,
+    now: DateTime<Local>,
+) -> Result<Saved<Transaction>, AppError> {
+    let goals_moved = if saved.kind == TransactionKind::Income {
+        Vec::new()
+    } else {
+        goals::follow_forecast(conn, now)?
+    };
+    Ok(Saved { saved, goals_moved })
 }
 
 pub fn delete(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result<(), AppError> {
@@ -664,7 +679,7 @@ mod tests {
         let mut fields = expense(&conn, 2_550, bank);
         fields.payee = Some("Market".into());
         fields.note = Some("weekly shop".into());
-        let saved = create(&mut conn, fields, now()).unwrap();
+        let saved = create(&mut conn, fields, now()).unwrap().saved;
         assert_eq!(
             saved,
             Transaction {
@@ -717,7 +732,8 @@ mod tests {
             let f = expense(&conn, 10_000, bank);
             create(&mut conn, f, now())
         }
-        .unwrap();
+        .unwrap()
+        .saved;
         {
             let f = expense(&conn, 25_000, bank);
             update(&mut conn, saved.id, f, now())
@@ -782,7 +798,7 @@ mod tests {
             date: "2027-11-03".into(),
             ..expense(&conn, 100, cash)
         };
-        let edited = update(&mut conn, saved.id, next_year, now()).unwrap();
+        let edited = update(&mut conn, saved.id, next_year, now()).unwrap().saved;
         assert_eq!(edited.date, d(2027, 11, 3));
         assert_eq!(balance(&conn, cash), 0);
         let leap = TransactionFields {
@@ -790,7 +806,7 @@ mod tests {
             ..expense(&conn, 100, cash)
         };
         assert_eq!(
-            create(&mut conn, leap, now()).unwrap().date,
+            create(&mut conn, leap, now()).unwrap().saved.date,
             NaiveDate::from_ymd_opt(2024, 2, 29).unwrap()
         );
     }
@@ -827,7 +843,7 @@ mod tests {
             payee: Some("  ".into()),
             ..transfer(100, bank, cash)
         };
-        assert_eq!(create(&mut conn, blank, now()).unwrap().payee, None);
+        assert_eq!(create(&mut conn, blank, now()).unwrap().saved.payee, None);
     }
 
     #[test]
@@ -887,7 +903,7 @@ mod tests {
             note: Some(format!(" {} ", "ñ".repeat(500))),
             ..expense(&conn, 100, cash)
         };
-        let saved = create(&mut conn, fields, now()).unwrap();
+        let saved = create(&mut conn, fields, now()).unwrap().saved;
         assert_eq!(saved.payee.unwrap().chars().count(), 100);
         assert_eq!(saved.note.unwrap().chars().count(), 500);
         let blank = TransactionFields {
@@ -895,7 +911,7 @@ mod tests {
             note: Some("   ".into()),
             ..expense(&conn, 100, cash)
         };
-        let saved = create(&mut conn, blank, now()).unwrap();
+        let saved = create(&mut conn, blank, now()).unwrap().saved;
         assert_eq!((saved.payee, saved.note), (None, None));
         let long_payee = TransactionFields {
             payee: Some("a".repeat(101)),
@@ -958,7 +974,7 @@ mod tests {
             payment_method_id: Some(method),
             ..expense(&conn, 100, old)
         };
-        let saved = create(&mut conn, with_method.clone(), now()).unwrap();
+        let saved = create(&mut conn, with_method.clone(), now()).unwrap().saved;
         bank(&mut conn, "Keeps one active", 0);
         accounts::archive(&mut conn, old, true, now()).unwrap();
         accounts::archive(&mut conn, other, true, now()).unwrap();
@@ -968,7 +984,10 @@ mod tests {
             ..with_method
         };
         assert_eq!(
-            update(&mut conn, saved.id, edited, now()).unwrap().amount,
+            update(&mut conn, saved.id, edited, now())
+                .unwrap()
+                .saved
+                .amount,
             Money(300)
         );
         assert_eq!(
@@ -1034,8 +1053,12 @@ mod tests {
         let mut conn = db();
         let cash = cash(&conn);
         let old = bank(&mut conn, "Old bank", 10_000);
-        let out = create(&mut conn, transfer(1_000, old, cash), now()).unwrap();
-        let into = create(&mut conn, transfer(1_000, cash, old), now()).unwrap();
+        let out = create(&mut conn, transfer(1_000, old, cash), now())
+            .unwrap()
+            .saved;
+        let into = create(&mut conn, transfer(1_000, cash, old), now())
+            .unwrap()
+            .saved;
         accounts::archive(&mut conn, old, true, now()).unwrap();
         // Fixing the direction keeps the same two accounts.
         assert!(update(&mut conn, out.id, transfer(1_000, cash, old), now()).is_ok());
@@ -1054,7 +1077,8 @@ mod tests {
             let f = expense(&conn, 100, bank);
             create(&mut conn, f, now())
         }
-        .unwrap();
+        .unwrap()
+        .saved;
         assert_eq!(last_used(&conn), Some(bank.to_string()));
         {
             let f = expense(&conn, 100, cash);
@@ -1073,8 +1097,11 @@ mod tests {
             let f = expense(&conn, 1_000, bank);
             create(&mut conn, f, now())
         }
-        .unwrap();
-        let moved = update(&mut conn, saved.id, transfer(1_000, bank, cash), now()).unwrap();
+        .unwrap()
+        .saved;
+        let moved = update(&mut conn, saved.id, transfer(1_000, bank, cash), now())
+            .unwrap()
+            .saved;
         assert_eq!(
             (moved.kind, moved.category_id, moved.to_account_id),
             (TransactionKind::Transfer, None, Some(cash))
@@ -1092,7 +1119,7 @@ mod tests {
             date: date.to_string(),
             ..expense(conn, amount, account)
         };
-        create(conn, f, now()).unwrap()
+        create(conn, f, now()).unwrap().saved
     }
 
     /// A card owing `owed`, with a 10,000.00 limit, closing on the 20th and due on the 5th.
@@ -1165,7 +1192,7 @@ mod tests {
         f.date = "2026-10-01".into();
         f.payee = Some("Market".into());
         f.note = Some("weekly shop".into());
-        let original = create(&mut conn, f, now()).unwrap();
+        let original = create(&mut conn, f, now()).unwrap().saved;
         // What the form does (ARCHITECTURE §4.5): load the row, take today from the defaults, save.
         let row = get(&conn, original.id).unwrap();
         let copy = TransactionFields {
@@ -1179,7 +1206,7 @@ mod tests {
             payment_method_id: row.payment_method_id,
             note: row.note,
         };
-        let copy = create(&mut conn, copy, now()).unwrap();
+        let copy = create(&mut conn, copy, now()).unwrap().saved;
         assert_ne!(copy.id, original.id);
         assert_eq!(
             copy,
@@ -1379,7 +1406,9 @@ mod tests {
         let mut conn = db();
         let cash = cash(&conn);
         let bank = bank(&mut conn, "Bank", 10_000);
-        let incoming = create(&mut conn, transfer(2_000, bank, cash), now()).unwrap();
+        let incoming = create(&mut conn, transfer(2_000, bank, cash), now())
+            .unwrap()
+            .saved;
         let spent = spend(&mut conn, 100, bank, today());
         spend(&mut conn, 100, cash, today());
         let of = |account| TransactionFilter {
@@ -1403,12 +1432,12 @@ mod tests {
                 payment_method_id: Some(method),
                 ..expense(&conn, 100, cash)
             };
-            create(&mut conn, f, now()).unwrap()
+            create(&mut conn, f, now()).unwrap().saved
         };
         let plain = spend(&mut conn, 200, cash, today());
         let earned = {
             let f = income(&conn, 300, cash);
-            create(&mut conn, f, now()).unwrap()
+            create(&mut conn, f, now()).unwrap().saved
         };
         let by_kind = TransactionFilter {
             kind: Some(TransactionKind::Income),
@@ -1439,7 +1468,7 @@ mod tests {
                 note: note.map(Into::into),
                 ..expense(&conn, 100, cash)
             };
-            create(&mut conn, f, now()).unwrap().id
+            create(&mut conn, f, now()).unwrap().saved.id
         };
         let sale = save(Some("Store"), Some("50% off"));
         let other = save(Some("Store"), Some("500 off"));
@@ -1489,7 +1518,7 @@ mod tests {
             date: "2026-12-01".into(),
             ..income(&conn, 5_000, cash)
         };
-        let pay = create(&mut conn, pay, now()).unwrap().id;
+        let pay = create(&mut conn, pay, now()).unwrap().saved.id;
         let next_year = spend(&mut conn, 400, cash, d(2027, 1, 15)).id;
 
         let november = page(&conn, this_month(), 0);

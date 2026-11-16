@@ -2,6 +2,7 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::services::categories::CategoryKind;
+use crate::services::goals::Saved;
 use crate::services::transactions::{
     PayBillDefaults, PayeeSuggestion, Transaction, TransactionDefaults, TransactionFields,
     TransactionFilter, TransactionList,
@@ -50,7 +51,7 @@ pub fn get_transaction(state: State<'_, AppState>, id: i64) -> Result<Transactio
 pub fn create_transaction(
     state: State<'_, AppState>,
     transaction: TransactionFields,
-) -> Result<Transaction, AppError> {
+) -> Result<Saved<Transaction>, AppError> {
     services::transactions::create(&mut *state.conn()?, transaction, chrono::Local::now())
         .inspect_err(|err| log::record(&state.log_path, err))
 }
@@ -60,7 +61,7 @@ pub fn update_transaction(
     state: State<'_, AppState>,
     id: i64,
     transaction: TransactionFields,
-) -> Result<Transaction, AppError> {
+) -> Result<Saved<Transaction>, AppError> {
     services::transactions::update(&mut *state.conn()?, id, transaction, chrono::Local::now())
         .inspect_err(|err| log::record(&state.log_path, err))
 }

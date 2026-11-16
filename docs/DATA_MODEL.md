@@ -810,19 +810,21 @@ earliest     = today + ⌈left to save ÷ monthly room⌉ months   (the day clam
 - a recurring rule created or updated
 - a loan created or updated
 
-each active goal that isn't achieved and has a target date and something left to save is checked again, oldest first:
+each active goal that isn't achieved and has a target date and something left to save is checked again, newest first:
 
 ```
-earliest(goal) = §5.17's earliest date, worked out after the save, with the other goals at their dates now
+room(goal)     = §5.17's monthly room, worked out after the save, with the other goals at their dates now
                  (a goal moved earlier in this pass counts at its new date)
-if the monthly room is 0          → the date stays, and the goal is behind
-else if earliest(goal) > its date → its target_date becomes earliest(goal)
+late(goal)     = its months left (§5.7) is 0, or its monthly_needed (§5.7) > room(goal)
+if room(goal) is 0  → the date stays, and the goal is behind
+else if late(goal)  → its target_date becomes earliest(goal), §5.17's earliest date with room(goal)
 ```
 
 - **The save always goes ahead.** The goal is what changes, never the expense.
 - **Only a date that's no longer realistic moves**, and only later. A save that leaves every goal on track changes nothing, and a goal never moves earlier by itself.
-- **Oldest first**, so a goal added earlier keeps its claim on the monthly room. Moving it later lowers its monthly amount, which leaves more room for the goals after it.
-- **Behind** (`list_goals`' `behind`): there's a payday rule, something left to save, and either the monthly room is 0 or the earliest date is after the target date (time passing, a payslip below the estimate, or a deleted income can do this without a save that moves it). The card says so; nothing else changes.
+- **Judged by month, not by day.** The earliest date moves a day later every day, so comparing it with the target date would make a goal at its suggested date late the next day. A goal is on track while its monthly amount fits in the monthly room; on the day a date is set this is the same test as the date being no sooner than the earliest (§9 item 99).
+- **Newest first**, so a goal added earlier keeps its claim on the monthly room: the newest goal gives way first, and moving it later lowers its monthly amount, which leaves more room for the older goals checked after it (§9 item 100).
+- **Behind** (`list_goals`' `behind`): there's a payday rule, something left to save, and either the monthly room is 0 or the goal is late (`late` above, with every other goal at its date now). Time passing, a payslip below the estimate, or a deleted income can do this without a save that moves it. The card says so; nothing else changes.
 - With no payday rule, nothing is checked or moved.
 - Recurring dates posted by processing and payslips aren't saves that move goals: their dates were already in the forecast. Deleting a row never moves a goal either; a goal it leaves behind shows as behind.
 
@@ -1125,4 +1127,10 @@ Answered on 2026-11-16, building the smart goal date (GOL-5, GOL-6):
 96. **Another goal takes its monthly amount on its first months-left saving dates** (the owner, 2026-11-16), not only on the saving dates before its target date. `monthly_needed` divides what's left by the months left, so counting one date fewer would leave its last month's money free for another goal to plan on (§5.7, §5.17).
 97. **Any short day in the 12 months makes the monthly room 0**, even one before the first saving date, so the definition ("without any day's running total going below 0") and the room-0 bullet agree. A short window has to be fixed before a goal can count on money (§5.15, §5.17).
 98. **The too-soon message's "saving about" amount is the monthly room**, the same figure as the line under the date, not the smaller `monthly_needed` for the earliest date (§5.17).
+
+Answered on 2026-11-16, building goals that follow the forecast (GOL-7):
+
+99. **A goal is judged by month** (the owner, 2026-11-16): it's late when its months left is 0 or its `monthly_needed` is more than the monthly room, not when the earliest date is after its target date. `today + ⌈left ÷ room⌉ months` moves a day later every day, so the day-by-day test made a goal at its suggested date late the next day, and nearly every save moved it by a day (§5.17).
+100. **The newest goal gives way first** (the owner, 2026-11-16), replacing item 95's oldest first: checking the oldest first, with the newer goals still taking their share, made the oldest goal the one that moved, the opposite of letting a goal added earlier keep its claim (§5.17).
+101. **A goal whose earliest date is past the calendar's range** (room above 0, a huge target) is kept at its date and shown as behind, like a room of 0, as the too-soon check already does (§5.17).
 

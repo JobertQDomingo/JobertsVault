@@ -440,6 +440,7 @@ mod tests {
     fn payday_rule(conn: &mut Connection, account: i64, start: &str, today: &str) -> i64 {
         recurring::create(conn, rule_fields(account, start), on(today))
             .unwrap()
+            .saved
             .id
     }
 
@@ -576,6 +577,7 @@ mod tests {
         plain.is_payday = false;
         let plain = recurring::create(&mut conn, plain, on("2026-11-15"))
             .unwrap()
+            .saved
             .id;
         conflict_of(record(
             &mut conn,
@@ -596,6 +598,7 @@ mod tests {
         fields.max_occurrences = Some(2); // Oct 15 and Nov 15
         let rule = recurring::create(&mut conn, fields, on("2026-11-13"))
             .unwrap()
+            .saved
             .id;
         let f = slip(&conn, bank, "2026-11-13");
         let gross = record(&mut conn, rule, "2026-11-15", f, on("2026-11-13")).unwrap();
@@ -970,7 +973,8 @@ mod tests {
             },
             now(),
         )
-        .unwrap();
+        .unwrap()
+        .saved;
         assert_eq!(plain.payslip_id, None);
         assert!(matches!(
             get(&conn, plain.id),

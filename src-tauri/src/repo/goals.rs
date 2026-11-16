@@ -97,6 +97,15 @@ pub fn set_achieved(conn: &Connection, id: i64, on: &str) -> rusqlite::Result<()
     Ok(())
 }
 
+/// GOL-7: a save moved the goal's date later.
+pub fn set_target_date(conn: &Connection, id: i64, date: &str, now: &str) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE goals SET target_date = ?2, updated_at = ?3 WHERE id = ?1",
+        params![id, date, now],
+    )?;
+    Ok(())
+}
+
 /// The number of rows changed: 0 when there's no such goal.
 pub fn set_archived(
     conn: &Connection,

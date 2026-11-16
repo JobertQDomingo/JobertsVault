@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::domain::budget::used_percent;
-use crate::domain::goal::{self, OtherGoal, Room, monthly_needed, months_left};
+use crate::domain::goal::{self, Check, Dated, Room, monthly_needed, months_left};
 use crate::domain::money::{Decimals, Money};
 use crate::error::AppError;
 use crate::repo;
@@ -68,6 +68,41 @@ pub struct GoalProgress {
     /// `remaining` over `months_left`, rounded up; none once achieved, when nothing is left to
     /// save, when no month is, or without a target date.
     pub monthly_needed: Option<Money>,
+    /// GOL-7: its monthly amount no longer fits what can be set aside, or nothing can be. None
+    /// with no payday rule, nothing left to save, no date, or once archived or achieved.
+    pub behind: Option<Behind>,
+}
+
+/// How a goal is behind (DATA_MODEL §5.17).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Behind {
+    /// Its earliest realistic date now; none when nothing can be set aside.
+    pub earliest_date: Option<NaiveDate>,
+}
+
+/// A goal whose date a save moved later, so it stays realistic (GOL-7).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GoalMove {
+    #[ts(type = "number")]
+    pub id: i64,
+    pub name: String,
+    pub from: NaiveDate,
+    pub to: NaiveDate,
+}
+
+/// A save's usual result with the goals it moved beside its fields, so callers that only read
+/// the result keep working (GOL-7).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Saved<T: TS> {
+    #[serde(flatten)]
+    pub saved: T,
+    pub goals_moved: Vec<GoalMove>,
 }
 
 /// What the goal dialog asks about as the user types (GOL-5).
@@ -120,41 +155,16 @@ fn room(conn: &Connection, today: NaiveDate, draft: &GoalDraft) -> Result<Option
     // No pay windows (no payday rule) gives None below.
     let plan = forecast::gather(conn, today, Some(as_goal))?;
     let accounts = repo::accounts::all(conn, today)?;
-    let progress = |id: i64| {
-        accounts
-            .iter()
-            .find(|a| a.id == id)
-            .map_or(0, |a| a.balance.max(0))
-    };
-    let mut others = Vec::new();
-    for g in repo::goals::all(conn)? {
-        if g.archived || g.achieved_at.is_some() || Some(g.id) == draft.goal_id {
-            continue;
-        }
-        let Some(text) = g.target_date.as_deref() else {
-            continue;
-        };
-        let date = real_date(text).ok_or_else(|| AppError::Database {
-            message: format!("Goal {} has an invalid target date", g.id),
-        })?;
-        let months = months_left(today, date);
-        let remaining = Money(
-            g.target_amount
-                .saturating_sub(progress(g.account_id))
-                .max(0),
-        );
-        if let Some(needed) = monthly_needed(remaining, months) {
-            others.push(OtherGoal {
-                monthly_needed: needed,
-                months_left: months,
-            });
-        }
-    }
+    let others: Vec<_> = dated(&accounts, repo::goals::all(conn)?)?
+        .iter()
+        .filter(|(g, _)| Some(g.id) != draft.goal_id)
+        .filter_map(|(_, g)| goal::other(today, g))
+        .collect();
     let left = Money(
         draft
             .target_amount
             .0
-            .saturating_sub(progress(draft.account_id)),
+            .saturating_sub(balance(&accounts, draft.account_id)),
     );
     Ok(goal::room(
         plan.money_now,
@@ -164,6 +174,93 @@ fn room(conn: &Connection, today: NaiveDate, draft: &GoalDraft) -> Result<Option
         &others,
         left,
     ))
+}
+
+/// The active goals that aren't achieved and have a target date, oldest first, with what's left
+/// to save.
+fn dated(
+    accounts: &[repo::accounts::Row],
+    goals: Vec<repo::goals::Row>,
+) -> Result<Vec<(repo::goals::Row, Dated)>, AppError> {
+    let mut list = Vec::new();
+    for g in goals {
+        if g.archived || g.achieved_at.is_some() {
+            continue;
+        }
+        let Some(text) = g.target_date.as_deref() else {
+            continue;
+        };
+        let date = real_date(text).ok_or_else(|| AppError::Database {
+            message: format!("Goal {} has an invalid target date", g.id),
+        })?;
+        let left_to_save = Money(
+            g.target_amount
+                .saturating_sub(balance(accounts, g.account_id)),
+        );
+        list.push((g, Dated { left_to_save, date }));
+    }
+    Ok(list)
+}
+
+/// The account's balance today, never below 0: a goal's progress.
+fn balance(accounts: &[repo::accounts::Row], id: i64) -> i64 {
+    accounts
+        .iter()
+        .find(|a| a.id == id)
+        .map_or(0, |a| a.balance.max(0))
+}
+
+/// GOL-7's check of every dated goal against the forecast (DATA_MODEL §5.17). Empty with no
+/// payday rule, or when no goal has anything left to save, which skips reading the forecast.
+fn checked(
+    conn: &Connection,
+    today: NaiveDate,
+    follow: bool,
+) -> Result<Vec<(repo::goals::Row, Dated, Check)>, AppError> {
+    let accounts = repo::accounts::all(conn, today)?;
+    let goals = dated(&accounts, repo::goals::all(conn)?)?;
+    if goals.iter().all(|(_, g)| g.left_to_save <= Money::ZERO) {
+        return Ok(Vec::new());
+    }
+    // Every active goal's account is already left out, so one forecast serves them all.
+    let plan = forecast::gather(conn, today, None)?;
+    let list: Vec<Dated> = goals.iter().map(|(_, g)| *g).collect();
+    let checks = goal::check(
+        plan.money_now,
+        today,
+        &plan.windows,
+        &plan.movements,
+        &list,
+        follow,
+    )
+    .unwrap_or_default();
+    Ok(goals
+        .into_iter()
+        .zip(checks)
+        .map(|((row, g), check)| (row, g, check))
+        .collect())
+}
+
+/// GOL-7, at the end of a save's database transaction: every goal whose monthly amount no longer
+/// fits moves to its earliest realistic date, the newest first. Nothing moves with no payday rule.
+pub(crate) fn follow_forecast(
+    conn: &Connection,
+    now: DateTime<Local>,
+) -> Result<Vec<GoalMove>, AppError> {
+    let stamp = stamp(now);
+    let mut moved = Vec::new();
+    for (row, g, check) in checked(conn, now.date_naive(), true)? {
+        if let Check::Late(to) = check {
+            repo::goals::set_target_date(conn, row.id, &to.to_string(), &stamp)?;
+            moved.push(GoalMove {
+                id: row.id,
+                name: row.name,
+                from: g.date,
+                to,
+            });
+        }
+    }
+    Ok(moved)
 }
 
 /// Every goal with its progress, archived ones included, in the order they were created. A goal
@@ -193,6 +290,17 @@ pub fn list(conn: &mut Connection, today: NaiveDate) -> Result<Vec<GoalProgress>
         }
         list.push(progress(goal, balance, today)?);
     }
+    // After the achieved marks above, so a goal reached today is never behind.
+    for (row, _, check) in checked(&tx, today, false)? {
+        let earliest_date = match check {
+            Check::OnTrack => continue,
+            Check::Late(date) => Some(date),
+            Check::Behind => None,
+        };
+        if let Some(p) = list.iter_mut().find(|p| p.goal.id == row.id) {
+            p.behind = Some(Behind { earliest_date });
+        }
+    }
     tx.commit()?;
     Ok(list)
 }
@@ -221,6 +329,7 @@ fn progress(goal: Goal, balance: i64, today: NaiveDate) -> Result<GoalProgress, 
         monthly_needed: months
             .filter(|_| goal.achieved_at.is_none())
             .and_then(|m| monthly_needed(remaining, m)),
+        behind: None,
         goal,
     })
 }
@@ -433,11 +542,15 @@ fn view(row: repo::goals::Row) -> Result<Goal, AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::recurrence::Frequency;
     use crate::services::accounts::{self, AccountFields, AccountKind, NewAccount};
-    use crate::services::recurring;
+    use crate::services::loans::{self, Loan, LoanFields, LoanPaymentFields, NewLoan};
+    use crate::services::payslips::{self, PayslipFields};
+    use crate::services::recurring::{self, RecurringMode, RecurringRuleFields};
     use crate::services::settings;
     use crate::services::transactions::{self, TransactionFields, TransactionKind};
     use crate::test_support::{db, now, payday};
+    use chrono::TimeZone;
     use std::fmt::Debug;
 
     // The seed (DATA_MODEL §7): Cash is account 1, Salary income category 1, Food expense 8.
@@ -1144,8 +1257,8 @@ mod tests {
         let mut conn = db();
         let pay = paid(&mut conn);
         let japan = |date| fields("Japan", 3_000_000, Some(date), CASH);
-        let trip = create(&mut conn, japan("2027-02-03"), now()).unwrap();
         // A 5,000.00 bill on Dec 20 leaves 15,000.00 for two saving dates by Jan 3: 7,500.00.
+        // Saved before the goal, which is stored as it was before the bill, now too soon.
         save(
             &mut conn,
             TransactionKind::Expense,
@@ -1153,14 +1266,15 @@ mod tests {
             500_000,
             d(2026, 12, 20),
         );
-        // Keeping the date passes, though it's now too soon.
-        update(&mut conn, trip.id, japan("2027-02-03"), now()).unwrap();
+        let trip = insert(&conn, japan("2027-02-03"));
+        // Keeping the date passes, though it's too soon.
+        update(&mut conn, trip, japan("2027-02-03"), now()).unwrap();
         assert_eq!(
-            message(update(&mut conn, trip.id, japan("2027-02-04"), now())),
+            message(update(&mut conn, trip, japan("2027-02-04"), now())),
             "That's too soon. The earliest you can reach this is Mar 3, 2027, saving about \
              ₱7,500.00 a month."
         );
-        update(&mut conn, trip.id, japan("2027-03-03"), now()).unwrap();
+        update(&mut conn, trip, japan("2027-03-03"), now()).unwrap();
     }
 
     #[test]
@@ -1252,5 +1366,302 @@ mod tests {
         assert_eq!(field_of(ask(Money::MAX.0 + 1, CASH)), "targetAmount");
         assert_eq!(field_of(ask(100, card)), "accountId");
         assert_eq!(field_of(ask(100, 999)), "accountId");
+    }
+
+    // GOL-7. With `paid`, 10,000.00 can be set aside a month: 30,000.00 by Mar 3 asks 7,500.00.
+    // A 15,000.00 bill on Dec 20 leaves 5,000.00 for Jan 3's two saving dates, 2,500.00 a month,
+    // so the goal moves to Nov 3, 2027 (12 months).
+    const PLAN: &str = "2027-03-03";
+    const MOVED: &str = "2027-11-03";
+    const BIG: i64 = 1_500_000;
+
+    /// The pay account and a goal on Cash at its plan.
+    fn planned(conn: &mut Connection) -> (i64, i64) {
+        let pay = paid(conn);
+        let trip = create(conn, fields("Trip", 3_000_000, Some(PLAN), CASH), now()).unwrap();
+        (pay, trip.id)
+    }
+
+    fn date_of(conn: &Connection, id: i64) -> String {
+        get(conn, id).unwrap().fields.target_date.unwrap()
+    }
+
+    fn behind_of(conn: &mut Connection, id: i64) -> Option<Behind> {
+        list(conn, now().date_naive())
+            .unwrap()
+            .into_iter()
+            .find(|p| p.goal.id == id)
+            .unwrap()
+            .behind
+    }
+
+    fn moved(id: i64) -> Vec<GoalMove> {
+        vec![GoalMove {
+            id,
+            name: "Trip".into(),
+            from: d(2027, 3, 3),
+            to: d(2027, 11, 3),
+        }]
+    }
+
+    fn txn(kind: TransactionKind, account_id: i64, amount: i64, date: &str) -> TransactionFields {
+        TransactionFields {
+            kind,
+            amount: Money(amount),
+            date: date.into(),
+            account_id,
+            to_account_id: (kind == TransactionKind::Transfer).then_some(CASH),
+            category_id: match kind {
+                TransactionKind::Income => Some(SALARY),
+                TransactionKind::Expense => Some(FOOD),
+                TransactionKind::Transfer => None,
+            },
+            payee: None,
+            payment_method_id: None,
+            note: None,
+        }
+    }
+
+    fn bill(account_id: i64, amount: i64) -> TransactionFields {
+        txn(TransactionKind::Expense, account_id, amount, "2026-12-20")
+    }
+
+    /// Once, on Dec 20.
+    fn bill_rule(account_id: i64, amount: i64) -> RecurringRuleFields {
+        RecurringRuleFields {
+            transaction: bill(account_id, amount),
+            frequency: Frequency::Monthly,
+            interval: 1,
+            end_date: None,
+            max_occurrences: Some(1),
+            mode: RecurringMode::Auto,
+            is_payday: false,
+        }
+    }
+
+    fn loan_category(conn: &Connection) -> i64 {
+        conn.query_row("SELECT id FROM categories WHERE name = 'Loan'", [], |r| {
+            r.get(0)
+        })
+        .unwrap()
+    }
+
+    /// One payment on Dec 20; `id` keeps a stored one on an edit.
+    fn loan(conn: &Connection, account_id: i64, amount: i64, id: Option<i64>) -> LoanFields {
+        LoanFields {
+            name: "E-wallet loan".into(),
+            account_id,
+            category_id: loan_category(conn),
+            amount_borrowed: None,
+            borrowed_on: None,
+            payments: vec![LoanPaymentFields {
+                id,
+                due_date: "2026-12-20".into(),
+                amount: Money(amount),
+            }],
+        }
+    }
+
+    fn new_loan(conn: &mut Connection, pay: i64, amount: i64) -> Saved<Loan> {
+        let fields = loan(conn, pay, amount, None);
+        loans::create(
+            conn,
+            NewLoan {
+                is_new: false,
+                fields,
+            },
+            now(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_save_that_leaves_the_goal_on_track_moves_nothing() {
+        let mut conn = db();
+        let (pay, trip) = planned(&mut conn);
+        let saved = transactions::create(&mut conn, bill(pay, 100_000), now()).unwrap();
+        assert_eq!(saved.goals_moved, []);
+        assert_eq!(date_of(&conn, trip), PLAN);
+        assert_eq!(behind_of(&mut conn, trip), None);
+    }
+
+    #[test]
+    fn each_save_that_leaves_a_goal_late_moves_it_in_the_same_change() {
+        type Save = fn(&mut Connection, i64) -> Vec<GoalMove>;
+        let cases: [(&str, Save); 8] = [
+            ("expense", |c, pay| {
+                transactions::create(c, bill(pay, BIG), now())
+                    .unwrap()
+                    .goals_moved
+            }),
+            ("transfer", |c, pay| {
+                let f = txn(TransactionKind::Transfer, pay, BIG, "2026-12-20");
+                transactions::create(c, f, now()).unwrap().goals_moved
+            }),
+            ("edited expense", |c, pay| {
+                let small = transactions::create(c, bill(pay, 100_000), now()).unwrap();
+                assert_eq!(small.goals_moved, []);
+                let id = small.saved.id;
+                transactions::update(c, id, bill(pay, BIG), now())
+                    .unwrap()
+                    .goals_moved
+            }),
+            ("mark paid", |c, pay| {
+                let small = new_loan(c, pay, 100_000);
+                assert_eq!(small.goals_moved, []);
+                let payment = small.saved.payments[0].id;
+                let f = TransactionFields {
+                    category_id: Some(loan_category(c)),
+                    ..bill(pay, BIG)
+                };
+                loans::mark_paid(c, payment, f, now()).unwrap().goals_moved
+            }),
+            ("new rule", |c, pay| {
+                recurring::create(c, bill_rule(pay, BIG), now())
+                    .unwrap()
+                    .goals_moved
+            }),
+            ("edited rule", |c, pay| {
+                let small = recurring::create(c, bill_rule(pay, 100_000), now()).unwrap();
+                assert_eq!(small.goals_moved, []);
+                let id = small.saved.id;
+                recurring::update(c, id, bill_rule(pay, BIG), now())
+                    .unwrap()
+                    .goals_moved
+            }),
+            ("new loan", |c, pay| new_loan(c, pay, BIG).goals_moved),
+            ("edited loan", |c, pay| {
+                let small = new_loan(c, pay, 100_000);
+                assert_eq!(small.goals_moved, []);
+                let (id, payment) = (small.saved.id, small.saved.payments[0].id);
+                let f = loan(c, pay, BIG, Some(payment));
+                loans::update(c, id, f, now()).unwrap().goals_moved
+            }),
+        ];
+        for (what, save) in cases {
+            let mut conn = db();
+            let (pay, trip) = planned(&mut conn);
+            assert_eq!(save(&mut conn, pay), moved(trip), "{what}");
+            assert_eq!(date_of(&conn, trip), MOVED, "{what}");
+            assert_eq!(behind_of(&mut conn, trip), None, "{what}");
+        }
+    }
+
+    #[test]
+    fn a_refused_save_moves_nothing() {
+        let mut conn = db();
+        let (pay, trip) = planned(&mut conn);
+        let no_category = TransactionFields {
+            category_id: None,
+            ..bill(pay, BIG)
+        };
+        assert!(transactions::create(&mut conn, no_category, now()).is_err());
+        assert_eq!(date_of(&conn, trip), PLAN);
+    }
+
+    #[test]
+    fn a_room_of_0_keeps_the_date_and_shows_behind() {
+        let mut conn = db();
+        let (pay, trip) = planned(&mut conn);
+        // Today, from a pay account holding nothing: it runs short now.
+        let short = txn(TransactionKind::Expense, pay, 100, "2026-11-03");
+        let saved = transactions::create(&mut conn, short, now()).unwrap();
+        assert_eq!(saved.goals_moved, []);
+        assert_eq!(date_of(&conn, trip), PLAN);
+        assert_eq!(
+            behind_of(&mut conn, trip),
+            Some(Behind {
+                earliest_date: None
+            })
+        );
+    }
+
+    #[test]
+    fn processing_payslips_income_and_deletes_dont_move_goals_but_can_leave_them_behind() {
+        let mut conn = db();
+        // 1.00 now, so the auto bill posted on Nov 1 doesn't run it short.
+        let pay = account(&mut conn, "Pay", AccountKind::Bank, 100);
+        let payday_rule = payday(&mut conn, pay, 1_000_000);
+        // An auto bill of 0.01 due again on Dec 1, and 20,000.00 extra pay on Dec 1: with it, 33,000.00
+        // by Feb 3 (11,000.00 a month) fits; without it, only 10,000.00 a month does.
+        let mut rule = bill_rule(pay, 1);
+        rule.transaction.date = "2026-11-01".into();
+        rule.max_occurrences = None;
+        recurring::create(&mut conn, rule, now()).unwrap();
+        let bonus = txn(TransactionKind::Income, pay, 2_000_000, "2026-12-01");
+        let bonus = transactions::create(&mut conn, bonus, now())
+            .unwrap()
+            .saved
+            .id;
+        let trip = create(
+            &mut conn,
+            fields("Trip", 3_300_000, Some("2027-02-03"), CASH),
+            now(),
+        )
+        .unwrap()
+        .id;
+        transactions::delete(&mut conn, bonus, now()).unwrap();
+        assert_eq!(date_of(&conn, trip), "2027-02-03");
+        assert_eq!(
+            behind_of(&mut conn, trip),
+            Some(Behind {
+                earliest_date: Some(d(2027, 3, 3))
+            })
+        );
+        let income = txn(TransactionKind::Income, pay, 100, "2026-12-01");
+        let saved = transactions::create(&mut conn, income, now()).unwrap();
+        assert_eq!(saved.goals_moved, []);
+        let dec_2 = Local.with_ymd_and_hms(2026, 12, 2, 14, 5, 0).unwrap();
+        assert!(recurring::process_due(&mut conn, dec_2).unwrap() > 0);
+        let slip = PayslipFields {
+            date: "2026-11-15".into(),
+            account_id: pay,
+            gross: Money(500_000),
+            deductions: Vec::new(),
+            note: None,
+        };
+        payslips::record(&mut conn, payday_rule, "2026-11-15", slip, dec_2).unwrap();
+        assert_eq!(date_of(&conn, trip), "2027-02-03");
+    }
+
+    #[test]
+    fn with_no_payday_rule_nothing_moves_or_is_behind() {
+        let mut conn = db();
+        let pay = account(&mut conn, "Pay", AccountKind::Bank, 0);
+        let trip = insert(&conn, fields("Trip", 3_000_000, Some("2027-01-03"), CASH));
+        let saved = transactions::create(&mut conn, bill(pay, BIG), now()).unwrap();
+        assert_eq!(saved.goals_moved, []);
+        assert_eq!(date_of(&conn, trip), "2027-01-03");
+        assert_eq!(behind_of(&mut conn, trip), None);
+    }
+
+    #[test]
+    fn a_passed_date_moves_on_the_next_save() {
+        let mut conn = db();
+        let pay = paid(&mut conn);
+        let trip = insert(&conn, fields("Trip", 3_000_000, Some("2026-10-01"), CASH));
+        let saved = transactions::create(&mut conn, bill(pay, 100), now()).unwrap();
+        assert_eq!(saved.goals_moved[0].to, d(2027, 3, 3));
+        assert_eq!(date_of(&conn, trip), "2027-03-03");
+    }
+
+    #[test]
+    fn archived_achieved_and_dateless_goals_are_left_alone() {
+        let mut conn = db();
+        let pay = paid(&mut conn);
+        let soon = Some("2027-01-03");
+        let archived = insert(&conn, fields("Old", 3_000_000, soon, CASH));
+        repo::goals::set_archived(&conn, archived, true, &stamp(now())).unwrap();
+        let achieved = insert(&conn, fields("Done", 3_000_000, soon, CASH));
+        repo::goals::set_achieved(&conn, achieved, "2026-10-01").unwrap();
+        let dateless = insert(&conn, fields("Someday", 3_000_000, None, CASH));
+        let saved = transactions::create(&mut conn, bill(pay, BIG), now()).unwrap();
+        assert_eq!(saved.goals_moved, []);
+        for id in [archived, achieved] {
+            assert_eq!(date_of(&conn, id), "2027-01-03");
+        }
+        for id in [archived, achieved, dateless] {
+            assert_eq!(behind_of(&mut conn, id), None);
+        }
     }
 }

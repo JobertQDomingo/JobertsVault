@@ -685,7 +685,7 @@ mod tests {
         to: Option<i64>,
     ) -> i64 {
         let f = fields(conn, kind, amount, date, account, to);
-        transactions::create(conn, f, now()).unwrap().id
+        transactions::create(conn, f, now()).unwrap().saved.id
     }
 
     /// A monthly rule from `start`, created (and processed) on `created`.
@@ -705,7 +705,7 @@ mod tests {
             mode,
             is_payday,
         };
-        recurring::create(conn, f, on(created)).unwrap().id
+        recurring::create(conn, f, on(created)).unwrap().saved.id
     }
 
     /// Salary each month from `start`, a payday with an estimate of `estimate` net.
@@ -851,7 +851,8 @@ mod tests {
             },
             on(TODAY),
         )
-        .unwrap();
+        .unwrap()
+        .saved;
 
         let f = windows(&conn);
         let label = |kind, id| labelled(&f, kind, id);
@@ -1085,7 +1086,8 @@ mod tests {
             },
             on("2026-11-01"),
         )
-        .unwrap();
+        .unwrap()
+        .saved;
         let [_, nov, dec, jan] = [0, 1, 2, 3].map(|i| loan.payments[i].id);
         // Paid with an expense dated Nov 20: it counts once, as that transaction.
         let paid = fields(
@@ -1098,6 +1100,7 @@ mod tests {
         );
         let paid = loans::mark_paid(&mut conn, dec, paid, on(TODAY))
             .unwrap()
+            .saved
             .id;
 
         let forecast = windows(&conn);

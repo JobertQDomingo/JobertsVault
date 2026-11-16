@@ -41,7 +41,7 @@ pub fn payday(conn: &mut rusqlite::Connection, account: i64, net: i64) -> i64 {
         mode: RecurringMode::Confirm,
         is_payday: true,
     };
-    recurring::create(conn, rule, now()).unwrap().id
+    recurring::create(conn, rule, now()).unwrap().saved.id
 }
 
 /// A folder under the system temp dir, wiped when created and when dropped.

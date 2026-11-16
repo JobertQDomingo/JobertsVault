@@ -121,6 +121,85 @@ pub fn earliest(today: NaiveDate, left_to_save: Money, monthly_room: Money) -> O
         .and_then(|m| today.checked_add_months(Months::new(m)))
 }
 
+/// An active goal that isn't achieved and has a target date, as GOL-7 checks it (DATA_MODEL §5.17).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Dated {
+    pub left_to_save: Money,
+    pub date: NaiveDate,
+}
+
+/// What it asks of the monthly room: its monthly amount on its first months-left saving dates.
+/// None when nothing is left or no month is.
+pub fn other(today: NaiveDate, goal: &Dated) -> Option<OtherGoal> {
+    let months = months_left(today, goal.date);
+    monthly_needed(goal.left_to_save, months).map(|needed| OtherGoal {
+        monthly_needed: needed,
+        months_left: months,
+    })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Check {
+    OnTrack,
+    /// Its monthly amount no longer fits the room: the earliest realistic date, always later.
+    Late(NaiveDate),
+    /// Nothing can be set aside, so no date is realistic: it keeps its date.
+    Behind,
+}
+
+/// GOL-7: each goal (given oldest first) judged by month against its monthly room, with the
+/// others at their dates. The newest gives way first, and with `follow` a late goal counts at its
+/// new date for the older ones after it (DATA_MODEL §5.17, §9 items 99–100). None with no pay
+/// windows.
+pub fn check(
+    money_now: Money,
+    today: NaiveDate,
+    windows: &[PayWindow],
+    movements: &[Movement],
+    goals: &[Dated],
+    follow: bool,
+) -> Option<Vec<Check>> {
+    windows.last()?;
+    let mut goals = goals.to_vec();
+    let mut checks = vec![Check::OnTrack; goals.len()];
+    for i in (0..goals.len()).rev() {
+        let goal = goals[i];
+        if goal.left_to_save <= Money::ZERO {
+            continue;
+        }
+        let others: Vec<OtherGoal> = goals
+            .iter()
+            .enumerate()
+            .filter(|(j, _)| *j != i)
+            .filter_map(|(_, g)| other(today, g))
+            .collect();
+        let r = room(
+            money_now,
+            today,
+            windows,
+            movements,
+            &others,
+            goal.left_to_save,
+        )?;
+        // A room of 0 never fits, so it's late with no earliest date: behind.
+        let fits = monthly_needed(goal.left_to_save, months_left(today, goal.date))
+            .is_some_and(|needed| needed <= r.monthly_room);
+        checks[i] = match r.earliest {
+            _ if fits => Check::OnTrack,
+            // shortcut: an earliest date past the calendar (a huge target, a tiny room) is shown
+            // as no room at all, as the too-soon check does; upgrade if a real goal gets there.
+            None => Check::Behind,
+            Some(earliest) => {
+                if follow {
+                    goals[i].date = earliest;
+                }
+                Check::Late(earliest)
+            }
+        };
+    }
+    Some(checks)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -352,5 +431,116 @@ mod tests {
     fn nothing_left_or_no_months_has_no_monthly_amount() {
         assert_eq!(monthly_needed(Money::ZERO, 6), None);
         assert_eq!(monthly_needed(Money(500), 0), None);
+    }
+
+    fn dated(left: i64, date: NaiveDate) -> Dated {
+        Dated {
+            left_to_save: Money(left),
+            date,
+        }
+    }
+
+    fn checks(on: NaiveDate, movements: &[Movement], goals: &[Dated], follow: bool) -> Vec<Check> {
+        check(Money(1_000_000), on, &windows(), movements, goals, follow).unwrap()
+    }
+
+    fn with_bill() -> Vec<Movement> {
+        let mut ms = pays();
+        ms.push(bill(d(2026, 12, 20), 1_200_000));
+        ms
+    }
+
+    #[test]
+    fn a_goal_whose_monthly_amount_fits_is_on_track() {
+        // 10,000.00 over 2 months is 5,000.00 a month, within the 5,909.09 room.
+        let goal = dated(1_000_000, d(2027, 1, 3));
+        assert_eq!(checks(today(), &pays(), &[goal], true), [Check::OnTrack]);
+    }
+
+    #[test]
+    fn a_late_goal_moves_to_exactly_its_earliest_date_and_never_earlier() {
+        // The Dec 20 bill lowers the room to 4,000.00: 5,000.00 a month no longer fits, and
+        // 10,000.00 at 4,000.00 takes 3 months.
+        let late = dated(1_000_000, d(2027, 1, 3));
+        let far = dated(1_000_000, d(2030, 1, 1));
+        assert_eq!(
+            checks(today(), &with_bill(), &[late], true),
+            [Check::Late(d(2027, 2, 3))]
+        );
+        assert_eq!(
+            checks(today(), &with_bill(), &[far], true),
+            [Check::OnTrack]
+        );
+    }
+
+    #[test]
+    fn a_goal_at_its_earliest_date_is_still_on_track_the_next_day() {
+        // Set on Nov 3 to its earliest, Jan 3. By Nov 4 the earliest is Jan 4, but the monthly
+        // amount still fits (DATA_MODEL §9 item 99).
+        let goal = dated(1_000_000, d(2027, 1, 3));
+        let next_day = d(2026, 11, 4);
+        let r = room_with(&pays(), &[], 1_000_000);
+        assert_eq!(
+            earliest(next_day, Money(1_000_000), r.monthly_room),
+            Some(d(2027, 1, 4))
+        );
+        assert_eq!(checks(next_day, &pays(), &[goal], true), [Check::OnTrack]);
+    }
+
+    #[test]
+    fn a_room_of_0_keeps_the_date_and_is_behind() {
+        let mut ms = pays();
+        ms.push(bill(d(2026, 11, 10), 1_100_000));
+        let goal = dated(1_000_000, d(2027, 1, 3));
+        assert_eq!(checks(today(), &ms, &[goal], true), [Check::Behind]);
+    }
+
+    #[test]
+    fn the_newest_goal_gives_way_and_the_older_one_keeps_its_date() {
+        // Two goals of 33,000.00 by Oct 3, 3,000.00 a month each: with the other taking its
+        // share, each has only 2,909.09. The newer one moves to Nov 3, 2027 (2,750.00 a month),
+        // which leaves the older one 3,159.09, enough (DATA_MODEL §9 item 100).
+        let older = dated(3_300_000, d(2027, 10, 3));
+        let newer = dated(3_300_000, d(2027, 10, 3));
+        assert_eq!(
+            checks(today(), &pays(), &[older, newer], true),
+            [Check::OnTrack, Check::Late(d(2027, 11, 3))]
+        );
+        // Without moving (behind on the goal cards), each is judged with the other at its date.
+        assert_eq!(
+            checks(today(), &pays(), &[older, newer], false),
+            [Check::Late(d(2027, 11, 3)), Check::Late(d(2027, 11, 3))]
+        );
+    }
+
+    #[test]
+    fn a_goal_with_nothing_left_is_untouched_even_past_its_date() {
+        let done = dated(0, d(2026, 1, 1));
+        let over = dated(-500, d(2026, 1, 1));
+        assert_eq!(
+            checks(today(), &with_bill(), &[done, over], true),
+            [Check::OnTrack, Check::OnTrack]
+        );
+    }
+
+    #[test]
+    fn a_passed_date_with_something_left_is_late() {
+        let goal = dated(100, d(2026, 11, 1));
+        assert_eq!(
+            checks(today(), &pays(), &[goal], true),
+            [Check::Late(d(2026, 12, 3))]
+        );
+    }
+
+    #[test]
+    fn an_earliest_date_out_of_range_is_behind() {
+        let goal = dated(i64::MAX, d(2027, 1, 3));
+        assert_eq!(checks(today(), &pays(), &[goal], true), [Check::Behind]);
+    }
+
+    #[test]
+    fn no_windows_checks_nothing() {
+        let goal = dated(1, d(2027, 1, 3));
+        assert_eq!(check(Money(1), today(), &[], &[], &[goal], true), None);
     }
 }
