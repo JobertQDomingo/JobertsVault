@@ -185,8 +185,11 @@ function Summary({
                       [
                         "Spending level",
                         <SpendLevelTag key="l" level={card.spendLevel}>
-                          Past your{" "}
-                          {money(levelAmount(account, card.spendLevel))}{" "}
+                          {card.cycleSpending ===
+                          levelAmount(account, card.spendLevel)
+                            ? "Reached"
+                            : "Past"}{" "}
+                          your {money(levelAmount(account, card.spendLevel))}{" "}
                           {card.spendLevel} level
                         </SpendLevelTag>,
                       ],

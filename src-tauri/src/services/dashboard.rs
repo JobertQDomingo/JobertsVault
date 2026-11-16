@@ -732,6 +732,18 @@ mod tests {
     }
 
     #[test]
+    fn the_5_days_count_across_a_month_end() {
+        let mut conn = db();
+        let cash = id_of(&conn, "accounts", "Cash");
+        let loan = loan(&mut conn, "Soon", cash, &[("2026-12-03", 100_000)]);
+        assert_eq!(due_dates(&get(&conn, &MONTH, d(2026, 11, 27)).unwrap()), []);
+        assert_eq!(
+            due_dates(&get(&conn, &MONTH, d(2026, 11, 28)).unwrap()),
+            [(loan.id, d(2026, 12, 3), 5)]
+        );
+    }
+
+    #[test]
     fn a_loan_gets_one_banner_for_its_next_payment_saying_how_many_more_are_overdue() {
         let mut conn = db();
         let cash = id_of(&conn, "accounts", "Cash");

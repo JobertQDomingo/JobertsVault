@@ -9,4 +9,8 @@ export type PayslipDefaults = { accountId: number, categoryId: number,
 /**
  * The payday, or today when it's recorded early.
  */
-date: string, gross: Money, deductions: Array<Deduction>, };
+date: string, 
+/**
+ * None the first time, so the form's Gross pay starts empty rather than on the net estimate.
+ */
+gross: Money | null, deductions: Array<Deduction>, };

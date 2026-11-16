@@ -423,7 +423,12 @@ test("a loan payment due soon has a warning banner with Pay, before every other 
     "Credit card payment due in 3 days: ₱640.00 owedPay bill",
   ]);
   fireEvent.click(within(first).getByRole("button", { name: "Pay" }));
-  const form = within(await screen.findByRole("dialog", { name: "Mark paid" }));
+  // The title names the payment it pays, from the loan list (UI_FLOWS F13).
+  const form = within(
+    await screen.findByRole("dialog", {
+      name: "Mark paid: E-wallet loan, due Sat, Nov 28",
+    }),
+  );
   await waitFor(() =>
     expect(
       (form.getByRole("textbox", { name: "Amount" }) as HTMLInputElement).value,

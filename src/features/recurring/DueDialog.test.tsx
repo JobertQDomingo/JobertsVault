@@ -240,6 +240,31 @@ test("a payday has Record payslip and Skip, an early one only Record now, and th
   expect(calls("skip_occurrence")).toEqual([{ id: 13 }]);
 });
 
+test("the first payslip starts with no gross, no net and no error (F14)", async () => {
+  await openReview([WATER, EARLY], {
+    get_payslip_defaults: {
+      accountId: 2,
+      categoryId: 3,
+      date: TODAY,
+      gross: null,
+      deductions: [],
+    },
+    preview_payslip: ({ payslip }: { payslip: { gross: number } }) => ({
+      net: payslip.gross,
+    }),
+  });
+  fireEvent.click(review().getByRole("button", { name: "Record now" }));
+  const form = within(
+    await screen.findByRole("dialog", { name: "Payslip · Salary" }),
+  );
+  const gross = (await form.findByRole("textbox", {
+    name: "Gross pay",
+  })) as HTMLInputElement;
+  expect(gross.value).toBe("");
+  expect(form.getByTestId("payslip-net").textContent).toBe("");
+  expect(form.queryByRole("alert")).toBeNull();
+});
+
 test("Record now opens the payslip for that payday, and saving records it on its date (F14)", async () => {
   await openReview([WATER, EARLY], {
     list_categories: {

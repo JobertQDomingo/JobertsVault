@@ -57,7 +57,8 @@ export function SafeToSpendCard({
     <GlassPanel className="grid gap-1 px-[18px] py-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-muted-foreground">
-          Safe to spend until {weekdayDate(windowEnd, today)}
+          Safe to spend until{" "}
+          {windowEnd === today ? "today" : weekdayDate(windowEnd, today)}
         </h2>
         {viewForecast}
       </div>

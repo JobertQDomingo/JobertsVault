@@ -240,6 +240,14 @@ test("the level reached shows under This cycle (CC-10, F16 step 5)", async () =>
   );
 });
 
+test("spending exactly at the level says Reached (CC-10)", async () => {
+  renderRoute("/accounts/4", answers(withLevel("soft", { spendSoft: 324000 })));
+  const figures = await screen.findByRole("table");
+  expect(figures.textContent).toContain(
+    "Spending levelReached your ₱3,240.00 soft level",
+  );
+});
+
 test("the edit form shows the card's own levels", async () => {
   renderRoute(
     "/accounts/4",

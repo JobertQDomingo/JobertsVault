@@ -88,7 +88,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
     - `danger`, once it's overdue: "E-wallet loan: ₱1,000.00 overdue since Mon, Nov 16", plus "and 1 more overdue" when the loan has others
     - Each has a **Pay** button that opens Mark paid for that payment (F13). When its account is short, a second line says "E-wallet has ₱200.00. Move ₱800.00 there first."
   - a **Safe to spend** card at the top of the right column, above Accounts (SAFE-6). It's for today, like the balances, whatever the period switcher shows:
-    - "Safe to spend until Sun, Nov 29", then the amount in `display` size
+    - "Safe to spend until Sun, Nov 29" ("until today" when the window ends today), then the amount in `display` size
     - "₱560.00 a day · 15 days left"
     - "₱1,500.00 held back for Nov 30 – Dec 4", or, when even that isn't enough, ₱0.00 and "Short by ₱1,240.00 on Fri, Dec 4" in `--danger`, with an icon
     - from 3 days before a payday: "Payday Mon, Nov 30. Paid early? **Record now**" (PAY-4, F14)
@@ -335,18 +335,18 @@ Welcome to Jobert's Vault
 
 ### F13: Pay a loan payment (Phase 4, LOAN-3, LOAN-4)
 1. Click **Pay** on the dashboard's loan banner, or open the loan on Debt-free and click **Mark paid** on an unpaid row.
-2. The transaction form (§4) opens, titled "Mark paid", with the type fixed to Expense and these fields filled in: the scheduled amount, the loan's account and category, today's date, and the loan's name as the payee. Change the amount for a late fee. **Save** records the expense, with a "Marked paid" toast. The balances go down, and the row says "Paid Nov 20".
+2. The transaction form (§4) opens, titled with the payment it pays, "Mark paid: E-wallet loan, due Fri, Nov 20" (plain "Mark paid" while the loans load), with the type fixed to Expense and these fields filled in: the scheduled amount, the loan's account and category, today's date, and the loan's name as the payee. Change the amount for a late fee. **Save** records the expense, with a "Marked paid" toast. The balances go down, and the row says "Paid Nov 20".
 3. **To undo it**, open the paid row's ⋯ menu in the payments dialog and choose **Mark unpaid**. It confirms first: "Mark this payment unpaid? The expense recorded for it is deleted." Deleting that expense on the Transactions screen does the same.
 
 ### F14: Record a payslip (Phase 4, PAY-2, PAY-4)
 1. **On payday:** the Due banner (F10) → **Review** → **Record payslip** on the payday's row. **Paid early:** **Record now** on the Safe to spend card, or on the payday's early row in the Due dialog, from 3 days before.
-2. The "Payslip · Salary" dialog opens, filled in from that payday rule's last payslip, else the last Salary payslip, else the rule's amount the first time (`get_payslip_defaults`):
+2. The "Payslip · Salary" dialog opens, filled in from that payday rule's last payslip, else the last Salary payslip, else with no gross and no lines the first time (`get_payslip_defaults`):
    - **Date:** the payday, or today when it's early
    - **Account**
    - **Gross pay**
    - **Deductions:** one row each, with a category (the deduction categories come first, then the other expense categories) and an amount, plus an ✕. **+ Add deduction** adds one.
    - **Note**
-   - **Net pay**, shown under the rows. It comes from the backend as the user types (`preview_payslip`), and it's in `--danger` with "Deductions can't add up to the gross pay or more" when it isn't above 0.
+   - **Net pay**, shown under the rows. It comes from the backend as the user types (`preview_payslip`), and it's in `--danger` with "Deductions can't add up to the gross pay or more" when it isn't above 0. While Gross pay is empty it shows nothing, and no error.
 3. **Save** records the gross as income and each deduction as an expense (DATA_MODEL §4.7), with a "Payslip saved" toast, and settles the payday.
 4. **Editing:** clicking any of its rows on Transactions opens it again as "Edit payslip". **Delete** (bottom left) asks "Delete this payslip? Its gross pay and 4 deductions are deleted. Its payday won't be offered again, so to fix a mistake, edit the payslip instead.", since the payday stays settled (DATA_MODEL §4.7).
 
@@ -359,8 +359,8 @@ Welcome to Jobert's Vault
 
 ### F16: Spend on a card past a level (Phase 4, CC-10, CC-11)
 1. The user saves an expense on a card, dated in its current cycle. The form asks `preview_card_spend` first.
-2. **Hard level:** a confirm, "Spend anyway?", says "This takes Credit card to ₱5,120.00 this cycle, past your ₱5,000.00 hard level." with **Go back** and **Spend anyway** (destructive). Go back returns to the form.
-3. **Soft or mid level, reached by this expense:** it saves, and a warning toast says "Credit card: ₱3,240.00 this cycle, past your ₱3,000.00 soft level."
+2. **Hard level:** a confirm, "Spend anyway?", says "This takes Credit card to ₱5,120.00 this cycle, past your ₱5,000.00 hard level." ("reached your" when the spending is exactly the level) with **Go back** and **Spend anyway** (destructive). Go back returns to the form.
+3. **Soft or mid level, reached by this expense:** it saves, and a warning toast says "Credit card: ₱3,240.00 this cycle, past your ₱3,000.00 soft level." (exactly ₱3,000.00: "reached your ₱3,000.00 soft level")
 4. Below the soft level, or already past the level it reaches: it saves as usual.
 5. The card's details show the level under "This cycle" (soft in the muted text color, mid in `--warning` and hard in `--danger`, each with the level's name, and an icon from mid up), and so do its row in the Accounts list and the dashboard's card summary.
 
@@ -634,3 +634,7 @@ Answered on 2026-11-16 (Phase 4, building card spending levels):
 Answered on 2026-11-16 (Phase 4, testing on a copy of the owner's data):
 
 60. **Deleting a payslip says its payday won't come back.** The payday stays settled (DATA_MODEL §4.7), so the pay it recorded leaves the forecast for good, which can make a window run short, and Review or Record now never offers it again. The confirm says so and points to editing instead; the rule itself is unchanged (F14 step 4).
+61. **Mark paid names the payment** in its title, "Mark paid: E-wallet loan, due Fri, Nov 20", so paying early or from a banner says which payment it records (F13).
+62. **Exactly at a level says "reached"**, not "past": "Reached means equal or more" (DATA_MODEL §5.18), and "past" read wrong at the boundary. Above it, "past" stays (F16, §5.3).
+63. **The first payslip starts with no gross**, rather than the rule's amount, which is the expected **net** and looked like a gross with nothing deducted. The net shows nothing until a gross is typed (F14).
+64. **"Safe to spend until today"** when the current window ends today, instead of today's own date (§2).

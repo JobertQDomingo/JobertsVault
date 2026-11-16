@@ -293,7 +293,9 @@ test("Mark paid opens the transaction form filled in, fixed to Expense, and reco
       name: "Mark paid",
     }),
   );
-  const form = within(await screen.findByRole("dialog", { name: "Mark paid" }));
+  const form = within(
+    await screen.findByRole("dialog", { name: /^Mark paid/ }),
+  );
   await waitFor(() =>
     expect(
       (form.getByRole("textbox", { name: "Amount" }) as HTMLInputElement).value,
@@ -332,7 +334,7 @@ test("Mark paid opens the transaction form filled in, fixed to Expense, and reco
   );
   await screen.findByText("Marked paid");
   await waitFor(() =>
-    expect(screen.queryByRole("dialog", { name: "Mark paid" })).toBeNull(),
+    expect(screen.queryByRole("dialog", { name: /^Mark paid/ })).toBeNull(),
   );
 });
 
@@ -351,7 +353,9 @@ test("Mark paid keeps the loan's archived account and category", async () => {
       name: "Mark paid",
     }),
   );
-  const form = within(await screen.findByRole("dialog", { name: "Mark paid" }));
+  const form = within(
+    await screen.findByRole("dialog", { name: /^Mark paid/ }),
+  );
   await waitFor(() =>
     expect(
       (form.getByRole("combobox", { name: "Account" }) as HTMLInputElement)
@@ -464,7 +468,7 @@ test("Mark paid on a payment that's no longer unpaid says so and closes, instead
   );
   await screen.findByText("This payment is no longer unpaid.");
   await waitFor(() =>
-    expect(screen.queryByRole("dialog", { name: "Mark paid" })).toBeNull(),
+    expect(screen.queryByRole("dialog", { name: /^Mark paid/ })).toBeNull(),
   );
 });
 

@@ -39,6 +39,7 @@ import {
   useTransactionDefaults,
   useUpdateTransaction,
 } from "@/hooks/useTransactions";
+import { formatDue } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { named, offered } from "@/lib/records";
 import { unitOf } from "@/lib/recurrence";
@@ -308,7 +309,12 @@ export function QuickAddDialog({
     <>
       <Dialog open onOpenChange={(open) => !open && close()}>
         <DialogContent
-          title={titleOf(request)}
+          title={
+            // Mark paid names the payment once the loans are here (UI_FLOWS F13).
+            loan && scheduled && today
+              ? `Mark paid: ${loan.name}, ${formatDue(scheduled.dueDate, today)}`
+              : titleOf(request)
+          }
           // The form puts the cursor in Amount itself.
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
@@ -591,11 +597,14 @@ function TransactionForm({
     });
   };
 
-  // "Credit card: ₱5,120.00 this cycle, past your ₱5,000.00 hard level" (UI_FLOWS F16).
-  const pastLevel = (p: CardSpendPreview, card: Account) =>
-    p.levelAfter === "none"
-      ? ""
-      : `${money(p.spent)} this cycle, past your ${money(levelAmount(card, p.levelAfter))} ${p.levelAfter} level`;
+  // "Credit card: ₱5,120.00 this cycle, past your ₱5,000.00 hard level", or "reached your" when
+  // it's exactly the level (UI_FLOWS F16).
+  const pastLevel = (p: CardSpendPreview, card: Account) => {
+    if (p.levelAfter === "none") return "";
+    const level = levelAmount(card, p.levelAfter);
+    const verb = p.spent === level ? "reached" : "past";
+    return `${money(p.spent)} this cycle, ${verb} your ${money(level)} ${p.levelAfter} level`;
+  };
 
   // An expense on a card asks the backend first (DATA_MODEL §5.18). A rule's form saves no
   // expense, and Edit & post is processing, which never asks (§5.17); Mark paid's and Pay bill's

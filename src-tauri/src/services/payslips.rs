@@ -65,7 +65,8 @@ pub struct PayslipDefaults {
     pub category_id: i64,
     /// The payday, or today when it's recorded early.
     pub date: NaiveDate,
-    pub gross: Money,
+    /// None the first time, so the form's Gross pay starts empty rather than on the net estimate.
+    pub gross: Option<Money>,
     pub deductions: Vec<Deduction>,
 }
 
@@ -77,8 +78,8 @@ pub struct PayslipNet {
     pub net: Money,
 }
 
-/// The rule's last payslip, else the last one in its category, else the rule's amount and no
-/// lines (PAY-2). A line whose category is archived now is left out: a new payslip can't use it.
+/// The rule's last payslip, else the last one in its category, else no gross and no lines
+/// (PAY-2). A line whose category is archived now is left out: a new payslip can't use it.
 pub fn defaults(
     conn: &Connection,
     rule_id: i64,
@@ -101,9 +102,9 @@ pub fn defaults(
                     lines.push(line);
                 }
             }
-            (last.gross, lines)
+            (Some(last.gross), lines)
         }
-        None => (Money(rule.amount), Vec::new()),
+        None => (None, Vec::new()),
     };
     Ok(PayslipDefaults {
         account_id: rule.account_id,
@@ -687,6 +688,24 @@ mod tests {
     }
 
     #[test]
+    fn early_counts_days_across_a_month_end() {
+        let mut conn = db();
+        let bank = bank(&mut conn, "Bank");
+        // A payday on the 3rd: Dec 3 is 4 days after Nov 29 and 3 after Nov 30.
+        let rule = payday_rule(&mut conn, bank, "2026-12-03", "2026-11-29");
+        let f = slip(&conn, bank, "2026-11-29");
+        conflict_of(record(&mut conn, rule, "2026-12-03", f, on("2026-11-29")));
+        let f = slip(&conn, bank, "2026-11-30");
+        record(&mut conn, rule, "2026-12-03", f, on("2026-11-30")).unwrap();
+        // February 2027 has 28 days: Mar 3 is 3 days after Feb 28.
+        let march = payday_rule(&mut conn, bank, "2027-03-03", "2027-02-27");
+        let f = slip(&conn, bank, "2027-02-27");
+        conflict_of(record(&mut conn, march, "2027-03-03", f, on("2027-02-27")));
+        let f = slip(&conn, bank, "2027-02-28");
+        record(&mut conn, march, "2027-03-03", f, on("2027-02-28")).unwrap();
+    }
+
+    #[test]
     fn a_payday_that_arrived_while_the_dialog_was_open_can_be_recorded() {
         let mut conn = db();
         let bank = bank(&mut conn, "Bank");
@@ -701,13 +720,13 @@ mod tests {
     }
 
     #[test]
-    fn defaults_come_from_the_rules_last_payslip_then_the_categorys_then_the_rule() {
+    fn defaults_come_from_the_rules_last_payslip_then_the_categorys_then_nothing() {
         let mut conn = db();
         let bank = bank(&mut conn, "Bank");
         let first = payday_rule(&mut conn, bank, "2026-10-15", "2026-11-13");
         let second = payday_rule(&mut conn, bank, "2026-10-30", "2026-11-13");
 
-        // Nothing recorded yet: the rule's amount, no lines, and today when it's early.
+        // Nothing recorded yet: no gross, no lines, and today when it's early.
         let start = defaults(&conn, first, "2026-11-15", d("2026-11-13")).unwrap();
         assert_eq!(
             start,
@@ -715,7 +734,7 @@ mod tests {
                 account_id: bank,
                 category_id: SALARY,
                 date: d("2026-11-13"),
-                gross: Money(420_000),
+                gross: None,
                 deductions: vec![],
             }
         );
@@ -724,7 +743,10 @@ mod tests {
         let f = slip(&conn, bank, "2026-10-30");
         record(&mut conn, second, "2026-10-30", f.clone(), on("2026-11-13")).unwrap();
         let start = defaults(&conn, first, "2026-10-15", d("2026-11-13")).unwrap();
-        assert_eq!((start.gross, start.deductions.len()), (Money(460_000), 2));
+        assert_eq!(
+            (start.gross, start.deductions.len()),
+            (Some(Money(460_000)), 2)
+        );
         assert_eq!(
             start.date,
             d("2026-10-15"),
@@ -738,13 +760,19 @@ mod tests {
         own.deductions.truncate(1);
         record(&mut conn, first, "2026-10-15", own, on("2026-11-13")).unwrap();
         let start = defaults(&conn, first, "2026-11-15", d("2026-11-13")).unwrap();
-        assert_eq!((start.gross, start.deductions.len()), (Money(450_000), 1));
+        assert_eq!(
+            (start.gross, start.deductions.len()),
+            (Some(Money(450_000)), 1)
+        );
 
         // A line whose category is archived now is left out.
         let sss = id_of(&conn, "categories", "SSS");
         categories::archive(&mut conn, sss, now()).unwrap();
         let start = defaults(&conn, first, "2026-11-15", d("2026-11-13")).unwrap();
-        assert_eq!((start.gross, start.deductions), (Money(450_000), vec![]));
+        assert_eq!(
+            (start.gross, start.deductions),
+            (Some(Money(450_000)), vec![])
+        );
     }
 
     #[test]
