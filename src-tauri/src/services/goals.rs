@@ -1517,7 +1517,7 @@ mod tests {
     #[test]
     fn each_save_that_leaves_a_goal_late_moves_it_in_the_same_change() {
         type Save = fn(&mut Connection, i64) -> Vec<GoalMove>;
-        let cases: [(&str, Save); 8] = [
+        let cases: [(&str, Save); 10] = [
             ("expense", |c, pay| {
                 transactions::create(c, bill(pay, BIG), now())
                     .unwrap()
@@ -1560,6 +1560,25 @@ mod tests {
                 let small = recurring::create(c, bill_rule(pay, 100_000), now()).unwrap();
                 assert_eq!(small.goals_moved, []);
                 let id = small.saved.id;
+                recurring::update(c, id, bill_rule(pay, BIG), now())
+                    .unwrap()
+                    .goals_moved
+            }),
+            ("new transfer rule", |c, pay| {
+                // Into an undated goal's account, as the transfer above.
+                let someday = account(c, "Someday", AccountKind::Bank, 0);
+                insert(c, fields("Someday", 100, None, someday));
+                let mut rule = bill_rule(pay, BIG);
+                rule.transaction = TransactionFields {
+                    to_account_id: Some(someday),
+                    ..txn(TransactionKind::Transfer, pay, BIG, "2026-12-20")
+                };
+                recurring::create(c, rule, now()).unwrap().goals_moved
+            }),
+            ("income rule edited into an expense", |c, pay| {
+                let income =
+                    recurring::create(c, income_rule(pay, 100, "2026-12-20", false), now());
+                let id = income.unwrap().saved.id;
                 recurring::update(c, id, bill_rule(pay, BIG), now())
                     .unwrap()
                     .goals_moved
