@@ -763,9 +763,16 @@ per day       = ⌊safe to spend ÷ days left in the current window, counting to
 A **draft loan** is either the rows the user typed in the Add loan form (LOAN-10), or a payment amount, a number of payments and a first payment date (LOAN-9). The second form gives monthly dates from the first one, as a monthly rule does (§4.1: the *n*-th date is `first + n` months, with the day clamped to the month's end), so the day of the month is the first payment's.
 
 The draft's payments are added as unpaid payments of an active loan, and nothing is saved. The result is:
-- the **debt-free date** before and after (§5.11)
-- **safe to spend** before and after (§5.15)
+- the **debt-free date** before and after (§5.11), and how many days later it is: after − before, counting from today when nothing is left
+- **safe to spend** before and after (§5.15), none with no payday rule
 - **each pay window's** `left` before and after, so the screen can say which windows it hurts and which would run short
+- **short by**, on each window the draft makes short: it runs short with the draft (§5.15), and its lowest running total is lower than without it. It's `−(that lowest total)`.
+
+```
+debt-free after = max(debt-free before (today when none), the draft's latest date)
+days later      = debt-free after − (debt-free before, or today)
+short by(k)     = −low_after(k)   when window k runs short with the draft and low_after(k) < low_before(k)
+```
 
 ---
 
@@ -1021,3 +1028,8 @@ Answered on 2026-11-15, while building `get_forecast` and the Safe to spend card
 79. **Pending dates of a paused rule still count**, a payday's too: they wait in the Due list whatever the rule does next. Only the dates still to come need a rule that isn't paused (§5.13, §5.15).
 80. **A date up to today that processing hasn't reached yet** (the app was open past midnight) counts as due today, once, so the figures don't change when processing runs (§5.15).
 81. **Received pay is listed by the payslip's date.** A payslip recorded early shows in the window it was recorded in, which is where its money already is (§5.15).
+
+Answered on 2026-11-16, while building Before you borrow (LOAN-9, LOAN-10):
+
+82. **A window already short isn't blamed on the loan.** `short by` is set only when the draft lowers the window's lowest running total and it runs short with it, so a window that runs short anyway, before the draft's first payment, isn't named (§5.16).
+83. **The draft's typed rows are checked like a new loan's payments**, without a date borrowed, since the preview doesn't have one: 1–600 rows, real dates, amounts above 0. The other loan fields are checked when the loan is saved, after the confirm (§5.16, §6).
