@@ -114,7 +114,7 @@ jobertsvault/
 └─ src-tauri/                      # ── Backend ──
    ├─ Cargo.toml  tauri.conf.json
    ├─ capabilities/default.json    # the minimum permissions the frontend needs
-   ├─ migrations/                  # 0001_initial.sql  0002_planning.sql  0003_loans_payroll.sql
+   ├─ migrations/                  # 0001_initial.sql  0002_planning.sql  0003_loans_payroll.sql  0004_card_spend_levels.sql
    └─ src/
       ├─ main.rs                   # entry point
       ├─ lib.rs                    # builds the app, registers commands, startup steps
