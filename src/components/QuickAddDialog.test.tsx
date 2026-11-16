@@ -903,6 +903,27 @@ test("a soft or mid level reached by the save shows a warning", async () => {
   ).toBeTruthy();
 });
 
+test("spending exactly at a level says reached, not past (CC-11)", async () => {
+  await saveDining(spending(300000, "none", "soft"));
+  expect(
+    await screen.findByText(
+      "Credit card: ₱3,000.00 this cycle, reached your ₱3,000.00 soft level.",
+    ),
+  ).toBeTruthy();
+});
+
+test("exactly at the hard level, Spend anyway? says reached", async () => {
+  await saveDining(spending(500000, "mid", "hard"));
+  const confirm = await screen.findByRole("dialog", {
+    name: "Spend anyway?",
+  });
+  expect(
+    within(confirm).getByText(
+      "This takes Credit card to ₱5,000.00 this cycle, reached your ₱5,000.00 hard level.",
+    ),
+  ).toBeTruthy();
+});
+
 test("a level already reached before the save shows no warning", async () => {
   const warning = vi.spyOn(notify, "warning");
   await saveDining(spending(330000, "soft", "soft"));

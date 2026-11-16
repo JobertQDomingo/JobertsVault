@@ -26,6 +26,10 @@ export const levelAmount = (account: Account, level: Reached) =>
     level
   ] ?? 0;
 
+/** "reached" when the spending is exactly the level's amount, else "past" (UI_FLOWS F16). */
+export const reachedOrPast = (spent: number, level: number) =>
+  spent === level ? "reached" : "past";
+
 /**
  * The level this cycle's spending has reached (UI_FLOWS F16 step 5): its name in the muted
  * color, `--warning` or `--danger`, with an icon from mid up, so it never relies on color alone.

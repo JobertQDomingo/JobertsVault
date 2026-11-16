@@ -220,7 +220,9 @@ function PayslipForm({
   } = useForm<Values>({ defaultValues: initial });
   const lines = useFieldArray({ control, name: "deductions" });
   const values = useWatch({ control }) as Values;
-  const net = usePayslipNet(toFields(values)).data?.net;
+  const preview = usePayslipNet(toFields(values)).data?.net;
+  // No net, and no "can't add up" error, before a gross is typed (the first payslip).
+  const net = values.gross === null ? undefined : preview;
   // A message about the lines as a whole (more than 30), shown under Net pay.
   const [listError, setListError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);

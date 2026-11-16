@@ -279,7 +279,13 @@ test("an overdue payment says so in red, with Mark paid", async () => {
   );
   const first = within(dialog.getAllByRole("listitem")[0]);
   expect(first.getByText("Overdue").className).toContain("text-danger");
-  first.getByRole("button", { name: "Mark paid" });
+  fireEvent.click(first.getByRole("button", { name: "Mark paid" }));
+  // Its title says it's overdue, as the banner does (UI_FLOWS F13).
+  expect(
+    await screen.findByRole("dialog", {
+      name: "Mark paid: Bank loan, overdue since Sat, Oct 10",
+    }),
+  ).toBeTruthy();
 });
 
 test("Mark paid opens the transaction form filled in, fixed to Expense, and records it (F13)", async () => {
@@ -293,7 +299,9 @@ test("Mark paid opens the transaction form filled in, fixed to Expense, and reco
       name: "Mark paid",
     }),
   );
-  const form = within(await screen.findByRole("dialog", { name: "Mark paid" }));
+  const form = within(
+    await screen.findByRole("dialog", { name: /^Mark paid/ }),
+  );
   await waitFor(() =>
     expect(
       (form.getByRole("textbox", { name: "Amount" }) as HTMLInputElement).value,
@@ -332,7 +340,7 @@ test("Mark paid opens the transaction form filled in, fixed to Expense, and reco
   );
   await screen.findByText("Marked paid");
   await waitFor(() =>
-    expect(screen.queryByRole("dialog", { name: "Mark paid" })).toBeNull(),
+    expect(screen.queryByRole("dialog", { name: /^Mark paid/ })).toBeNull(),
   );
 });
 
@@ -351,7 +359,9 @@ test("Mark paid keeps the loan's archived account and category", async () => {
       name: "Mark paid",
     }),
   );
-  const form = within(await screen.findByRole("dialog", { name: "Mark paid" }));
+  const form = within(
+    await screen.findByRole("dialog", { name: /^Mark paid/ }),
+  );
   await waitFor(() =>
     expect(
       (form.getByRole("combobox", { name: "Account" }) as HTMLInputElement)
@@ -464,7 +474,7 @@ test("Mark paid on a payment that's no longer unpaid says so and closes, instead
   );
   await screen.findByText("This payment is no longer unpaid.");
   await waitFor(() =>
-    expect(screen.queryByRole("dialog", { name: "Mark paid" })).toBeNull(),
+    expect(screen.queryByRole("dialog", { name: /^Mark paid/ })).toBeNull(),
   );
 });
 

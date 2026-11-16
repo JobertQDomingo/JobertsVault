@@ -140,6 +140,11 @@ function show(url = "/forecast", forecast?: Forecast) {
 
 const rowButton = (name: RegExp) => screen.findByRole("button", { name });
 
+test("its Safe to spend card says until today when the window ends today", async () => {
+  show("/forecast", { ...WINDOWS, windowEnd: WINDOWS.today, daysLeft: 1 });
+  expect(await screen.findByText("Safe to spend until today")).toBeTruthy();
+});
+
 test("rows show their dates, figures and the pay received (SAFE-7)", async () => {
   show();
   // The current window starts today.

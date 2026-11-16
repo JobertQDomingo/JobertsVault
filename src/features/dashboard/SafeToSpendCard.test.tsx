@@ -50,6 +50,12 @@ test("the card shows what's safe to spend, a day's share and what's held back (S
   expect(c.queryByText(/Paid early/)).toBeNull();
 });
 
+test("a window ending today says until today", async () => {
+  show({ ...SAFE, windowEnd: SAFE.today, daysLeft: 1 });
+  const c = await card();
+  expect(c.getByText("Safe to spend until today")).toBeTruthy();
+});
+
 test("nothing held back, one day left and a window ending next year", async () => {
   show({
     ...SAFE,
