@@ -558,6 +558,21 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
         </div>
         <div class="result"><span>Records <span class="money inc">+₱4,600.00</span> Salary and 4 deductions (<span class="money exp">−₱400.00</span>), so Bank goes up by the net <span class="money">₱4,200.00</span>.</span></div>
       </div>
+
+      <div class="flow">
+        <div class="flow-h"><span class="fid">F16</span><h4>Spend on a card past a level</h4><span class="phase">Phase 4</span></div>
+        <ol class="steps"><li>Save an expense on a card, dated in its current cycle.</li><li><b>Hard level:</b> "Spend anyway?" asks first. <b>Go back</b> returns to the form.</li><li><b>Soft or mid level</b>, reached by this expense: it saves, and a warning toast names the level ("reached your" at exactly the level).</li></ol>
+        <div class="preview backdrop">
+          <div class="v-dialog confirm" style="width:100%">
+            <div class="v-dialog-h"><h3>Spend anyway?</h3></div>
+            <div class="v-dialog-b">
+              <p style="margin:0">This takes Credit card to <span class="money">₱5,120.00</span> this cycle, past your <span class="money">₱5,000.00</span> hard level.</p>
+            </div>
+            <div class="v-dialog-f"><button class="v-btn secondary" type="button">Go back</button><button class="v-btn destructive" type="button">Spend anyway</button></div>
+          </div>
+        </div>
+        <div class="result"><span>Levels only warn: the card can always go past them.</span></div>
+      </div>
     </div>
   </section>
 
