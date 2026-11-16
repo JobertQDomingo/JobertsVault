@@ -804,6 +804,27 @@ earliest     = today + ⌈left to save ÷ monthly room⌉ months   (the day clam
 - **Nothing left to save** (the account already holds the target): any date today or later is allowed, and the suggestion is today. It still needs a date and a payday rule.
 - Budgets still don't hold anything back, and Safe to spend doesn't set money aside for goals (PRD §3). The monthly room is advice for the goal only.
 
+**Goals follow the forecast (GOL-7).** After these saves, in the same database transaction:
+- a transaction created or updated as an expense or a transfer, whatever screen it comes from (quick-add, Edit, Duplicate, Mark paid)
+- a recurring rule created or updated
+- a loan created or updated
+
+each active goal that isn't achieved and has a target date and something left to save is checked again, oldest first:
+
+```
+earliest(goal) = §5.17's earliest date, worked out after the save, with the other goals at their dates now
+                 (a goal moved earlier in this pass counts at its new date)
+if the monthly room is 0          → the date stays, and the goal is behind
+else if earliest(goal) > its date → its target_date becomes earliest(goal)
+```
+
+- **The save always goes ahead.** The goal is what changes, never the expense.
+- **Only a date that's no longer realistic moves**, and only later. A save that leaves every goal on track changes nothing, and a goal never moves earlier by itself.
+- **Oldest first**, so a goal added earlier keeps its claim on the monthly room. Moving it later lowers its monthly amount, which leaves more room for the goals after it.
+- **Behind** (`list_goals`' `behind`): there's a payday rule, something left to save, and either the monthly room is 0 or the earliest date is after the target date (time passing, a payslip below the estimate, or a deleted income can do this without a save that moves it). The card says so; nothing else changes.
+- With no payday rule, nothing is checked or moved.
+- Recurring dates posted by processing and payslips aren't saves that move goals: their dates were already in the forecast. Deleting a row never moves a goal either; a goal it leaves behind shows as behind.
+
 ### 5.18 Card spending levels (CC-10, CC-11, Phase 4)
 
 ```
@@ -1093,4 +1114,8 @@ Answered on 2026-11-16, planning the smart goal date and the card spending level
 89. **The hard level asks "Spend anyway?" but never blocks**, like the credit limit. Soft and mid only warn (§5.18).
 90. **A goal needs a target date and a payday rule** (the owner, 2026-11-16). A goal with no date can't be judged and asks for no monthly amount, so it's refused, on add and on every edit. Without a payday rule there's no forecast to judge a date by, so adding a goal, or changing its date, is refused with a message to mark the pay as a payday first (§5.17).
 91. **Goals saved before Phase 4 without a date** stay as they are: `target_date` stays nullable, with no migration, and they show their progress with no monthly amount. Archive, Unarchive and Delete never need a date; Edit does (§4.4, §5.7, §5.17).
+92. **Goals follow the forecast** (the owner, 2026-11-16): a save that leaves a goal's date unrealistic moves the date to the new earliest one by itself, with a note, rather than asking or blocking the save. The expense is what the user meant to record; the goal is the plan that adjusts (§5.17).
+93. **What moves goals:** saving an expense or a transfer, a recurring rule or a loan, the changes that add spending to the forecast. Processing, payslips and deletes don't move them, and a goal a delete leaves behind is shown as behind instead (§5.17).
+94. **No room at all keeps the date**, since no date would be realistic, and the goal shows as behind until money frees up (§5.17).
+95. **Oldest goal first** when one save affects several, each worked out with the goals before it at their new dates (§5.17).
 

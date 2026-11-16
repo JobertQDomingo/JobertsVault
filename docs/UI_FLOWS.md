@@ -429,6 +429,8 @@ Clicking a card edits it. Its ⋯ menu has **Edit**, **Archive** and **Delete** 
 
 The backend's message shows under the field it names.
 
+**Phase 4 (GOL-7):** when a save moves a goal's date, a toast says "Emergency fund now aims for Jul 5, 2027 (was May 5, 2027), so it stays realistic." (one line per goal moved). A goal that's behind says "Behind: nothing can be set aside right now" in `--warning` on its card in place of the monthly amount, or "Behind: the earliest realistic date is now Jul 5, 2027" when there is room.
+
 ### 8.5 Debt-free (`/debt-free`), Phase 4
 
 ```
@@ -620,3 +622,5 @@ Answered on 2026-11-16 (Phase 4, planning smart goals and card spending levels):
 52. **The goal dialog asks `suggest_goal` as the user types**, after 250 ms, like the payslip's net (item 23). The frontend never works out the monthly room or the date (§8.4, DATA_MODEL §5.17).
 53. **A new goal's date starts on the suggestion** once there is one, and the user may change it but not clear it. An edit keeps its date, and the line shows the suggestion beside it. A goal from before Phase 4 with no date opens with an empty date, which must be filled in to save (§8.4, DATA_MODEL §9 items 90–91).
 54. **The card spending confirm** is a ConfirmDialog over the transaction form, as "Before you add this loan" is over the loan form (item 51), so Go back returns to the form as it was (F16).
+55. **A goal moved by a save is told with a toast**, not a dialog, since there's nothing to choose: the save went ahead and the date moved (DATA_MODEL §9 item 92). The toast follows any card spending confirm, which comes before the save (F16).
+56. **Behind is shown on the goal's card only**, in `--warning`, without a banner, since goals don't hold money back (PRD §3).
