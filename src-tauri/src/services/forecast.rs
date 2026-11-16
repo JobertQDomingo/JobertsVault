@@ -179,7 +179,7 @@ pub fn get(
         nets,
         paydays,
         early,
-    } = gather(conn, today)?;
+    } = gather(conn, today, None)?;
     let mut forecast = Forecast {
         today,
         money_now,
@@ -258,15 +258,28 @@ pub fn get(
     Ok(forecast)
 }
 
-/// Money now, the pay windows and every movement in the horizon, as `get` and the loan preview
-/// (DATA_MODEL §5.16) read them.
-pub(crate) fn gather(conn: &Connection, today: NaiveDate) -> Result<Gathered, AppError> {
+/// A goal being added or edited, so the forecast is worked out as if it's saved (DATA_MODEL
+/// §5.17): `id` is the goal being edited, whose stored account no longer counts as its own.
+#[derive(Clone, Copy)]
+pub(crate) struct AsGoal {
+    pub id: Option<i64>,
+    pub account_id: i64,
+}
+
+/// Money now, the pay windows and every movement in the horizon, as `get`, the loan preview
+/// (DATA_MODEL §5.16) and the smart goal date (§5.17) read them.
+pub(crate) fn gather(
+    conn: &Connection,
+    today: NaiveDate,
+    as_goal: Option<AsGoal>,
+) -> Result<Gathered, AppError> {
     let horizon = f::horizon_end(today).ok_or_else(out_of_range)?;
     let accounts = repo::accounts::all(conn, today)?;
     let goal_accounts: HashSet<i64> = repo::goals::all(conn)?
         .into_iter()
-        .filter(|g| !g.archived)
+        .filter(|g| !g.archived && as_goal.is_none_or(|a| a.id != Some(g.id)))
         .map(|g| g.account_id)
+        .chain(as_goal.map(|a| a.account_id))
         .collect();
     let places: HashMap<i64, Place> = accounts
         .iter()
@@ -578,7 +591,7 @@ mod tests {
     use super::*;
     use crate::domain::recurrence::Frequency;
     use crate::services::accounts::{self, AccountFields, AccountKind, NewAccount};
-    use crate::services::goals::{self, GoalFields};
+    use crate::services::goals;
     use crate::services::loans::{self, LoanFields, LoanPaymentFields, NewLoan};
     use crate::services::payslips::{self, Deduction, PayslipFields};
     use crate::services::recurring::{RecurringMode, RecurringRuleFields};
@@ -627,13 +640,13 @@ mod tests {
     /// A bank account linked to an active goal.
     fn goal_account(conn: &mut Connection, name: &str, opening: i64) -> i64 {
         let id = account(conn, AccountKind::Bank, name, opening);
-        let goal = GoalFields {
-            name: format!("{name} goal"),
-            target_amount: Money(10_000_000),
+        let goal = repo::goals::Values {
+            name: &format!("{name} goal"),
+            target_amount: 10_000_000,
             target_date: None,
             account_id: id,
         };
-        goals::create(conn, goal, now()).unwrap();
+        repo::goals::insert(conn, &goal, "2026-11-03T06:05:00Z").unwrap();
         id
     }
 

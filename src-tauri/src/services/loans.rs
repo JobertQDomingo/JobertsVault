@@ -416,7 +416,7 @@ pub fn preview(
         }
     };
     let before = list(conn, today)?.summary.debt_free_on;
-    let plan = forecast::gather(conn, today)?;
+    let plan = forecast::gather(conn, today, None)?;
     Ok(loan::preview(
         before,
         &draft,
@@ -1549,13 +1549,14 @@ mod tests {
             amount: Money(500_000),
         };
         budgets::create(&mut conn, budget, now()).unwrap();
-        let goal = goals::GoalFields {
-            name: "Emergency fund".into(),
-            target_amount: Money(1_000_000),
+        // Not about adding goals, so stored as it is, without the smart date (GOL-6).
+        let goal = repo::goals::Values {
+            name: "Emergency fund",
+            target_amount: 1_000_000,
             target_date: None,
             account_id: CASH,
         };
-        goals::create(&mut conn, goal, now()).unwrap();
+        repo::goals::insert(&conn, &goal, "2026-11-03T06:05:00Z").unwrap();
         let before = figures(&mut conn);
 
         // One overdue and one due today: neither is a transaction until it's marked paid.

@@ -304,29 +304,10 @@ pub fn rows(
             };
             let (money_in, money_out) = (sum(Direction::In), sum(Direction::Out));
             let first_day = if i == 0 { today } else { span.start };
-            let mut run = start_amount.0;
-            let mut low = i64::MAX;
-            let mut short_on = None;
-            let mut see = |run: i64, day: NaiveDate| {
-                low = low.min(run);
-                if run < 0 && short_on.is_none() {
-                    short_on = Some(day);
-                }
-            };
-            // A first day with nothing due keeps the total it starts with.
-            if ms.first().is_none_or(|m| m.date > first_day) {
-                see(run, first_day);
-            }
-            for day in ms.chunk_by(|a, b| a.date == b.date) {
-                run = day.iter().fold(run, |run, m| match m.direction {
-                    Direction::In => run.saturating_add(m.amount.0),
-                    Direction::Out => run.saturating_sub(m.amount.0),
-                });
-                see(run, day[0].date);
-            }
+            let steps = walk(start_amount, first_day, &ms);
             let row = Row {
-                low: Money(low),
-                short_on,
+                low: steps.iter().map(|s| s.1).min().unwrap_or(Money(i64::MAX)),
+                short_on: steps.iter().find(|s| s.1 < Money::ZERO).map(|s| s.0),
                 start: span.start,
                 end: span.end,
                 start_amount,
@@ -344,6 +325,45 @@ pub fn rows(
             row
         })
         .collect()
+}
+
+/// The running total after each day it changes, starting from `start` on `first_day` (which
+/// counts even with nothing due). `ms` are sorted by date, none before `first_day`.
+fn walk(start: Money, first_day: NaiveDate, ms: &[Movement]) -> Vec<(NaiveDate, Money)> {
+    let mut run = start.0;
+    let mut steps = Vec::new();
+    // A first day with nothing due keeps the total it starts with.
+    if ms.first().is_none_or(|m| m.date > first_day) {
+        steps.push((first_day, start));
+    }
+    for day in ms.chunk_by(|a, b| a.date == b.date) {
+        run = day.iter().fold(run, |run, m| match m.direction {
+            Direction::In => run.saturating_add(m.amount.0),
+            Direction::Out => run.saturating_sub(m.amount.0),
+        });
+        steps.push((day[0].date, Money(run)));
+    }
+    steps
+}
+
+/// `run(d)` from today through `end` (§5.15): the running total after each day it changes, the
+/// first entry on today. Dates before today count as today; movements after `end` are left out.
+pub fn running(
+    money_now: Money,
+    today: NaiveDate,
+    end: NaiveDate,
+    movements: &[Movement],
+) -> Vec<(NaiveDate, Money)> {
+    let mut ms: Vec<Movement> = movements
+        .iter()
+        .map(|m| Movement {
+            date: m.date.max(today),
+            ..*m
+        })
+        .filter(|m| m.date <= end)
+        .collect();
+    ms.sort_by_key(|m| m.date);
+    walk(money_now, today, &ms)
 }
 
 /// Safe to spend: the lowest running total, day by day, over every window, never below 0, with
@@ -1201,5 +1221,33 @@ mod tests {
             f.rows.last().map(|r| (r.start, r.end)),
             Some((d(2027, 10, 25), d(2027, 10, 25)))
         );
+    }
+
+    #[test]
+    fn running_is_the_same_walk_as_the_rows() {
+        let today = d(2026, 11, 3);
+        let ms = [
+            out(d(2026, 11, 1), 300),
+            pay(d(2026, 11, 15), 1_000),
+            out(d(2026, 11, 15), 200),
+            out(d(2026, 12, 2), 900),
+            pay(d(2027, 1, 9), 50),
+        ];
+        // Overdue counts as today, a shared day is one step, and after `end` is left out.
+        assert_eq!(
+            running(Money(100), today, d(2026, 12, 31), &ms),
+            [
+                (today, Money(-200)),
+                (d(2026, 11, 15), Money(600)),
+                (d(2026, 12, 2), Money(-300)),
+            ]
+        );
+        assert_eq!(
+            running(Money(100), today, d(2026, 11, 2), &[]),
+            [(today, Money(100))]
+        );
+        let span = [w(today, d(2026, 12, 31))];
+        let row = &rows(Money(100), today, &span, &ms)[0];
+        assert_eq!((row.low, row.short_on), (Money(-300), Some(today)));
     }
 }

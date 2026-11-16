@@ -10,7 +10,8 @@ export type GoalFields = {
  */
 name: string, targetAmount: Money, 
 /**
- * `YYYY-MM-DD`, or none. It may already have passed.
+ * `YYYY-MM-DD`, required from Phase 4 and not before the earliest realistic date (GOL-6).
+ * None only on goals saved before Phase 4, until they're edited.
  */
 targetDate: string | null, 
 /**

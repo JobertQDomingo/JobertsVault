@@ -63,6 +63,30 @@ impl Money {
         let unit = 10u64.pow(width as u32);
         format!("{sign}{}.{:0width$}", abs / unit, abs % unit)
     }
+
+    /// An amount of 0 or more as `formatMoney` shows it (src/lib/money.ts), for messages:
+    /// "₱1,234.50", or "1,234.50 ₱" (a no-break space) with the symbol after.
+    pub fn shown(self, decimals: Decimals, symbol: &str, before: bool) -> String {
+        let plain = self.to_plain(decimals);
+        let (whole, fraction) = plain
+            .split_once('.')
+            .map_or((plain.as_str(), None), |(w, f)| (w, Some(f)));
+        let mut grouped = String::new();
+        for (i, c) in whole.chars().enumerate() {
+            if i > 0 && (whole.len() - i) % 3 == 0 {
+                grouped.push(',');
+            }
+            grouped.push(c);
+        }
+        if let Some(f) = fraction {
+            grouped = format!("{grouped}.{f}");
+        }
+        if before {
+            format!("{symbol}{grouped}")
+        } else {
+            format!("{grouped}\u{a0}{symbol}")
+        }
+    }
 }
 
 /// The digits of the whole part: plain, or grouped by commas in threes, as in "12,345".
@@ -140,6 +164,21 @@ mod tests {
         assert_eq!(Money(i64::MAX).checked_add(Money(1)), None);
         assert_eq!(Money(5).checked_sub(Money(7)), Some(Money(-2)));
         assert_eq!(Money(i64::MIN).checked_sub(Money(1)), None);
+    }
+
+    #[test]
+    fn shown_formats_like_the_ui() {
+        assert_eq!(Money(43_334).shown(Decimals::Two, "₱", true), "₱433.34");
+        assert_eq!(
+            Money(123_456_789).shown(Decimals::Two, "₱", true),
+            "₱1,234,567.89"
+        );
+        assert_eq!(
+            Money(1_234_567).shown(Decimals::Zero, "$", false),
+            "1,234,567\u{a0}$"
+        );
+        assert_eq!(Money(5).shown(Decimals::Two, "₱", true), "₱0.05");
+        assert_eq!(Money(999).shown(Decimals::Zero, "₱", true), "₱999");
     }
 
     #[test]
