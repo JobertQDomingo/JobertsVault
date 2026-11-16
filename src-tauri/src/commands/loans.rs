@@ -1,7 +1,8 @@
 use tauri::State;
 
+use crate::domain::loan::LoanPreview;
 use crate::error::AppError;
-use crate::services::loans::{Loan, LoanFields, LoanList, NewLoan};
+use crate::services::loans::{Loan, LoanDraft, LoanFields, LoanList, NewLoan};
 use crate::services::transactions::{Transaction, TransactionFields};
 use crate::state::AppState;
 use crate::{log, services};
@@ -67,5 +68,12 @@ pub fn mark_loan_payment_unpaid(
     payment_id: i64,
 ) -> Result<(), AppError> {
     services::loans::mark_unpaid(&mut *state.conn()?, payment_id, chrono::Local::now())
+        .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+/// Before you borrow (LOAN-9) and the new-loan confirm (LOAN-10): saves nothing.
+#[tauri::command(async)]
+pub fn preview_loan(state: State<'_, AppState>, draft: LoanDraft) -> Result<LoanPreview, AppError> {
+    services::loans::preview(&*state.conn()?, draft, chrono::Local::now().date_naive())
         .inspect_err(|err| log::record(&state.log_path, err))
 }

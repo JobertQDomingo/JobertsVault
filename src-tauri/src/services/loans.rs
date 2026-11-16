@@ -5,14 +5,14 @@ use ts_rs::TS;
 
 use std::collections::{HashMap, HashSet};
 
-use crate::domain::loan::{self, LoanSummary};
+use crate::domain::loan::{self, LoanPreview, LoanSummary};
 use crate::domain::money::Money;
 use crate::error::AppError;
 use crate::repo;
-use crate::services::period;
 use crate::services::transactions::{
     self, Transaction, TransactionFields, TransactionKind, real_date,
 };
+use crate::services::{forecast, period};
 use crate::services::{invalid, not_found, stamp};
 
 /// What the add loan form sends (LOAN-1). Whether it's new can't change afterwards, so the edit
@@ -59,6 +59,25 @@ pub struct LoanPaymentFields {
     /// `YYYY-MM-DD`.
     pub due_date: String,
     pub amount: Money,
+}
+
+/// A loan the user is thinking about (DATA_MODEL §5.16): the rows typed in the Add loan form
+/// (LOAN-10), or a payment amount, a number of payments and a first date (LOAN-9).
+#[derive(Clone, Debug, Deserialize, TS)]
+#[serde(untagged, rename_all_fields = "camelCase")]
+#[ts(export)]
+pub enum LoanDraft {
+    Rows {
+        payments: Vec<LoanPaymentFields>,
+    },
+    /// Monthly from `first_date`, on its day of the month.
+    Monthly {
+        amount: Money,
+        #[ts(type = "number")]
+        count: i64,
+        /// `YYYY-MM-DD`.
+        first_date: String,
+    },
 }
 
 /// Read from the row, never stored (DATA_MODEL §4.6).
@@ -352,6 +371,60 @@ pub fn mark_unpaid(
     transactions::delete_in(&tx, txn, &stamp(now))?;
     tx.commit()?;
     Ok(())
+}
+
+/// What the draft would do to the debt-free date, Safe to spend and each pay window, saving
+/// nothing (LOAN-9, LOAN-10, DATA_MODEL §5.16).
+pub fn preview(
+    conn: &Connection,
+    draft: LoanDraft,
+    today: NaiveDate,
+) -> Result<LoanPreview, AppError> {
+    let draft = match draft {
+        LoanDraft::Rows { payments } => {
+            check_payments(&payments, &[], true, None)?;
+            // Every date was just checked.
+            payments
+                .iter()
+                .filter_map(|r| {
+                    real_date(&r.due_date).map(|due_date| loan::Payment {
+                        due_date,
+                        amount: r.amount,
+                        paid: None,
+                    })
+                })
+                .collect()
+        }
+        LoanDraft::Monthly {
+            amount,
+            count,
+            first_date,
+        } => {
+            if amount <= Money::ZERO {
+                return Err(invalid("amount", "Enter an amount above 0"));
+            }
+            if amount > Money::MAX {
+                return Err(invalid("amount", "That amount is too large"));
+            }
+            let count = u32::try_from(count)
+                .ok()
+                .filter(|n| (1..=600).contains(n))
+                .ok_or_else(|| invalid("count", "Enter 1 to 600 payments"))?;
+            let first =
+                real_date(&first_date).ok_or_else(|| invalid("firstDate", "Enter a real date"))?;
+            loan::monthly_payments(amount, count, first).ok_or_else(period::out_of_range)?
+        }
+    };
+    let before = list(conn, today)?.summary.debt_free_on;
+    let plan = forecast::gather(conn, today)?;
+    Ok(loan::preview(
+        before,
+        &draft,
+        today,
+        plan.money_now,
+        &plan.windows,
+        &plan.movements,
+    ))
 }
 
 /// Trims the name and checks every field but the payments (DATA_MODEL §6), and returns the date
@@ -1826,5 +1899,167 @@ mod tests {
             (stored.kind, stored.amount),
             (TransactionKind::Expense, Money(105_000))
         );
+    }
+
+    // Before you borrow (LOAN-9, LOAN-10, DATA_MODEL §5.16).
+
+    use crate::domain::recurrence::Frequency;
+    use crate::services::forecast::{self, ForecastGrain};
+    use crate::services::recurring::{self, RecurringMode, RecurringRuleFields};
+
+    /// ₱100.00 into Cash today, and a monthly payday into Cash from Nov 30 expecting ₱50.00.
+    fn forecast_db() -> Connection {
+        let mut conn = crate::test_support::db();
+        let income = |amount: i64, date: &str| TransactionFields {
+            kind: TransactionKind::Income,
+            amount: Money(amount),
+            date: date.into(),
+            category_id: Some(SALARY),
+            payee: None,
+            ..expense(0)
+        };
+        transactions::create(&mut conn, income(10_000, "2026-11-03"), now()).unwrap();
+        let rule = RecurringRuleFields {
+            transaction: income(5_000, "2026-11-30"),
+            frequency: Frequency::Monthly,
+            interval: 1,
+            end_date: None,
+            max_occurrences: None,
+            mode: RecurringMode::Confirm,
+            is_payday: true,
+        };
+        recurring::create(&mut conn, rule, now()).unwrap();
+        conn
+    }
+
+    fn monthly(amount: i64, count: i64, first: &str) -> LoanDraft {
+        LoanDraft::Monthly {
+            amount: Money(amount),
+            count,
+            first_date: first.into(),
+        }
+    }
+
+    fn safe(conn: &Connection) -> Option<Money> {
+        forecast::get(conn, ForecastGrain::Window, today())
+            .unwrap()
+            .safe_to_spend
+    }
+
+    #[test]
+    fn preview_saves_nothing_and_matches_adding_the_loan() {
+        let mut conn = forecast_db();
+        create(
+            &mut conn,
+            new_loan(
+                "Bank loan",
+                vec![row("2026-12-10", 2_000), row("2027-01-10", 2_000)],
+            ),
+            now(),
+        )
+        .unwrap();
+        let loans = list(&conn, today()).unwrap();
+        let before = forecast::get(&conn, ForecastGrain::Window, today()).unwrap();
+
+        let p = preview(&conn, monthly(6_000, 3, "2026-12-18"), today()).unwrap();
+
+        assert_eq!(list(&conn, today()).unwrap(), loans, "nothing saved");
+        assert_eq!(
+            forecast::get(&conn, ForecastGrain::Window, today()).unwrap(),
+            before
+        );
+        assert_eq!(p.debt_free_before, Some(d(2027, 1, 10)));
+        assert_eq!(p.debt_free_after, Some(d(2027, 2, 18)));
+        assert_eq!(p.days_later, 39);
+        assert_eq!(p.safe_before, before.safe_to_spend);
+        let lefts: Vec<Money> = before.rows.iter().map(|r| r.left).collect();
+        assert_eq!(
+            p.windows.iter().map(|w| w.left_before).collect::<Vec<_>>(),
+            lefts
+        );
+
+        // Adding that loan gives the figures the preview said.
+        let rows = vec![
+            row("2026-12-18", 6_000),
+            row("2027-01-18", 6_000),
+            row("2027-02-18", 6_000),
+        ];
+        create(&mut conn, new_loan("E-wallet loan", rows), now()).unwrap();
+        let after = forecast::get(&conn, ForecastGrain::Window, today()).unwrap();
+        assert_eq!(p.safe_after, after.safe_to_spend);
+        assert!(p.safe_after < p.safe_before);
+        let lefts: Vec<Money> = after.rows.iter().map(|r| r.left).collect();
+        assert_eq!(
+            p.windows.iter().map(|w| w.left_after).collect::<Vec<_>>(),
+            lefts
+        );
+        assert_eq!(
+            list(&conn, today()).unwrap().summary.debt_free_on,
+            p.debt_free_after
+        );
+    }
+
+    #[test]
+    fn preview_of_typed_rows_matches_the_same_monthly_draft() {
+        let conn = forecast_db();
+        let rows = LoanDraft::Rows {
+            payments: vec![row("2027-01-31", 1_000), row("2027-02-28", 1_000)],
+        };
+        assert_eq!(
+            preview(&conn, rows, today()).unwrap(),
+            preview(&conn, monthly(1_000, 2, "2027-01-31"), today()).unwrap()
+        );
+    }
+
+    #[test]
+    fn preview_marks_only_the_windows_the_loan_makes_short() {
+        let conn = forecast_db();
+        // Nov 30 – Dec 29: ₱100.00 + ₱50.00 pay − ₱200.00 on Dec 1. The next pay brings it to 0.
+        let p = preview(&conn, monthly(20_000, 1, "2026-12-01"), today()).unwrap();
+        let short: Vec<_> = p.windows.iter().map(|w| w.short_by).collect();
+        assert_eq!(short[..3], [None, Some(Money(5_000)), None]);
+        assert_eq!(p.safe_after, Some(Money::ZERO));
+        assert_eq!(p.windows[1].start, d(2026, 11, 30));
+    }
+
+    #[test]
+    fn preview_without_a_payday_rule_has_no_safe_to_spend() {
+        let conn = db();
+        let p = preview(&conn, monthly(1_000, 2, "2026-12-01"), today()).unwrap();
+        assert_eq!((p.safe_before, p.safe_after), (None, None));
+        assert!(p.windows.is_empty());
+        assert_eq!(p.debt_free_before, None);
+        assert_eq!(p.debt_free_after, Some(d(2027, 1, 1)));
+        assert_eq!(p.days_later, 59);
+        assert_eq!(safe(&conn), None);
+    }
+
+    #[test]
+    fn preview_checks_the_draft_field_by_field() {
+        let conn = db();
+        let field = |draft| field_of(preview(&conn, draft, today()));
+        assert_eq!(field(monthly(0, 3, "2026-12-01")), "amount");
+        assert_eq!(field(monthly(Money::MAX.0 + 1, 3, "2026-12-01")), "amount");
+        assert_eq!(field(monthly(1_000, 0, "2026-12-01")), "count");
+        assert_eq!(field(monthly(1_000, 601, "2026-12-01")), "count");
+        assert_eq!(field(monthly(1_000, 3, "")), "firstDate");
+        assert_eq!(field(monthly(1_000, 3, "2027-02-30")), "firstDate");
+        let rows = |payments| LoanDraft::Rows { payments };
+        assert_eq!(field(rows(vec![])), "payments");
+        assert_eq!(field(rows(vec![row("2026-13-01", 1_000)])), "payments");
+        assert_eq!(field(rows(vec![row("2026-12-01", 0)])), "payments");
+        assert!(preview(&conn, monthly(1_000, 600, "2026-12-01"), today()).is_ok());
+    }
+
+    #[test]
+    fn a_draft_is_typed_rows_or_an_amount_count_and_first_date() {
+        let monthly: LoanDraft =
+            serde_json::from_str(r#"{"amount":0,"count":0,"firstDate":""}"#).unwrap();
+        assert!(matches!(monthly, LoanDraft::Monthly { count: 0, .. }));
+        let rows: LoanDraft = serde_json::from_str(
+            r#"{"payments":[{"id":null,"dueDate":"2026-12-01","amount":100}]}"#,
+        )
+        .unwrap();
+        assert!(matches!(rows, LoanDraft::Rows { payments } if payments.len() == 1));
     }
 }
