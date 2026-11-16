@@ -86,12 +86,15 @@ export function GoalDialog({
   const suggestion = useGoalSuggestion(draft);
   // A new goal's date follows the suggestion until the user picks one (UI_FLOWS §11 item 53).
   const picked = useRef(goal !== undefined);
-  const earliest = suggestion.isPlaceholderData
-    ? null
-    : suggestion.data?.earliestDate;
+  // Only a settled answer: placeholder data is the previous target's or account's.
+  const followed =
+    suggestion.isPlaceholderData || suggestion.data === undefined
+      ? undefined
+      : (suggestion.data?.earliestDate ?? "");
   useEffect(() => {
-    if (earliest && !picked.current) setValue("targetDate", earliest);
-  }, [earliest, setValue]);
+    if (followed !== undefined && !picked.current)
+      setValue("targetDate", followed);
+  }, [followed, setValue]);
   const create = useCreateGoal();
   const update = useUpdateGoal();
   const saving = useRef(false);

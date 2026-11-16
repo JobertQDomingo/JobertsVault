@@ -72,10 +72,7 @@ pub fn prepare(conn: &Connection, range: &DateRange, path: &Path) -> Result<CsvF
             "Choose a .csv file in a folder that exists.",
         ));
     }
-    let decimals = match settings::stored(conn)?.currency_decimals {
-        0 => Decimals::Zero,
-        _ => Decimals::Two,
-    };
+    let decimals = Decimals::of(settings::stored(conn)?.currency_decimals);
     let rows = repo::transactions::export(conn, &start.to_string(), &end.to_string())?;
     let count = rows.len();
     let text = csv::document(

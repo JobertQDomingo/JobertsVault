@@ -310,3 +310,23 @@ test.each([
     expect(dialog().queryByText(SUGGESTED)).toBeNull();
   },
 );
+
+test("a suggested date the user didn't pick clears once no date is realistic", async () => {
+  renderRoute("/goals", {
+    ...ANSWERS,
+    suggest_goal: ({ draft }: { draft: { targetAmount: number } }) =>
+      draft.targetAmount === 5000000
+        ? ANSWERS.suggest_goal
+        : { monthlyRoom: 0, earliestDate: null },
+  });
+  await startGoal();
+  await dialog().findByText(SUGGESTED);
+  expect(dateValue()).toBe("02/03/2027");
+  fireEvent.change(dialog().getByRole("textbox", { name: "Target" }), {
+    target: { value: "90,000" },
+  });
+  await dialog().findByText(
+    "You can't set anything aside each month right now, so no date is realistic yet.",
+  );
+  expect(dateValue()).toBe("");
+});

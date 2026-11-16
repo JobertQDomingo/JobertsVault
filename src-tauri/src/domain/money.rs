@@ -15,6 +15,15 @@ pub enum Decimals {
 }
 
 impl Decimals {
+    /// From the `currency_decimals` setting, 0 or 2 (DATA_MODEL §3.5).
+    pub fn of(currency_decimals: u8) -> Self {
+        if currency_decimals == 0 {
+            Self::Zero
+        } else {
+            Self::Two
+        }
+    }
+
     fn places(self) -> usize {
         match self {
             Self::Zero => 0,

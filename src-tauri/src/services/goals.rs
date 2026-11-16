@@ -117,10 +117,8 @@ fn room(conn: &Connection, today: NaiveDate, draft: &GoalDraft) -> Result<Option
         id: draft.goal_id,
         account_id: draft.account_id,
     };
+    // No pay windows (no payday rule) gives None below.
     let plan = forecast::gather(conn, today, Some(as_goal))?;
-    if plan.windows.is_empty() {
-        return Ok(None);
-    }
     let accounts = repo::accounts::all(conn, today)?;
     let progress = |id: i64| {
         accounts
@@ -353,13 +351,8 @@ fn check_date(
         return Ok(());
     }
     let s = settings::stored(conn)?;
-    let decimals = if s.currency_decimals == 0 {
-        Decimals::Zero
-    } else {
-        Decimals::Two
-    };
     let monthly = room.monthly_room.shown(
-        decimals,
+        Decimals::of(s.currency_decimals),
         &s.currency_symbol,
         s.currency_position == CurrencyPosition::Before,
     );
