@@ -83,7 +83,7 @@ pub fn create(
     catch_up(&tx, self::stored(&tx, id)?, now)?;
     let saved = Saved {
         saved: get(&tx, id)?,
-        goals_moved: goals::follow_forecast(&tx, now)?,
+        goals_moved: goals::follow_save(&tx, fields.transaction.kind, now)?,
     };
     tx.commit()?;
     Ok(saved)
@@ -127,7 +127,7 @@ pub fn update(
     catch_up(&tx, self::stored(&tx, id)?, now)?;
     let saved = Saved {
         saved: get(&tx, id)?,
-        goals_moved: goals::follow_forecast(&tx, now)?,
+        goals_moved: goals::follow_save(&tx, fields.transaction.kind, now)?,
     };
     tx.commit()?;
     Ok(saved)

@@ -11,7 +11,7 @@ use crate::error::AppError;
 use crate::repo;
 use crate::services::forecast::{self, AsGoal};
 use crate::services::settings::{self, CurrencyPosition};
-use crate::services::transactions::real_date;
+use crate::services::transactions::{TransactionKind, real_date};
 use crate::services::{invalid, not_found, stamp};
 
 /// What the new and edit goal forms send (GOL-1, GOL-2).
@@ -252,6 +252,19 @@ fn without_deposits(plan: &forecast::Gathered) -> Vec<Movement> {
         .filter(|m| !plan.goal_deposits.contains(&m.source))
         .copied()
         .collect()
+}
+
+/// GOL-7 after saving a transaction or a recurring rule of `kind`: an expense or a transfer moves
+/// any goal it leaves unrealistic; income, a payday rule included, never does (DATA_MODEL §5.17).
+pub(crate) fn follow_save(
+    conn: &Connection,
+    kind: TransactionKind,
+    now: DateTime<Local>,
+) -> Result<Vec<GoalMove>, AppError> {
+    if kind == TransactionKind::Income {
+        return Ok(Vec::new());
+    }
+    follow_forecast(conn, now)
 }
 
 /// GOL-7, at the end of a save's database transaction: every goal whose monthly amount no longer
@@ -1622,6 +1635,62 @@ mod tests {
             behind_of(&mut conn, trip),
             Some(Behind {
                 earliest_date: None
+            })
+        );
+    }
+
+    /// A Salary rule into `account`, monthly from `start`, in Confirm mode.
+    fn income_rule(account: i64, amount: i64, start: &str, is_payday: bool) -> RecurringRuleFields {
+        RecurringRuleFields {
+            transaction: TransactionFields {
+                date: start.into(),
+                ..txn(TransactionKind::Income, account, amount, start)
+            },
+            frequency: Frequency::Monthly,
+            interval: 1,
+            end_date: None,
+            max_occurrences: None,
+            mode: RecurringMode::Confirm,
+            is_payday,
+        }
+    }
+
+    #[test]
+    fn income_rules_never_move_goals_but_can_leave_them_behind() {
+        // A goal already too soon (all 30,000.00 by Dec 3) gets a second payday of 0.01: the
+        // room becomes 10,000.01, enough for Feb 3, but adding pay never moves a goal.
+        let mut conn = db();
+        let pay = paid(&mut conn);
+        let trip = insert(&conn, fields("Trip", 3_000_000, Some("2026-12-03"), CASH));
+        let saved = recurring::create(&mut conn, income_rule(pay, 1, "2026-11-20", true), now());
+        assert_eq!(saved.unwrap().goals_moved, []);
+        assert_eq!(date_of(&conn, trip), "2026-12-03");
+        assert_eq!(
+            behind_of(&mut conn, trip),
+            Some(Behind {
+                earliest_date: Some(d(2027, 2, 3))
+            })
+        );
+
+        // A lower estimate (6,000.00 a month < the 7,500.00 the plan needs) leaves it behind.
+        let mut conn = db();
+        let pay = account(&mut conn, "Pay", AccountKind::Bank, 0);
+        let rule = payday(&mut conn, pay, 1_000_000);
+        let trip = create(
+            &mut conn,
+            fields("Trip", 3_000_000, Some(PLAN), CASH),
+            now(),
+        )
+        .unwrap()
+        .id;
+        let lower = income_rule(pay, 600_000, "2026-11-15", true);
+        let saved = recurring::update(&mut conn, rule, lower, now()).unwrap();
+        assert_eq!(saved.goals_moved, []);
+        assert_eq!(date_of(&conn, trip), PLAN);
+        assert_eq!(
+            behind_of(&mut conn, trip),
+            Some(Behind {
+                earliest_date: Some(d(2027, 4, 3))
             })
         );
     }
