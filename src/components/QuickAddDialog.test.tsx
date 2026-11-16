@@ -941,3 +941,13 @@ test("editing an expense on a card sends its id, so its old amount comes off", a
     },
   ]);
 });
+
+test("a spending level check that fails never stops the save", async () => {
+  await saveDining({
+    ...ANSWERS,
+    preview_card_spend: () => {
+      throw { code: "database", message: "busy" };
+    },
+  });
+  await waitFor(() => expect(calls("create_transaction")).toHaveLength(1));
+});

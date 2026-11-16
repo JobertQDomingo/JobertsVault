@@ -606,12 +606,13 @@ function TransactionForm({
     );
     if (schedule || postId !== undefined || v.kind !== "expense") return null;
     if (!card || v.amount === null) return null;
+    // The levels only warn, so a check that fails never stops the save (CLAUDE.md).
     const preview = await previewCardSpend({
       accountId: card.id,
       amount: v.amount,
       date: v.date,
       transactionId: editId ?? null,
-    });
+    }).catch(() => null);
     return preview && { preview, card };
   };
 

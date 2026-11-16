@@ -428,7 +428,8 @@ pub fn preview_spend(
         return Ok(None);
     };
     let end = cycle.end.min(today);
-    if row.archived || spend.amount <= Money::ZERO || date < cycle.start || date > end {
+    let refused = spend.amount <= Money::ZERO || spend.amount > Money::MAX;
+    if row.archived || refused || date < cycle.start || date > end {
         return Ok(None);
     }
     let before = repo::accounts::expenses_between(conn, row.id, cycle.start, end, None)?;
@@ -1480,6 +1481,12 @@ mod tests {
             (visa, 1, "2026-11-04", "future-dated (TXN-8)"),
             (visa, 1, "2026-10-20", "an earlier cycle"),
             (visa, 0, "2026-11-03", "an amount the save refuses"),
+            (
+                visa,
+                Money::MAX.0 + 1,
+                "2026-11-03",
+                "an amount too large to save",
+            ),
             (visa, 1, "2026-13-01", "not a date"),
             (1, 1, "2026-11-03", "Cash isn't a card"),
             (999, 1, "2026-11-03", "no such account"),
