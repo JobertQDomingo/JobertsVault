@@ -9,6 +9,7 @@ import type { Dashboard } from "@/bindings/Dashboard";
 import type { GoalProgress } from "@/bindings/GoalProgress";
 import type { Loan } from "@/bindings/Loan";
 import type { LoanList } from "@/bindings/LoanList";
+import type { LoanPreview } from "@/bindings/LoanPreview";
 import type { LoanPayment } from "@/bindings/LoanPayment";
 import type { UpcomingDate } from "@/bindings/UpcomingDate";
 import type { PaymentMethod } from "@/bindings/PaymentMethod";
@@ -557,4 +558,36 @@ export const LOANS: LoanList = {
       { start: "2027-04-01", end: "2027-04-30", due: 0, freed: 300000 },
     ],
   },
+};
+
+/** preview_loan (LOAN-9, LOAN-10): one window unchanged, one lower, one made short. */
+export const LOAN_PREVIEW: LoanPreview = {
+  debtFreeBefore: "2027-03-28",
+  debtFreeAfter: "2027-05-05",
+  daysLater: 38,
+  safeBefore: 840000,
+  safeAfter: 740000,
+  windows: [
+    {
+      start: "2026-11-05",
+      end: "2026-12-14",
+      leftBefore: 840000,
+      leftAfter: 840000,
+      shortBy: null,
+    },
+    {
+      start: "2026-12-15",
+      end: "2026-12-29",
+      leftBefore: 1830000,
+      leftAfter: 1730000,
+      shortBy: null,
+    },
+    {
+      start: "2026-12-30",
+      end: "2027-01-14",
+      leftBefore: 9000,
+      leftAfter: -1000,
+      shortBy: 18000,
+    },
+  ],
 };

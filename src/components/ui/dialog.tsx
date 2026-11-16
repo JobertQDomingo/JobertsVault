@@ -87,6 +87,7 @@ export function ConfirmDialog({
   title,
   message,
   confirmLabel,
+  cancelLabel = "Cancel",
   destructive = false,
   onConfirm,
 }: {
@@ -95,6 +96,7 @@ export function ConfirmDialog({
   title: ReactNode;
   message: ReactNode;
   confirmLabel: string;
+  cancelLabel?: string;
   destructive?: boolean;
   onConfirm: () => void;
 }) {
@@ -102,7 +104,7 @@ export function ConfirmDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title={title} description={message} size="confirm">
         <DialogFooter>
-          <Button onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={() => onOpenChange(false)}>{cancelLabel}</Button>
           <Button
             variant={destructive ? "destructive" : "primary"}
             // Closes first, so a second click can't run the action twice.

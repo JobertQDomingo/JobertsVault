@@ -1,6 +1,8 @@
 import type { Loan } from "@/bindings/Loan";
+import type { LoanDraft } from "@/bindings/LoanDraft";
 import type { LoanFields } from "@/bindings/LoanFields";
 import type { LoanList } from "@/bindings/LoanList";
+import type { LoanPreview } from "@/bindings/LoanPreview";
 import type { NewLoan } from "@/bindings/NewLoan";
 import type { Transaction } from "@/bindings/Transaction";
 import type { TransactionFields } from "@/bindings/TransactionFields";
@@ -38,3 +40,7 @@ export const markLoanPaymentPaid = ({
 /** Deletes the payment's expense, so it's unpaid again (LOAN-3). */
 export const markLoanPaymentUnpaid = (paymentId: number) =>
   call<null>("mark_loan_payment_unpaid", { paymentId });
+
+/** What a loan would do to the debt-free date, Safe to spend and each pay window. Saves nothing (LOAN-9, LOAN-10). */
+export const previewLoan = (draft: LoanDraft) =>
+  call<LoanPreview>("preview_loan", { draft });

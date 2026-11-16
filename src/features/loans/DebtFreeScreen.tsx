@@ -36,6 +36,7 @@ import {
 } from "@/lib/dates";
 import { formatMoney, type MoneySettings } from "@/lib/money";
 import { cn } from "@/lib/utils";
+import { BeforeYouBorrow } from "./BeforeYouBorrow";
 import { LoanDialog } from "./LoanDialog";
 import { PaymentsDialog } from "./PaymentsDialog";
 
@@ -162,39 +163,47 @@ export function DebtFreeScreen() {
       ) : (
         <>
           <Summary data={loans.data} settings={money} />
-          <GlassPanel className="overflow-hidden">
-            <div className="flex items-center justify-between gap-2 px-[18px] pt-4 pb-2.5">
-              <h2 className="text-h3">Loans</h2>
-              {addLoan}
-            </div>
-            {active.length ? (
-              cards(active)
-            ) : (
-              <p className="px-[18px] pb-4 text-muted-foreground">
-                No active loans.
-              </p>
-            )}
-            {archived.length > 0 && (
-              <>
-                <button
-                  type="button"
-                  aria-expanded={showArchived}
-                  onClick={() => setShowArchived(!showArchived)}
-                  className="flex w-full items-center gap-1.5 border-t border-hairline px-4 py-2.5 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/40"
-                >
-                  <ChevronRight
-                    aria-hidden
-                    className={cn(
-                      "size-3.5 transition-transform duration-150",
-                      showArchived && "rotate-90",
-                    )}
-                  />
-                  Show archived ({archived.length})
-                </button>
-                {showArchived && cards(archived)}
-              </>
-            )}
-          </GlassPanel>
+          {/* Before you borrow sits beside Loans (§8.5, UI_FLOWS §11 item 29). */}
+          <div className="grid grid-cols-2 items-start gap-3">
+            <GlassPanel className="overflow-hidden">
+              <div className="flex items-center justify-between gap-2 px-[18px] pt-4 pb-2.5">
+                <h2 className="text-h3">Loans</h2>
+                {addLoan}
+              </div>
+              {active.length ? (
+                cards(active)
+              ) : (
+                <p className="px-[18px] pb-4 text-muted-foreground">
+                  No active loans.
+                </p>
+              )}
+              {archived.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    aria-expanded={showArchived}
+                    onClick={() => setShowArchived(!showArchived)}
+                    className="flex w-full items-center gap-1.5 border-t border-hairline px-4 py-2.5 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/40"
+                  >
+                    <ChevronRight
+                      aria-hidden
+                      className={cn(
+                        "size-3.5 transition-transform duration-150",
+                        showArchived && "rotate-90",
+                      )}
+                    />
+                    Show archived ({archived.length})
+                  </button>
+                  {showArchived && cards(archived)}
+                </>
+              )}
+            </GlassPanel>
+            <BeforeYouBorrow
+              today={today}
+              weekStart={money.weekStart}
+              settings={money}
+            />
+          </div>
           <FreedUp data={loans.data} settings={money} />
         </>
       )}
