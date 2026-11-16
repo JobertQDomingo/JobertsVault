@@ -207,6 +207,7 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 | Type | Cash / Bank / E-wallet / Credit card. **Can't be changed after the account is created**, because that would change how its balance works. |
 | Opening balance | 0 or more. For a credit card the label changes to **"Amount owed now"** (DATA_MODEL §5.1). |
 | *(Credit card only)* Credit limit, Statement closing day, Payment due day | Days are 1–31, with the help text "If a month is shorter, the last day is used." |
+| *(Credit card only, Phase 4)* Spending levels: Soft, Mid, Hard | Three amounts on one row, ₱3,000.00, ₱4,000.00 and ₱5,000.00 to start with. Help text: "Warnings for each statement cycle's spending. They never block a purchase." (CC-10) |
 
 ### 5.3 Account details (`/accounts/:id`)
 
@@ -220,6 +221,7 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 │ ████░░░░░░░░░░░░░░░░░░░░  6% of ₱10,000.00 limit                 │
 │ Available credit   ₱9,360.00                                    │
 │ This cycle         ₱412.30 spent   (Oct 21 – Nov 20)            │
+│ (Phase 4) ₱3,240.00 spent · past your ₱3,000.00 soft level      │
 │ Statement closes   Nov 20          Payment due   Nov 5          │
 ├─────────────────────────────────────────────────────────────────┤
 │ (this card's transactions)                                      │
@@ -355,6 +357,13 @@ Welcome to Jobert's Vault
    - "Safe to spend now: ₱8,400.00 → ₱7,400.00"
    - each pay window it changes, with what's left before and after ("Dec 15–29: ₱18,300.00 → ₱17,300.00"), and any window it would make short in `--danger`
 
+### F16: Spend on a card past a level (Phase 4, CC-10, CC-11)
+1. The user saves an expense on a card, dated in its current cycle. The form asks `preview_card_spend` first.
+2. **Hard level:** a confirm, "Spend anyway?", says "This takes Credit card to ₱5,120.00 this cycle, past your ₱5,000.00 hard level." with **Go back** and **Spend anyway** (destructive). Go back returns to the form.
+3. **Soft or mid level, reached by this expense:** it saves, and a warning toast says "Credit card: ₱3,240.00 this cycle, past your ₱3,000.00 soft level."
+4. Below the soft level, or already past the level it reaches: it saves as usual.
+5. The card's details show the level under "This cycle" (soft in the muted text color, mid in `--warning` and hard in `--danger`, each with the level's name, and an icon from mid up), and so do its row in the Accounts list and the dashboard's card summary.
+
 ### F11: Update the app (Phase 1)
 - **Automatic (the default):** at startup, the app checks for a newer version. "Checking for updates…" appears only if the check takes more than 150 ms. If there's a newer version, "Updating Jobert's Vault to 0.2.0…" appears, and the app closes and reopens on it. There's nothing to click (UPD-1).
 - **No internet, or the check fails:** the app starts normally and shows no error (UPD-2).
@@ -414,10 +423,13 @@ Clicking a card edits it. Its ⋯ menu has **Edit**, **Archive** and **Delete** 
 **+ New goal** opens a small dialog, "New goal" (or "Edit goal"):
 - **Name:** 1–50 characters, unique.
 - **Target:** the amount to reach.
-- **Target date:** optional, any date. With one, the card says how much to save each month.
+- **Target date:** required from Phase 4 (optional before). The card says how much to save each month.
+  - **Phase 4 (GOL-5, GOL-6):** once the target and account are chosen, a line under the date says "You can set aside about ₱433.34 a month. The earliest realistic date is Mar 5, 2027." (`suggest_goal`, asked as the user types, like the payslip's net). On a new goal the date starts on that suggestion. A missing or sooner date is refused when saving, with the backend's message under the field. With no payday rule, the line says "Mark your pay as a payday first, so the app can suggest a realistic date." with **Open Recurring**, and saving a new goal (or a new date) is refused with the same message. A monthly room of 0 says "You can't set anything aside each month right now, so no date is realistic yet."
 - **Account:** an active account that isn't a credit card. An edit keeps its own account even if it's been archived. A note says the account's balance is the goal's progress (GOL-2).
 
 The backend's message shows under the field it names.
+
+**Phase 4 (GOL-7):** when a save moves a goal's date, a toast says "Emergency fund now aims for Jul 5, 2027 (was May 5, 2027), so it stays realistic." (one line per goal moved). A goal that's behind says "Behind: nothing can be set aside right now" in `--warning` on its card in place of the monthly amount, or "Behind: the earliest realistic date is now Jul 5, 2027" when there is room.
 
 ### 8.5 Debt-free (`/debt-free`), Phase 4
 
@@ -604,3 +616,11 @@ Answered on 2026-11-16 (Phase 4, Before you borrow):
 49. **Before you borrow sits beside Loans**, half width each (item 29), and is left out with no loans at all, when the screen is one empty state (§8.5).
 50. **The first payment starts a month from today**, a form default the user can change. Blank fields go to the backend as 0 or empty, so its message shows under the field. Changing a field clears the result and its errors, so nothing shown is for other values, and Try it with the same values asks again (F15).
 51. **"Before you add this loan" opens over the Add loan form**, so Go back returns to it as it was. The other fields are checked when Add this loan anyway saves, and an error there shows on the form (F12).
+
+Answered on 2026-11-16 (Phase 4, planning smart goals and card spending levels):
+
+52. **The goal dialog asks `suggest_goal` as the user types**, after 250 ms, like the payslip's net (item 23). The frontend never works out the monthly room or the date (§8.4, DATA_MODEL §5.17).
+53. **A new goal's date starts on the suggestion** once there is one, and the user may change it but not clear it. An edit keeps its date, and the line shows the suggestion beside it. A goal from before Phase 4 with no date opens with an empty date, which must be filled in to save (§8.4, DATA_MODEL §9 items 90–91).
+54. **The card spending confirm** is a ConfirmDialog over the transaction form, as "Before you add this loan" is over the loan form (item 51), so Go back returns to the form as it was (F16).
+55. **A goal moved by a save is told with a toast**, not a dialog, since there's nothing to choose: the save went ahead and the date moved (DATA_MODEL §9 item 92). The toast follows any card spending confirm, which comes before the save (F16).
+56. **Behind is shown on the goal's card only**, in `--warning`, without a banner, since goals don't hold money back (PRD §3).
