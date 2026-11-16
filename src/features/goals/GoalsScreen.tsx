@@ -162,7 +162,7 @@ export function GoalsScreen() {
         <GoalDialog
           goal={editing.goal}
           accounts={accounts.data.accounts}
-          weekStart={settings.data.weekStart}
+          settings={settings.data}
           onClose={() => setEditing(null)}
         />
       )}

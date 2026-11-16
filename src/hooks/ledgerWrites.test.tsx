@@ -447,6 +447,7 @@ const READS = [
   "useRecurringRules",
   "useDueOccurrences",
   "useBudgets",
+  "useGoalSuggestion",
   "useGoals",
   "useLoans",
   "useLoanPreview",

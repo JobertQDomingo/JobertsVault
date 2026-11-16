@@ -1,6 +1,8 @@
 import type { Goal } from "@/bindings/Goal";
 import type { GoalFields } from "@/bindings/GoalFields";
+import type { GoalDraft } from "@/bindings/GoalDraft";
 import type { GoalProgress } from "@/bindings/GoalProgress";
+import type { GoalSuggestion } from "@/bindings/GoalSuggestion";
 import { call } from "./client";
 
 /** Every goal with its account's progress as of today (GOL-3), in the order they were created. */
@@ -9,6 +11,10 @@ export const listGoals = () => call<GoalProgress[]>("list_goals");
 /** A goal is linked to one account that isn't a credit card (GOL-1, GOL-2). */
 export const createGoal = (goal: GoalFields) =>
   call<Goal>("create_goal", { goal });
+
+/** The monthly room and earliest realistic date as the user types; null with no payday rule (GOL-5). */
+export const suggestGoal = (draft: GoalDraft) =>
+  call<GoalSuggestion | null>("suggest_goal", { draft });
 
 export const updateGoal = ({ id, goal }: { id: number; goal: GoalFields }) =>
   call<Goal>("update_goal", { id, goal });

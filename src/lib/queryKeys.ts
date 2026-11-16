@@ -1,6 +1,7 @@
 import type { CategoryKind } from "@/bindings/CategoryKind";
 import type { ComparisonMode } from "@/bindings/ComparisonMode";
 import type { ForecastGrain } from "@/bindings/ForecastGrain";
+import type { GoalDraft } from "@/bindings/GoalDraft";
 import type { LoanDraft } from "@/bindings/LoanDraft";
 import type { PayslipFields } from "@/bindings/PayslipFields";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
@@ -25,6 +26,9 @@ export const queryKeys = {
   budgets: ["ledger", "budgets"],
   // Progress is the account's balance, which every transaction write changes.
   goals: ["ledger", "goals"],
+  // The monthly room comes from the forecast, which every write moves (GOL-5).
+  goalSuggestion: (draft: GoalDraft | null) =>
+    ["ledger", "goalSuggestion", draft] as const,
   // A loan payment's expense is a transaction, and a merge moves loans.
   loans: ["ledger", "loans"],
   // Before you borrow reads the loans and the forecast, so every write moves it (LOAN-9).

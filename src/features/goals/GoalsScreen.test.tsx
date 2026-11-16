@@ -18,7 +18,29 @@ const ANSWERS: Answers = {
   archive_goal: null,
   unarchive_goal: null,
   delete_goal: null,
+  suggest_goal: { monthlyRoom: 1000000, earliestDate: "2027-02-03" },
 };
+
+const SUGGESTED =
+  "You can set aside about ₱10,000.00 a month. The earliest realistic date is Feb 3, 2027.";
+
+/** Opens New goal and fills the target and the account, which asks for a suggestion. */
+const startGoal = async () => {
+  fireEvent.click(
+    (await screen.findAllByRole("button", { name: "New goal" }))[0],
+  );
+  fireEvent.change(dialog().getByRole("textbox", { name: "Name" }), {
+    target: { value: "Emergency fund" },
+  });
+  fireEvent.change(dialog().getByRole("textbox", { name: "Target" }), {
+    target: { value: "50,000" },
+  });
+  fireEvent.click(dialog().getByRole("combobox", { name: "Account" }));
+  fireEvent.click(screen.getByRole("option", { name: "E-wallet" }));
+};
+const dateValue = () =>
+  (dialog().getByRole("textbox", { name: "Target date" }) as HTMLInputElement)
+    .value;
 
 const calls = (command: string) =>
   vi
@@ -90,7 +112,7 @@ test("with only archived goals, the empty state says none are active", async () 
   screen.getByRole("button", { name: "Show archived (1)" });
 });
 
-test("New goal offers only active accounts that aren't cards, and the date is optional (GOL-1, GOL-2)", async () => {
+test("New goal offers only active accounts that aren't cards, and its date starts on the suggestion (GOL-1, GOL-2, GOL-5)", async () => {
   renderRoute("/goals", ANSWERS);
   fireEvent.click(
     (await screen.findAllByRole("button", { name: "New goal" }))[0],
@@ -110,6 +132,13 @@ test("New goal offers only active accounts that aren't cards, and the date is op
     "E-wallet",
   ]);
   fireEvent.click(screen.getByRole("option", { name: "E-wallet" }));
+  await dialog().findByText(SUGGESTED);
+  expect(calls("suggest_goal").slice(-1)).toEqual([
+    {
+      draft: { targetAmount: 5000000, accountId: 3, goalId: null },
+    },
+  ]);
+  expect(dateValue()).toBe("02/03/2027");
   fireEvent.click(dialog().getByRole("button", { name: "Create goal" }));
   await waitFor(() =>
     expect(calls("create_goal")).toEqual([
@@ -117,7 +146,7 @@ test("New goal offers only active accounts that aren't cards, and the date is op
         goal: {
           name: "Emergency fund",
           targetAmount: 5000000,
-          targetDate: null,
+          targetDate: "2027-02-03",
           accountId: 3,
         },
       },
@@ -154,6 +183,14 @@ test("clicking a goal edits it, with its date", async () => {
     (dialog().getByRole("textbox", { name: "Target date" }) as HTMLInputElement)
       .value,
   ).toBe("05/05/2027");
+  // An edit keeps its date, with the suggestion beside it, and doesn't count against itself.
+  await dialog().findByText(SUGGESTED);
+  expect(calls("suggest_goal").slice(-1)).toEqual([
+    {
+      draft: { targetAmount: 1000000, accountId: 2, goalId: 1 },
+    },
+  ]);
+  expect(dateValue()).toBe("05/05/2027");
   fireEvent.change(dialog().getByRole("textbox", { name: "Name" }), {
     target: { value: "Kyoto trip" },
   });
@@ -214,3 +251,62 @@ test("Delete asks first", async () => {
   fireEvent.click(confirm.getByRole("button", { name: "Delete" }));
   await waitFor(() => expect(calls("delete_goal")).toEqual([{ id: 3 }]));
 });
+
+test("nothing is suggested before the target and account are chosen", async () => {
+  renderRoute("/goals", ANSWERS);
+  fireEvent.click(
+    (await screen.findAllByRole("button", { name: "New goal" }))[0],
+  );
+  fireEvent.change(dialog().getByRole("textbox", { name: "Target" }), {
+    target: { value: "50,000" },
+  });
+  await new Promise((r) => setTimeout(r, 300));
+  expect(calls("suggest_goal")).toEqual([]);
+  expect(dialog().queryByText(/set aside/)).toBeNull();
+  expect(dateValue()).toBe("");
+});
+
+test("with no payday rule, the line says so with Open Recurring, and the date stays empty (GOL-6)", async () => {
+  renderRoute("/goals", { ...ANSWERS, suggest_goal: null });
+  await startGoal();
+  await dialog().findByText(
+    /Mark your pay as a payday first, so the app can suggest a realistic date\./,
+  );
+  expect(
+    dialog().getByRole("link", { name: "Open Recurring" }).getAttribute("href"),
+  ).toBe("/recurring");
+  expect(dateValue()).toBe("");
+});
+
+test("a room of 0 says no date is realistic yet", async () => {
+  renderRoute("/goals", {
+    ...ANSWERS,
+    suggest_goal: { monthlyRoom: 0, earliestDate: null },
+  });
+  await startGoal();
+  await dialog().findByText(
+    "You can't set anything aside each month right now, so no date is realistic yet.",
+  );
+  expect(dateValue()).toBe("");
+});
+
+test.each([
+  "Enter a target date",
+  "That's too soon. The earliest you can reach this is Feb 3, 2027, saving about ₱10,000.00 a month.",
+  "Mark your pay as a payday first, so the app can work out a realistic date.",
+])(
+  "the backend's %s shows under the date in place of the line",
+  async (message) => {
+    renderRoute("/goals", {
+      ...ANSWERS,
+      create_goal: () => {
+        throw { code: "validation", field: "targetDate", message };
+      },
+    });
+    await startGoal();
+    await dialog().findByText(SUGGESTED);
+    fireEvent.click(dialog().getByRole("button", { name: "Create goal" }));
+    await dialog().findByText(message);
+    expect(dialog().queryByText(SUGGESTED)).toBeNull();
+  },
+);
