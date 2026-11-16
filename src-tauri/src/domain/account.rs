@@ -1,3 +1,6 @@
+use serde::Serialize;
+use ts_rs::TS;
+
 use crate::domain::money::Money;
 
 /// What a credit card's balance means for its limit (DATA_MODEL §5.1, CC-6).
@@ -25,6 +28,39 @@ pub fn card_figures(balance: Money, credit_limit: Money) -> CardFigures {
         amount_owed: Money(saturate(owed)),
         available_credit: Money(saturate(limit - owed)),
         utilization_percent: saturate(percent),
+    }
+}
+
+/// How far a card's spending this statement cycle has gone (CC-10, DATA_MODEL §5.18), in rank
+/// order, so a level reached for the first time compares higher.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum SpendLevel {
+    None,
+    Soft,
+    Mid,
+    Hard,
+}
+
+/// A card's three levels, `0 < soft < mid < hard`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SpendLevels {
+    pub soft: Money,
+    pub mid: Money,
+    pub hard: Money,
+}
+
+/// The highest level `spent` has reached: equal counts as reached.
+pub fn spend_level(spent: Money, levels: SpendLevels) -> SpendLevel {
+    if spent >= levels.hard {
+        SpendLevel::Hard
+    } else if spent >= levels.mid {
+        SpendLevel::Mid
+    } else if spent >= levels.soft {
+        SpendLevel::Soft
+    } else {
+        SpendLevel::None
     }
 }
 
@@ -71,5 +107,30 @@ mod tests {
         assert_eq!(f.amount_owed, Money(i64::MAX));
         assert!(f.available_credit < Money::ZERO);
         assert!(f.utilization_percent > 0);
+    }
+
+    #[test]
+    fn a_spending_level_is_reached_at_exactly_its_amount() {
+        let levels = SpendLevels {
+            soft: Money(300_000),
+            mid: Money(400_000),
+            hard: Money(500_000),
+        };
+        let at = |spent| spend_level(Money(spent), levels);
+        assert_eq!(at(0), SpendLevel::None);
+        assert_eq!(at(299_999), SpendLevel::None);
+        assert_eq!(at(300_000), SpendLevel::Soft);
+        assert_eq!(at(399_999), SpendLevel::Soft);
+        assert_eq!(at(400_000), SpendLevel::Mid);
+        assert_eq!(at(499_999), SpendLevel::Mid);
+        assert_eq!(at(500_000), SpendLevel::Hard);
+        assert_eq!(at(i64::MAX), SpendLevel::Hard);
+    }
+
+    #[test]
+    fn spending_levels_rank_from_none_to_hard() {
+        assert!(SpendLevel::None < SpendLevel::Soft);
+        assert!(SpendLevel::Soft < SpendLevel::Mid);
+        assert!(SpendLevel::Mid < SpendLevel::Hard);
     }
 }

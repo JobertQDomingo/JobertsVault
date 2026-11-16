@@ -381,6 +381,9 @@ mod tests {
             credit_limit: Some(Money(1_000_000)),
             statement_day: Some(20),
             due_day: Some(5),
+            spend_soft: None,
+            spend_mid: None,
+            spend_hard: None,
         };
         let card = NewAccount {
             kind: AccountKind::CreditCard,

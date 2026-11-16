@@ -115,6 +115,7 @@ pub fn run() {
             commands::accounts::archive_account,
             commands::accounts::unarchive_account,
             commands::accounts::delete_account,
+            commands::accounts::preview_card_spend,
             commands::categories::list_categories,
             commands::categories::create_category,
             commands::categories::update_category,

@@ -221,7 +221,7 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 │ ████░░░░░░░░░░░░░░░░░░░░  6% of ₱10,000.00 limit                 │
 │ Available credit   ₱9,360.00                                    │
 │ This cycle         ₱412.30 spent   (Oct 21 – Nov 20)            │
-│ (Phase 4) ₱3,240.00 spent · past your ₱3,000.00 soft level      │
+│ (Phase 4) Spending level   Past your ₱3,000.00 soft level       │
 │ Statement closes   Nov 20          Payment due   Nov 5          │
 ├─────────────────────────────────────────────────────────────────┤
 │ (this card's transactions)                                      │
@@ -625,3 +625,8 @@ Answered on 2026-11-16 (Phase 4, planning smart goals and card spending levels):
 55. **A goal moved by a save is told with a toast**, not a dialog, since there's nothing to choose: the save went ahead and the date moved (DATA_MODEL §9 item 92). The toast follows any card spending confirm, which comes before the save (F16).
 56. **Behind is shown on the goal's card only**, in `--warning`, without a banner, since goals don't hold money back (PRD §3).
 57. **The goal-moved toast has no icon and stays 8 s**, one line per goal in a single toast (answered on 2026-11-16, building GOL-7): it's a note rather than a success or an error, and several lines need longer than the 4 s default to read. Toasts now show one above the other rather than piled up, since the form's "Saved" comes after the note and would otherwise cover it (§8.4, DESIGN_SYSTEM §9.1).
+
+Answered on 2026-11-16 (Phase 4, building card spending levels):
+
+58. **The level is its own row under This cycle** on the card's details ("Spending level · Past your ₱3,000.00 soft level"), since the This cycle row already says what's spent. The Accounts list and the dashboard add "· Soft level" to the card's line (§5.3, F16 step 5).
+59. **The level warning is its own toast**, in `--warning` with the `triangle-alert` icon, after "Saved", and stays 8 s like the goal-moved note. Edit & post and the Due dialog's Post never ask (DATA_MODEL §9 items 104–105).

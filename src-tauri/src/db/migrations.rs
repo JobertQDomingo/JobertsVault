@@ -26,6 +26,7 @@ pub fn migration_list(now: DateTime<Utc>) -> Vec<M<'static>> {
                 Ok(seed::phase_4_categories(tx, &stamp_0003)?)
             },
         ),
+        M::up(include_str!("../../migrations/0004_card_spend_levels.sql")),
     ]
 }
 
@@ -77,7 +78,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 3);
+        assert_eq!(version, 4);
 
         let strict_tables: Vec<String> = conn
             .prepare("SELECT name FROM pragma_table_list WHERE schema = 'main' AND strict = 1 ORDER BY name")
@@ -722,5 +723,86 @@ mod tests {
             ]),
             "an archived category doesn't count toward the colors, and an income one doesn't block an expense one"
         );
+    }
+    /// Migrates to version 3, adds a card and a bank with `decimals` stored, then runs 0004.
+    fn levels_after_0004(decimals: Option<&str>) -> Vec<(String, [Option<i64>; 3])> {
+        let mut conn = open(Path::new(":memory:")).unwrap();
+        let all = migrations(Utc.with_ymd_and_hms(2026, 10, 26, 9, 30, 0).unwrap());
+        all.to_version(&mut conn, 3).unwrap();
+        if let Some(decimals) = decimals {
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES ('currency_decimals', ?1)",
+                [decimals],
+            )
+            .unwrap();
+        }
+        conn.execute(
+            "INSERT INTO accounts (name, kind, opening_balance, credit_limit, statement_day, due_day, created_at, updated_at) VALUES ('Visa', 'credit_card', 0, 5000000, 15, 5, ?1, ?1)",
+            [NOW],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO accounts (name, kind, created_at, updated_at) VALUES ('Bank', 'bank', ?1, ?1)",
+            [NOW],
+        )
+        .unwrap();
+        all.to_latest(&mut conn).unwrap();
+        conn.prepare("SELECT name, spend_soft, spend_mid, spend_hard FROM accounts ORDER BY id")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, [r.get(1)?, r.get(2)?, r.get(3)?])))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap()
+    }
+
+    #[test]
+    fn existing_cards_get_the_default_spending_levels_in_the_main_unit() {
+        let card = |soft, mid, hard| ("Visa".to_owned(), [Some(soft), Some(mid), Some(hard)]);
+        let none = |name: &str| (name.to_owned(), [None; 3]);
+        for (decimals, levels) in [
+            (Some("2"), card(300_000, 400_000, 500_000)),
+            (None, card(300_000, 400_000, 500_000)),
+            (Some("0"), card(3_000, 4_000, 5_000)),
+        ] {
+            assert_eq!(
+                levels_after_0004(decimals),
+                [none("Cash"), levels, none("Bank")],
+                "decimals {decimals:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn spending_levels_are_for_cards_only_and_rise_from_soft_to_hard() {
+        let conn = migrated();
+        let insert = |name: &str, kind: &str, levels: [Option<i64>; 3]| {
+            let card = kind == "credit_card";
+            conn.execute(
+                "INSERT INTO accounts (name, kind, credit_limit, statement_day, due_day, spend_soft, spend_mid, spend_hard, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6, ?7, ?8, ?8)",
+                rusqlite::params![
+                    name,
+                    kind,
+                    card.then_some(5_000_000),
+                    card.then_some(15),
+                    levels[0],
+                    levels[1],
+                    levels[2],
+                    NOW
+                ],
+            )
+        };
+        for (kind, levels) in [
+            ("bank", [Some(1), None, None]),
+            ("bank", [None, None, Some(3)]),
+            ("credit_card", [Some(0), Some(2), Some(3)]),
+            ("credit_card", [Some(2), Some(2), Some(3)]),
+            ("credit_card", [Some(1), Some(3), Some(3)]),
+            ("credit_card", [None, None, Some(3)]),
+            ("credit_card", [Some(1), None, None]),
+            ("credit_card", [Some(1), Some(2), None]),
+        ] {
+            assert!(insert("X", kind, levels).is_err(), "{kind} {levels:?}");
+        }
+        assert!(insert("Visa", "credit_card", [Some(1), Some(2), Some(3)]).is_ok());
     }
 }

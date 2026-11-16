@@ -99,6 +99,9 @@ const account = {
   creditLimit: null,
   statementDay: null,
   dueDay: null,
+  spendSoft: null,
+  spendMid: null,
+  spendHard: null,
 } satisfies AccountFields;
 const newAccount = { kind: "bank", ...account } satisfies NewAccount;
 const category = {

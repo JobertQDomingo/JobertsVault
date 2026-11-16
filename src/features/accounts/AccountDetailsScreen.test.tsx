@@ -218,3 +218,51 @@ test("Edit opens the account's dialog with the type locked", async () => {
       .disabled,
   ).toBe(true);
 });
+
+const CARD = ACCOUNTS[3];
+const withLevel = (spendLevel: "soft" | "mid" | "hard", over = {}) =>
+  ACCOUNTS.map((a) =>
+    a === CARD
+      ? {
+          ...a,
+          ...over,
+          card: { ...a.card!, cycleSpending: 324000, spendLevel },
+        }
+      : a,
+  );
+
+test("the level reached shows under This cycle (CC-10, F16 step 5)", async () => {
+  renderRoute("/accounts/4", answers(withLevel("soft")));
+  const figures = await screen.findByRole("table");
+  expect(figures.textContent).toContain(
+    "This cycle (Oct 21 – Nov 20)₱3,240.00 spent" +
+      "Spending levelPast your ₱3,000.00 soft level",
+  );
+});
+
+test("the edit form shows the card's own levels", async () => {
+  renderRoute(
+    "/accounts/4",
+    answers(
+      withLevel("hard", {
+        spendSoft: 100000,
+        spendMid: 200000,
+        spendHard: 300000,
+      }),
+    ),
+  );
+  expect(
+    await screen.findByText("Past your ₱3,000.00 hard level"),
+  ).toBeTruthy();
+  await openMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
+  const dialog = within(
+    await screen.findByRole("dialog", { name: "Edit account" }),
+  );
+  expect(
+    ["Soft", "Mid", "Hard"].map(
+      (name) =>
+        (dialog.getByRole("textbox", { name }) as HTMLInputElement).value,
+    ),
+  ).toEqual(["1,000.00", "2,000.00", "3,000.00"]);
+});

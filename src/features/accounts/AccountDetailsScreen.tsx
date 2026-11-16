@@ -12,6 +12,7 @@ import { MoneyText } from "@/components/MoneyText";
 import { PeriodSwitcher } from "@/components/PeriodSwitcher";
 import { ProgressBar } from "@/components/ProgressBar";
 import { useQuickAdd } from "@/components/QuickAddProvider";
+import { levelAmount, SpendLevelTag } from "@/components/SpendLevel";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
@@ -177,6 +178,19 @@ function Summary({
                     spent
                   </>,
                 ],
+                // Under This cycle once a level is reached (UI_FLOWS §5.3, F16 step 5).
+                ...(card.spendLevel === "none"
+                  ? []
+                  : [
+                      [
+                        "Spending level",
+                        <SpendLevelTag key="l" level={card.spendLevel}>
+                          Past your{" "}
+                          {money(levelAmount(account, card.spendLevel))}{" "}
+                          {card.spendLevel} level
+                        </SpendLevelTag>,
+                      ],
+                    ]),
                 [
                   "Statement closes",
                   <b key="s">{formatShortDate(card.cycleEnd)}</b>,

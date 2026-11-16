@@ -407,6 +407,9 @@ mod tests {
             credit_limit: None,
             statement_day: None,
             due_day: None,
+            spend_soft: None,
+            spend_mid: None,
+            spend_hard: None,
         };
         let kind = accounts::AccountKind::Bank;
         accounts::create(conn, accounts::NewAccount { kind, fields }, now())
@@ -821,6 +824,9 @@ mod tests {
                     credit_limit: Some(Money(1_000_000)),
                     statement_day: Some(20),
                     due_day: Some(5),
+                    spend_soft: None,
+                    spend_mid: None,
+                    spend_hard: None,
                 },
             },
             now(),

@@ -1,6 +1,8 @@
 import type { Account } from "@/bindings/Account";
 import type { AccountList } from "@/bindings/AccountList";
 import type { AccountFields } from "@/bindings/AccountFields";
+import type { CardSpend } from "@/bindings/CardSpend";
+import type { CardSpendPreview } from "@/bindings/CardSpendPreview";
 import type { NewAccount } from "@/bindings/NewAccount";
 import { call } from "./client";
 
@@ -19,6 +21,13 @@ export const updateAccount = ({
   id: number;
   account: AccountFields;
 }) => call<Account>("update_account", { id, account });
+
+/**
+ * The spending level check before saving an expense on a card (CC-11, DATA_MODEL §5.18): none
+ * when the save asks nothing.
+ */
+export const previewCardSpend = (spend: CardSpend) =>
+  call<CardSpendPreview | null>("preview_card_spend", { spend });
 
 /** Each id's position becomes its sort order. */
 export const reorderAccounts = (ids: number[]) =>

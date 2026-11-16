@@ -16,6 +16,8 @@ import {
 import { Field, Input } from "@/components/ui/input";
 import { notify } from "@/components/ui/toast";
 import { useCreateAccount, useUpdateAccount } from "@/hooks/useAccounts";
+import { useSettings } from "@/hooks/useSettings";
+import { parseAmount } from "@/lib/money";
 import { showSaveError } from "@/lib/saveError";
 
 type Values = {
@@ -25,7 +27,16 @@ type Values = {
   creditLimit: number | null;
   statementDay: string | null;
   dueDay: string | null;
+  spendSoft: number | null;
+  spendMid: number | null;
+  spendHard: number | null;
 };
+
+const LEVELS = [
+  { name: "spendSoft", label: "Soft", start: "3000" },
+  { name: "spendMid", label: "Mid", start: "4000" },
+  { name: "spendHard", label: "Hard", start: "5000" },
+] as const;
 
 const KIND_OPTIONS = (Object.keys(ACCOUNT_KINDS) as AccountKind[]).map(
   (kind) => {
@@ -46,7 +57,10 @@ const DAYS = Array.from({ length: 31 }, (_, i) => ({
 const ROW =
   "grid-cols-[96px_minmax(0,1fr)] items-center gap-x-3 [&>p]:col-start-2";
 
-/** Only a credit card sends its limit and days (CC-1); empty amounts go as typed for the backend to name. */
+/**
+ * Only a credit card sends its limit, days (CC-1) and spending levels (CC-10); empty amounts go
+ * as 0 for the backend to name.
+ */
 function toFields(v: Values): AccountFields {
   const card = v.kind === "credit_card";
   return {
@@ -55,6 +69,9 @@ function toFields(v: Values): AccountFields {
     creditLimit: card ? v.creditLimit : null,
     statementDay: card && v.statementDay ? Number(v.statementDay) : null,
     dueDay: card && v.dueDay ? Number(v.dueDay) : null,
+    spendSoft: card ? (v.spendSoft ?? 0) : null,
+    spendMid: card ? (v.spendMid ?? 0) : null,
+    spendHard: card ? (v.spendHard ?? 0) : null,
   };
 }
 
@@ -72,6 +89,9 @@ export function AccountDialog({
   kind?: AccountKind;
   onClose: () => void;
 }) {
+  // A new card starts at 3,000, 4,000 and 5,000 in the main unit (DATA_MODEL §2). The app
+  // waits for the settings before any screen, so they're here.
+  const decimals = useSettings().data?.currencyDecimals ?? 2;
   const { control, register, handleSubmit, setError, formState } =
     useForm<Values>({
       defaultValues: account
@@ -82,6 +102,9 @@ export function AccountDialog({
             creditLimit: account.creditLimit,
             statementDay: account.statementDay?.toString() ?? null,
             dueDay: account.dueDay?.toString() ?? null,
+            spendSoft: account.spendSoft,
+            spendMid: account.spendMid,
+            spendHard: account.spendHard,
           }
         : {
             kind,
@@ -90,6 +113,9 @@ export function AccountDialog({
             creditLimit: null,
             statementDay: null,
             dueDay: null,
+            spendSoft: parseAmount(LEVELS[0].start, decimals),
+            spendMid: parseAmount(LEVELS[1].start, decimals),
+            spendHard: parseAmount(LEVELS[2].start, decimals),
           },
     });
   const { errors } = formState;
@@ -98,7 +124,16 @@ export function AccountDialog({
   const saving = useRef(false);
   const card = useWatch({ control, name: "kind" }) === "credit_card";
   const shown: (keyof Values)[] = card
-    ? ["name", "openingBalance", "creditLimit", "statementDay", "dueDay"]
+    ? [
+        "name",
+        "openingBalance",
+        "creditLimit",
+        "statementDay",
+        "dueDay",
+        "spendSoft",
+        "spendMid",
+        "spendHard",
+      ]
     : ["name", "openingBalance"];
 
   const save = async (values: Values) => {
@@ -212,6 +247,40 @@ export function AccountDialog({
                 {amount("creditLimit", "Credit limit")}
                 {day("statementDay", "Statement closes")}
                 {day("dueDay", "Payment due")}
+                {/* CC-10: three amounts on one row (UI_FLOWS §5.2). */}
+                <div className={`grid ${ROW}`}>
+                  <span className="text-small font-semibold text-muted-foreground">
+                    Spending levels
+                  </span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {LEVELS.map(({ name, label }) => (
+                      <Controller
+                        key={name}
+                        control={control}
+                        name={name}
+                        render={({ field }) => (
+                          <Field
+                            label={label}
+                            htmlFor={`acct-${name}`}
+                            error={errors[name]?.message}
+                          >
+                            <AmountInput
+                              id={`acct-${name}`}
+                              ref={field.ref}
+                              value={field.value}
+                              onChange={field.onChange}
+                              onBlur={field.onBlur}
+                            />
+                          </Field>
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-small text-muted-foreground">
+                    Warnings for each statement cycle's spending. They never
+                    block a purchase.
+                  </p>
+                </div>
               </>
             )}
             {(card || !account) && (

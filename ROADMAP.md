@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-16 |
-| **Current focus** | **Phase 4: Loans & forecast**: Credit card spending levels [CC-10] [CC-11] |
+| **Current focus** | **Phase 4: Loans & forecast**: Test every Phase 4 feature on a copy of the installed app's data |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -21,7 +21,7 @@ This file is the progress tracker.
 | **1 · MVP** | Log transactions and see cashflow by period | `v0.1.0` | Every item in PRD §10 is ticked on Windows 11, and an installed `v0.1.0` has updated itself | 53 / 53 |
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 16 / 16 |
-| **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 14 / 17 |
+| **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 15 / 17 |
 | **5 · Polish** | Ready for daily use for years | `v1.0.0` | All P5 requirements done | 0 / 9 |
 
 ---
@@ -190,7 +190,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 - [x] Before you borrow, and the confirm step when adding a new loan [LOAN-9] [LOAN-10]
 - [x] Smart goal target dates: the monthly room from the forecast, the suggested earliest date, and refusing a sooner one [GOL-5] [GOL-6]
 - [x] Goals follow the forecast: a save that makes a goal's date unrealistic moves it by itself, with a note, and Behind on the goal card [GOL-7]
-- [ ] Credit card spending levels: soft, mid and hard per statement cycle, migration `0004`, the warnings, and "Spend anyway?" at the hard level [CC-10] [CC-11]
+- [x] Credit card spending levels: soft, mid and hard per statement cycle, migration `0004`, the warnings, and "Spend anyway?" at the hard level [CC-10] [CC-11]
 - [ ] Test every Phase 4 feature on a copy of the installed app's data with the owner's real pay schedule, log every bug and issue, and fix them. The copy and the log stay out of the repo.
 - [ ] Release `v0.4.0` with `/release`, then set up the real loans and paydays in the installed app and delete the old Loan-category upcoming transactions and recurring rules, so no payment counts twice
 

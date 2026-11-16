@@ -12,6 +12,7 @@ import { formatShortDate } from "@/lib/dates";
 import { named, offered } from "@/lib/records";
 import { cn } from "@/lib/utils";
 import { MoneyText } from "./MoneyText";
+import { SpendLevelTag } from "./SpendLevel";
 import type { ComboboxOption } from "./ui/combobox";
 
 /** DESIGN_SYSTEM §6 fixed icons. */
@@ -51,7 +52,7 @@ export const ACCOUNT_KINDS: Record<AccountKind, string> = {
 /**
  * The account's icon in a `--wash` square, its name and its balance (DESIGN_SYSTEM §9.2). A credit
  * card shows what's owed, with "Available ₱X · Due Nov 5" under its name, unless `subtitle`
- * replaces that line.
+ * replaces that line, and then the spending level once one is reached (CC-10).
  */
 export function AccountRow({
   account,
@@ -76,24 +77,31 @@ export function AccountRow({
       </span>
       <div className="min-w-0">
         <p className="truncate">{account.name}</p>
-        {subtitle ? (
-          <p className="text-small text-muted-foreground">{subtitle}</p>
-        ) : (
-          card && (
-            <p className="text-small text-muted-foreground">
-              Available{" "}
-              <MoneyText
-                amount={card.availableCredit}
-                kind="balance"
-                // Past the limit it's negative, and keeps its red.
-                className={cn(
-                  "font-normal",
-                  card.availableCredit >= 0 && "text-muted-foreground",
-                )}
-              />{" "}
-              · Due {formatShortDate(card.dueDate)}
-            </p>
-          )
+        {(subtitle || card) && (
+          <p className="text-small text-muted-foreground">
+            {subtitle ??
+              (card && (
+                <>
+                  Available{" "}
+                  <MoneyText
+                    amount={card.availableCredit}
+                    kind="balance"
+                    // Past the limit it's negative, and keeps its red.
+                    className={cn(
+                      "font-normal",
+                      card.availableCredit >= 0 && "text-muted-foreground",
+                    )}
+                  />{" "}
+                  · Due {formatShortDate(card.dueDate)}
+                </>
+              ))}
+            {card && card.spendLevel !== "none" && (
+              <>
+                {" · "}
+                <SpendLevelTag level={card.spendLevel} />
+              </>
+            )}
+          </p>
         )}
       </div>
       {/* An overpaid card has a credit, which shows as a plain balance. */}
