@@ -164,7 +164,9 @@ test("Delete removes the whole payslip after saying what goes", async () => {
   const form = await openPayslip();
   fireEvent.click(form.getByRole("button", { name: "Delete" }));
   expect(
-    await screen.findByText("Its gross pay and 2 deductions are deleted."),
+    await screen.findByText(
+      "Its gross pay and 2 deductions are deleted. Its payday won't be offered again, so to fix a mistake, edit the payslip instead.",
+    ),
   ).toBeTruthy();
   const confirm = within(
     screen.getByRole("dialog", { name: "Delete this payslip?" }),
