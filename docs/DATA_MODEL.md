@@ -76,6 +76,7 @@ Phase 4 also adds two columns: `transactions.payslip_id` (§4.7) and `recurring_
 | `opening_balance` | INTEGER | no | Signed, in minor units. Forms accept only 0 or more (§6). **For a credit card, the amount owed is stored as a negative number** (see §5.1), and every other account stores 0 or more. Default 0. |
 | `credit_limit` | INTEGER | card only | > 0. Must be NULL for every kind except a credit card. |
 | `statement_day` | INTEGER | card only | 1–31. If the month is shorter, the last day of the month is used. |
+| `spend_soft`, `spend_mid`, `spend_hard` | INTEGER | card only | Phase 4 (CC-10, migration `0004`): the spending levels for a statement cycle, `0 < soft < mid < hard`. NULL for every kind except a credit card. A new card starts at 3,000, 4,000 and 5,000 in the main currency unit (`3000 × 10^currency_decimals` minor units), and `0004` gives every existing card the same. |
 | `due_day` | INTEGER | card only | 1–31. Same rule for shorter months. |
 | `sort_order` | INTEGER | no | Display order. Default 0. |
 | `archived` | INTEGER | no | 0 or 1 |
@@ -557,6 +558,7 @@ The statement closing date in a given month is `min(statement_day, last day of t
 - **Cycle spending (CC-6):** total expenses on the card within the current cycle.
 - **Next due date:** the first date on or after today whose day is `min(due_day, last day of the month)`.
 - **Reminder (CC-7, Phase 3):** shown when the next due date is 5 days away or closer (0–5 days, 0 being today) and `amount_owed > 0`, for active cards only.
+- **Spending level (CC-10, Phase 4):** see §5.18.
 
 ### 5.6 Budget progress (Phase 3)
 
@@ -585,6 +587,8 @@ monthly_needed = (target_amount − progress) ÷ months left until target_date  
 - **% done** is a whole percent **rounded down**, so it shows 100 only once the target is really reached.
 - **Months left** are calendar months from today to `target_date`, a part month counting as a whole one: from Nov 12, Dec 12 is 1 month and Dec 13 is 2. Adding a month clamps to the month's end, so from Jan 31, Feb 28 is 1 month. Once the target date is today or has passed, months left is 0 and there's no monthly amount.
 - **Monthly needed** is rounded up to the minor unit, so saving it every month always reaches the target: ₱2,600 over 6 months is ₱433.34. There's none once nothing is left to save, or without a target date.
+
+- **Phase 4 (GOL-5, GOL-6):** the suggested target date, and the earliest one a goal may have, come from §5.17.
 
 ### 5.8 Default accounts
 
@@ -774,6 +778,47 @@ days later      = debt-free after − (debt-free before, or today)
 short by(k)     = −low_after(k)   when window k runs short with the draft and not without it
 ```
 
+### 5.17 Smart goal target date (GOL-5, GOL-6, Phase 4)
+
+How much the user could set aside each month for a goal, and so the earliest realistic target date. It's worked out **as if the goal already exists**, so its account isn't a counted account (§5.15).
+
+```
+saving dates = today + k months, for k = 1, 2, …   (the day clamped to the month's end, as §5.7 counts months)
+n(d)         = the number of saving dates on or before day d
+others(d)    = Σ over every other active goal that isn't achieved and has a target date:
+               its monthly_needed (§5.7) × the saving dates on or before d, and before its target date
+run(d)       = the forecast's running total (§5.15), day by day over the horizon
+monthly room = max(0, the lowest of ⌊(run(d) − others(d)) ÷ n(d)⌋ over every day d with n(d) ≥ 1)
+left to save = target_amount − max(0, the account's balance today)
+earliest     = today + ⌈left to save ÷ monthly room⌉ months   (the day clamped to the month's end)
+```
+
+- **The monthly room** is the most the user could move into the goal's account on every saving date for the next 12 months without any day's running total going below 0. Other goals with a date are already taking their monthly amount, so two goals never count on the same money. A goal without a date asks for nothing, so it takes nothing.
+- **The earliest date** is when saving the monthly room reaches the target. Saving §5.7's `monthly_needed` for that date is then never more than the monthly room. Past the 12-month horizon, the same monthly room is assumed to continue.
+- **The suggestion** is the earliest date. A new goal's date field starts on it once the target and account are chosen, and the user may pick a later one.
+- **The check (GOL-6):** a target date before the earliest is refused (`targetDate`: "That's too soon. The earliest you can reach this is Mar 5, 2027, saving about ₱433.34 a month."). It runs when a goal is added with a date, and when an edit changes the date. An edit that keeps the date is never refused, so a goal can't become unsaveable by itself as bills change.
+- **No date is always allowed.** Nothing to check, and no monthly amount (§5.7).
+- **No payday rule:** there's no forecast (§5.15), so no suggestion, and any date is allowed.
+- **A monthly room of 0** (some window already runs short, or every peso is spoken for) makes every date too soon while there's something left to save: "You can't set anything aside each month right now. Leave the date empty, or free up money first."
+- **Nothing left to save** (the account already holds the target): any date today or later is allowed, and the suggestion is today.
+- Budgets still don't hold anything back, and Safe to spend doesn't set money aside for goals (PRD §3). The monthly room is advice for the goal only.
+
+### 5.18 Card spending levels (CC-10, CC-11, Phase 4)
+
+```
+spent = the card's cycle spending (§5.5): Σ its expenses dated in the current statement cycle, up to today
+level = hard  when spent ≥ spend_hard
+        mid   when spent ≥ spend_mid
+        soft  when spent ≥ spend_soft
+        none  otherwise
+```
+
+- **"Reached" means equal or more.** Exactly ₱3,000.00 spent is the soft level.
+- **Archived cards** show no level; they take no new spending.
+- **The check before saving (CC-11):** for a new or edited expense on a card, dated in the card's current cycle and up to today, the backend works out the level **after** the save: `spent` plus the new amount, less the old amount when an edit keeps it on the same card. When that's `hard`, the form asks "Spend anyway?" first. When it reaches `soft` or `mid` for the first time (the level after is higher than before), it saves and shows a warning toast. A future-dated expense, one dated in an earlier cycle, and recurring dates posted by processing are never asked about.
+- The levels are warnings only: like the credit limit, they never block a save (CLAUDE.md).
+- They're amounts, but every card already has a credit limit, which locks `currency_decimals` (§1), so they add nothing to that lock.
+
 ---
 
 ## 6. Validation rules (checked in Rust)
@@ -797,6 +842,8 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | `currency_decimals` can't change once any amount is stored: a transaction, a recurring rule, a budget, a goal, a loan, or an account's non-zero opening balance or credit limit (§1) | settings |
 | A budget's category is an expense category, and a goal's account isn't a credit card | category / account |
 | A goal's name is 1–50 characters and unique, ignoring case; its target amount is > 0 and ≤ the maximum; its target date, if any, is a real date (past dates are allowed); a new goal can't use an archived account, but an edit may keep the one it has | name / targetAmount / targetDate / accountId |
+| Phase 4 (GOL-6): a goal's target date isn't before the earliest realistic date (§5.17), checked when a goal is added with a date and when an edit changes the date | targetDate |
+| Phase 4 (CC-10): a card's spending levels are each > 0 and ≤ the maximum, with soft < mid < hard; every other kind of account has none | spendSoft / spendMid / spendHard |
 | A new budget can't use an archived category, but an edit may keep the one it has. A category, or all spending, has at most one budget per period. | categoryId / period |
 | A recurring rule's template follows the transaction rules above: its date is the start date (§4.1) | that field |
 | A rule's interval is 1–999, its number of times is 1–9,999, and its end date is a real date on or after the start date. A rule ends on a date or after a number of times, not both. | interval / maxOccurrences / endDate |
@@ -886,6 +933,7 @@ Every icon is already on the curated list (DESIGN_SYSTEM §6). These are ordinar
 | — | 2 | Phase 2 needed no schema change: its new data is settings keys (§3.5) |
 | `0002_planning.sql` | 3 | recurring_rules, recurring_occurrences, budgets, goals |
 | `0003_loans_payroll.sql` | 4 | loans, loan_payments, `transactions.payslip_id`, `recurring_rules.is_payday`, and the Phase 4 categories a database doesn't have yet (§7), all in the migration's one database transaction |
+| `0004_card_spend_levels.sql` | 4 | `accounts.spend_soft`, `spend_mid` and `spend_hard`, with existing cards set to 3,000, 4,000 and 5,000 in the main currency unit (CC-10, §2) |
 
 ### CSV export format (BAK-6, Phase 2)
 
@@ -1033,3 +1081,13 @@ Answered on 2026-11-16, while building Before you borrow (LOAN-9, LOAN-10):
 
 82. **A window already short isn't blamed on the loan.** `short by` is set only on a window that runs short with the draft and not without it ("any window it would make short", UI_FLOWS F15). A window that runs short anyway isn't named, even when the draft makes it shorter; the panel still lists its `left` before and after (§5.16).
 83. **The draft's typed rows are checked like a new loan's payments**, without a date borrowed, since the preview doesn't have one: 1–600 rows, real dates, amounts above 0. The other loan fields are checked when the loan is saved, after the confirm (§5.16, §6).
+
+Answered on 2026-11-16, planning the smart goal date and the card spending levels (GOL-5, GOL-6, CC-10, CC-11):
+
+84. **A goal's monthly room is the forecast-safe amount**, the most that can be set aside on every saving date for 12 months without any day going below 0, rather than an average monthly surplus, which could suggest saving money a bill needs later in the month (§5.17).
+85. **Saving dates start a month from today**, the way §5.7 counts months left, so saving `monthly_needed` for the earliest date never asks for more than the monthly room (§5.17).
+86. **A too-soon date is refused on add and on a date edit only.** An edit that keeps the date passes, so a goal never becomes unsaveable as bills change. Without a payday rule, any date is allowed (§5.17).
+87. **Other goals with a date count against the monthly room**, so two goals never plan on the same money. Safe to spend still doesn't hold anything back for goals (PRD §3, §5.17).
+88. **Spending levels are per card, for the current statement cycle,** stored on the account, ₱3,000.00, ₱4,000.00 and ₱5,000.00 to start with. They need migration `0004`: `0003` was already run on development databases, so a new file is safer than changing it before `v0.4.0` (§2, §8).
+89. **The hard level asks "Spend anyway?" but never blocks**, like the credit limit. Soft and mid only warn (§5.18).
+

@@ -111,6 +111,8 @@ Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3**
 | CC-6 | The card's detail view shows: amount owed, available credit (limit − owed), % of the limit used, spending in the current statement cycle, and the next due date. | P1 |
 | CC-7 | When the payment due date is 5 days away or closer, the dashboard shows a reminder banner with the amount owed. | P3 |
 | CC-8 | The data model supports any number of cards (v1 is used with one). | P1 |
+| CC-10 | **Spending levels:** each credit card has three spending levels for its current statement cycle: **soft**, **mid** and **hard**, ₱3,000.00, ₱4,000.00 and ₱5,000.00 to start with, changeable in the card's form. The card's details, the Accounts list and the dashboard show which level this cycle's spending has reached. | P4 |
+| CC-11 | Saving an expense on a card that takes this cycle's spending to the **hard** level or past it first asks "Spend anyway?". Reaching the soft or mid level saves at once with a warning. The levels never block spending, as the credit limit doesn't. | P4 |
 | CC-9 | A **Pay bill** button on the card's details opens a transfer to the card, pre-filled with the **full amount owed**. The user can edit the amount for a partial payment. If nothing is owed, the amount starts empty. | P1 |
 
 **Due-day rule:** if the statement or due day is greater than the number of days in a month (e.g. 31 in February), the last day of that month is used.
@@ -189,6 +191,8 @@ Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3**
 | GOL-2 | Every goal is linked to one account, e.g. a dedicated savings account, and progress is that account's balance. Manual contributions aren't supported. | P3 |
 | GOL-3 | Each goal shows % complete, the amount remaining and, if it has a target date, how much must be saved per month to reach it. | P3 |
 | GOL-4 | A completed goal is marked as achieved and can be archived. | P3 |
+| GOL-5 | **Smart target date:** while a goal is being added or edited, the app works out how much the user could set aside each month, from the forecast (recurring bills, card bills, loan payments, future-dated expenses and expected pay over the next 12 months), and suggests the earliest realistic target date. The date field starts on that suggestion, and the user can pick another. | P4 |
+| GOL-6 | A target date sooner than the suggested one is refused, with the earliest realistic date in the message. This is checked when a goal is added and when an edit changes its date. A goal with no target date is always allowed, and with no payday rule there's no suggestion, so any date is allowed. | P4 |
 
 ### 7.10 Backup, restore and export
 
@@ -335,7 +339,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | **1: MVP** | Accounts (including the credit card), categories, transactions, dashboard totals by period, settings, basic first-launch setup, light and dark themes that follow Windows, automatic updates, a database backup before migrations |
 | **2: Reports & backups** | Charts over time, category breakdown, period comparison, % change, payee suggestions, regular backups, restore, CSV export |
 | **3: Planning** | Recurring transactions, budgets, savings goals, card due-date reminder, future-dated transactions |
-| **4: Loans & forecast** | Loans with payment reminders and the Debt-free screen, payday rules and payslips with deductions, Safe to spend and the Forecast screen |
+| **4: Loans & forecast** | Loans with payment reminders and the Debt-free screen, payday rules and payslips with deductions, Safe to spend and the Forecast screen, smart goal target dates, and credit card spending levels |
 | **5: Polish** | The theme switch, the Reduce transparency switch, more keyboard shortcuts, polished first-launch onboarding, Windows installer polish |
 
 ## 12. How we'll measure success
@@ -426,6 +430,8 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-13 | PAY-4's early paydays can also be recorded from the Safe to spend card, and the Due banner counts only dates that are due (UI_FLOWS §2, F10) |
 | 2026-11-13 | In the forecast, every unpaid loan payment counts whatever its account, transfers to or from a card don't count (the card's bills stand in for them), and pay counts only into a counted account (DATA_MODEL §5.13–5.15) |
 | 2026-11-15 | DSH-8 shows as many recent transactions as fit beside the dashboard's right column, from 5 to 10, so the Safe to spend card leaves no gap |
+| 2026-11-16 | GOL-5 and GOL-6 added to Phase 4: the monthly amount a goal can count on is the forecast-safe amount (the most that can be set aside every month for 12 months without any pay window running short), and a sooner date is refused on add and on a date edit (DATA_MODEL §5.17) |
+| 2026-11-16 | CC-10 and CC-11 added to Phase 4: spending levels per card, for the current statement cycle, that warn and ask to confirm at the hard level but never block (DATA_MODEL §5.18) |
 
 ---
 
