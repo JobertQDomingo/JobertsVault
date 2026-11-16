@@ -787,7 +787,8 @@ saving dates = today + k months, for k = 1, 2, …   (the day clamped to the mon
 n(d)         = the number of saving dates on or before day d
 others(d)    = Σ over every other active goal that isn't achieved and has a target date:
                its monthly_needed (§5.7) × min(n(d), its months left (§5.7))
-run(d)       = the forecast's running total (§5.15), day by day over the horizon
+run(d)       = the forecast's running total (§5.15), day by day over the horizon, leaving out
+               transfers from the counted accounts into a dated, unachieved goal's account
 monthly room = 0 when any day of the horizon has run(d) < 0, else
                max(0, the lowest of ⌊(run(d) − others(d)) ÷ n(d)⌋ over every day d with n(d) ≥ 1)
 left to save = target_amount − max(0, the account's balance today)
@@ -826,7 +827,8 @@ else if late(goal)  → its target_date becomes earliest(goal), §5.17's earlies
 - **Newest first**, so a goal added earlier keeps its claim on the monthly room: the newest goal gives way first, and moving it later lowers its monthly amount, which leaves more room for the older goals checked after it (§9 item 100).
 - **Behind** (`list_goals`' `behind`): there's a payday rule, something left to save, and either the monthly room is 0 or the goal is late (`late` above, with every other goal at its date now). Time passing, a payslip below the estimate, or a deleted income can do this without a save that moves it. The card says so; nothing else changes.
 - With no payday rule, nothing is checked or moved.
-- Recurring dates posted by processing and payslips aren't saves that move goals: their dates were already in the forecast. Deleting a row never moves a goal either; a goal it leaves behind shows as behind.
+- **A goal's own deposits aren't spending.** A future-dated transfer, or a transfer rule's dates, from the counted accounts into the account of a goal with a date (or the goal being added) is the saving its monthly amount already asks for, so the monthly room leaves it out rather than counting it twice. Safe to spend still sees the money leave (§9 item 102).
+- Recurring dates posted by processing (Post and Edit & post included) and payslips aren't saves that move goals: their dates were already in the forecast. Deleting a row never moves a goal either; a goal it leaves behind shows as behind.
 
 ### 5.18 Card spending levels (CC-10, CC-11, Phase 4)
 
@@ -1133,4 +1135,6 @@ Answered on 2026-11-16, building goals that follow the forecast (GOL-7):
 99. **A goal is judged by month** (the owner, 2026-11-16): it's late when its months left is 0 or its `monthly_needed` is more than the monthly room, not when the earliest date is after its target date. `today + ⌈left ÷ room⌉ months` moves a day later every day, so the day-by-day test made a goal at its suggested date late the next day, and nearly every save moved it by a day (§5.17).
 100. **The newest goal gives way first** (the owner, 2026-11-16), replacing item 95's oldest first: checking the oldest first, with the newer goals still taking their share, made the oldest goal the one that moved, the opposite of letting a goal added earlier keep its claim (§5.17).
 101. **A goal whose earliest date is past the calendar's range** (room above 0, a huge target) is kept at its date and shown as behind, like a room of 0, as the too-soon check already does (§5.17).
+102. **A goal's own scheduled deposits don't count against it** (the owner, 2026-11-16): a future transfer from the counted accounts into a dated, unachieved goal's account is left out of the goal forecast, for the suggestion (GOL-5) and the GOL-7 check. Counting it as money out while the goal also asks for its monthly amount counted the saving twice, so scheduling a goal's own deposit moved it later. A deposit bigger than its goal's monthly amount slightly overstates the room the other goals see, which errs toward keeping dates (§5.17).
+103. **Post and Edit & post on a due date are processing**, so they don't move goals, even with an edited amount: the date was already in the forecast, and a goal it leaves late shows as behind and moves on the next save that does (§5.17, item 93).
 

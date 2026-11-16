@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::domain::budget::used_percent;
+use crate::domain::forecast::Movement;
 use crate::domain::goal::{self, Check, Dated, Room, monthly_needed, months_left};
 use crate::domain::money::{Decimals, Money};
 use crate::error::AppError;
@@ -170,7 +171,7 @@ fn room(conn: &Connection, today: NaiveDate, draft: &GoalDraft) -> Result<Option
         plan.money_now,
         today,
         &plan.windows,
-        &plan.movements,
+        &without_deposits(&plan),
         &others,
         left,
     ))
@@ -229,7 +230,7 @@ fn checked(
         plan.money_now,
         today,
         &plan.windows,
-        &plan.movements,
+        &without_deposits(&plan),
         &list,
         follow,
     )
@@ -239,6 +240,18 @@ fn checked(
         .zip(checks)
         .map(|((row, g), check)| (row, g, check))
         .collect())
+}
+
+/// The forecast's movements without the goals' own deposits: a scheduled transfer into a goal's
+/// account is the saving its monthly amount already asks for, so it isn't counted twice (§9 item
+/// 102). shortcut: a deposit bigger than its goal's monthly amount overstates the room the other
+/// goals see, which errs toward keeping dates; upgrade if goals start sharing deposits.
+fn without_deposits(plan: &forecast::Gathered) -> Vec<Movement> {
+    plan.movements
+        .iter()
+        .filter(|m| !plan.goal_deposits.contains(&m.source))
+        .copied()
+        .collect()
 }
 
 /// GOL-7, at the end of a save's database transaction: every goal whose monthly amount no longer
@@ -1495,7 +1508,13 @@ mod tests {
                     .goals_moved
             }),
             ("transfer", |c, pay| {
-                let f = txn(TransactionKind::Transfer, pay, BIG, "2026-12-20");
+                // Into an undated goal's account: money out, and no goal's deposit.
+                let someday = account(c, "Someday", AccountKind::Bank, 0);
+                insert(c, fields("Someday", 100, None, someday));
+                let f = TransactionFields {
+                    to_account_id: Some(someday),
+                    ..txn(TransactionKind::Transfer, pay, BIG, "2026-12-20")
+                };
                 transactions::create(c, f, now()).unwrap().goals_moved
             }),
             ("edited expense", |c, pay| {
@@ -1545,6 +1564,34 @@ mod tests {
             assert_eq!(date_of(&conn, trip), MOVED, "{what}");
             assert_eq!(behind_of(&mut conn, trip), None, "{what}");
         }
+    }
+
+    #[test]
+    fn a_goals_own_scheduled_deposits_dont_count_against_it() {
+        let mut conn = db();
+        let (pay, trip) = planned(&mut conn);
+        // 15,000.00 into the goal's own Cash on Dec 20: the saving it asks for, not spending.
+        let deposit = txn(TransactionKind::Transfer, pay, BIG, "2026-12-20");
+        let saved = transactions::create(&mut conn, deposit, now()).unwrap();
+        assert_eq!(saved.goals_moved, []);
+        assert_eq!(behind_of(&mut conn, trip), None);
+        assert_eq!(
+            suggested(&conn, 3_000_000, CASH, Some(trip)).map(|s| s.0),
+            Some(1_000_000)
+        );
+        // A goal being added counts deposits into its account the same way.
+        let savings = account(&mut conn, "Savings", AccountKind::Bank, 0);
+        let f = TransactionFields {
+            to_account_id: Some(savings),
+            ..txn(TransactionKind::Transfer, pay, 500_000, "2026-12-20")
+        };
+        transactions::create(&mut conn, f, now()).unwrap();
+        let without = suggested(&conn, 1_000_000, savings, None);
+        let other = account(&mut conn, "Other", AccountKind::Bank, 0);
+        assert_eq!(
+            without,
+            suggested(&conn, 1_000_000, other, None).map(|s| (s.0, s.1))
+        );
     }
 
     #[test]

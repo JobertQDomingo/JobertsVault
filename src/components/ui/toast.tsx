@@ -7,7 +7,8 @@ export function Toaster() {
     <Sonner
       position="bottom-right"
       duration={4000}
-      // Side by side, not piled up, so a goal-moved note isn't hidden under "Saved" (GOL-7).
+      // One above the other, not piled up, so no toast hides another: a goal-moved note comes
+      // just before a form's "Saved" (GOL-7, DESIGN_SYSTEM §9.1).
       expand
       // Sonner's own stylesheet sets a system font, and it outranks Tailwind's classes.
       style={{ fontFamily: "inherit" }}

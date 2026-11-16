@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { GoalMove } from "@/bindings/GoalMove";
+import type { Saved } from "@/bindings/Saved";
 import { notify } from "@/components/ui/toast";
 import { formatDate } from "@/lib/dates";
 import { queryKeys } from "@/lib/queryKeys";
@@ -31,7 +31,9 @@ export function useLedgerMutation<TArgs, TResult>(
 
 /** One line per goal moved (UI_FLOWS §8.4). Results of other writes have no `goalsMoved`. */
 function tellGoalsMoved(result: unknown) {
-  const moved = (result as { goalsMoved?: GoalMove[] } | null)?.goalsMoved;
+  // Picked from the generated type, so a renamed field fails the typecheck.
+  const moved = (result as Partial<Pick<Saved<object>, "goalsMoved">> | null)
+    ?.goalsMoved;
   if (!moved?.length) return;
   notify.info(
     moved
