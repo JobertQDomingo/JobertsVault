@@ -152,11 +152,115 @@ pub struct Forecast {
     pub rows: Vec<ForecastRow>,
 }
 
+/// What the forecast is worked out from (§5.12–5.15).
+pub(crate) struct Gathered {
+    pub money_now: Money,
+    /// The pay windows: none with no payday rule (§5.12).
+    pub windows: Vec<PayWindow>,
+    pub movements: Vec<Movement>,
+    horizon: NaiveDate,
+    names: HashMap<Source, (String, i64)>,
+    nets: Vec<repo::transactions::PayslipNet>,
+    paydays: Vec<(NaiveDate, i64)>,
+    early: Vec<(NaiveDate, i64)>,
+}
+
 pub fn get(
     conn: &Connection,
     grain: ForecastGrain,
     today: NaiveDate,
 ) -> Result<Forecast, AppError> {
+    let Gathered {
+        money_now,
+        windows,
+        movements,
+        horizon,
+        names,
+        nets,
+        paydays,
+        early,
+    } = gather(conn, today)?;
+    let mut forecast = Forecast {
+        today,
+        money_now,
+        safe_to_spend: None,
+        per_day: None,
+        window_end: None,
+        days_left: None,
+        held_back: None,
+        held_for: None,
+        short: None,
+        next_payday: None,
+        early_payday: None,
+        rows: Vec::new(),
+    };
+    if windows.is_empty() {
+        return Ok(forecast);
+    }
+    let summary = f::forecast(money_now, today, &windows, &movements).ok_or_else(out_of_range)?;
+    let current = windows[0];
+    // The Months view lists the pay received since the current month's real start.
+    let (rows, received_from) = match grain {
+        ForecastGrain::Window => (summary.rows, current.start),
+        ForecastGrain::Month => {
+            let (spans, month_start) = months(conn, today, horizon)?;
+            (f::rows(money_now, today, &spans, &movements), month_start)
+        }
+    };
+    // Only payslips dated up to today are recorded, so only the first row holds any.
+    let mut received = Vec::new();
+    for n in nets.iter().rev() {
+        let date = stored_date(&n.date)?;
+        if date >= received_from {
+            received.push(Received {
+                payslip_id: n.id,
+                date,
+                net: Money(n.net),
+            });
+        }
+    }
+    let mut received = Some(received);
+    // The window held back for; by month, the month holding the same lowest day.
+    let lowest = (summary.held_back.0 > 0).then(|| f::lowest_row(&rows));
+    forecast.rows = rows
+        .into_iter()
+        .enumerate()
+        .map(|(i, row)| ForecastRow {
+            received: received.take().unwrap_or_default(),
+            movements: row.movements.iter().map(|m| movement(m, &names)).collect(),
+            short: row.short_on.is_some(),
+            lowest: lowest == Some(i),
+            start: row.start,
+            end: row.end,
+            start_amount: row.start_amount,
+            money_in: row.money_in,
+            money_out: row.money_out,
+            left: row.left,
+        })
+        .collect();
+    let payday = |(date, rule_id): (NaiveDate, i64)| PaydayDate { rule_id, date };
+    forecast.next_payday = paydays
+        .into_iter()
+        .filter(|(d, _)| *d > today && *d <= horizon)
+        .min()
+        .map(payday);
+    forecast.early_payday = early.into_iter().min().map(payday);
+    forecast.safe_to_spend = Some(summary.safe_to_spend);
+    forecast.per_day = Some(summary.per_day);
+    forecast.window_end = Some(current.end);
+    forecast.days_left = Some(summary.days_left);
+    forecast.held_back = Some(summary.held_back);
+    forecast.held_for = summary.held_for.map(|w| Span {
+        start: w.start,
+        end: w.end,
+    });
+    forecast.short = summary.short.map(|(date, amount)| Short { amount, date });
+    Ok(forecast)
+}
+
+/// Money now, the pay windows and every movement in the horizon, as `get` and the loan preview
+/// (DATA_MODEL §5.16) read them.
+pub(crate) fn gather(conn: &Connection, today: NaiveDate) -> Result<Gathered, AppError> {
     let horizon = f::horizon_end(today).ok_or_else(out_of_range)?;
     let accounts = repo::accounts::all(conn, today)?;
     let goal_accounts: HashSet<i64> = repo::goals::all(conn)?
@@ -399,85 +503,23 @@ pub fn get(
         movements.extend(f::card_bills(&state, charged, today, horizon));
     }
 
-    let mut forecast = Forecast {
-        today,
-        money_now,
-        safe_to_spend: None,
-        per_day: None,
-        window_end: None,
-        days_left: None,
-        held_back: None,
-        held_for: None,
-        short: None,
-        next_payday: None,
-        early_payday: None,
-        rows: Vec::new(),
-    };
     // A paused payday rule is still a payday rule: only its dates are left out (§5.12).
-    if !rules.iter().any(|r| r.is_payday) {
-        return Ok(forecast);
-    }
-    let boundaries: Vec<NaiveDate> = paydays.iter().map(|(d, _)| *d).collect();
-    let windows = f::pay_windows(&boundaries, today, horizon);
-    let summary = f::forecast(money_now, today, &windows, &movements).ok_or_else(out_of_range)?;
-    let current = windows[0];
-    // The Months view lists the pay received since the current month's real start.
-    let (rows, received_from) = match grain {
-        ForecastGrain::Window => (summary.rows, current.start),
-        ForecastGrain::Month => {
-            let (spans, month_start) = months(conn, today, horizon)?;
-            (f::rows(money_now, today, &spans, &movements), month_start)
-        }
+    let windows = if rules.iter().any(|r| r.is_payday) {
+        let boundaries: Vec<NaiveDate> = paydays.iter().map(|(d, _)| *d).collect();
+        f::pay_windows(&boundaries, today, horizon)
+    } else {
+        Vec::new()
     };
-    // Only payslips dated up to today are recorded, so only the first row holds any.
-    let mut received = Vec::new();
-    for n in nets.iter().rev() {
-        let date = stored_date(&n.date)?;
-        if date >= received_from {
-            received.push(Received {
-                payslip_id: n.id,
-                date,
-                net: Money(n.net),
-            });
-        }
-    }
-    let mut received = Some(received);
-    // The window held back for; by month, the month holding the same lowest day.
-    let lowest = (summary.held_back.0 > 0).then(|| f::lowest_row(&rows));
-    forecast.rows = rows
-        .into_iter()
-        .enumerate()
-        .map(|(i, row)| ForecastRow {
-            received: received.take().unwrap_or_default(),
-            movements: row.movements.iter().map(|m| movement(m, &names)).collect(),
-            short: row.short_on.is_some(),
-            lowest: lowest == Some(i),
-            start: row.start,
-            end: row.end,
-            start_amount: row.start_amount,
-            money_in: row.money_in,
-            money_out: row.money_out,
-            left: row.left,
-        })
-        .collect();
-    let payday = |(date, rule_id): (NaiveDate, i64)| PaydayDate { rule_id, date };
-    forecast.next_payday = paydays
-        .into_iter()
-        .filter(|(d, _)| *d > today && *d <= horizon)
-        .min()
-        .map(payday);
-    forecast.early_payday = early.into_iter().min().map(payday);
-    forecast.safe_to_spend = Some(summary.safe_to_spend);
-    forecast.per_day = Some(summary.per_day);
-    forecast.window_end = Some(current.end);
-    forecast.days_left = Some(summary.days_left);
-    forecast.held_back = Some(summary.held_back);
-    forecast.held_for = summary.held_for.map(|w| Span {
-        start: w.start,
-        end: w.end,
-    });
-    forecast.short = summary.short.map(|(date, amount)| Short { amount, date });
-    Ok(forecast)
+    Ok(Gathered {
+        money_now,
+        windows,
+        movements,
+        horizon,
+        names,
+        nets,
+        paydays,
+        early,
+    })
 }
 
 /// The app's months from today to the horizon's end, the first starting today and the last

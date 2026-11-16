@@ -7,6 +7,7 @@ import {
   ACCOUNT_LIST,
   DEFAULTS,
   LOAN_CATEGORIES,
+  LOAN_PREVIEW,
   LOANS,
   PAYMENT_METHODS,
 } from "@/test/fixtures";
@@ -463,4 +464,134 @@ test("Mark paid on a payment that's no longer unpaid says so and closes, instead
   await waitFor(() =>
     expect(screen.queryByRole("dialog", { name: "Mark paid" })).toBeNull(),
   );
+});
+
+// Before you borrow (F15, LOAN-9).
+
+const panel = async () =>
+  within(
+    (await screen.findByRole("heading", { name: "Before you borrow" }))
+      .parentElement!,
+  );
+
+test("Before you borrow tries a monthly loan and shows what it would do, saving nothing (F15)", async () => {
+  renderRoute("/debt-free", { ...ANSWERS, preview_loan: LOAN_PREVIEW });
+  const p = await panel();
+  fireEvent.change(p.getByRole("textbox", { name: "Payment" }), {
+    target: { value: "1000" },
+  });
+  fireEvent.change(p.getByRole("textbox", { name: "How many" }), {
+    target: { value: "6" },
+  });
+  // The first payment starts a month from today.
+  expect(
+    (p.getByRole("textbox", { name: "First payment" }) as HTMLInputElement)
+      .value,
+  ).toBe("12/05/2026");
+  fireEvent.click(p.getByRole("button", { name: "Try it" }));
+  await p.findByText("Mar 28, 2027 → May 5, 2027");
+  expect(calls("preview_loan")).toEqual([
+    { draft: { amount: 100000, count: 6, firstDate: "2026-12-05" } },
+  ]);
+  p.getByText("(38 days later)", { exact: false });
+  p.getByText("₱8,400.00 → ₱7,400.00");
+  const windows = within(
+    p.getByRole("list", { name: "Pay windows it changes" }),
+  )
+    .getAllByRole("listitem")
+    .map((li) => li.textContent);
+  // A window it doesn't change is left out.
+  expect(windows).toHaveLength(2);
+  expect(windows[0]).toBe("Dec 15–29: ₱18,300.00 → ₱17,300.00");
+  const short = p.getByText(/would run short by ₱180\.00/);
+  expect(short.closest("li")?.className).toContain("text-danger");
+  expect(calls("create_loan")).toEqual([]);
+});
+
+test("Before you borrow sends blank fields for the backend to name, and its error shows under the field", async () => {
+  renderRoute("/debt-free", {
+    ...ANSWERS,
+    preview_loan: () => {
+      throw {
+        code: "validation",
+        field: "count",
+        message: "Enter 1 to 600 payments",
+      };
+    },
+  });
+  const p = await panel();
+  fireEvent.click(p.getByRole("button", { name: "Try it" }));
+  await p.findByText("Enter 1 to 600 payments");
+  expect(calls("preview_loan")).toEqual([
+    { draft: { amount: 0, count: 0, firstDate: "2026-12-05" } },
+  ]);
+  expect(
+    p.getByRole("textbox", { name: "How many" }).getAttribute("aria-invalid"),
+  ).toBe("true");
+});
+
+test("Before you borrow leaves out Safe to spend with no payday rule, and says when the date doesn't move", async () => {
+  renderRoute("/debt-free", {
+    ...ANSWERS,
+    preview_loan: {
+      ...LOAN_PREVIEW,
+      debtFreeAfter: "2027-03-28",
+      daysLater: 0,
+      safeBefore: null,
+      safeAfter: null,
+      windows: [],
+    },
+  });
+  const p = await panel();
+  fireEvent.click(p.getByRole("button", { name: "Try it" }));
+  await p.findByText("(same day)", { exact: false });
+  expect(p.queryByText(/Safe to spend/)).toBeNull();
+  expect(p.queryByRole("list", { name: "Pay windows it changes" })).toBeNull();
+});
+
+test("with no loans the screen is one empty state, without Before you borrow (§8.5)", async () => {
+  renderRoute("/debt-free", {
+    ...ANSWERS,
+    list_loans: withSummary({}, []),
+  });
+  await screen.findByText("No loans. Keep it that way.");
+  expect(screen.queryByText("Before you borrow")).toBeNull();
+});
+
+test("changing a field after Try it clears the result and its error, so nothing shown is for other values", async () => {
+  renderRoute("/debt-free", {
+    ...ANSWERS,
+    preview_loan: () => {
+      throw {
+        code: "validation",
+        field: "count",
+        message: "Enter 1 to 600 payments",
+      };
+    },
+  });
+  const p = await panel();
+  fireEvent.click(p.getByRole("button", { name: "Try it" }));
+  await p.findByText("Enter 1 to 600 payments");
+  fireEvent.change(p.getByRole("textbox", { name: "How many" }), {
+    target: { value: "6" },
+  });
+  expect(p.queryByText("Enter 1 to 600 payments")).toBeNull();
+});
+
+test("Try it again with the same values asks again, so a failure can be retried", async () => {
+  let fail = true;
+  renderRoute("/debt-free", {
+    ...ANSWERS,
+    preview_loan: () => {
+      if (fail) throw { code: "database", message: "The database is busy" };
+      return LOAN_PREVIEW;
+    },
+  });
+  const p = await panel();
+  fireEvent.click(p.getByRole("button", { name: "Try it" }));
+  await p.findByText(/Something went wrong with the database/);
+  fail = false;
+  fireEvent.click(p.getByRole("button", { name: "Try it" }));
+  await p.findByText("Mar 28, 2027 → May 5, 2027");
+  expect(calls("preview_loan")).toHaveLength(2);
 });

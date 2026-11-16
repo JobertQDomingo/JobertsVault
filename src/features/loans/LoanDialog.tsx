@@ -1,10 +1,13 @@
-import { Plus, X } from "lucide-react";
+import { Plus, TriangleAlert, X } from "lucide-react";
 import { useRef, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { ApiError } from "@/api/client";
+import { previewLoan } from "@/api/loans";
 import type { Account } from "@/bindings/Account";
 import type { Category } from "@/bindings/Category";
 import type { Loan } from "@/bindings/Loan";
+import type { LoanFields } from "@/bindings/LoanFields";
+import type { LoanPreview } from "@/bindings/LoanPreview";
 import type { WeekStart } from "@/bindings/WeekStart";
 import { ACCOUNT_ICONS } from "@/components/AccountRow";
 import { AmountInput } from "@/components/AmountInput";
@@ -13,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
+  ConfirmDialog,
   Dialog,
   DialogBody,
   DialogContent,
@@ -25,7 +29,9 @@ import { useCreateLoan, useUpdateLoan } from "@/hooks/useLoans";
 import {
   addMonths,
   formatInputDate,
+  formatLongDate,
   formatShortDate,
+  formatSpan,
   isIsoDate,
 } from "@/lib/dates";
 import { formatMoney, type MoneySettings } from "@/lib/money";
@@ -67,6 +73,9 @@ const KINDS = [
 // The other forms' rows, with room for "Date borrowed".
 const ROW =
   "grid-cols-[112px_minmax(0,1fr)] items-center gap-x-3 [&>p]:col-start-2";
+/** Each row sent, with its place in the list, so a row's error can mark it. */
+type Sent = { r: Row; index: number }[];
+
 const blankRow: Row = {
   paymentId: null,
   dueDate: "",
@@ -148,6 +157,12 @@ export function LoanDialog({
   const create = useCreateLoan();
   const update = useUpdateLoan();
   const saving = useRef(false);
+  // A new loan's "Before you add this loan" (LOAN-10), waiting for Add this loan anyway.
+  const [checking, setChecking] = useState<{
+    preview: LoanPreview;
+    fields: LoanFields;
+    sent: Sent;
+  } | null>(null);
   // On a loan the user already has, rows before the day it's added are paid before (§4.6).
   const cutoff = loan?.addedOn ?? today;
 
@@ -194,36 +209,13 @@ export function LoanDialog({
     setValue("isNew", next);
   };
 
-  const save = async (v: Values) => {
+  // Runs a save step; the backend's errors show on the form.
+  const attempt = async (sent: Sent, step: () => Promise<void>) => {
     if (saving.current) return;
     saving.current = true;
     setRowsError(null);
-    const sent = v.payments
-      .map((r, index) => ({ r, index }))
-      .filter(({ r }) => !r.paidOn);
     try {
-      const fields = {
-        name: v.name,
-        // Empty choices go as 0, for the backend to name.
-        accountId: Number(v.accountId) || 0,
-        categoryId: Number(v.categoryId) || 0,
-        amountBorrowed: v.amountBorrowed,
-        borrowedOn: v.borrowedOn.trim() || null,
-        payments: sent.map(({ r }) => ({
-          id: r.paymentId,
-          dueDate: r.dueDate,
-          amount: r.amount ?? 0,
-        })),
-      };
-      if (loan) {
-        await update.mutateAsync({ id: loan.id, loan: fields });
-        notify.success("Saved");
-      } else {
-        // Task 12 (LOAN-10): a new loan shows "Before you add this loan" before this save.
-        await create.mutateAsync({ isNew: v.isNew === "new", ...fields });
-        notify.success("Loan added");
-      }
-      onClose();
+      await step();
     } catch (error) {
       const detail = error instanceof ApiError ? error.detail : null;
       if (detail?.code === "validation" && detail.field === "payments") {
@@ -236,6 +228,44 @@ export function LoanDialog({
     } finally {
       saving.current = false;
     }
+  };
+
+  const add = (fields: LoanFields, isNewLoan: boolean, sent: Sent) =>
+    attempt(sent, async () => {
+      await create.mutateAsync({ isNew: isNewLoan, ...fields });
+      notify.success("Loan added");
+      onClose();
+    });
+
+  const save = (v: Values) => {
+    const sent = v.payments
+      .map((r, index) => ({ r, index }))
+      .filter(({ r }) => !r.paidOn);
+    const fields = {
+      name: v.name,
+      // Empty choices go as 0, for the backend to name.
+      accountId: Number(v.accountId) || 0,
+      categoryId: Number(v.categoryId) || 0,
+      amountBorrowed: v.amountBorrowed,
+      borrowedOn: v.borrowedOn.trim() || null,
+      payments: sent.map(({ r }) => ({
+        id: r.paymentId,
+        dueDate: r.dueDate,
+        amount: r.amount ?? 0,
+      })),
+    };
+    if (loan)
+      return attempt(sent, async () => {
+        await update.mutateAsync({ id: loan.id, loan: fields });
+        notify.success("Saved");
+        onClose();
+      });
+    // A loan the user already has is saved at once (F12 step 2).
+    if (v.isNew === "existing") return add(fields, false, sent);
+    return attempt(sent, async () => {
+      const preview = await previewLoan({ payments: fields.payments });
+      setChecking({ preview, fields, sent });
+    });
   };
 
   const money = (amount: number) => formatMoney(amount, settings);
@@ -480,7 +510,73 @@ export function LoanDialog({
             </Button>
           </DialogFooter>
         </form>
+        <ConfirmDialog
+          open={checking !== null}
+          onOpenChange={(open) => !open && setChecking(null)}
+          title="Before you add this loan"
+          message={
+            checking && (
+              <WhatItWouldDo
+                preview={checking.preview}
+                today={today}
+                money={money}
+              />
+            )
+          }
+          cancelLabel="Go back"
+          confirmLabel="Add this loan anyway"
+          destructive
+          onConfirm={() =>
+            checking && void add(checking.fields, true, checking.sent)
+          }
+        />
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** "Before you add this loan" (F12 step 2, LOAN-10), from `preview_loan`. */
+function WhatItWouldDo({
+  preview: p,
+  today,
+  money,
+}: {
+  preview: LoanPreview;
+  today: string;
+  money: (minor: number) => string;
+}) {
+  const after = p.debtFreeAfter && formatLongDate(p.debtFreeAfter);
+  return (
+    // Inside the dialog's description, a <p>, so every line is a block <span>.
+    <span className="grid gap-2">
+      {after && (
+        <span className="block">
+          {p.debtFreeBefore === null
+            ? `You'd be debt-free on ${after}.`
+            : p.daysLater === 0
+              ? `Your debt-free date stays ${after}.`
+              : `Your debt-free date moves from ${formatLongDate(p.debtFreeBefore)} to ${after}.`}
+        </span>
+      )}
+      {p.safeBefore !== null && p.safeAfter !== null && (
+        <span className="block tabular-nums">
+          {p.safeAfter === p.safeBefore
+            ? `Safe to spend stays ${money(p.safeBefore)}.`
+            : `Safe to spend drops from ${money(p.safeBefore)} to ${money(p.safeAfter)}.`}
+        </span>
+      )}
+      {p.windows.map(
+        (w) =>
+          w.shortBy !== null && (
+            <span
+              key={w.start}
+              className="flex items-center gap-1 font-semibold text-danger tabular-nums"
+            >
+              <TriangleAlert aria-hidden className="size-3.5 shrink-0" />
+              {`${formatSpan(w.start, w.end, today)} would run short by ${money(w.shortBy)}.`}
+            </span>
+          ),
+      )}
+    </span>
   );
 }

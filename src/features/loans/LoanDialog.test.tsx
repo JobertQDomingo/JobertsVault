@@ -7,6 +7,7 @@ import {
   CATEGORIES,
   DEFAULTS,
   LOAN_CATEGORIES,
+  LOAN_PREVIEW,
   LOANS,
 } from "@/test/fixtures";
 import { renderRoute, type Answers } from "@/test/render";
@@ -27,6 +28,7 @@ const ANSWERS: Answers = {
     ...loan,
   }),
   update_loan: () => LOANS.loans[0],
+  preview_loan: LOAN_PREVIEW,
 };
 
 const calls = (command: string) =>
@@ -44,6 +46,12 @@ const type = (name: string, text: string, role = "textbox") =>
 const validation = (field: string, message: string) => () => {
   throw { code: "validation", field, message };
 };
+
+// A new loan's Save first shows "Before you add this loan" (LOAN-10).
+const addAnyway = async () =>
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Add this loan anyway" }),
+  );
 
 async function openAdd(answers: Answers = ANSWERS) {
   renderRoute("/debt-free", answers);
@@ -162,6 +170,8 @@ test("Save sends the loan and its rows, empty optional fields as none, and says 
   );
   await screen.findByText("Loan added");
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  // A loan the user already has skips "Before you add this loan" (F12 step 2).
+  expect(calls("preview_loan")).toEqual([]);
 });
 
 test.each([
@@ -174,6 +184,8 @@ test.each([
   async (field, label, message) => {
     await openAdd({ ...ANSWERS, create_loan: validation(field, message) });
     fireEvent.click(dialog().getByRole("button", { name: "Add loan" }));
+    // The backend checks everything else only on the save after the confirm.
+    await addAnyway();
     const input = await waitFor(() => {
       const el = dialog().getByLabelText(label);
       expect(el.getAttribute("aria-invalid")).toBe("true");
@@ -194,6 +206,7 @@ test("a row's error shows under the list and marks the row it names", async () =
   });
   fireEvent.click(dialog().getByRole("button", { name: "Add payment" }));
   fireEvent.click(dialog().getByRole("button", { name: "Add loan" }));
+  await addAnyway();
   await dialog().findByText("Payment 2: enter an amount above 0");
   expect(
     dialog()
@@ -268,4 +281,90 @@ test("editing: a row's error names it among the rows sent, so it marks the right
       .getByRole("textbox", { name: "Payment 3 date" })
       .getAttribute("aria-invalid"),
   ).toBe("true");
+});
+
+test("a new loan first shows Before you add this loan from its typed rows, and Go back returns to the form (LOAN-10)", async () => {
+  await openAdd();
+  type("Name", "E-wallet loan");
+  type("Payment 1 date", "12/15/2026");
+  fireEvent.blur(dialog().getByRole("textbox", { name: "Payment 1 date" }));
+  type("Payment 1 amount", "1000");
+  fireEvent.click(dialog().getByRole("button", { name: "Add loan" }));
+  const check = within(
+    await screen.findByRole("dialog", { name: "Before you add this loan" }),
+  );
+  expect(calls("preview_loan")).toEqual([
+    {
+      draft: {
+        payments: [{ id: null, dueDate: "2026-12-15", amount: 100000 }],
+      },
+    },
+  ]);
+  check.getByText(
+    "Your debt-free date moves from Sun, Mar 28, 2027 to Wed, May 5, 2027.",
+  );
+  check.getByText("Safe to spend drops from ₱8,400.00 to ₱7,400.00.");
+  const short = check.getByText(/would run short by ₱180\.00\./);
+  expect(short.className).toContain("text-danger");
+  // Only the window it makes short is named.
+  expect(check.queryByText(/Dec 15–29/)).toBeNull();
+  expect(
+    check.getByRole("button", { name: "Add this loan anyway" }).className,
+  ).toContain("bg-danger");
+
+  fireEvent.click(check.getByRole("button", { name: "Go back" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "Before you add this loan" }),
+    ).toBeNull(),
+  );
+  screen.getByRole("dialog", { name: "Add loan" });
+  expect(value("Name")).toBe("E-wallet loan");
+  expect(calls("create_loan")).toEqual([]);
+});
+
+test("Add this loan anyway saves it as a new loan", async () => {
+  await openAdd();
+  type("Payment 1 date", "12/15/2026");
+  fireEvent.blur(dialog().getByRole("textbox", { name: "Payment 1 date" }));
+  type("Payment 1 amount", "1000");
+  fireEvent.click(dialog().getByRole("button", { name: "Add loan" }));
+  await addAnyway();
+  await screen.findByText("Loan added");
+  expect(calls("create_loan")).toMatchObject([
+    {
+      loan: {
+        isNew: true,
+        payments: [{ id: null, dueDate: "2026-12-15", amount: 100000 }],
+      },
+    },
+  ]);
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+});
+
+test("with nothing owed and no payday rule, the confirm says when you'd be debt-free and nothing about Safe to spend", async () => {
+  await openAdd({
+    ...ANSWERS,
+    preview_loan: {
+      ...LOAN_PREVIEW,
+      debtFreeBefore: null,
+      safeBefore: null,
+      safeAfter: null,
+      windows: [],
+    },
+  });
+  fireEvent.click(dialog().getByRole("button", { name: "Add loan" }));
+  await screen.findByText("You'd be debt-free on Wed, May 5, 2027.");
+  expect(screen.queryByText(/Safe to spend/)).toBeNull();
+});
+
+test("a row the preview refuses shows under the list, with no confirm", async () => {
+  await openAdd({
+    ...ANSWERS,
+    preview_loan: validation("payments", "Payment 1: enter a real date"),
+  });
+  fireEvent.click(dialog().getByRole("button", { name: "Add loan" }));
+  await dialog().findByText("Payment 1: enter a real date");
+  expect(screen.queryByText("Before you add this loan")).toBeNull();
+  expect(calls("create_loan")).toEqual([]);
 });

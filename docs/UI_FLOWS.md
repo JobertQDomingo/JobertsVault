@@ -595,3 +595,12 @@ Answered on 2026-11-16 (Phase 4, the Forecast screen):
 43. **Received pay shows its date** ("₱10,500.00 received Nov 15"), since one row can hold two payslips: one recorded early, or two paydays in the Months view's first month (§8.6, DATA_MODEL §9 item 81).
 44. **The current row starts today** in the Pay windows view too, though its window started on the last payday (§8.6).
 45. **"Whose bills are more than its pay"** is left out of the held-back line. Money can also be held back for a bill due before the pay in the same window, where the clause isn't true. The Forecast's top panel is the dashboard's card as it is, without its View forecast link (§8.6).
+
+Answered on 2026-11-16 (Phase 4, Before you borrow):
+
+46. **Before you borrow lists every pay window it changes**, in a list that scrolls inside the panel, since what's left carries from window to window: every window from the first payment on changes. A window it makes short reads "Dec 25, 2026 – Jan 24, 2027 would run short by ₱991.23" in `--danger` with an icon, as in the preview. "Before you add this loan" names only the short ones (F12, F15).
+47. **Which windows are short, and the days later,** come from `preview_loan` (`shortBy`, `daysLater`), like the Forecast's `short` (item 40). A window that runs short without the loan isn't blamed on it (DATA_MODEL §9 item 82).
+48. **When nothing moves**, the panel says "(same day)" and the confirm "Your debt-free date stays Mon, Jun 28, 2027." With nothing owed before, the panel starts from "today" and the confirm says "You'd be debt-free on Fri, Oct 15, 2027." With no payday rule, the Safe to spend lines are left out (F12, F15).
+49. **Before you borrow sits beside Loans**, half width each (item 29), and is left out with no loans at all, when the screen is one empty state (§8.5).
+50. **The first payment starts a month from today**, a form default the user can change. Blank fields go to the backend as 0 or empty, so its message shows under the field. Changing a field clears the result and its errors, so nothing shown is for other values, and Try it with the same values asks again (F15).
+51. **"Before you add this loan" opens over the Add loan form**, so Go back returns to it as it was. The other fields are checked when Add this loan anyway saves, and an error there shows on the form (F12).

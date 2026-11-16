@@ -5,8 +5,10 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::domain::budget::used_percent;
+use crate::domain::forecast::{self, Direction, Movement, PayWindow, Source};
 use crate::domain::money::Money;
 use crate::domain::period::{Period, PeriodKind, PeriodSettings};
+use crate::domain::recurrence::{Frequency, Schedule};
 
 /// One loan payment, as the figures read it (DATA_MODEL §4.6).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -119,13 +121,14 @@ pub fn summary(
         .iter()
         .any(|f| f.interest.is_some())
         .then(|| total(each.iter().filter_map(|f| f.interest)));
-    let debt_free_on = loans
-        .iter()
-        .flat_map(|l| l.payments)
-        .filter(|p| p.paid.is_none())
-        .map(|p| p.due_date)
-        .max()
-        .map(|last| last.max(today));
+    let debt_free_on = debt_free_on(
+        loans
+            .iter()
+            .flat_map(|l| l.payments)
+            .filter(|p| p.paid.is_none())
+            .map(|p| p.due_date),
+        today,
+    );
     let freed_up = match debt_free_on {
         Some(last) => freed_up(loans, today, last, settings)?,
         None => Vec::new(),
@@ -206,6 +209,113 @@ pub fn move_first(dues: &[(i64, Money)], balance: impl Fn(i64) -> Money) -> Vec<
             (share > 0).then_some(Money(share))
         })
         .collect()
+}
+
+/// What a loan the user is thinking about would do (LOAN-9, LOAN-10, DATA_MODEL §5.16).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LoanPreview {
+    /// None when nothing is left: debt-free today.
+    pub debt_free_before: Option<NaiveDate>,
+    pub debt_free_after: Option<NaiveDate>,
+    /// After less before (today when nothing is left), in days.
+    #[ts(type = "number")]
+    pub days_later: i64,
+    /// None with no payday rule (§5.15).
+    pub safe_before: Option<Money>,
+    pub safe_after: Option<Money>,
+    /// Every pay window, in order.
+    pub windows: Vec<PreviewWindow>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct PreviewWindow {
+    pub start: NaiveDate,
+    pub end: NaiveDate,
+    pub left_before: Money,
+    pub left_after: Money,
+    /// With the loan, it runs short by this (§5.15). None when it doesn't, or does anyway.
+    pub short_by: Option<Money>,
+}
+
+/// `count` monthly payments of `amount` from `first`, as a monthly rule's dates (§4.1): the
+/// day is `first`'s, clamped to the month's end. None past chrono's range.
+pub fn monthly_payments(amount: Money, count: u32, first: NaiveDate) -> Option<Vec<Payment>> {
+    let schedule = Schedule {
+        frequency: Frequency::Monthly,
+        interval: 1,
+        start: first,
+        end: None,
+        max_occurrences: None,
+    };
+    (0..count)
+        .map(|n| {
+            Some(Payment {
+                due_date: schedule.occurrence(n)?,
+                amount,
+                paid: None,
+            })
+        })
+        .collect()
+}
+
+/// The draft's payments added as unpaid payments of an active loan, saving nothing: the
+/// debt-free date (§5.11) from `debt_free_before`, and the forecast (§5.15) run again with
+/// them. `windows` is empty with no payday rule.
+pub fn preview(
+    debt_free_before: Option<NaiveDate>,
+    draft: &[Payment],
+    today: NaiveDate,
+    money_now: Money,
+    windows: &[PayWindow],
+    movements: &[Movement],
+) -> LoanPreview {
+    let debt_free_after = debt_free_on(
+        draft.iter().map(|p| p.due_date).chain(debt_free_before),
+        today,
+    );
+    let mut with_loan = movements.to_vec();
+    with_loan.extend(draft.iter().map(|p| Movement {
+        date: p.due_date,
+        amount: p.amount,
+        direction: Direction::Out,
+        // Only labels read the id, and the preview has none; stored ids start at 1.
+        source: Source::Loan(0),
+    }));
+    let before = forecast::forecast(money_now, today, windows, movements);
+    let after = forecast::forecast(money_now, today, windows, &with_loan);
+    let rows = before
+        .iter()
+        .zip(&after)
+        .flat_map(|(b, a)| b.rows.iter().zip(&a.rows));
+    LoanPreview {
+        debt_free_before,
+        debt_free_after,
+        days_later: debt_free_after.map_or(0, |after| {
+            (after - debt_free_before.unwrap_or(today)).num_days()
+        }),
+        safe_before: before.as_ref().map(|f| f.safe_to_spend),
+        safe_after: after.as_ref().map(|f| f.safe_to_spend),
+        windows: rows
+            .map(|(b, a)| PreviewWindow {
+                start: a.start,
+                end: a.end,
+                left_before: b.left,
+                left_after: a.left,
+                // Only a window the loan makes short: one short anyway isn't blamed on it.
+                short_by: (a.short_on.is_some() && b.short_on.is_none())
+                    .then(|| Money(a.low.0.saturating_neg())),
+            })
+            .collect(),
+    }
+}
+
+/// The latest unpaid due date, or today when that has passed (an overdue payment is due today).
+fn debt_free_on(unpaid: impl Iterator<Item = NaiveDate>, today: NaiveDate) -> Option<NaiveDate> {
+    unpaid.max().map(|last| last.max(today))
 }
 
 /// Whole percent rounded down, 100 once nothing is left.
@@ -601,5 +711,179 @@ mod tests {
     fn move_first_below_zero_also_covers_what_the_account_lacks() {
         // Moving ₱1,100 pays ₱1,000 without taking the account further below 0.
         assert_eq!(shares(&[(1, -10_000)], &[(1, 100_000)]), [Some(110_000)]);
+    }
+
+    // Before you borrow (LOAN-9, LOAN-10, DATA_MODEL §5.16).
+
+    fn dates(payments: &[Payment]) -> Vec<NaiveDate> {
+        payments.iter().map(|p| p.due_date).collect()
+    }
+
+    #[test]
+    fn monthly_payments_keep_the_first_payments_day_clamped_to_the_month_end() {
+        let payments = monthly_payments(Money(100_000), 3, d(2027, 1, 31)).expect("in range");
+        assert_eq!(
+            dates(&payments),
+            [d(2027, 1, 31), d(2027, 2, 28), d(2027, 3, 31)]
+        );
+        assert!(
+            payments
+                .iter()
+                .all(|p| p.amount == Money(100_000) && p.paid.is_none())
+        );
+        let leap = monthly_payments(Money(1), 2, d(2028, 1, 31)).expect("in range");
+        assert_eq!(dates(&leap), [d(2028, 1, 31), d(2028, 2, 29)]);
+        assert_eq!(
+            dates(&monthly_payments(Money(1), 1, d(2026, 12, 18)).expect("in range")),
+            [d(2026, 12, 18)]
+        );
+    }
+
+    /// Paydays on the 15th and 30th: Nov 15–29, Nov 30 – Dec 14 and Dec 15–29.
+    fn three_windows() -> Vec<PayWindow> {
+        vec![
+            PayWindow {
+                start: d(2026, 11, 15),
+                end: d(2026, 11, 29),
+            },
+            PayWindow {
+                start: d(2026, 11, 30),
+                end: d(2026, 12, 14),
+            },
+            PayWindow {
+                start: d(2026, 12, 15),
+                end: d(2026, 12, 29),
+            },
+        ]
+    }
+
+    fn moving(date: NaiveDate, amount: i64, direction: Direction) -> Movement {
+        Movement {
+            date,
+            amount: Money(amount),
+            direction,
+            source: Source::Recurring(1),
+        }
+    }
+
+    /// ₱100.00 now and ₱50.00 of pay on Nov 30, with nothing owed before.
+    fn try_it(before: Option<NaiveDate>, draft: &[Payment], movements: &[Movement]) -> LoanPreview {
+        let mut all = vec![moving(d(2026, 11, 30), 5_000, Direction::In)];
+        all.extend_from_slice(movements);
+        preview(
+            before,
+            draft,
+            today(),
+            Money(10_000),
+            &three_windows(),
+            &all,
+        )
+    }
+
+    fn lefts(p: &LoanPreview) -> Vec<(i64, i64, Option<i64>)> {
+        p.windows
+            .iter()
+            .map(|w| (w.left_before.0, w.left_after.0, w.short_by.map(|m| m.0)))
+            .collect()
+    }
+
+    #[test]
+    fn preview_moves_the_debt_free_date_by_the_days_between() {
+        let p = try_it(Some(d(2027, 8, 10)), &[unpaid(d(2027, 10, 15), 1_000)], &[]);
+        assert_eq!(p.debt_free_before, Some(d(2027, 8, 10)));
+        assert_eq!(p.debt_free_after, Some(d(2027, 10, 15)));
+        assert_eq!(p.days_later, 66);
+    }
+
+    #[test]
+    fn preview_with_nothing_left_counts_from_today() {
+        let p = try_it(None, &[unpaid(d(2026, 12, 15), 1_000)], &[]);
+        assert_eq!(p.debt_free_before, None);
+        assert_eq!(p.debt_free_after, Some(d(2026, 12, 15)));
+        assert_eq!(p.days_later, 30);
+    }
+
+    #[test]
+    fn preview_inside_the_current_debt_free_date_is_zero_days_later() {
+        let p = try_it(Some(d(2027, 8, 10)), &[unpaid(d(2026, 12, 15), 1_000)], &[]);
+        assert_eq!(p.debt_free_after, Some(d(2027, 8, 10)));
+        assert_eq!(p.days_later, 0);
+    }
+
+    #[test]
+    fn preview_lowers_each_window_from_the_first_payment_and_marks_the_short_ones() {
+        // ₱160.00 on Dec 1: Nov 30 – Dec 14 drops to −₱10.00, and so does every later window.
+        let p = try_it(None, &[unpaid(d(2026, 12, 1), 16_000)], &[]);
+        assert_eq!(p.safe_before, Some(Money(10_000)));
+        assert_eq!(p.safe_after, Some(Money::ZERO));
+        assert_eq!(
+            lefts(&p),
+            [
+                (10_000, 10_000, None),
+                (15_000, -1_000, Some(1_000)),
+                (15_000, -1_000, Some(1_000))
+            ]
+        );
+        assert_eq!(
+            (p.windows[1].start, p.windows[1].end),
+            (d(2026, 11, 30), d(2026, 12, 14))
+        );
+    }
+
+    #[test]
+    fn preview_never_blames_the_loan_for_a_window_already_short() {
+        // ₱120.00 due Nov 20 already runs Nov 15–29 short by ₱20.00; the loan comes later.
+        let bill = [moving(d(2026, 11, 20), 12_000, Direction::Out)];
+        let p = try_it(None, &[unpaid(d(2026, 12, 1), 1_000)], &bill);
+        assert_eq!(p.safe_before, Some(Money::ZERO));
+        assert_eq!(p.safe_after, Some(Money::ZERO));
+        assert_eq!(
+            lefts(&p),
+            [
+                (-2_000, -2_000, None),
+                (3_000, 2_000, None),
+                (3_000, 2_000, None)
+            ]
+        );
+    }
+
+    #[test]
+    fn preview_never_names_a_window_short_without_the_loan_even_when_it_gets_shorter() {
+        // ₱120.00 due Nov 20 runs Nov 15–29 short by ₱20.00; ₱50.00 on Nov 25 makes it ₱70.00.
+        let bill = [moving(d(2026, 11, 20), 12_000, Direction::Out)];
+        let p = try_it(None, &[unpaid(d(2026, 11, 25), 5_000)], &bill);
+        assert_eq!(lefts(&p)[0], (-2_000, -7_000, None));
+    }
+
+    #[test]
+    fn preview_counts_an_overdue_draft_payment_as_due_today() {
+        let p = try_it(None, &[unpaid(d(2026, 11, 1), 4_000)], &[]);
+        assert_eq!(p.debt_free_after, Some(today()));
+        assert_eq!(p.days_later, 0);
+        assert_eq!(p.safe_after, Some(Money(6_000)));
+        assert_eq!(lefts(&p)[0], (10_000, 6_000, None));
+    }
+
+    #[test]
+    fn preview_past_the_horizon_moves_only_the_debt_free_date() {
+        let p = try_it(None, &[unpaid(d(2028, 1, 15), 50_000)], &[]);
+        assert_eq!(p.debt_free_after, Some(d(2028, 1, 15)));
+        assert_eq!(p.safe_before, p.safe_after);
+        assert!(p.windows.iter().all(|w| w.left_before == w.left_after));
+    }
+
+    #[test]
+    fn preview_without_windows_has_no_safe_to_spend() {
+        let p = preview(
+            None,
+            &[unpaid(d(2026, 12, 1), 1_000)],
+            today(),
+            Money(10_000),
+            &[],
+            &[],
+        );
+        assert_eq!((p.safe_before, p.safe_after), (None, None));
+        assert!(p.windows.is_empty());
+        assert_eq!(p.debt_free_after, Some(d(2026, 12, 1)));
     }
 }

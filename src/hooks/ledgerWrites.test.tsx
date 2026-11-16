@@ -449,6 +449,7 @@ const READS = [
   "useBudgets",
   "useGoals",
   "useLoans",
+  "useLoanPreview",
   "useSettings",
 ];
 
