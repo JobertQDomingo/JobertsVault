@@ -242,7 +242,7 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 | **Categories** | Two lists (Income and Expense). Add, rename, change color (12 swatches) and icon (curated list), reorder, archive, unarchive, **merge**, delete if unused | CAT-2, CAT-4 |
 | **Payment methods** | Add, rename, reorder, archive, unarchive, delete if unused | TXN-7 |
 | **Backup** (Phase 2) | **Back up now** (BAK-1, F9). **Restore from backup…** (BAK-4). **Export to CSV**, with From and To dates, from the start of this month to today by default (BAK-6). The backup folder with **Change…**, and a switch for the daily automatic backup (SET-3). The date of the last backup, and the warning when it's more than 7 days old (BAK-7). | BAK-1 to BAK-4, BAK-6, BAK-7, SET-3 |
-| **Appearance** (Phase 5) | Theme: system / light / dark, and a **Reduce transparency** switch | SET-5, SET-8 |
+| **Appearance** (Phase 5) | **Theme:** System, Light or Dark (`?tab=appearance`). It changes the whole window at once, title bar included. A **Reduce transparency** switch | SET-5, SET-8 |
 
 Changes to settings save **immediately**, with a "Saved" toast. There's no Save button.
 

@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::error::AppError;
 use crate::services::settings::{Settings, SettingsView};
@@ -12,9 +12,11 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<SettingsView, AppError
 
 #[tauri::command(async)]
 pub fn update_settings(
+    app: AppHandle,
     state: State<'_, AppState>,
     settings: Settings,
 ) -> Result<SettingsView, AppError> {
     services::settings::update(&mut *state.conn()?, settings)
+        .inspect(|saved| crate::apply_theme(&app, saved.settings.theme))
         .inspect_err(|err| log::record(&state.log_path, err))
 }

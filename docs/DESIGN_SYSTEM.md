@@ -179,7 +179,8 @@ Categories store a palette key, not a hex code (DATA_MODEL §3.2), so they switc
 ```
 
 - The aurora is one component, `<AuroraBackground>`, rendered once behind the app shell.
-- **Dark mode** is the `.dark` class on `<html>`. **From Phase 1**, it follows the Windows setting through the `prefers-color-scheme` media query, and it changes while the app is open. Phase 5 adds the theme switch (SET-5).
+- **Dark mode** is the `.dark` class on `<html>`. `lib/theme.ts` sets it from the `prefers-color-scheme` media query, and changes it while the app is open. **From Phase 1**, that follows the Windows setting.
+- **The theme switch** (SET-5, Phase 5) is in Settings → Appearance: System, Light or Dark, stored as `theme`. Rust gives the window that theme (`set_theme`), and WebView2 reports it as `prefers-color-scheme`, so the CSS and `lib/theme.ts` are unchanged and the title bar matches. System hands the window back to Windows, so it follows a change made while the app is open. Rust applies it at startup before the page loads, after every save and after a restore, so the first paint already has the right theme (measured 2026-11-17: `main.tsx` ran before the first paint in every launch). Nothing in the frontend stores or works out the theme, and there's no `next-themes`.
 
 ---
 
@@ -438,5 +439,6 @@ Glass costs graphics power, so these rules keep the app smooth:
 | 2026-11-06 | Income-vs-expense bars go up for income and down for expense, so the chart never relies on green versus red alone |
 | 2026-11-13 | Phase 4: the `danger` banner for an overdue loan payment, the Debt-free and Forecast sidebar icons, and the `SafeToSpendCard`, `LoanCard` and `ForecastRow` components. Safe to spend is shown in `--foreground`, never green. |
 | 2026-11-16 | Phase 4: the `SpendLevelTag` states and the warning toast (CC-10, CC-11) |
+| 2026-11-17 | The theme switch (SET-5) sets the window's theme from Rust rather than the class from a frontend copy of the setting, so the first paint and the title bar are right too (§3.5) |
 | 2026-11-17 | Phase 5: the check-in is a full-window screen with one glass panel, never a dialog, so the forms it opens aren't glass inside glass (§2.3, ADR 0012) |
 | 2026-11-17 | Phase 5: the `StepIndicator`, `StatHexagon`, `LevelBadge` (and the sidebar's level chip), `LevelPath`, `FocusStrip` and focus offer card, the Level sidebar icon, and the level-up moment, the only animation longer than 200 ms. They use existing tokens only: the level is always `--primary`, never gold or a color of its own, and no stat has its own color. |

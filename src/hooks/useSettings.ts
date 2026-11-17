@@ -26,8 +26,10 @@ export function useUpdateSettings() {
     // One at a time, each built on the one before: a quick second change keeps the first, and a
     // refused one isn't carried into the next.
     scope: { id: "settings" },
-    onSuccess: (saved) => {
+    onSuccess: (saved, change) => {
       client.setQueryData(queryKeys.settings, saved);
+      // The theme is only the look: Rust has already given it to the window.
+      if (Object.keys(change).every((key) => key === "theme")) return;
       // The week start and month start day change the totals (ARCHITECTURE §5.2).
       return client.invalidateQueries({ queryKey: queryKeys.ledger });
     },
