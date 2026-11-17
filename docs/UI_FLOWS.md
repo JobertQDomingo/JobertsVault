@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Approved v1.2 |
+| **Status** | Approved v1.3 |
 | **Style** | Glassmorphism 2.0 ([DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)) |
-| **Last updated** | 2026-11-13 |
+| **Last updated** | 2026-11-17 |
 | **Related docs** | [PRD.md](PRD.md), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), [ARCHITECTURE.md](ARCHITECTURE.md) §5.4 (routes) |
 
 The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors, glass levels and components come from DESIGN_SYSTEM.md. [design/ui-flows.html](design/ui-flows.html) shows every screen drawn in the real style, with consistent ₱ sample data. Open it in a browser.
@@ -27,6 +27,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
 │ │ ⚑ Goals     (P3) │                     (page content)                              │
 │ │ ¤ Debt-free (P4) │                                                                 │
 │ │ ◷ Forecast  (P4) │                                                                 │
+│ │ ⬡ Level     (P5) │                                                                 │
 │ │ ──────────────── │                                                                 │
 │ │ ⚙ Settings       │                                                                 │
 │ ╰──────────────────╯                                                                 │
@@ -34,7 +35,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
 ```
 
 - **Material:** every rounded box is a frosted glass panel (Level 1) floating **12 px** apart over the aurora. Dialogs, menus, the date picker and toasts are raised glass (Level 2). Text never sits straight on the aurora. See DESIGN_SYSTEM §2.
-- **Sidebar:** a glass panel with the app mark and name at the top, the screens in the middle and Settings at the bottom. The current screen gets a soft indigo tint. Items from later phases are **hidden** until their phase is built.
+- **Sidebar:** a glass panel with the app mark and name at the top, the screens in the middle and Settings at the bottom. The current screen gets a soft indigo tint. Items from later phases are **hidden** until their phase is built. From Phase 5, a **level chip** sits to the right of the app name: "Lv 4" inside a small ring that fills as the next level's conditions are met (LVL-5). Clicking it opens `/level`. While the status loads, the chip isn't shown.
 - **Top bar:** a glass panel with the page title on the left. The **"+ Add" button** (Ctrl+N) is always on the right and opens quick-add on every screen.
 - **Period bar:** on screens with a period, the period switcher is its own small glass toolbar under the top bar.
 - **Window:** a fixed **1440 × 900**. It can't be resized or maximized, so the title bar has minimize and close only. It opens centered on the main monitor. If 1440 × 900 doesn't fit, it opens at 1280 × 800 with the same layout zoomed to 88.9%. The sidebar and top bar stay in place, and the content below the top bar scrolls.
@@ -95,6 +96,9 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
     - **View forecast** in its header, to `/forecast`
     - With no payday rule: "Mark your pay as a payday to see what's safe to spend." with **Open Recurring**
   - **"Loans left: ₱14,000.00 · debt-free Aug 10, 2027"** under the net balance in Accounts, linking to `/debt-free`. When everything left is overdue, it says "Loans left: ₱1,000.00 · all overdue" in `--danger` instead of a date already passed, like the Debt-free screen (§8.5). It's hidden when nothing is left (LOAN-11).
+- **Phase 5:**
+  - a **focus strip** between the banners and the stat cards, shown only while a focus is active (CHK-8). It's one slim glass panel with one row per active focus, the month's first: "This week's focus: Keep Dining Out under ₱1,500.00 · ₱640.00 so far" with a `ProgressBar`, amber from 80% and red past the target (its state, DATA_MODEL §5.22). A focus that isn't a cap shows its own progress: "Stay under your ₱4,000.00 mid level · ₱2,310.00 this cycle", "Pay E-wallet loan by Fri, Nov 20 · not paid yet" (or "· paid Nov 18"), "Log on 5 days this week · 3 so far". Clicking it opens `/level`. It's for today, like the balances, whatever the period switcher shows. The strip is one more glass panel on the screen with the most of them, so its task counts the dashboard's blurred panels with every banner showing (DESIGN_SYSTEM §11). If the strip takes it past the budget, the same rows go flat at the top of the Safe to spend card instead.
+  - the dashboard is never shown while a check-in is due: the app opens on `/check-in` instead (§8.7).
 
 ---
 
@@ -271,7 +275,7 @@ Changes to settings save **immediately**, with a "Saved" toast. There's no Save 
 - **Duplicate:** ⧉ on the row opens the form already filled in with **today's** date → Save.
 - **Delete:** click the row → **Delete** → confirm.
 
-### F5: First launch (Phase 1 basic version ONB-1, Phase 5 polished version ONB-2)
+### F5: First launch (Phase 1, ONB-1)
 
 ```
 Welcome to Jobert's Vault
@@ -281,7 +285,7 @@ Welcome to Jobert's Vault
   Step 3  [Start using the app]
 ```
 
-- The **Phase 1** version is a plain form, because the currency must be set before the first transaction. **Phase 5** adds polish: a step indicator and a short tour.
+- The **Phase 1** version is a plain form, because the currency must be set before the first transaction. It stays a plain form: the polished version with a tour (ONB-2) was dropped on 2026-11-17 (PRD §14).
 - It can be skipped ("Set up later"). Every setting can be changed later in Settings.
 - It lives at `/welcome`. **Start using the app** or **Set up later** ends it for good (`onboarding_completed`). Closing the app before choosing either one shows it again on the next launch.
 
@@ -364,6 +368,21 @@ Welcome to Jobert's Vault
 4. Below the soft level, or at a soft or mid level the card had already reached: it saves as usual. The hard level asks every time, even when the card is already past it.
 5. The card's details show the level under "This cycle" (soft in the muted text color, mid in `--warning` and hard in `--danger`, each with the level's name, and an icon from mid up), and so do its row in the Accounts list and the dashboard's card summary.
 
+### F17: Finish a check-in (Phase 5, CHK-1 to CHK-9)
+1. **It appears by itself.** On Monday (or the first day of a new month), the app opens on the check-in (§8.7) instead of the dashboard. It also appears when the date changes while the app is open, the next time the window gets focus. There's nothing to click to start it, and no way to close or postpone it.
+2. **Go through the steps** with **Next** (Enter) and **Back**. Each step opens with one sentence that sums it up, with the figures below.
+3. **Log something on the way:** **+ Add** (Ctrl+N) opens quick-add over the check-in. After Save, the step's figures update. This is how a balance that doesn't match gets fixed in the Balance check step.
+4. **Act on what's due:** **Pay bill** in the Card step, and **Pay** and **Record now** in the Loans and bills step, open the same forms as the dashboard's banners (F2, F13, F14), over the check-in (CHK-9).
+5. **Pick a focus** in the last step. Nothing is preselected, and **Finish** is disabled until one is chosen.
+6. **Finish** saves the check-in and opens the dashboard, with a "Check-in done" toast. If an account was left as **Doesn't match**, it opens that account's details instead (the first such account in the step's order), with the toast "Check-in done. Check this account against your real balance." Finish sets the check-in query to none before it moves, so the guard doesn't send it back.
+7. **Closing the app before Finish** saves nothing, so the check-in starts again from its first step at the next start.
+
+### F18: A save reaches the focus (Phase 5, CHK-8)
+1. A category cap or spending cap is active, and the user saves an expense that counts toward it.
+2. **It reaches 80% of the target:** it saves, and a warning toast says "Dining Out focus: ₱1,240.00 of ₱1,500.00."
+3. **It goes past the target:** it saves, and the toast says "Dining Out focus: ₱1,720.00, past your ₱1,500.00 target." A spending cap says "Spending focus: …".
+4. The toast shows once for each step up (to near, then to over), never on every save, and never for a save that doesn't raise the focus's state. Nothing is asked and nothing is blocked. A card-level focus has no toast of its own: the card's spending levels already warn (F16).
+
 ### F11: Update the app (Phase 1)
 - **Automatic (the default):** at startup, the app checks for a newer version. "Checking for updates…" appears only if the check takes more than 150 ms. If there's a newer version, "Updating Jobert's Vault to 0.2.0…" appears, and the app closes and reopens on it. There's nothing to click (UPD-1).
 - **No internet, or the check fails:** the app starts normally and shows no error (UPD-2).
@@ -373,7 +392,7 @@ Welcome to Jobert's Vault
 
 ---
 
-## 8. Phase 2–4 screens (outline)
+## 8. Phase 2–5 screens (outline)
 
 ### 8.1 Reports (`/reports`), Phase 2
 - Period switcher plus an **account filter** (RPT-5): All accounts, or one account, with archived ones offered only when already chosen (DESIGN_SYSTEM §9.1). It's kept in the URL (`account=2`), and every section then counts only that account's own rows; a transfer into it counts nowhere (DATA_MODEL §5.2).
@@ -492,6 +511,84 @@ Today in this sketch is Sun, Nov 15, a payday whose payslip is already recorded.
 - **Clicking a row** opens it in place to list its movements, by date: each loan payment (by loan name), card bill ("Credit card payment"), recurring date ("Utilities · Water bill"), future-dated row, and payday ("Salary (expected)"), with its account and a signed amount. Only one row is open at a time.
 - **With no payday rule,** the screen is one empty state: "Mark your pay as a payday to see what's safe to spend." with **Open Recurring**.
 
+### 8.7 Check-in (`/check-in`), Phase 5
+
+A full-window screen with **no sidebar**, shown while a check-in is due (CHK-2). It's a route, like `/welcome`, not a dialog, so quick-add and the pay forms open over it as ordinary dialogs.
+
+```
+┌─ window: aurora background ──────────────────────────────────────────────────────────┐
+│ ╭──────────────────────────────────────────────────────────────────────────────────╮ │
+│ │ ◆ Weekly check-in · Nov 9–15                                    [+ Add  Ctrl+N]  │ │
+│ ╰──────────────────────────────────────────────────────────────────────────────────╯ │
+│         ╭────────────────────────────────────────────────────────────────╮           │
+│         │  ●───●───◉───○───○───○     Step 3 of 6 · Card                  │           │
+│         │                                                                │           │
+│         │  You're past your mid level this cycle.                        │           │
+│         │                                                                │           │
+│         │  ┌─ Credit card ────────────────────────────────────────────┐  │           │
+│         │  │ ₱4,310.00 this cycle          ▲ Mid level                │  │           │
+│         │  │ Soft ₱3,000.00 · Mid ₱4,000.00 · Hard ₱5,000.00          │  │           │
+│         │  │ ₱6,120.00 owed · 61% of your limit · due Sat, Dec 5      │  │           │
+│         │  │                                             [Pay bill]   │  │           │
+│         │  └──────────────────────────────────────────────────────────┘  │           │
+│         │                                                                │           │
+│         │  [Back]                                              [Next ⏎]  │           │
+│         ╰────────────────────────────────────────────────────────────────╯           │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Top bar:** the logo, the title and the period ("Weekly check-in · Nov 9–15", "Monthly check-in · October 2026"), and **+ Add**. There's no close button, and Esc does nothing here. A merged check-in is titled as the monthly one.
+- **The panel** is one Level 1 glass panel, 880 px wide and centered, with the `StepIndicator` (DESIGN_SYSTEM §9.2) at the top, the step's sentence in `h1` size, its figures in flat cards inside the panel, and **Back** (hidden on the first step) and **Next** at the bottom. The last step's button is **Finish**. Enter presses Next, and the step is kept in the URL by name (`?step=card`), so Back and a reload stay put, and a step that appears after a save (Goals, when a goal moves) doesn't move the user.
+- **The steps**, in order (CHK-3). A weekly check-in has 6 to 8 (with a month start day above 1, the first one finished in January can be weekly and still have Your year), and a monthly one 8 or 9:
+
+| Step | When | What it shows |
+|---|---|---|
+| **Start** | Always | The win, when there is one: "Dining Out fell by ₱640.00 from the week before." A personal best under it: "Your lowest-spending week of the last 12." Then the last focus's result: "Last week's focus: keep Dining Out under ₱1,500.00. You spent ₱1,720.00, ₱220.00 over." (or "You kept it: ₱1,180.00."), with a check icon in `--success` or an x icon in `--danger`. With no win and no focus, it says "Here's how last week went." |
+| **Money in and out** | Always | The three stat cards (income, expense, net) with their % change from the period before, the 3 largest expense categories with each one's change, and the budgets for that period as "kept" or "₱30.00 over" |
+| **Card** | Always | Each active card: this cycle's spending with its `SpendLevelTag`, the three levels, the amount owed, % of the limit used and the due date, with **Pay bill** when something is owed (CHK-9). With no active card: "No credit card." |
+| **Loans and bills** | Always | What was paid: "2 loan payments paid, ₱2,000.00." Anything overdue in `--danger`, with **Pay**. "Loans left: ₱14,000.00 · debt-free Aug 10, 2027", and "It moved from Jul 10, 2027." when it changed since the last check-in. Then **Coming up**: the next payday, with **Record now** when it's due or 1–3 days away, the Safe to spend line as on the dashboard card, and the next 3 pay windows as `ForecastRow`s, a short one marked. With no payday rule: "Mark your pay as a payday to see what's coming." |
+| **Goals** | A monthly check-in. A weekly one only when a goal moved or is Behind | Each active goal's `ProgressBar`, with "Now aims for Jul 5, 2027 (was May 5, 2027)" on one that moved by itself, and its Behind line (§8.4). With no goals: "No goals yet." |
+| **Balance check** | A monthly check-in | "Do these match your real accounts?" One row per account with its balance and a segmented control, **Matches** / **Doesn't match**, with neither chosen to start with. **Next** is disabled until every row has an answer. A row set to Doesn't match shows "Add what's missing with + Add. The balance updates here." (CHK-4) |
+| **Your year** | The first check-in finished in January | "2026: you earned ₱310,400.00 and spent ₱288,150.00." with the three figures against the year before, the 3 largest categories, the yearly budgets, the loans paid off, and "You started the year at level 2 and ended it at level 5." (CHK-5) |
+| **Stats and level** | Always | The `StatHexagon` with the six scores beside it, each with its change since the last check-in. The `LevelBadge`: "Level 4 · In the black". When it rose, the badge plays the level-up moment and the sentence is "You reached level 4." When it fell: "Level 2 now: a loan payment is overdue." Under it, the next best move and the two streaks: "4 check-ins in a row on time · 2 focuses kept in a row" (LVL-4, LVL-6, LVL-7) |
+| **Pick a focus** | Always | "Pick one focus for this week." Up to 3 cards, one per offer, each with a sentence and what it's based on: "Keep Dining Out under ₱1,500.00 · that's what you spent the week before", "Spend under ₱3,920.00 this week · your Safe to spend, ₱560.00 a day", "Stay under your ₱5,000.00 hard level this cycle", "Pay E-wallet loan by Fri, Nov 20", "Log on at least 5 days this week". Clicking a card selects it, and ↑ ↓ move between them. **Finish** is disabled until one is selected (CHK-7) |
+
+- **A step with nothing to show** still appears, with one line saying so. Only Goals can come and go, after a save.
+- **The forms** opened by + Add, Pay bill, Pay and Record now are the usual Level 2 dialogs over the screen. When one saves, the check-in's figures reload in place and the step stays where it is.
+- **Loading** is a skeleton of the panel. **An error** is the inline message with Retry (§9). The guard never traps the user behind a failed load: if `get_checkin` fails, the app opens normally and tries again on the next window focus. Until its first answer, a guarded route shows nothing, so the dashboard never flashes before the check-in.
+- **Finish** is F17. A failed save is a toast, and the check-in stays open on its last step.
+
+### 8.8 Level (`/level`), Phase 5
+
+```
+┌─ Vault level ───────────────────────────────────────────────────────────────────────┐
+│  ⬢ 4   Level 4 · In the black                                                       │
+│  ●───●───●───◉───○───○───○───○───○───○                                              │
+│  1   2   3   4   5   6   7   8   9   10                                             │
+│  Next: Level 5 · Steady                                                             │
+│   ○ Earn more than you spend 3 months in a row · 1 of 3 so far                      │
+│   ✓ No pay window runs short in the next 12 months                                  │
+│  Next best move: keep November's spending under your income.                        │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+┌─ Stats ─────────────────────────────────────┐ ┌─ Focus ─────────────────────────────┐
+│        Cashflow                             │ │ This week                           │
+│     Habit  ╱▔▔▔╲  Bills    Cashflow 72 ▲ 6  │ │ Keep Dining Out under ₱1,500.00     │
+│           ▕ ⬡  ▏           Bills   100 —    │ │ ████████░░░░░░ ₱640.00 so far       │
+│   Savings  ╲▁▁▁╱  Card     Card     48 ▼ 10 │ │                                     │
+│          Debt              Debt     40 ▲ 3  │ │ Last 8: ✓ ✓ ✕ ✓ ✓ ✓ ✕ ✓             │
+│                            Savings  22 ▲ 2  │ │ 2 focuses kept in a row             │
+│                            Habit    90 ▲ 5  │ │ 4 check-ins in a row on time        │
+│ Weakest: Savings. Your money covers less    │ │ 52 days since your last new loan    │
+│ than a month of spending.                   │ │                                     │
+└─────────────────────────────────────────────┘ └─────────────────────────────────────┘
+```
+
+- **The top panel** has the `LevelBadge` and name, then the `LevelPath` (DESIGN_SYSTEM §9.2): ten nodes in a row, the finished ones filled with a check, the current one ringed, the later ones hollow with a lock. Hovering or focusing a node shows that level's name and conditions. Under it, the next level's conditions as a checklist, each ticked or not, with its gap where there is one, then the **next best move** (LVL-2 to LVL-4). At level 10 it says "You're at the top level." and the move names the lowest stat. At level 0 the badge reads "Level 0" with no name.
+- **Stats:** the `StatHexagon`, with last check-in's shape as an outline behind it, and the six scores as a list: the name, the score, and `▲ 6`, `▼ 10` or `—` against the last check-in, colored by direction with the arrow, never by color alone. A stat that doesn't apply shows "—" for its score and has no corner. From 3 check-ins on, each row ends with a small trend line of its last 12 snapshots (LVL-8). Under the chart, one sentence gives the lowest stat's reason. Before the first check-in there's no outline and no change column.
+- **Focus:** each active focus as on the dashboard's strip, with its `ProgressBar`. With none: "No focus right now. You'll pick one at your next check-in." Then the **focus record**, the last 8 graded focuses as check and x icons, oldest first, each with a tooltip naming the focus and the result, and the three streaks: focuses kept in a row, check-ins on time in a row, and the loan-free streak (LOAN-8), hidden when it has none.
+- Nothing on this screen can be edited. It has no period switcher: everything is for today.
+- The screen has 3 glass panels, and everything inside them is flat (DESIGN_SYSTEM §2.3).
+
 ---
 
 ## 9. Screen states
@@ -505,6 +602,7 @@ Today in this sketch is Sun, Nov 15, a payday whose payslip is already recorded.
 | **Error loading data** | An inline message with a **Retry** button. Details are in the error log (ARCHITECTURE §4.4). |
 | **App can't start** | A full-window error screen showing the database path and the error, plus **Open data folder** and **Check for updates** (ARCHITECTURE §6, UPD-6) |
 | **Updating** | A centered glass panel with the logo and "Updating Jobert's Vault to 0.2.0…". The rest of the app isn't shown yet. |
+| **Check-in due** (Phase 5) | The check-in fills the window, with no sidebar, until it's finished (§8.7). Only + Add and the forms it offers open over it. |
 | **Transparency off** (Windows setting) | The same screens with solid panels and no blur. The aurora and layout stay (DESIGN_SYSTEM §2.4). |
 
 ---
@@ -523,6 +621,10 @@ Today in this sketch is Sun, Nov 15, a payday whose payslip is already recorded.
 | `Enter` / `Shift+Enter` | Save / save and add another | Quick-add |
 | `↑` / `↓` | Previous / next day | Date input |
 | `Esc` | Close a dialog or popover | Everywhere |
+| `Enter` / `Alt+←` | Next step (Finish on the last) / previous step | Check-in (Phase 5) |
+| `↑` / `↓` | Move between the offered focuses | Check-in, Pick a focus |
+
+While a check-in is due, `Ctrl+N` still works, and `Ctrl+1` … `Ctrl+4`, `Ctrl+,` and Esc do nothing (CHK-2).
 
 The Phase 5 polish adds a `?` shortcut that shows this list in a help dialog.
 
@@ -638,3 +740,13 @@ Answered on 2026-11-16 (Phase 4, testing on a copy of the owner's data):
 62. **Exactly at a level says "reached"**, not "past": "Reached means equal or more" (DATA_MODEL §5.18), and "past" read wrong at the boundary. Above it, "past" stays (F16, §5.3).
 63. **The first payslip starts with no gross**, rather than the rule's amount, which is the expected **net** and looked like a gross with nothing deducted. The net shows nothing until a gross is typed (F14).
 64. **"Safe to spend until today"** when the current window ends today, instead of today's own date (§2).
+
+Answered on 2026-11-17 (Phase 5, the check-in and the Vault level):
+
+65. **The check-in is a full-window route, not a dialog** (§8.7), so quick-add and the pay forms can open over it without glass inside glass, and so it can't be dismissed like a dialog ([ADR 0012](decisions/0012-required-check-in.md)).
+66. **Every step is its own screen**, with the same steps for a week and a month, so the weekly one stays about a minute long and a step can be acted on before moving on.
+67. **The focus has nothing preselected**, so Enter alone can't finish a check-in.
+68. **The sidebar item is "Level"**, with the level chip beside the app name on every screen (§1, §8.8).
+69. **A failed load never locks the app.** If the check-in can't be loaded, the app opens normally and asks again on the next window focus (§8.7).
+70. **The first-launch form stays plain.** ONB-2's step indicator and tour were dropped (the owner, 2026-11-17): the only user is past it. This replaces item 1's "polished in Phase 5" (F5).
+71. **The check-in's step is kept in the URL by name**, not number, because the Goals step can appear after a save (§8.7).

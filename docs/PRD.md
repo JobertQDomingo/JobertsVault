@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **App name** | Jobert's Vault |
-| **Status** | Approved v1.2 |
-| **Last updated** | 2026-11-13 |
+| **Status** | Approved v1.3 |
+| **Last updated** | 2026-11-17 |
 | **Platform** | Windows desktop app built with Tauri 2: React + TypeScript frontend, Rust backend, SQLite database |
 
 ---
@@ -13,7 +13,7 @@
 
 A private Windows desktop app for tracking personal cashflow (income and expenses) and viewing it by **day, week, month, year or a custom range**. All data is entered by hand and stored locally on the user's computer. Financial data is never sent over the internet. The only network use is checking for and downloading app updates (§7.13).
 
-Besides cashflow, the app tracks balances across several accounts (including one credit card), budgets, recurring transactions and savings goals. Local backups, restore and CSV export came in Phase 2 (`v0.2.0`). Phase 4 (`v0.4.0`) adds loans with payment reminders, payslips with their deductions, and **Safe to spend**: what the user can spend until the next payday after every bill coming in the next 12 months.
+Besides cashflow, the app tracks balances across several accounts (including one credit card), budgets, recurring transactions and savings goals. Local backups, restore and CSV export came in Phase 2 (`v0.2.0`). Phase 4 (`v0.4.0`) adds loans with payment reminders, payslips with their deductions, and **Safe to spend**: what the user can spend until the next payday after every bill coming in the next 12 months. Phase 5 (`v1.0.0`) adds the **check-in**, a weekly and monthly review the app requires, and the **Vault level**: stats and levels worked out from the user's real money data.
 
 ## 2. Goals
 
@@ -24,6 +24,7 @@ Besides cashflow, the app tracks balances across several accounts (including one
 5. **Plan ahead.** Budgets, recurring transactions and savings goals help the user stay on track.
 6. **Data is never lost.** Automatic backups, easy restore and export to an open format (CSV).
 7. **Never miss a loan payment, and know what's safe to spend.** Every loan payment is reminded until it's paid, borrowing again is made to feel what it costs, and the user always sees how much they can spend until the next payday.
+8. **Review and improve.** Every week and month the app stops the user to review their money, ends with one target to do better, and shows their standing as stats and levels that only real financial progress can raise.
 
 ## 3. Non-goals (out of scope for v1)
 
@@ -41,6 +42,12 @@ Besides cashflow, the app tracks balances across several accounts (including one
 - Splitting a loan payment into interest and principal
 - Tracking a loan repaid through payroll deductions as a loan (it's only a deduction line, PAY-3)
 - Setting money aside in Safe to spend for budgets or savings goals
+- Points or rewards for using the app: nothing in the Vault level goes up because a button was clicked (LVL-2)
+- Windows notifications or reminders while the app is closed
+- Changing the stat formulas or the level ladder in Settings
+- Reopening a past check-in to read it again
+- One overall score, sounds, badges, or a typed note to self in the check-in
+- A polished first-launch onboarding with a tour (ONB-2): the plain setup form (ONB-1) is seen once, and the only user is already past it
 
 ## 4. Target user
 
@@ -70,6 +77,10 @@ One person (the developer/owner) who:
 | **Payslip** | What's recorded on a payday: the gross pay as income, and each deduction as an expense, on the same account and date. Gross minus deductions is the **net pay**. |
 | **Pay window** | The days from one payday up to the day before the next one. |
 | **Safe to spend** | What the user can spend in the current pay window after setting aside every bill due in the next 12 months (SAFE-5). |
+| **Check-in** | The required review of the week or month that just ended. It takes over the window until it's finished (CHK-2). |
+| **Focus** | One target for the coming week or month, picked at the end of a check-in and graded at a later one (CHK-7). |
+| **Stat** | One of six scores from 0 to 100, worked out from the money data: Cashflow, Bills, Card, Debt, Savings and Habit (LVL-1). |
+| **Vault level** | The user's place on a ladder of 10 levels. Each level is a set of real financial conditions, so the level can go down as well as up (LVL-2). |
 
 ## 6. Period rules
 
@@ -87,7 +98,7 @@ The user can move to the previous or next period with ◀ ▶ buttons and jump b
 
 ## 7. Functional requirements
 
-Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3** is in Phase 3 (planning), **P4** is in Phase 4 (loans and forecast), and **P5** is in Phase 5 (polish).
+Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3** is in Phase 3 (planning), **P4** is in Phase 4 (loans and forecast), and **P5** is in Phase 5 (check-in and polish).
 
 ### 7.1 Accounts
 
@@ -227,7 +238,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | ID | Requirement | Priority |
 |---|---|---|
 | ONB-1 | On first launch, a plain setup form asks for the currency (₱ preselected, symbol before the amount, 2 decimals) and lets the user add their first accounts: bank, e-wallet and credit card with its limit, statement day and due day. Cash already exists. The form can be skipped with "Set up later". Closing the app without finishing shows the form again on the next launch. | P1 |
-| ONB-2 | The setup is polished into a step-by-step onboarding with a progress indicator and a short tour of quick-add and the period bar. | P5 |
+| ONB-2 | **Dropped on 2026-11-17 (§14).** It was: the setup is polished into a step-by-step onboarding with a progress indicator and a short tour of quick-add and the period bar. | — |
 
 ### 7.13 Updates
 
@@ -278,6 +289,33 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | SAFE-6 | A **Safe to spend** card on the dashboard shows the amount until the next payday, the amount per day (over the days left in the window, counting today), and how much is held back and for which pay window, with a link to the Forecast screen. With no payday rule, it says how to set one up. | P4 |
 | SAFE-7 | A **Forecast** screen lists each pay window in the next 12 months, or each month, with a **Pay windows / Months** switch (months follow the month start day). Each row shows the pay (expected or received), the bills, what's left, and a warning on a window that would run short. Opening a row lists its bills. | P4 |
 
+### 7.17 Check-in
+
+| ID | Requirement | Priority |
+|---|---|---|
+| CHK-1 | **When it's due:** a weekly check-in covers the last completed week and is due from the first day of the new week. A monthly one covers the last completed month (by the month start day) and is due from the first day of the new month. When both are due they merge into one check-in that shows the month and settles both. If the app wasn't opened for several periods, only the newest completed one is reviewed. A period is reviewed only when at least one transaction is dated on or before its last day, so a new database gets no check-in. | P5 |
+| CHK-2 | **Required:** while a check-in is due, it takes over the whole window. It has no close button, Esc does nothing, and it can't be postponed. **+ Add** and Ctrl+N still work on top of it, so it never blocks logging a transaction (TXN-5), and its figures update after a save. Nothing is saved until **Finish**, so closing the app shows it again at the next start. It also appears when the date changes while the app is open. | P5 |
+| CHK-3 | **Steps:** one screen each, with **Next** and **Back** and a step indicator: Start, Money in and out (income, expense and net against the period before, the 3 largest categories, each budget kept or broken), Card (cycle spending against its levels, amount owed, due date, % of the limit used), Loans and bills (payments made, anything overdue, loans left, the debt-free date and whether it moved, then the coming paydays, bills, Safe to spend and any pay window that runs short), Goals, Stats and level, and Pick a focus. Each step opens with one sentence that sums it up. The Goals step shows in every monthly check-in, and in a weekly one only when a goal's date moved by itself (GOL-7) or a goal is Behind. | P5 |
+| CHK-4 | **Balance check:** a monthly check-in has a step listing every active account, and any archived one whose balance isn't 0, with its balance (the amount owed for a card). Each needs an answer, **Matches** or **Doesn't match**. A mismatch can be fixed on the spot with + Add. If one still doesn't match at Finish, the app opens that account's details. The answers aren't stored. | P5 |
+| CHK-5 | **Your year:** the first check-in finished in January has an extra step for the calendar year that just ended: income, expense and net against the year before, the largest categories, the loans paid off, and the level at the start and the end of the year. It's first due in January 2027. | P5 |
+| CHK-6 | **Wins first:** the Start step names one thing that went well, when there is one: the last focus was kept, a stat rose, a category's spending fell, total spending fell, or every loan payment was paid on time. With none, the line is left out; finishing the check-in is never the win. A **personal best** shows too when the period set one: the lowest spending or the highest net cashflow of the last 12 periods of its kind. | P5 |
+| CHK-7 | **Focus:** the last step offers up to 3 targets worked out from the user's data, and the user must pick one to finish; nothing is preselected. The kinds are a category cap ("Keep Dining Out under ₱1,500.00 this week"), a spending cap for the week from Safe to spend, staying under a card spending level, paying a loan payment on time, and logging on enough days. A weekly check-in sets a focus for the current week, and a monthly or merged one for the current month. Once a focus has ended, the Start step of the next check-in says whether it was kept, and that result is stored. | P5 |
+| CHK-8 | **Focus on the dashboard:** while a focus is active, the dashboard shows it with its progress. Saving an expense that takes a category cap or spending cap to 80% of its target, or past it, shows a warning toast. It never blocks the save or asks to confirm. | P5 |
+| CHK-9 | **Act from the check-in:** the Card step has **Pay bill**, and the Loans and bills step has **Pay** on a due or overdue loan payment and **Record now** on a due or early payday. They open the existing forms over the check-in. | P5 |
+
+### 7.18 Vault level
+
+| ID | Requirement | Priority |
+|---|---|---|
+| LVL-1 | **Stats:** six scores from 0 to 100, always worked out for today from the money data: **Cashflow** (spending against income), **Bills** (paid on time), **Card** (spending level and limit used), **Debt** (loan payments against income), **Savings** (months of spending covered) and **Habit** (days logged and check-ins on time). A stat can go down. One that doesn't apply, such as Card with no credit card, shows "—". Each stat names the main thing holding it down. | P5 |
+| LVL-2 | **Levels:** a fixed ladder of 10 levels, each a set of real conditions, such as nothing overdue, or savings that cover a month of spending. The level is the highest one whose conditions, and those of every level below it, are true today. It can go down, and the app says why. Nothing in the app raises a stat or a level except the money data and finishing check-ins on time. | P5 |
+| LVL-3 | A **Level** screen shows the ten levels as a path, with the next level's conditions as a checklist, and the six stats as a hexagon chart with last check-in's shape behind it. Every score is also written as a number with its change since the last check-in. | P5 |
+| LVL-4 | **Next best move:** one sentence naming the single action that would help most: paying what's overdue first, otherwise the first unmet condition of the next level, with the gap as an amount where there is one. | P5 |
+| LVL-5 | The sidebar shows the level ("Lv 4") with a ring for how many of the next level's conditions are met, on every screen. Clicking it opens the Level screen. | P5 |
+| LVL-6 | **Level-up moment:** when a check-in finds the level higher than at the last check-in, the level badge plays one short animation, skipped when Windows has animations turned off. A lower level gets a plain sentence with the reason and no animation. | P5 |
+| LVL-7 | **Streaks:** the number of weekly check-ins in a row finished within 2 days of coming due, and the number of focuses kept in a row. | P5 |
+| LVL-8 | The Level screen shows the last 8 graded focuses as kept or missed, and a small trend line for each stat once there are 3 or more check-ins. | P5 |
+
 ---
 
 ## 8. Non-functional requirements
@@ -286,7 +324,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 |---|---|
 | **Privacy** | Financial data never leaves the computer. No analytics or telemetry. The only network requests are for app updates from this project's GitHub releases (§7.13), and turning automatic updates off stops them. The app works fully offline. The local error log never records amounts, payees or notes. |
 | **Data integrity** | Money is stored as **integers in minor units** (e.g. cents), never as floating-point numbers. Every write is wrapped in a database transaction, so a crash can't leave data half-saved. |
-| **Performance** | Cold start in < 2 s, not counting the time the update check waits on a slow connection (up to 3 s, UPD-2). With 50,000 transactions, each dashboard or report view, including the Debt-free and Forecast screens, loads in < 300 ms. |
+| **Performance** | Cold start in < 2 s, not counting the time the update check waits on a slow connection (up to 3 s, UPD-2). With 50,000 transactions, each dashboard or report view, including the Debt-free and Forecast screens, the check-in and the Level screen, loads in < 300 ms. |
 | **Architecture** | All business logic (balances, period totals, comparisons, recurring rules) and all database access live in the **Rust backend**. The React frontend only displays data and calls backend commands. It never runs SQL itself. |
 | **Storage location** | The database is stored in the user's app data folder, at a path based on the app's identifier (e.g. `%APPDATA%\com.jobertsvault.app\`). |
 | **Platform** | Windows 10 and 11, 64-bit. Distributed as an `.exe` installer on GitHub Releases. Installed copies then update themselves (§7.13). |
@@ -304,6 +342,8 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 6. *As a user, a banner reminds me 5 days before each loan payment, and one I haven't marked paid turns red, so I never miss a payment until every loan is paid off.*
 7. *As a user, on payday I record my payslip and see what's safe to spend until the next payday, with money already held back for a short pay window next month.*
 8. *As a user, before I take a new loan I try it in Before you borrow and see my debt-free date move months later.*
+9. *As a user, on Monday the app won't let me go on until I've looked at last week: what I spent, what's due, and whether I kept last week's focus. I pick one focus for this week before it lets me through.*
+10. *As a user, I open Level and see that Card is my weakest stat, and that paying down the card is what gets me to the next level.*
 
 ## 10. Acceptance criteria for the MVP (Phase 1)
 
@@ -341,13 +381,14 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | **2: Reports & backups** | Charts over time, category breakdown, period comparison, % change, payee suggestions, regular backups, restore, CSV export |
 | **3: Planning** | Recurring transactions, budgets, savings goals, card due-date reminder, future-dated transactions |
 | **4: Loans & forecast** | Loans with payment reminders and the Debt-free screen, payday rules and payslips with deductions, Safe to spend and the Forecast screen, smart goal target dates, and credit card spending levels |
-| **5: Polish** | The theme switch, the Reduce transparency switch, more keyboard shortcuts, polished first-launch onboarding, Windows installer polish |
+| **5: Check-in & polish** | The weekly and monthly check-in with a focus, the Vault level (stats, levels and the Level screen), the theme switch, the Reduce transparency switch, more keyboard shortcuts, Windows installer polish |
 
 ## 12. How we'll measure success
 
 - Logging a typical transaction takes **≤ 5 seconds**.
 - Account balances in the app match the real bank and card statements at the end of each month.
 - The app is used daily for at least 3 months without any data loss.
+- From Phase 5: every week and month the app is opened has a finished check-in, and the Vault level is higher after 6 months than at the first check-in.
 
 ## 13. Open questions
 
@@ -435,6 +476,16 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-16 | GOL-7 added to Phase 4: a save that makes a goal's date unrealistic moves the date to the new earliest one by itself, with a note; with no room at all, the goal keeps its date and shows as Behind (DATA_MODEL §5.17) |
 | 2026-11-16 | CC-10 and CC-11 added to Phase 4: spending levels per card, for the current statement cycle, that warn and ask to confirm at the hard level but never block (DATA_MODEL §5.18) |
 | 2026-11-16 | GOL-7: an income recurring rule, a payday included, never moves a goal, like an income transaction (DATA_MODEL §9 item 107) |
+| 2026-11-17 | Added the check-in (CHK-1 to CHK-9) and the Vault level (LVL-1 to LVL-8) to Phase 5, so `v1.0.0` ships with them. Phase 5 becomes "Check-in & polish" (the owner) |
+| 2026-11-17 | The check-in must be finished: no close button and no snooze. Only + Add still works over it, so saving a transaction is never blocked ([ADR 0012](decisions/0012-required-check-in.md)) |
+| 2026-11-17 | Check-ins are weekly and monthly, merged when both are due, and only the newest completed period is reviewed. A yearly review is one extra step in January, not a third check-in |
+| 2026-11-17 | The game layer is six stats and a ladder of milestone levels, not points: only the money data moves them, and the level is live, so it can go down ([ADR 0013](decisions/0013-levels-are-milestones.md)) |
+| 2026-11-17 | The ladder puts a savings level before debt-free and another after it, so an emergency doesn't force a new loan: two weeks of spending (level 7), then one month (level 9) |
+| 2026-11-17 | Every check-in ends with one focus the app can grade. A typed note to self was left out, because the app can't grade it |
+| 2026-11-17 | The Goals step is in every monthly check-in, and in a weekly one only when a goal's date moved or a goal is Behind |
+| 2026-11-17 | The names are "Check-in" and "Vault level" ("Level" in the sidebar). "Review" already means confirming recurring dates (UI_FLOWS F10) |
+| 2026-11-17 | The stats and levels were tuned to the owner's situation (DATA_MODEL §9 items 128–135): they measure against take-home pay and leave borrowed money out of what was earned; Cashflow is full at 10% unspent; Debt reaches 0 when loans take 90% of take-home pay; Habit is full at 25 days logged of 30; a late payment has no grace; and the level names stay |
+| 2026-11-17 | ONB-2, the polished onboarding with a tour, is dropped: the only user is already set up and will never see the first-launch form again. ONB-1's plain form stays (the owner) |
 
 ---
 

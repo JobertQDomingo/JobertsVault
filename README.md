@@ -2,7 +2,7 @@
 
 A private desktop app for Windows that tracks personal cashflow (income and expenses) by **day, week, month or year**. You enter every transaction yourself, and all data stays in a local SQLite file on your computer. Your financial data is never sent over the internet. The only network use is checking GitHub for app updates, which you can turn off, and the app works fully offline.
 
-> **Status:** in development. `v0.4.0` has everything from Phases 1–4 below. Phase 5 (Polish, ending in `v1.0.0`) is next. See [ROADMAP.md](ROADMAP.md) for progress.
+> **Status:** in development. `v0.4.0` has everything from Phases 1–4 below. Phase 5 (Check-in & polish, ending in `v1.0.0`) is next. See [ROADMAP.md](ROADMAP.md) for progress.
 
 ## Features
 
@@ -12,7 +12,7 @@ A private desktop app for Windows that tracks personal cashflow (income and expe
 | **2: Reports & backups** | Income-vs-expense charts, category breakdown, period comparison, payee suggestions, automatic daily backups, restore, CSV export |
 | **3: Planning** | Recurring transactions, budgets, savings goals, credit card due-date reminders, future-dated transactions |
 | **4: Loans & forecast** | Loans with payment reminders and a Debt-free screen, Before you borrow, payslips with their deductions, Safe to spend that looks 12 months ahead with a Forecast screen, goal target dates that follow the forecast, and credit card spending levels |
-| **5: Polish** | Theme and Reduce transparency switches, more keyboard shortcuts, polished onboarding on first launch, installer polish |
+| **5: Check-in & polish** | A required weekly and monthly check-in that ends with one focus to do better, the Vault level (six stats and ten levels worked out from your real data), Theme and Reduce transparency switches, more keyboard shortcuts, installer polish |
 
 See [PRD.md](docs/PRD.md) for the full requirements.
 
@@ -87,7 +87,7 @@ Start with [docs/README.md](docs/README.md) for the reading order.
 | [UI_FLOWS.md](docs/UI_FLOWS.md) | Screens and user flows |
 | [ROADMAP.md](ROADMAP.md) | Phase checklists and progress |
 | [RELEASING.md](RELEASING.md) | How a change gets from a branch to every installed copy |
-| [docs/decisions/](docs/decisions/README.md) | Decision records 0001–0011: why the big choices were made |
+| [docs/decisions/](docs/decisions/README.md) | Decision records 0001–0013: why the big choices were made |
 | [docs/design/](docs/design/) | Visual previews of the design system and every screen. Open the `.html` files in a browser. |
 | `assets/brand/` | The logo (`logo.svg`), one-color versions and the 1024 px app icon source |
 

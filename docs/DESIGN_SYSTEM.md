@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | Approved v1.1 |
+| **Status** | Approved v1.2 |
 | **Style** | **Glassmorphism 2.0**: frosted glass panels floating over a soft colored light (the "aurora") |
-| **Last updated** | 2026-11-13 |
+| **Last updated** | 2026-11-17 |
 | **Related docs** | [PRD.md](PRD.md), [UI_FLOWS.md](UI_FLOWS.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 | **Built with** | Tailwind CSS 4 + shadcn/ui (Radix), lucide-react icons, Sora font (bundled) |
 
@@ -258,6 +258,12 @@ Categories store a palette key, not a hex code (DATA_MODEL §3.2), so they switc
 | A loan payment due (banner) | `calendar-clock`, the same as a card payment due |
 | A loan payment overdue, a pay window that runs short | `octagon-alert` (banner) and `triangle-alert` (in a row) |
 | Payday | `banknote` |
+| Level (sidebar, Phase 5) | `hexagon` |
+| A focus (the dashboard strip, the Level screen) | `target` |
+| A level reached, a focus kept, a condition met | `check` |
+| A focus missed | `x` |
+| A level not reached yet | `lock` |
+| A stat or level up / down since the last check-in | `▲` / `▼`, as text, like the percent change (§7) |
 
 The sidebar and banner icons are imported where they're used, like the ones above, and aren't part of the category icon list.
 
@@ -345,7 +351,7 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **Toolbar** | Level 1 | A small glass bar (16 px radius, 6 px padding) for controls that sit on the canvas: the period bar, the filter bar, report controls. Inside a card it becomes a flat `--wash`. |
 | **Dialog** | Level 2 | 24 px radius, max width 480 px (forms), 400 px (confirmations) or 640 px (a list whose rows have actions, such as the recurring dates due, which scrolls inside it past 60% of the window's height). The backdrop is `--overlay` plus a 6 px blur of the app behind. Esc closes it, and focus stays inside. |
 | **Confirm dialog** | Level 2 | A title, one sentence, `secondary` Cancel, and a `primary` or `destructive` button that names the action. |
-| **Toast** | Level 2 | Bottom-right, 16 px radius, several shown one above the other. Closes after 4 s. One with an action, such as **Open folder**, stays 10 s, and its action is a ghost `sm` button in `--primary` text. Errors stay until closed. From Phase 4, a warning (a card spending level reached, CC-11) has the `triangle-alert` icon in `--warning` and stays 8 s. |
+| **Toast** | Level 2 | Bottom-right, 16 px radius, several shown one above the other. Closes after 4 s. One with an action, such as **Open folder**, stays 10 s, and its action is a ghost `sm` button in `--primary` text. Errors stay until closed. From Phase 4, a warning (a card spending level reached, CC-11) has the `triangle-alert` icon in `--warning` and stays 8 s. From Phase 5, a focus reaching 80% of its target or going past it (CHK-8) is the same warning toast. |
 | **Banner** | Level 1, tinted | Panel glass mixed with the meaning color at 14%. Has an icon, the message and an optional action. Variants: `warning`, `danger`, `info`. Inside another panel, the tint is flat (§2.3). `components/Banner.tsx` has `warning` (`.glass-warning`, the backup warning and the card due date) and `info` (`.glass-info`, tinted with `--primary` as in the mockups, the recurring dates due). From Phase 4 it also has `danger` (`.glass-danger`, an overdue loan payment), and uses `warning` for a loan payment due. A banner can have a second line in `small` text (`detail`), such as "Move ₱800.00 there first." |
 | **Tabs** | Flat | Inside Settings. A 2 px `--primary` underline marks the active tab. |
 | **Skeleton** | Flat | `--wash` blocks with no shimmer, shown only if loading takes more than **150 ms**. |
@@ -370,6 +376,12 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **`LoanCard`** (Phase 4) | A flat card inside the Loans panel, like a budget card: the name, "E-wallet · 3 of 8 paid", a `ProgressBar` of % paid, "₱5,000.00 left" and the next payment. An overdue next payment is in `--danger` with the `triangle-alert` icon. A paid-off loan has a **Paid off** badge in `--success` (UI_FLOWS §8.5). |
 | **`SpendLevelTag`** (Phase 4) | The level a card's spending has reached this cycle (CC-10): "Soft level" in `--muted-foreground`, "Mid level" in `--warning` and "Hard level" in `--danger`, the last two with the `triangle-alert` icon, so it never relies on color alone. Nothing below soft. On the card's details it reads "Past your ₱3,000.00 soft level", or "Reached your …" when the spending is exactly the level (UI_FLOWS F16). |
 | **`ForecastRow`** (Phase 4) | A row of the Forecast table, 52 px tall: the window's dates, then Start, Pay in, Bills and Left, right-aligned with tabular digits. The lowest window gets a **lowest** badge in `--muted-foreground`. A window that runs short has the `triangle-alert` icon, and its Left in `--danger` with the word "Short". Opening it shows its movements as flat rows in `--wash` (UI_FLOWS §8.6). |
+| **`StepIndicator`** (Phase 5) | A row of 10 px dots joined by a 2 px `--wash` line: steps done are solid `--primary`, the current one is a `--primary` ring with a solid center, the ones ahead are `--wash`. "Step 3 of 6 · Card" is written beside it in `small` text, so it never relies on the dots alone. It's used by the check-in (UI_FLOWS §8.7). Not clickable. |
+| **`StatHexagon`** (Phase 5) | The six stats as a radar chart (Recharts), 280 px, flat inside its panel: one corner per stat, in the order Cashflow, Bills, Card, Debt, Savings, Habit, clockwise from the top. The grid rings are `--wash`. Today's shape is `--primary` at 24% with a 2 px `--primary` edge. Last check-in's shape is a 1.5 px dashed outline in `--muted-foreground`, with no fill. A stat that doesn't apply has no corner, so the shape has fewer sides. With fewer than 3 that apply, there's no chart, only the list. The corner labels are `small` text. The scores are always listed as numbers next to it, and a hidden table gives screen readers the same figures, as on the Reports charts. It doesn't animate. |
+| **`LevelBadge`** (Phase 5) | A 40 px hexagon, solid `--primary` with the level number in `--primary-foreground`, `h2` weight. Level 0 is a `--wash` hexagon with the number in `--muted-foreground`. Beside it, "Level 4 · In the black". The **level chip** in the sidebar is its 26 px version inside a 2 px ring: the ring's track is `--wash`, and its `--primary` arc is the share of the next level's conditions that are met. Its label for screen readers says both: "Level 4, 1 of 2 conditions met for level 5". |
+| **`LevelPath`** (Phase 5) | Ten 20 px nodes in a row, joined by a 2 px line, numbered below. Reached: solid `--primary` with a `check`. Current: the same, with a 3 px ring at 25%, like a focused field. Not reached: `--wash` with a `lock` in `--muted-foreground`. The line is `--primary` up to the current node and `--wash` after it. Each node's tooltip has the level's name and conditions, and the nodes can be reached with the keyboard. |
+| **`FocusStrip`** (Phase 5) | A slim Level 1 panel on the dashboard (UI_FLOWS §2), one 40 px row per active focus: the `target` icon, the sentence, the progress so far in `--muted-foreground`, and for a cap a `ProgressBar` with the budget thresholds. On the Level screen and in the check-in, the same row is flat inside its panel. |
+| **Focus offer card** (Phase 5) | A flat `--wash` card in the check-in's last step, 12 px radius: the sentence in `body` weight 600 and what it's based on in `small` text. Selected: a 2 px `--primary` border and a `check` in the corner, like a selected radio, never by tint alone. The cards form one radio group. |
 
 ---
 
@@ -378,6 +390,7 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 - **Timing:** 150–200 ms, ease-out.
 - **Hover and press:** clickable cards lift 2 px on hover. Buttons shrink to 97% while pressed.
 - **Dialogs** fade in while growing from 98% to full size in 180 ms, and the backdrop fades in with them.
+- **The level-up moment (Phase 5, LVL-6):** the one place a little more is allowed. When a check-in finds a higher level, the `LevelBadge` grows from 80% to 110% and settles at full size over 600 ms, ease-out, while a soft `--primary` glow behind it fades out. It plays once, when the step is first shown. A lower level, the stat bars, the hexagon and the level path never animate.
 - **What never moves:** the aurora, and numbers (they never count up).
 - `prefers-reduced-motion` turns all of this off.
 
@@ -425,3 +438,5 @@ Glass costs graphics power, so these rules keep the app smooth:
 | 2026-11-06 | Income-vs-expense bars go up for income and down for expense, so the chart never relies on green versus red alone |
 | 2026-11-13 | Phase 4: the `danger` banner for an overdue loan payment, the Debt-free and Forecast sidebar icons, and the `SafeToSpendCard`, `LoanCard` and `ForecastRow` components. Safe to spend is shown in `--foreground`, never green. |
 | 2026-11-16 | Phase 4: the `SpendLevelTag` states and the warning toast (CC-10, CC-11) |
+| 2026-11-17 | Phase 5: the check-in is a full-window screen with one glass panel, never a dialog, so the forms it opens aren't glass inside glass (§2.3, ADR 0012) |
+| 2026-11-17 | Phase 5: the `StepIndicator`, `StatHexagon`, `LevelBadge` (and the sidebar's level chip), `LevelPath`, `FocusStrip` and focus offer card, the Level sidebar icon, and the level-up moment, the only animation longer than 200 ms. They use existing tokens only: the level is always `--primary`, never gold or a color of its own, and no stat has its own color. |

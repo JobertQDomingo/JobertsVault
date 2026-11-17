@@ -17,6 +17,8 @@ Short records of the big decisions behind Jobert's Vault: what was decided, why,
 | [0009](0009-offline-only.md) | Offline only: no network access at all | Superseded by 0010 | 2026-10-26 |
 | [0010](0010-automatic-updates.md) | Automatic updates: the one exception to offline | Accepted | 2026-11-03 |
 | [0011](0011-loans-are-payment-schedules.md) | Loans are lists of scheduled payments, not accounts | Accepted | 2026-11-13 |
+| [0012](0012-required-check-in.md) | The check-in is required, and still never blocks a save | Accepted | 2026-11-17 |
+| [0013](0013-levels-are-milestones.md) | Levels are milestones worked out from the data, not points | Accepted | 2026-11-17 |
 
 ## When to write one
 
