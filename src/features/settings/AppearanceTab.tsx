@@ -23,13 +23,11 @@ export function AppearanceTab({ settings }: { settings: SettingsView }) {
         <Segmented
           aria-label="Theme"
           value={settings.theme}
+          // The promise, not mutate's callbacks, so the toast still shows if the tab is left.
           onChange={(theme) =>
-            update.mutate(
-              { theme },
-              {
-                onSuccess: () => notify.success("Saved"),
-                onError: (error) => notify.error(error.message),
-              },
+            void update.mutateAsync({ theme }).then(
+              () => notify.success("Saved"),
+              (error: Error) => notify.error(error.message),
             )
           }
           options={THEMES}

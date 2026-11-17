@@ -32,9 +32,9 @@ export function SettingsScreen() {
   const tab: Tab = TABS.find((t) => t === asked) ?? "general";
   const settings = useSettings();
   // General and Appearance show the stored settings, or why they're not there yet.
-  const withSettings = (tab: (loaded: SettingsView) => ReactNode) =>
+  const withSettings = (render: (loaded: SettingsView) => ReactNode) =>
     settings.data ? (
-      tab(settings.data)
+      render(settings.data)
     ) : settings.isError ? (
       <ErrorState
         onRetry={() => settings.refetch()}

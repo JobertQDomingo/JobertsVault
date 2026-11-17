@@ -55,11 +55,8 @@ pub async fn restore_backup(app: AppHandle, path: PathBuf) -> Result<(), AppErro
             &path,
             chrono::Local::now(),
         )?;
-        // The theme comes from the backup like every other setting (DATA_MODEL §9). It's only
-        // the look, so a setting that can't be read never fails the restore.
-        if let Ok(settings) = services::settings::stored(&conn) {
-            crate::apply_theme(&handle, settings.theme);
-        }
+        // The theme comes from the backup like every other setting (DATA_MODEL §9).
+        crate::apply_stored_theme(&handle, &conn);
         Ok(())
     })
     .await

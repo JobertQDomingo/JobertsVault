@@ -937,10 +937,12 @@ mod tests {
         let old_pc = dir.path().join("Old PC");
         fs::create_dir_all(&old_pc).unwrap();
         set(&conn, "currency_symbol", "$");
+        set(&conn, "theme", "dark");
         set(&conn, "backup_folder", &old_pc.display().to_string());
         set(&conn, LAST_AUTO, "2026-01-01");
         let backup = old_pc.join(back_up_now(&conn, dir.path(), now()).unwrap().file_name);
         set(&conn, "currency_symbol", "\u{20B1}");
+        set(&conn, "theme", "light");
         repo::settings::delete(&conn, "backup_folder").unwrap();
         set(&conn, "auto_backup_enabled", "false");
         // Never what the backup holds: it was stamped 2026-11-03 14:05 local, in any timezone.
@@ -955,6 +957,7 @@ mod tests {
             Some("$"),
             "the data's own settings"
         );
+        assert_eq!(get("theme").as_deref(), Some("dark"), "SET-5");
         assert_eq!(get("backup_folder"), None);
         assert_eq!(get("auto_backup_enabled").as_deref(), Some("false"));
         assert_eq!(

@@ -4,7 +4,7 @@
  * System, and WebView2 reports it as `prefers-color-scheme` (DESIGN_SYSTEM §3.5). Returns a
  * function that stops it.
  */
-export function followSystemTheme(root = document.documentElement) {
+export function followWindowTheme(root = document.documentElement) {
   const query = window.matchMedia("(prefers-color-scheme: dark)");
   const apply = () => root.classList.toggle("dark", query.matches);
   apply();

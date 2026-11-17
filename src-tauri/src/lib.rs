@@ -69,6 +69,14 @@ pub(crate) fn apply_theme(app: &tauri::AppHandle, theme: services::settings::The
     }
 }
 
+/// [`apply_theme`] with the theme stored in `conn`. If it can't be read, the window follows
+/// Windows: it's only the look, so it never stops startup or a restore.
+pub(crate) fn apply_stored_theme(app: &tauri::AppHandle, conn: &rusqlite::Connection) {
+    if let Ok(settings) = services::settings::stored(conn) {
+        apply_theme(app, settings.theme);
+    }
+}
+
 pub fn run() {
     tauri::Builder::default()
         // Only Rust uses it: the frontend gets no updater permissions (ARCHITECTURE §10).
@@ -82,15 +90,9 @@ pub fn run() {
             app.manage(AppState::open(data_dir, &db::migrations(now.to_utc()), now));
             // Before the backup thread takes the connection, so the window never waits for it,
             // and before the page loads, so its first paint has the right theme. If startup
-            // failed or the setting can't be read, the window follows Windows.
-            let theme = app
-                .state::<AppState>()
-                .conn()
-                .ok()
-                .and_then(|conn| services::settings::stored(&conn).ok())
-                .map(|settings| settings.theme);
-            if let Some(theme) = theme {
-                apply_theme(app.handle(), theme);
+            // failed, the window follows Windows.
+            if let Ok(conn) = app.state::<AppState>().conn() {
+                apply_stored_theme(app.handle(), &conn);
             }
             // Setup goes on only once the backup thread holds the connection, so every screen
             // waits for today's backup and recurring dates rather than reading the state from

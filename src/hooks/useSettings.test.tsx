@@ -113,3 +113,19 @@ test("a save cancels a settings reload already on its way, so its old answer can
     weekStart: "monday",
   });
 });
+
+test("a theme change alone leaves the ledger alone (SET-5)", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({ ...saved, theme: "dark" });
+  const client = new QueryClient();
+  client.setQueryData(["settings"], saved);
+  client.setQueryData(["ledger", "dashboard"], "totals");
+  const result = renderUpdate(client);
+  await result.current.mutateAsync({ theme: "dark" });
+  expect(client.getQueryData(["settings"])).toEqual({
+    ...saved,
+    theme: "dark",
+  });
+  expect(client.getQueryState(["ledger", "dashboard"])?.isInvalidated).toBe(
+    false,
+  );
+});

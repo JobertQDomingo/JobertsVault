@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { followSystemTheme } from "./theme";
+import { followWindowTheme } from "./theme";
 
 /** A stand-in for Windows' light or dark setting, which jsdom doesn't have. */
 function fakeWindowsTheme(dark: boolean) {
@@ -30,13 +30,13 @@ afterEach(() => {
 
 test("adds dark when Windows is dark", () => {
   fakeWindowsTheme(true);
-  followSystemTheme();
+  followWindowTheme();
   expect(document.documentElement.classList.contains("dark")).toBe(true);
 });
 
 test("follows a change while the app is open", () => {
   const windows = fakeWindowsTheme(false);
-  followSystemTheme();
+  followWindowTheme();
   expect(document.documentElement.classList.contains("dark")).toBe(false);
   windows.switchTo(true);
   expect(document.documentElement.classList.contains("dark")).toBe(true);
@@ -46,7 +46,7 @@ test("follows a change while the app is open", () => {
 
 test("stops following after cleanup", () => {
   const windows = fakeWindowsTheme(false);
-  const stop = followSystemTheme();
+  const stop = followWindowTheme();
   stop();
   windows.switchTo(true);
   expect(document.documentElement.classList.contains("dark")).toBe(false);
