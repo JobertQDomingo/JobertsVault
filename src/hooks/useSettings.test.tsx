@@ -19,6 +19,7 @@ const settings: Settings = {
   onboardingCompleted: true,
   autoUpdateEnabled: true,
   comparisonMode: "to_date",
+  theme: "system",
 };
 const saved = { ...settings, decimalsLocked: false };
 

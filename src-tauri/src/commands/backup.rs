@@ -45,14 +45,22 @@ pub async fn inspect_backup(app: AppHandle, path: PathBuf) -> Result<BackupFile,
 /// throughout, so no other command reads or writes in between.
 #[tauri::command(async)]
 pub async fn restore_backup(app: AppHandle, path: PathBuf) -> Result<(), AppError> {
+    let handle = app.clone();
     blocking(app, move |state| {
+        let mut conn = state.conn()?;
         services::backup::restore(
-            &mut *state.conn()?,
+            &mut conn,
             &state.data_dir,
             &state.db_path,
             &path,
             chrono::Local::now(),
-        )
+        )?;
+        // The theme comes from the backup like every other setting (DATA_MODEL §9). It's only
+        // the look, so a setting that can't be read never fails the restore.
+        if let Ok(settings) = services::settings::stored(&conn) {
+            crate::apply_theme(&handle, settings.theme);
+        }
+        Ok(())
     })
     .await
 }

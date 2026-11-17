@@ -159,6 +159,7 @@ const settings: Settings = {
   onboardingCompleted: true,
   autoUpdateEnabled: true,
   comparisonMode: "to_date",
+  theme: "system",
 };
 
 // Every write the app can make (ARCHITECTURE §4.5), with the arguments it sends to Rust.

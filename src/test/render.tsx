@@ -21,6 +21,7 @@ export const SETTINGS: SettingsView = {
   onboardingCompleted: true,
   autoUpdateEnabled: true,
   comparisonMode: "to_date",
+  theme: "system",
 };
 
 /** Renders inside a QueryClient that already holds the settings, as the app does once started. */

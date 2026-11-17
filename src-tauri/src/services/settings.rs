@@ -23,6 +23,16 @@ pub enum WeekStart {
     Sunday,
 }
 
+/// The app's light or dark look (SET-5). `System` follows Windows, even while the app is open.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export)]
+pub enum Theme {
+    System,
+    Light,
+    Dark,
+}
+
 /// The settings so far (DATA_MODEL §3.5). A key missing from the table takes its default.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -39,6 +49,7 @@ pub struct Settings {
     pub auto_update_enabled: bool,
     /// The comparison the dashboard's % change uses, and Reports by default (SET-7).
     pub comparison_mode: ComparisonMode,
+    pub theme: Theme,
 }
 
 impl Default for Settings {
@@ -53,6 +64,7 @@ impl Default for Settings {
             onboarding_completed: false,
             auto_update_enabled: true,
             comparison_mode: ComparisonMode::ToDate,
+            theme: Theme::System,
         }
     }
 }
@@ -156,6 +168,7 @@ pub fn update(conn: &mut Connection, mut settings: Settings) -> Result<SettingsV
             "comparison_mode",
             comparison_mode_text(settings.comparison_mode).into(),
         ),
+        ("theme", theme_text(settings.theme).into()),
     ] {
         repo::settings::set(&tx, key, &value)?;
     }
@@ -201,6 +214,11 @@ fn read(settings: &mut Settings, key: &str, value: &str) -> Option<()> {
                 .into_iter()
                 .find(|m| comparison_mode_text(*m) == value)?
         }
+        "theme" => {
+            settings.theme = [Theme::System, Theme::Light, Theme::Dark]
+                .into_iter()
+                .find(|t| theme_text(*t) == value)?
+        }
         // Later phases' keys, and last_used_account_id, which transactions own.
         _ => {}
     }
@@ -225,6 +243,14 @@ fn comparison_mode_text(mode: ComparisonMode) -> &'static str {
     match mode {
         ComparisonMode::ToDate => "to_date",
         ComparisonMode::Full => "full",
+    }
+}
+
+fn theme_text(theme: Theme) -> &'static str {
+    match theme {
+        Theme::System => "system",
+        Theme::Light => "light",
+        Theme::Dark => "dark",
     }
 }
 
@@ -273,6 +299,7 @@ mod tests {
             onboarding_completed: false,
             auto_update_enabled: true,
             comparison_mode: ComparisonMode::ToDate,
+            theme: Theme::System,
         };
         assert_eq!(Settings::default(), defaults);
         assert_eq!(
@@ -297,10 +324,13 @@ mod tests {
             onboarding_completed: true,
             auto_update_enabled: false,
             comparison_mode: ComparisonMode::Full,
+            theme: Theme::Dark,
         };
         let saved = update(&mut conn, changed.clone()).unwrap();
         let stored = repo::settings::get(&conn, "comparison_mode").unwrap();
         assert_eq!(stored.as_deref(), Some("full"));
+        let stored = repo::settings::get(&conn, "theme").unwrap();
+        assert_eq!(stored.as_deref(), Some("dark"));
         assert_eq!(saved.settings, changed);
         assert_eq!(get(&conn).unwrap().settings, changed);
     }
@@ -444,6 +474,26 @@ mod tests {
     fn an_unknown_comparison_mode_is_a_database_error() {
         let conn = db();
         store(&conn, "comparison_mode", "half");
+        assert!(matches!(get(&conn), Err(AppError::Database { .. })));
+    }
+
+    #[test]
+    fn each_theme_is_stored_and_read_back() {
+        let mut conn = db();
+        for theme in [Theme::Light, Theme::Dark, Theme::System] {
+            let with = Settings {
+                theme,
+                ..Settings::default()
+            };
+            update(&mut conn, with).unwrap();
+            assert_eq!(get(&conn).unwrap().settings.theme, theme);
+        }
+    }
+
+    #[test]
+    fn an_unknown_theme_is_a_database_error() {
+        let conn = db();
+        store(&conn, "theme", "sepia");
         assert!(matches!(get(&conn), Err(AppError::Database { .. })));
     }
 

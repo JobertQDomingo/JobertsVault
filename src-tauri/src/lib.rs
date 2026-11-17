@@ -46,6 +46,29 @@ fn fit_window(window: &tauri::WebviewWindow) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Gives the window the `theme` setting's look (SET-5). WebView2 passes it on to
+/// `prefers-color-scheme`, which `lib/theme.ts` follows, and the title bar matches. `System`
+/// hands it back to Windows. Best effort: a failure is logged and the window keeps its look.
+pub(crate) fn apply_theme(app: &tauri::AppHandle, theme: services::settings::Theme) {
+    use services::settings::Theme;
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let native = match theme {
+        Theme::System => None,
+        Theme::Light => Some(tauri::Theme::Light),
+        Theme::Dark => Some(tauri::Theme::Dark),
+    };
+    if let Err(err) = window.set_theme(native) {
+        log::record(
+            &app.state::<AppState>().log_path,
+            &error::AppError::Io {
+                message: format!("window theme: {err}"),
+            },
+        );
+    }
+}
+
 pub fn run() {
     tauri::Builder::default()
         // Only Rust uses it: the frontend gets no updater permissions (ARCHITECTURE §10).
@@ -57,6 +80,18 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             let now = chrono::Local::now();
             app.manage(AppState::open(data_dir, &db::migrations(now.to_utc()), now));
+            // Before the backup thread takes the connection, so the window never waits for it,
+            // and before the page loads, so its first paint has the right theme. If startup
+            // failed or the setting can't be read, the window follows Windows.
+            let theme = app
+                .state::<AppState>()
+                .conn()
+                .ok()
+                .and_then(|conn| services::settings::stored(&conn).ok())
+                .map(|settings| settings.theme);
+            if let Some(theme) = theme {
+                apply_theme(app.handle(), theme);
+            }
             // Setup goes on only once the backup thread holds the connection, so every screen
             // waits for today's backup and recurring dates rather than reading the state from
             // before them.

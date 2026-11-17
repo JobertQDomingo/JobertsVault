@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import type { Settings } from "@/bindings/Settings";
+import { notify } from "@/components/ui/toast";
 import { CATEGORIES, PAYMENT_METHODS } from "@/test/fixtures";
 import { renderRoute, SETTINGS, type Answers } from "@/test/render";
 
@@ -322,4 +323,17 @@ test("Compare periods saves the comparison setting (SET-7)", async () => {
   await waitFor(() =>
     expect(saves()).toEqual([{ ...STORED, comparisonMode: "full" }]),
   );
+});
+
+test("Appearance opens from the URL and saves the theme (SET-5)", async () => {
+  const saved = vi.spyOn(notify, "success");
+  renderRoute("/settings?tab=appearance", ANSWERS);
+  expect(
+    (await screen.findByRole("radio", { name: "System" })).getAttribute(
+      "aria-checked",
+    ),
+  ).toBe("true");
+  fireEvent.click(radio("Dark"));
+  await waitFor(() => expect(saves()).toEqual([{ ...STORED, theme: "dark" }]));
+  await waitFor(() => expect(saved).toHaveBeenCalledWith("Saved"));
 });

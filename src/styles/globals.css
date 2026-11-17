@@ -3,7 +3,8 @@
 @import "@fontsource/sora/600.css";
 @import "@fontsource/sora/700.css";
 
-/* Dark mode is the .dark class on <html>, which lib/theme.ts keeps in step with Windows. */
+/* Dark mode is the .dark class on <html>, which lib/theme.ts keeps in step with the window's
+   theme: the theme setting, or Windows when it's System (DESIGN_SYSTEM §3.5). */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* Light values (DESIGN_SYSTEM §2.2, §3). Components use these names, never raw colors. */

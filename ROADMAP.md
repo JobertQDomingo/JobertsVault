@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-17 |
-| **Current focus** | **Phase 5: Check-in & polish**: theme switch [SET-5] |
+| **Current focus** | **Phase 5: Check-in & polish**: Reduce transparency switch [SET-8] |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -22,7 +22,7 @@ This file is the progress tracker.
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 16 / 16 |
 | **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 17 / 17 |
-| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 1 / 29 |
+| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 2 / 29 |
 
 ---
 
@@ -200,7 +200,7 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 
 ### 5.0 Appearance
 These come first, so every screen built after them is checked in both themes and with transparency off.
-- [ ] Theme switch: system, light or dark [SET-5]
+- [x] Theme switch: system, light or dark [SET-5]
 - [ ] Reduce transparency switch [SET-8]
 - [ ] Overdue banner in dark mode: its `--danger` tint reads as plain glass over the aurora, with only the icon red, while the amber warning banner is clearly tinted. Fix the tint in DESIGN_SYSTEM §9.1 first, and re-check its contrast (left from Phase 4) [LOAN-4]
 

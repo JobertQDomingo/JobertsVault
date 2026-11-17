@@ -228,7 +228,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | SET-2 | First day of week (default **Monday**) and month start day (default **1**). | P1 |
 | SET-3 | Backup folder location and whether automatic backups are on. | P2 |
 | SET-4 | Category and payment method management. | P1 |
-| SET-5 | A switch for light, dark or system theme. Until it arrives, the app follows the Windows setting. | P5 |
+| SET-5 | A switch in Settings → Appearance for the theme: System (the default, which follows the Windows setting even while the app is open), Light or Dark. It applies at once and from the first paint at startup, and a restore takes it from the backup. | P5 |
 | SET-6 | Show or hide the payment method field (shown by default). | P1 |
 | SET-7 | Default comparison mode for RPT-4a: same number of days so far (default) or full previous period. | P2 |
 | SET-8 | A **Reduce transparency** switch in Settings → Appearance makes every glass panel solid and turns off blur for this app, even when Windows transparency effects are on. | P5 |
@@ -486,6 +486,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-17 | The names are "Check-in" and "Vault level" ("Level" in the sidebar). "Review" already means confirming recurring dates (UI_FLOWS F10) |
 | 2026-11-17 | The stats and levels were tuned to the owner's situation (DATA_MODEL §9 items 128–135): they measure against take-home pay and leave borrowed money out of what was earned; Cashflow is full at 10% unspent; Debt reaches 0 when loans take 90% of take-home pay; Habit is full at 25 days logged of 30; a late payment has no grace; and the level names stay |
 | 2026-11-17 | ONB-2, the polished onboarding with a tour, is dropped: the only user is already set up and will never see the first-launch form again. ONB-1's plain form stays (the owner) |
+| 2026-11-17 | SET-5's theme is the window's theme, set by Rust, so the title bar follows it too (DESIGN_SYSTEM §3.5) |
 
 ---
 
