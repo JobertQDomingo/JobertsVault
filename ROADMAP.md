@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **Status** | Active |
-| **Last updated** | 2026-11-16 |
-| **Current focus** | **Phase 5: Polish**: theme switch [SET-5] |
+| **Last updated** | 2026-11-17 |
+| **Current focus** | **Phase 5: Check-in & polish**: theme switch [SET-5] |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -22,7 +22,7 @@ This file is the progress tracker.
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 16 / 16 |
 | **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 17 / 17 |
-| **5 · Polish** | Ready for daily use for years | `v1.0.0` | All P5 requirements done | 0 / 9 |
+| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 1 / 29 |
 
 ---
 
@@ -196,20 +196,56 @@ The same process as NBSBuddy ([ARCHITECTURE §11.1](docs/ARCHITECTURE.md), [ADR 
 
 ---
 
-## Phase 5 · Polish (`v1.0.0`)
+## Phase 5 · Check-in & polish (`v1.0.0`)
 
+### 5.0 Appearance
+These come first, so every screen built after them is checked in both themes and with transparency off.
 - [ ] Theme switch: system, light or dark [SET-5]
 - [ ] Reduce transparency switch [SET-8]
-- [ ] Polished onboarding: step indicator and a short tour [ONB-2]
-- [ ] `?` opens the keyboard shortcut help dialog, and every shortcut is reviewed
-- [ ] Accessibility pass: focus order, screen reader labels, contrast re-check of any changed tokens
-- [ ] Performance pass on the glass UI with a full year of data
+- [ ] Overdue banner in dark mode: its `--danger` tint reads as plain glass over the aurora, with only the icon red, while the amber warning banner is clearly tinted. Fix the tint in DESIGN_SYSTEM §9.1 first, and re-check its contrast (left from Phase 4) [LOAN-4]
+
+### 5.1 Check-in and Vault level
+The owner approved the plan on 2026-11-17 ([ADR 0012](docs/decisions/0012-required-check-in.md), [ADR 0013](docs/decisions/0013-levels-are-milestones.md)), and tuned the stats and levels the same day (DATA_MODEL §9 items 128–135). The rules are DATA_MODEL §4.9 and §5.19–5.23, and the screens are UI_FLOWS §8.7–8.8. The first ten tasks make the feature work. The five after them each stand alone, so one can slip without breaking the rest.
+
+- [x] Docs first:
+  - PRD: goal 8, §7.17 Check-in (CHK-1 to CHK-9), §7.18 Vault level (LVL-1 to LVL-8), the non-goals, user stories and decision log
+  - DATA_MODEL: the `checkins` table and migration `0005`, `goals.moved_on` and `moved_from`, the rules for due periods, the six stats, the levels and the next best move, focus offers and grading, wins, personal bests and streaks, and validation
+  - UI_FLOWS: the Check-in and Level screens, the dashboard's focus strip, the sidebar item and level chip, and flows F17 and F18
+  - ARCHITECTURE: the command catalog, routes, the check-in guard, query keys, the startup order and the tests that must exist
+  - DESIGN_SYSTEM: the `StepIndicator`, `StatHexagon`, `LevelBadge`, `LevelPath`, `FocusStrip` and focus offer card, the icons and the level-up moment
+  - ADR 0012 (the check-in is required, and never blocks a save) and ADR 0013 (levels are milestones, not points), with the decision record lists
+  - CLAUDE.md's "Domain rules that are easy to get wrong", and README.md
+- [ ] `docs/design/` previews: draw the Check-in screen (the Card, Balance check, Stats and level, and Pick a focus steps), the Level screen, the dashboard's focus strip and the sidebar's level chip in `ui-flows.html`, and the six new components in `design-system.html`, in light and dark (docs/README)
+- [ ] Migration `0005_checkins.sql` (DATA_MODEL §4.9, §4.4), and the domain rule for which periods are due, with tests: a Monday week start, `month_start_day` above 1, a week and a month due together, January and the year, three weeks unopened, a period already finished, and a database with no transactions [CHK-1] [CHK-5]
+- [ ] Domain: the six stats and their reason codes, with a test at both ends of every scale and for each "none" case (DATA_MODEL §5.20) [LVL-1]
+- [ ] Domain: the level ladder, the ring and the next best move, with a test for every level, for a drop, and for a condition about something the user doesn't have (DATA_MODEL §5.21) [LVL-2] [LVL-4]
+- [ ] Domain: focus offers, grading and the cap state, with tests for each of the five kinds, everyday spending, a `void` loan focus and the 80% and over boundaries (DATA_MODEL §5.22) [CHK-7] [CHK-8]
+- [ ] Domain: the win, personal bests, both streaks, the trend history and the focus record, with tests (DATA_MODEL §5.23) [CHK-6] [LVL-7] [LVL-8]
+- [ ] Service, repo and commands: `get_checkin`, `complete_checkin` and `get_vault_status`, `focuses` on `get_dashboard`, a focus counted as using its category or card and moved by a category merge, the `currency_decimals` lock, and GOL-7 recording `moved_on` and `moved_from`. Service tests: Finish writes every row in one database transaction, a second Finish is refused, a focus that isn't an offer is refused, and a graded focus keeps its grade after an old transaction is edited [CHK-1] [CHK-3] [CHK-4] [CHK-5] [CHK-7] [LVL-1] [LVL-2]
+- [ ] Check-in screen at `/check-in` with the `StepIndicator`, every step, the route guard and the startup order. It can't be closed, Ctrl+N opens over it and its figures refresh after a save, and a failed load opens the app normally (UI_FLOWS §8.7, F17) [CHK-2] [CHK-3] [CHK-4] [CHK-5] [CHK-6] [CHK-7]
+- [ ] Level screen at `/level` with the `LevelBadge`, `LevelPath` and `StatHexagon`, the next best move and the streaks, plus its sidebar item (UI_FLOWS §8.8) [LVL-3] [LVL-4] [LVL-7]
+- [ ] Sidebar level chip with its ring [LVL-5]
+- [ ] Dashboard focus strip, and the warning toast when a save takes a cap to 80% of its target or past it. Count the dashboard's blurred panels with every banner showing first: past the budget, the rows go flat in the Safe to spend card instead (UI_FLOWS §2, F18) [CHK-8]
+- [ ] Focus record and stat trend lines on the Level screen [LVL-8]
+- [ ] Level-up moment in the check-in's Stats and level step, skipped with `prefers-reduced-motion` [LVL-6]
+- [ ] Pay bill, Pay and Record now inside the check-in, opening the existing forms over it [CHK-9]
+- [ ] Test the check-in and the Vault level on a copy of the installed app's data: finish a merged, a weekly and a monthly check-in (the January step is covered by service tests, since the real app can't be given a January date), and check that every stat and the level read right for the real figures (a formula that doesn't is changed in DATA_MODEL §5.20–5.21 first). If the monthly check-in feels long, fold Card into Loans and bills. Log every bug and issue, and fix them. The copy and the log stay out of the repo.
+
+### 5.2 Polish
+The first four were found while testing Phase 4 on the owner's data and left for this phase, like the overdue banner in 5.0. None is a bug that loses or miscounts money. Each one updates its doc first.
+- [ ] Card edit form: "Amount owed now" shows the opening amount, not what the card owes today, and UI_FLOWS §5.2 says otherwise. Settle which is right with the owner, then make the doc and the form agree [CC-1] [CC-8]
+- [ ] Add loan form: a running total of the typed payment rows, worked out by the backend, to check against the lender app before saving [LOAN-1]
+- [ ] Goal dialog and goal card show two monthly figures for one date: the too-soon message's "saving about ₱X a month" (the monthly room) and the card's "Save ₱Y/month" (what the date needs). Make the wording tell them apart [GOL-3] [GOL-6]
+- [ ] HMO preset deduction category, added by a new migration to a database that doesn't have one yet, like Phase 4's categories [PAY-3]
+- [ ] `?` opens the keyboard shortcut help dialog, and every shortcut is reviewed, the check-in's included
+- [ ] Accessibility pass: focus order, screen reader labels, contrast re-check of any changed tokens. It covers the check-in, the hexagon's hidden table, the level path and the level chip
+- [ ] Performance pass on the glass UI with a full year of data, with `get_checkin` and `get_vault_status` added to the 50,000-transaction check ([ARCHITECTURE §12](docs/ARCHITECTURE.md))
 - [ ] Installer polish: icon, product name, version info
 - [ ] Review all docs against the shipped app, and update any that drifted
-- [ ] Release `v1.0.0` with `/release`
+- [ ] Release `v1.0.0` with `/release`, then finish a real weekly and monthly check-in in the installed app
 
 ---
 
 ## Not planned
 
-The PRD §3 non-goals stay out of scope unless the PRD is changed first: bank sync, statement import, receipts, multiple users, cloud sync, multiple currencies, investments, tax, other platforms, and split transactions.
+The PRD §3 non-goals stay out of scope unless the PRD is changed first: bank sync, statement import, receipts, multiple users, cloud sync, multiple currencies, investments, tax, other platforms, and split transactions. The same goes for the check-in's non-goals: points for using the app, reminders while the app is closed, editable stat formulas, and reopening a past check-in. The polished onboarding (ONB-2) was dropped on 2026-11-17.
