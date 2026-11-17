@@ -543,7 +543,7 @@ CREATE INDEX idx_checkins_completed ON checkins(completed_on);
 | `focus_kind` | Which kind of target (§5.22). The row for a year never has a focus, and in a merged check-in only one row has it. |
 | `focus_category_id` | The category of a `category_cap`. **A focus puts its category in use**, so it's archived rather than deleted, and merging categories moves it (§3.2). |
 | `focus_account_id` | The card of a `card_level`. A focus puts that account in use too. |
-| `focus_loan_payment_id` | The payment of a `loan_on_time`. If the payment is removed (the loan is edited or deleted), `ON DELETE SET NULL` clears it and the focus is graded `void`. |
+| `focus_loan_payment_id` | The payment of a `loan_on_time`. If the payment is removed (the loan is edited or deleted), `ON DELETE SET NULL` clears it: the focus is left out of the active focuses (§5.22) and is graded `void`. |
 | `focus_target` | Minor units for `category_cap`, `spending_cap` and `card_level`, a number of days for `logging`, NULL for `loan_on_time`. |
 | `focus_start`, `focus_end` | The week or month the focus runs for: the one that contains `completed_on` (§5.22). |
 | `focus_result`, `focus_actual` | Set once, when a later check-in grades the focus (§5.22). `void` means it couldn't be graded. `focus_actual` is what was reached, in the target's unit, and NULL for `loan_on_time` and `void`. |
@@ -950,14 +950,15 @@ shown  = month when the month is due, else week
   - The 3 largest expense categories are ranked like the breakdown (§5.10), each with its change (§5.4).
   - **Budgets kept or broken:** each weekly budget for a week, or each monthly budget for a month (§4.3), measured over the shown period: kept when `spent ≤ amount` (§5.6). Yearly budgets show in Your year.
 - **The Card step** shows each active card as it is today (§5.5, §5.18), not as it was at the period's end.
-- **The Loans and bills step** shows the loan payments whose expense is dated in the shown period, what's overdue today, `total left` and `debt-free on` (§5.11), and the forecast as it is today (§5.15). **The debt-free date moved** when it differs from `debt_free_on` on the latest earlier check-in row; with no earlier row, nothing is said.
+- **The Loans and bills step** shows the loan payments whose expense is dated in the shown period, what's overdue today, `total left` and `debt-free on` (§5.11), and the forecast as it is today (§5.15). **The debt-free date moved** when it differs from `debt_free_on` on the latest earlier check-in row. Nothing is said when there's no earlier row, when either date is none, or when everything left is overdue (the date is then today, §5.11).
 - **The Goals step** lists every active goal with its progress (§5.7), marks the ones that are Behind (§5.17), and names each goal whose `moved_on` (§4.4) is on or after the shown period's start. It shows in a check-in whose month is due. When only the week is due, it shows only if some goal is Behind or was moved since the week's start.
 - **The Balance check step (CHK-4)** shows when the month is due. It lists every active account, and any archived one whose balance isn't 0, with its balance today (§5.1), a card as its amount owed. The answers are held by the screen and never sent or stored.
+- **Changing the week start or `month_start_day`** moves the periods, so the latest one may have no row and be reviewed again, and the on-time count and check-in streak (§5.20, §5.23) start over. That's accepted: the settings rarely change.
 - **Your year (CHK-5)** shows when the year is due: the year's totals compared in full with the year before, its 3 largest expense categories, each yearly budget kept or broken, the loans whose last payment was paid in that year, and the `level` on the first and the last check-in row with `completed_on` in that year (none when there's no such row).
 
 ### 5.20 Stats (LVL-1, Phase 5)
 
-Six whole numbers from 0 to 100, worked out for `today`. Every division rounds down, and nothing here uses a float. A stat is **none** ("—") when it doesn't apply.
+Six whole numbers from 0 to 100, worked out for `today`. Every division rounds down, toward minus infinity when the number divided is below 0 (Rust's `div_euclid`, not `/`), and nothing here uses a float. A stat is **none** ("—") when it doesn't apply.
 
 Shared figures:
 
@@ -983,13 +984,24 @@ paid late(n) = the number of loan payments whose expense is dated after their du
 | Stat | Score | None when |
 |---|---|---|
 | **Cashflow** | `clamp(50 + (take_home − spending) × 500 ÷ take_home, 0, 100)`, and 0 when `take_home` is 0. Breaking even is 50, leaving 10% of take-home pay unspent or more is 100, and overspending by 10% or more is 0. | There's no completed month, or `I` and `E` are both 0 |
-| **Bills** | `max(0, 100 − 25 × overdue − 10 × paid late(90))` | There's no loan and no credit card |
-| **Card** | For each active card: `(L × 60 + U × 40) ÷ 100`, where `L` is 100, 70, 40 or 10 for the level none, soft, mid or hard (§5.18), and `U` comes from its utilization `u`, a whole percent (§5.1): 100 when `u ≤ 10`, 0 when `u ≥ 90`, else `(90 − u) × 100 ÷ 80`. With several cards, the lowest score. | There's no active card |
-| **Debt** | 100 when `total left` is 0 (§5.11). Otherwise `clamp(95 − share × 95 ÷ 90, 0, 95)`, where `share = due(current month) × 100 ÷ avg_take_home` and `due(current month)` is §5.11's (LOAN-7): 95 when nothing is due this month, 0 when loans take 90% of an average month's take-home pay or more. 0 when `avg_take_home` is 0. | Something is left on a loan and there's no completed month |
-| **Savings** | `min(100, money × 100 ÷ (3 × avg_spending))`, then 15 off for each active goal that's Behind (§5.17), never below 0. When `avg_spending` is 0: 100 if `money > 0`, else 0. Three months of spending covered is 100. | There's no completed month |
-| **Habit** | `min(70, logged × 70 ÷ 25) + on_time × 30 ÷ 4`, where `on_time` counts, of the 4 latest completed weeks, those whose week row (§4.9) has `completed_on ≤ period_end + 3`: finished on the day it came due or within the 2 days after. | Never |
+| **Bills** | `max(0, 100 − 25 × overdue − 10 × paid late(90))` | There's no loan (paid-off and archived ones count as loans) and no active credit card |
+| **Card** | For each active card: `(L × 60 + U × 40) ÷ 100`, where `L` is 100, 70, 40 or 10 for the level none, soft, mid or hard (§5.18), and `U` comes from its utilization `u`, a whole percent (§5.1): 100 when `u ≤ 10`, 0 when `u ≥ 90`, else `(90 − u) × 100 ÷ 80`. With several cards, the lowest score (the first by account id on a tie). | There's no active card |
+| **Debt** | 100 when `total left` is 0 (§5.11). Otherwise 95 when nothing is due this month, else 0 when `avg_take_home` is 0, else `clamp(95 − share × 95 ÷ 90, 0, 95)`, where `share = due(current month) × 100 ÷ avg_take_home` and `due(current month)` is §5.11's (LOAN-7): 0 when loans take 90% of an average month's take-home pay or more. | Something is left on a loan and there's no completed month |
+| **Savings** | `cushion − 15 × behind`, never below 0, where `cushion = min(100, money × 100 ÷ (3 × avg_spending))` (when `avg_spending` is 0: 100 if `money > 0`, else 0) and `behind` is the number of active goals that are Behind (§5.17). Three months of spending covered is 100. | There's no completed month |
+| **Habit** | `days + checkins`, where `days = min(70, logged × 70 ÷ 25)` and `checkins = on_time × 30 ÷ 4`, and `on_time` counts, of the 4 latest completed weeks, those whose week row (§4.9) has `completed_on ≤ period_end + 3`: finished on the day it came due or within the 2 days after. | Never |
 
-- **Each stat names its reason**, a code for the main thing holding it down, such as `card_past_mid`, `loan_overdue` or `spending_over_income`. The frontend turns the code into the sentence. No amount or name is ever logged (ARCHITECTURE §4.4).
+- **The check-in being finished counts as finished today** in `get_checkin`'s `status` and in the snapshot Finish stores (§4.9), for `on_time` here and for both streaks (§5.23). Without that, a stored Habit could never reach 100. Elsewhere the live figure counts only rows that exist, and while a check-in is due nothing else is on screen to show it.
+- **Each stat names its reason**, a code for the main thing holding it down: the first that applies below. A stat at 100, or one that's none, has no reason. The frontend turns the code into the sentence. No amount or name is ever logged (ARCHITECTURE §4.4).
+
+| Stat | Reason codes, the first that applies |
+|---|---|
+| **Cashflow** | `no_take_home` when `take_home` is 0; `spending_over_income` when `spending > take_home`; else `little_left` |
+| **Bills** | `loan_overdue` when an unpaid loan payment is dated before today; `card_overdue` when a card's statement is unpaid past its due date; else `paid_late` |
+| **Card** | For the card that gives the score: `card_past_hard`, `card_past_mid` or `card_past_soft` (its level) when its level costs at least as many points as its utilization, `(100 − L) × 60 ≥ (100 − U) × 40`; else `card_high_use` |
+| **Debt** | `loans_due` when something is due this month; else `loans_left` |
+| **Savings** | `goal_behind` when `15 × behind > 100 − cushion`; else `cushion_low` |
+| **Habit** | `few_days_logged` when `70 − days ≥ 30 − checkins`; else `late_checkins` |
+
 - **Days logged go by a transaction's `date`**, never by when it was typed in (§1). A day with no spending at all isn't a logged day, which is why 25 days of 30 is full marks, not 30.
 - **Take-home pay, not gross.** A payslip records the gross as income and each deduction as an expense (§4.7), so the stats take the deductions off both sides: `take_home` and `spending`. The difference between them is the same as `I − E`; only what it's measured against changes.
 - **Borrowed money isn't earnings.** A new loan's money is logged as income (ADR 0011), so its `amount_borrowed` is taken off, in the month it was borrowed. Without that, borrowing would raise Cashflow and reach level 4. It works only when the loan has an amount borrowed, and assumes the money was logged as income.
@@ -1002,26 +1014,28 @@ paid late(n) = the number of loan payments whose expense is dated after their du
 
 The **level** is the highest `n` from 0 to 10 for which every condition of levels 1 to `n` holds today. It's worked out live, like a balance, so it can go down.
 
-| Lv | Name | Conditions |
+Each condition has a code, and a level's conditions are checked in the order given. The gap is the figure the next best move and the checklist show.
+
+| Lv | Name | Conditions, in order: `code`, the rule (gap) |
 |---|---|---|
-| 1 | Tracker | `logged ≥ 20` (§5.20) |
-| 2 | Planner | There's a payday rule (a paused one counts, §5.15), and at least one budget |
-| 3 | Bill Keeper | `overdue = 0`, and `paid late(30) = 0` (§5.20) |
-| 4 | In the black | The latest completed month has `earned > 0` (§5.20) |
-| 5 | Steady | Each of the 3 latest completed months has `earned > 0`, and the forecast has no short day (§5.15) |
-| 6 | Card under control | For every active card, in each of its 3 latest completed statement cycles (§5.5), the card's expenses dated in that cycle total less than its `spend_mid` as it is today |
-| 7 | Two weeks ahead | `money × 2 ≥ avg_spending`, with `avg_spending > 0` (§5.20) |
-| 8 | Debt-free | `total left = 0` (§5.11), and the loan-free streak (§5.11) is 90 days or more, or there's none |
-| 9 | One month ahead | `money ≥ avg_spending`, with `avg_spending > 0` |
-| 10 | Vault Master | Every stat that applies is 80 or more, no active goal is Behind, and the loan-free streak is 365 days or more, or there's none |
+| 1 | Tracker | `logged_20`: `logged ≥ 20` (§5.20) (gap: `20 − logged` days still to log) |
+| 2 | Planner | `payday_rule`: there's a payday rule (a paused one counts, §5.15); `budget`: there's at least one budget |
+| 3 | Bill Keeper | `nothing_overdue`: `overdue = 0`; `none_late`: `paid late(30) = 0` (§5.20) |
+| 4 | In the black | `earned_month`: the latest completed month has `earned > 0` (§5.20) |
+| 5 | Steady | `earned_3_months`: each of the 3 latest completed months has `earned > 0` (gap: how many of them in a row, counting back from the latest, have it: "1 of 3 so far"); `no_short_day`: the forecast has no short day (§5.15) |
+| 6 | Card under control | `card_under_mid`: for every active card, in each of its 3 latest completed statement cycles (§5.5), the card's expenses dated in that cycle total less than its `spend_mid` as it is today. A cycle with no expenses is under. (gap: the first card that fails, by account id, and how far its current cycle's spending (§5.18) is over its `spend_mid`, 0 when it's under) |
+| 7 | Two weeks ahead | `two_weeks_saved`: `money × 2 ≥ avg_spending`, with `avg_spending > 0` (§5.20) (gap: `(avg_spending + 1) ÷ 2 − money`) |
+| 8 | Debt-free | `loans_paid`: `total left = 0` (§5.11) (gap: `total left`); `loan_free_90`: the loan-free streak (§5.11) is 90 days or more, or there's none (gap: the days left) |
+| 9 | One month ahead | `month_saved`: `money ≥ avg_spending`, with `avg_spending > 0` (gap: `avg_spending − money`) |
+| 10 | Vault Master | `stats_80`: every stat that applies is 80 or more (gap: the lowest stat); `no_goal_behind`: no active goal is Behind; `loan_free_365`: the loan-free streak is 365 days or more, or there's none (gap: the days left) |
 
 - **A condition about something the user doesn't have counts as met:** with no active card, level 6 asks nothing.
 - **A condition that needs history waits for it:** levels 4, 7 and 9 need one completed month, and level 5 needs three. Until then they aren't met.
 - **Level 0** is the start: no level's conditions are met yet. It has no name.
-- **The ring** on the sidebar chip (LVL-5) is the number of the next level's conditions that hold, out of how many it has. At level 10 it's full.
+- **The ring** on the sidebar chip (LVL-5) is the number of the next level's conditions that hold, out of how many it has (1 to 3, from the table: one `card_under_mid` covers every card). At level 10 it's full.
 - **The order** puts two weeks of savings before debt-free and one month after, so an emergency doesn't force a new loan (PRD §14). Three months stays the long-run aim: level 10 needs the Savings stat at 80, which is about 2.4 months of spending.
 - **Level 1 asks for 20 logged days, not Habit's 25.** Every level rests on level 1, so a week away from the app shouldn't drop them all to 0.
-- **`levelChange`** compares the level today with the latest earlier check-in row's: `up`, `down` or `same`. With no earlier row it's `same`, so the first check-in has no level-up moment.
+- **`levelChange`** compares the level today with the latest earlier check-in row's: `up`, `down` or `same`. With no earlier row it's `same`, so the first check-in has no level-up moment. When it's `down`, the reason given is the first unmet condition of the level above today's, by its code.
 
 **The next best move** is one code with its figures, the first of these that applies:
 
@@ -1029,7 +1043,7 @@ The **level** is the highest `n` from 0 to 10 for which every condition of level
 |---|---|---|
 | 1 | A loan payment is overdue | Pay it: the earliest overdue payment, with its loan and amount |
 | 2 | A card statement is unpaid past its due date | Pay that card's statement amount (§5.14) |
-| 3 | The level is below 10 | The first unmet condition of the next level, with the gap where it's a figure: the days still to log, the amount `money` lacks, the amount the card's cycle spending is over `spend_mid`, the days left on the streak, or the total left on loans |
+| 3 | The level is below 10 | The first unmet condition of the next level, by its code, with its gap from the table where it has one |
 | 4 | The level is 10 | The reason of the lowest stat (§5.20) |
 
 ### 5.22 Focus (CHK-7, CHK-8, Phase 5)
@@ -1038,17 +1052,19 @@ A focus runs for the week or month that **contains the day the check-in was fini
 
 **Everyday spending** is what a cap counts: the expenses dated in a range, on any account, **leaving out** those that pay a loan payment (`loan_payments.transaction_id`), that a recurring date posted (`recurring_occurrences.transaction_id`), or that are payslip deductions (`payslip_id` set). Those are bills, which Safe to spend has already set aside (§5.15).
 
-**Offers.** Each kind is tied to a stat. The kinds that apply are ordered by their stat's score today, lowest first (ties in the order below), and the first 3 are offered. Logging always applies, so there's always at least one.
+**A cap** is a `category_cap` or a `spending_cap`. A `card_level` focus isn't one: the card's spending levels already warn (§5.18).
+
+**Offers.** Each kind is tied to a stat. The kinds that apply are ordered by their stat's score today, lowest first (ties in the order below), and the first 3 are offered. A kind whose stat is none ranks as if it were 100. Logging always applies, so there's always at least one.
 
 | Kind | Stat | Applies when | Target |
 |---|---|---|---|
 | `loan_on_time` | Bills | An active loan has an unpaid payment due in the focus period: the earliest one | That payment |
-| `card_level` | Card | An active card's level today isn't hard (§5.18): with several, the card with the lowest Card score | The lowest of its three levels that's above its cycle spending today |
+| `card_level` | Card | An active card's level today isn't hard (§5.18): with several, the one with the lowest Card score of those (ties by account id) | The lowest of its three levels that's above its cycle spending today |
 | `spending_cap` | Cashflow | The focus is for a week, there's a payday rule, and `per day` (§5.15) is above 0 | `per day × 7` |
 | `category_cap` | Cashflow | An active expense category's everyday spending in the period reviewed rose over the period before it, where that earlier amount is above 0: the one with the largest rise (ties by category id) | Its everyday spending in that earlier period |
 | `logging` | Habit | Always | 5 days for a week, 20 for a month |
 
-**Grading.** A focus is graded once `focus_end` is before today, by the next check-in that's finished. Finishing grades **every** ended focus that isn't graded yet, and the Start step shows the one that ended latest.
+**Grading.** A focus is graded once `focus_end` is before today, by the next check-in that's finished. Finishing grades **every** ended focus that isn't graded yet. The Start step shows, of those, the one that ended latest, and nothing when there are none, so a focus graded at an earlier check-in never shows again. `get_checkin` works those grades out for the Start step without storing them; Finish works them out again and stores them.
 
 | Kind | `focus_actual` | Kept when |
 |---|---|---|
@@ -1061,7 +1077,7 @@ A focus runs for the week or month that **contains the day the check-in was fini
 - A `loan_on_time` focus whose payment was removed is `void`. A `void` focus counts as neither kept nor missed.
 - A grade is stored once and never worked out again (§4.9).
 
-**State (CHK-8).** While a focus is active (`focus_start ≤ today ≤ focus_end`), `get_vault_status` returns its progress: the `actual` so far, counted to today. A cap also has a state:
+**State (CHK-8).** While a focus is active (`focus_start ≤ today ≤ focus_end`), `get_vault_status` returns its progress: the `actual` so far, by the grading table's rule counted to today. A `loan_on_time` focus whose payment was removed isn't returned. A cap also has its `percent` (`actual × 100 ÷ target`, rounded down) and a state, which sets its bar's color: amber when `near`, red when `over`.
 
 ```
 over  when actual > target
@@ -1081,9 +1097,9 @@ When a save raises a cap's state, the app shows a warning toast. It never blocks
 | 2 | A stat rose | A stat is 5 or more above its value on the latest earlier check-in row: the largest rise (ties in §5.20's order) |
 | 3 | A category fell | An expense category's amount fell from the period before: the largest fall, with the amount |
 | 4 | Spending fell | The period's expense is below the period before's, which is above 0 |
-| 5 | Loans paid on time | At least one loan payment was due in the period, and each has an expense dated on or before its `due_date` |
+| 5 | Loans paid on time | At least one loan payment was due in the period, leaving out paid-before ones (§4.6), and each has an expense dated on or before its `due_date` |
 
-**Personal bests** look at the 12 latest completed periods of the shown kind, the shown one included, leaving out any that ended before the earliest transaction's date. With 4 or more of them, the shown period sets one when it has the **lowest expense** of them, or the **highest net** of them, with no tie.
+**Personal bests** look at the 12 latest completed periods of the shown kind, the shown one included, leaving out any that ended before the earliest transaction's date. With 4 or more of them, the shown period sets one when it has the **lowest expense** of them, or else the **highest net** of them, with no tie. Only one is named, the lowest expense first.
 
 **Streaks:**
 
@@ -1095,7 +1111,7 @@ focus streak    = counting back from the focus that ended latest, the number of 
 ```
 
 - **The latest week doesn't break the streak while it can still be on time:** until `period_end + 3` has passed, a week with no row yet is passed over rather than counted as missed.
-- In the check-in's own Stats and level step, the check-in being finished counts as finished today.
+- The check-in being finished counts as finished today, in its own Stats and level step and in its snapshot (§5.20).
 - Neither streak feeds a stat or a level, beyond the on-time check-ins that Habit already counts (§5.20).
 
 **History (LVL-8).** The trend lines use the 12 latest check-ins, one point per `completed_on` (a merged check-in's rows hold the same snapshot). The focus record is the 8 latest graded focuses, `void` ones left out.
@@ -1138,7 +1154,7 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | A payslip's gross is > 0 and ≤ the maximum. It has 0–30 deduction lines, each with an expense category (active, though an edit may keep an archived one) and an amount > 0. Its net is more than 0 ("Deductions can't add up to the gross pay or more"). Its date is a real date, and its account an active cash, bank or e-wallet account (an edit may keep an archived one). | gross / deductions / date / accountId |
 | A payday can be recorded early only when it's 1–3 days after today, has no occurrence yet, and its rule isn't paused or ended (§4.8, `Conflict` otherwise) | shown as a toast |
 | Phase 5 (CHK-1): a check-in can be finished only while one is due (§5.19, `Conflict` otherwise: "This check-in is already done"). The backend works out which periods are due itself, and takes none from the frontend. | shown as a toast |
-| Phase 5 (CHK-7): finishing a check-in needs a focus, and it must be one of the offers the backend would make now (§5.22): the same kind, category, account, loan payment and target ("Pick one of the offered focuses") | focus |
+| Phase 5 (CHK-7): finishing a check-in needs a focus, and it must be one of the offers the backend would make now (§5.22): the same kind, category, account, loan payment, target, start and end ("Pick one of the offered focuses") | focus |
 
 Text is trimmed before saving, and empty optional text is stored as `NULL`.
 
@@ -1439,3 +1455,11 @@ Answered on 2026-11-17, tuning the stats and levels with the owner:
 133. **The savings levels are two weeks (level 7) and one month (level 9)** (the owner), so there's a savings level within reach before debt-free. The Savings stat still scores three months as 100 (§5.21).
 134. **A late payment has no grace** (the owner): on the due date or before is on time (§5.20).
 135. **The level names stay** (the owner): Tracker, Planner, Bill Keeper, In the black, Steady, Card under control, Two weeks ahead, Debt-free, One month ahead, Vault Master (§5.21).
+
+Answered on 2026-11-17, reviewing the Phase 5 docs before building (PR #111):
+
+136. **Each stat's reason and each level condition has a fixed code**, picked by the order in §5.20's reason table and §5.21's conditions, so a reason, a level drop and the next best move are the same everywhere and testable (§5.20, §5.21).
+137. **The check-in being finished counts as finished today** in its own status and stored snapshot, for Habit as well as the streaks, so a stored Habit can reach 100 (§5.20).
+138. **The Start step shows only a focus this check-in grades**, so one graded earlier never shows, or counts as the win, twice (§5.22).
+139. **A kind whose stat is none ranks as 100** among the focus offers, and a focus must match its offer's period too (§5.22, §6).
+140. **Divisions below 0 round toward minus infinity**, so a month a little over break-even scores 49 for Cashflow, never 50 (§5.20).

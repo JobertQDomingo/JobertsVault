@@ -97,7 +97,7 @@ The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors
     - With no payday rule: "Mark your pay as a payday to see what's safe to spend." with **Open Recurring**
   - **"Loans left: ₱14,000.00 · debt-free Aug 10, 2027"** under the net balance in Accounts, linking to `/debt-free`. When everything left is overdue, it says "Loans left: ₱1,000.00 · all overdue" in `--danger` instead of a date already passed, like the Debt-free screen (§8.5). It's hidden when nothing is left (LOAN-11).
 - **Phase 5:**
-  - a **focus strip** between the banners and the stat cards, shown only while a focus is active (CHK-8). It's one slim glass panel with one row per active focus, the month's first: "This week's focus: Keep Dining Out under ₱1,500.00 · ₱640.00 so far" with a `ProgressBar`, amber from 80% and red past the target, like a budget. A focus that isn't a cap shows its own progress: "Stay under your ₱4,000.00 mid level · ₱2,310.00 this cycle", "Pay E-wallet loan by Fri, Nov 20 · not paid yet" (or "· paid Nov 18"), "Log on 5 days this week · 3 so far". Clicking it opens `/level`. It's for today, like the balances, whatever the period switcher shows. The strip is one more glass panel on the screen with the most of them, so its task counts the dashboard's blurred panels with every banner showing (DESIGN_SYSTEM §11). If the strip takes it past the budget, the same rows go flat at the top of the Safe to spend card instead.
+  - a **focus strip** between the banners and the stat cards, shown only while a focus is active (CHK-8). It's one slim glass panel with one row per active focus, the month's first: "This week's focus: Keep Dining Out under ₱1,500.00 · ₱640.00 so far" with a `ProgressBar`, amber from 80% and red past the target (its state, DATA_MODEL §5.22). A focus that isn't a cap shows its own progress: "Stay under your ₱4,000.00 mid level · ₱2,310.00 this cycle", "Pay E-wallet loan by Fri, Nov 20 · not paid yet" (or "· paid Nov 18"), "Log on 5 days this week · 3 so far". Clicking it opens `/level`. It's for today, like the balances, whatever the period switcher shows. The strip is one more glass panel on the screen with the most of them, so its task counts the dashboard's blurred panels with every banner showing (DESIGN_SYSTEM §11). If the strip takes it past the budget, the same rows go flat at the top of the Safe to spend card instead.
   - the dashboard is never shown while a check-in is due: the app opens on `/check-in` instead (§8.7).
 
 ---
@@ -374,7 +374,7 @@ Welcome to Jobert's Vault
 3. **Log something on the way:** **+ Add** (Ctrl+N) opens quick-add over the check-in. After Save, the step's figures update. This is how a balance that doesn't match gets fixed in the Balance check step.
 4. **Act on what's due:** **Pay bill** in the Card step, and **Pay** and **Record now** in the Loans and bills step, open the same forms as the dashboard's banners (F2, F13, F14), over the check-in (CHK-9).
 5. **Pick a focus** in the last step. Nothing is preselected, and **Finish** is disabled until one is chosen.
-6. **Finish** saves the check-in and opens the dashboard, with a "Check-in done" toast. If an account was left as **Doesn't match**, it opens that account's details instead, with the toast "Check-in done. Check this account against your real balance."
+6. **Finish** saves the check-in and opens the dashboard, with a "Check-in done" toast. If an account was left as **Doesn't match**, it opens that account's details instead (the first such account in the step's order), with the toast "Check-in done. Check this account against your real balance." Finish sets the check-in query to none before it moves, so the guard doesn't send it back.
 7. **Closing the app before Finish** saves nothing, so the check-in starts again from its first step at the next start.
 
 ### F18: A save reaches the focus (Phase 5, CHK-8)
@@ -538,8 +538,8 @@ A full-window screen with **no sidebar**, shown while a check-in is due (CHK-2).
 ```
 
 - **Top bar:** the logo, the title and the period ("Weekly check-in · Nov 9–15", "Monthly check-in · October 2026"), and **+ Add**. There's no close button, and Esc does nothing here. A merged check-in is titled as the monthly one.
-- **The panel** is one Level 1 glass panel, 880 px wide and centered, with the `StepIndicator` (DESIGN_SYSTEM §9.2) at the top, the step's sentence in `h1` size, its figures in flat cards inside the panel, and **Back** (hidden on the first step) and **Next** at the bottom. The last step's button is **Finish**. Enter presses Next, and the step is kept in the URL (`?step=3`), so Back and a reload stay put.
-- **The steps**, in order (CHK-3). A weekly check-in has 6 or 7, and a monthly one 8 or 9:
+- **The panel** is one Level 1 glass panel, 880 px wide and centered, with the `StepIndicator` (DESIGN_SYSTEM §9.2) at the top, the step's sentence in `h1` size, its figures in flat cards inside the panel, and **Back** (hidden on the first step) and **Next** at the bottom. The last step's button is **Finish**. Enter presses Next, and the step is kept in the URL by name (`?step=card`), so Back and a reload stay put, and a step that appears after a save (Goals, when a goal moves) doesn't move the user.
+- **The steps**, in order (CHK-3). A weekly check-in has 6 to 8 (with a month start day above 1, the first one finished in January can be weekly and still have Your year), and a monthly one 8 or 9:
 
 | Step | When | What it shows |
 |---|---|---|
@@ -550,12 +550,12 @@ A full-window screen with **no sidebar**, shown while a check-in is due (CHK-2).
 | **Goals** | A monthly check-in. A weekly one only when a goal moved or is Behind | Each active goal's `ProgressBar`, with "Now aims for Jul 5, 2027 (was May 5, 2027)" on one that moved by itself, and its Behind line (§8.4). With no goals: "No goals yet." |
 | **Balance check** | A monthly check-in | "Do these match your real accounts?" One row per account with its balance and a segmented control, **Matches** / **Doesn't match**, with neither chosen to start with. **Next** is disabled until every row has an answer. A row set to Doesn't match shows "Add what's missing with + Add. The balance updates here." (CHK-4) |
 | **Your year** | The first check-in finished in January | "2026: you earned ₱310,400.00 and spent ₱288,150.00." with the three figures against the year before, the 3 largest categories, the yearly budgets, the loans paid off, and "You started the year at level 2 and ended it at level 5." (CHK-5) |
-| **Stats and level** | Always | The `StatHexagon` with the six scores beside it, each with its change since the last check-in. The `LevelBadge`: "Level 4 · In the black". When it rose, the badge plays the level-up moment and the sentence is "You reached level 4." When it fell: "Level 3 now: a loan payment is overdue." Under it, the next best move and the two streaks: "4 check-ins in a row on time · 2 focuses kept in a row" (LVL-4, LVL-6, LVL-7) |
+| **Stats and level** | Always | The `StatHexagon` with the six scores beside it, each with its change since the last check-in. The `LevelBadge`: "Level 4 · In the black". When it rose, the badge plays the level-up moment and the sentence is "You reached level 4." When it fell: "Level 2 now: a loan payment is overdue." Under it, the next best move and the two streaks: "4 check-ins in a row on time · 2 focuses kept in a row" (LVL-4, LVL-6, LVL-7) |
 | **Pick a focus** | Always | "Pick one focus for this week." Up to 3 cards, one per offer, each with a sentence and what it's based on: "Keep Dining Out under ₱1,500.00 · that's what you spent the week before", "Spend under ₱3,920.00 this week · your Safe to spend, ₱560.00 a day", "Stay under your ₱5,000.00 hard level this cycle", "Pay E-wallet loan by Fri, Nov 20", "Log on at least 5 days this week". Clicking a card selects it, and ↑ ↓ move between them. **Finish** is disabled until one is selected (CHK-7) |
 
-- **A step with nothing to show** still appears, with one line saying so, so the count of steps is steady within a check-in.
+- **A step with nothing to show** still appears, with one line saying so. Only Goals can come and go, after a save.
 - **The forms** opened by + Add, Pay bill, Pay and Record now are the usual Level 2 dialogs over the screen. When one saves, the check-in's figures reload in place and the step stays where it is.
-- **Loading** is a skeleton of the panel. **An error** is the inline message with Retry (§9). The guard never traps the user behind a failed load: if `get_checkin` fails, the app opens normally and tries again on the next window focus.
+- **Loading** is a skeleton of the panel. **An error** is the inline message with Retry (§9). The guard never traps the user behind a failed load: if `get_checkin` fails, the app opens normally and tries again on the next window focus. Until its first answer, a guarded route shows nothing, so the dashboard never flashes before the check-in.
 - **Finish** is F17. A failed save is a toast, and the check-in stays open on its last step.
 
 ### 8.8 Level (`/level`), Phase 5
@@ -566,8 +566,8 @@ A full-window screen with **no sidebar**, shown while a check-in is due (CHK-2).
 │  ●───●───●───◉───○───○───○───○───○───○                                              │
 │  1   2   3   4   5   6   7   8   9   10                                             │
 │  Next: Level 5 · Steady                                                             │
-│   ✓ No pay window runs short in the next 12 months                                  │
 │   ○ Earn more than you spend 3 months in a row · 1 of 3 so far                      │
+│   ✓ No pay window runs short in the next 12 months                                  │
 │  Next best move: keep November's spending under your income.                        │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ┌─ Stats ─────────────────────────────────────┐ ┌─ Focus ─────────────────────────────┐
@@ -749,3 +749,4 @@ Answered on 2026-11-17 (Phase 5, the check-in and the Vault level):
 68. **The sidebar item is "Level"**, with the level chip beside the app name on every screen (§1, §8.8).
 69. **A failed load never locks the app.** If the check-in can't be loaded, the app opens normally and asks again on the next window focus (§8.7).
 70. **The first-launch form stays plain.** ONB-2's step indicator and tour were dropped (the owner, 2026-11-17): the only user is past it. This replaces item 1's "polished in Phase 5" (F5).
+71. **The check-in's step is kept in the URL by name**, not number, because the Goals step can appear after a save (§8.7).
