@@ -121,10 +121,12 @@ All colors are **CSS variables** in `src/styles/globals.css`. Components use the
 | `--warning` | Budget ≥ 80%, due-date banners (card and loan), stale-backup notice | `#8A4500` | `#FCD34D` | 5.3 / 8.4 |
 | `--danger` | Budget ≥ 100%, an overdue loan payment, a pay window that runs short, delete, errors (same red as `--expense`) | `#B4183A` | `#FDA4AF` | 4.95 / 6.4 |
 | `--danger-foreground` | Text on a danger button | `#FFFFFF` | `#0B1020` | 6.7 / 10.0 |
+| `--danger-banner` | The red mixed into a `danger` banner (§9.1). Dark mode uses a deeper red than `--danger`, because the light pink at 14% read as plain glass over the aurora | `#B4183A` | `#DC2626` | 11.2 / 9.4 (text), 16.5 / 8.2 (Pay button), — / 5.3 (icon) |
+| `--danger-banner-mix` | How much of `--danger-banner` a `danger` banner mixes in | `14%` | `30%` | — |
 | `--success` | Goal achieved, loan paid off, "You're debt-free", "Saved" toasts | `#03684A` | `#6EE7B7` | 5.0 / 7.9 |
 
 - **Tints:** each meaning color has a tint for chips and banners. It's the color mixed into transparent at **16%** in light mode and **20%** in dark (`--tint`).
-- **Banners** are panel glass with the meaning color mixed in at 14%, and a border with it mixed in at 35%.
+- **Banners** are panel glass with the meaning color mixed in at 14%, and a border with it mixed in at 35%. A `danger` banner mixes in `--danger-banner` at `--danger-banner-mix` instead, so in dark mode it reads as red and as more urgent than the amber `warning` banner beside it. Its contrast figures are `--foreground` text, the `secondary` Pay button's text and the `--danger` icon on the banner, at the worst spot and with transparency off.
 
 ### 3.4 Category palette (`cat-1` … `cat-12`)
 
@@ -357,7 +359,7 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **Dialog** | Level 2 | 24 px radius, max width 480 px (forms), 400 px (confirmations) or 640 px (a list whose rows have actions, such as the recurring dates due, which scrolls inside it past 60% of the window's height). The backdrop is `--overlay` plus a 6 px blur of the app behind. Esc closes it, and focus stays inside. |
 | **Confirm dialog** | Level 2 | A title, one sentence, `secondary` Cancel, and a `primary` or `destructive` button that names the action. |
 | **Toast** | Level 2 | Bottom-right, 16 px radius, several shown one above the other. Closes after 4 s. One with an action, such as **Open folder**, stays 10 s, and its action is a ghost `sm` button in `--primary` text. Errors stay until closed. From Phase 4, a warning (a card spending level reached, CC-11) has the `triangle-alert` icon in `--warning` and stays 8 s. From Phase 5, a focus reaching 80% of its target or going past it (CHK-8) is the same warning toast. |
-| **Banner** | Level 1, tinted | Panel glass mixed with the meaning color at 14%. Has an icon, the message and an optional action. Variants: `warning`, `danger`, `info`. Inside another panel, the tint is flat (§2.3). `components/Banner.tsx` has `warning` (`.glass-warning`, the backup warning and the card due date) and `info` (`.glass-info`, tinted with `--primary` as in the mockups, the recurring dates due). From Phase 4 it also has `danger` (`.glass-danger`, an overdue loan payment), and uses `warning` for a loan payment due. A banner can have a second line in `small` text (`detail`), such as "Move ₱800.00 there first." |
+| **Banner** | Level 1, tinted | Panel glass mixed with the meaning color at 14%. Has an icon, the message and an optional action. Variants: `warning`, `danger`, `info`. Inside another panel, the tint is flat (§2.3). `components/Banner.tsx` has `warning` (`.glass-warning`, the backup warning and the card due date) and `info` (`.glass-info`, tinted with `--primary` as in the mockups, the recurring dates due). From Phase 4 it also has `danger` (`.glass-danger`, an overdue loan payment, tinted with `--danger-banner` at `--danger-banner-mix`, §3.3), and uses `warning` for a loan payment due. A banner can have a second line in `small` text (`detail`), such as "Move ₱800.00 there first." |
 | **Tabs** | Flat | Inside Settings. A 2 px `--primary` underline marks the active tab. |
 | **Skeleton** | Flat | `--wash` blocks with no shimmer, shown only if loading takes more than **150 ms**. |
 | **Empty state** | Inside a panel | A 24 px icon, one line of text and one main action. |
@@ -447,3 +449,4 @@ Glass costs graphics power, so these rules keep the app smooth:
 | 2026-11-17 | Phase 5: the check-in is a full-window screen with one glass panel, never a dialog, so the forms it opens aren't glass inside glass (§2.3, ADR 0012) |
 | 2026-11-17 | Phase 5: the `StepIndicator`, `StatHexagon`, `LevelBadge` (and the sidebar's level chip), `LevelPath`, `FocusStrip` and focus offer card, the Level sidebar icon, and the level-up moment, the only animation longer than 200 ms. They use existing tokens only: the level is always `--primary`, never gold or a color of its own, and no stat has its own color. |
 | 2026-11-18 | Windows' transparency setting and the Reduce transparency switch share one `transparency-off` variant, and it unblurs the dialog backdrop too (§2.4) |
+| 2026-11-18 | The `danger` banner gets its own tint, `--danger-banner` at `--danger-banner-mix` (`#DC2626` at 30% in dark mode, unchanged in light), so an overdue loan payment reads as red beside a warning in dark mode (§3.3, LOAN-4) |

@@ -21,7 +21,7 @@
   --foreground: #0B1020; --muted-foreground: #3D4560;
   --primary: #3730A3; --primary-hover: #312E81; --primary-foreground: #FFFFFF; --ring: #3730A3;
   --income: #03684A; --expense: #B4183A; --transfer: #3D4560;
-  --warning: #8A4500; --danger: #B4183A; --danger-foreground: #FFFFFF; --success: #03684A;
+  --warning: #8A4500; --danger: #B4183A; --danger-foreground: #FFFFFF; --danger-banner: #B4183A; --danger-banner-mix: 14%; --success: #03684A;
   --cat-1: #1D4ED8; --cat-2: #C2410C; --cat-3: #0F766E; --cat-4: #BE185D; --cat-5: #6D28D9; --cat-6: #B45309;
   --cat-7: #0E7490; --cat-8: #BE123C; --cat-9: #4D7C0F; --cat-10: #A21CAF; --cat-11: #57534E; --cat-12: #047857;
   --tint: 16%;
@@ -42,7 +42,7 @@
     --foreground: #F5F7FF; --muted-foreground: #C3C9DE;
     --primary: #A5B4FC; --primary-hover: #C7D2FE; --primary-foreground: #0B1020; --ring: #A5B4FC;
     --income: #6EE7B7; --expense: #FDA4AF; --transfer: #C3C9DE;
-    --warning: #FCD34D; --danger: #FDA4AF; --danger-foreground: #0B1020; --success: #6EE7B7;
+    --warning: #FCD34D; --danger: #FDA4AF; --danger-foreground: #0B1020; --danger-banner: #DC2626; --danger-banner-mix: 30%; --success: #6EE7B7;
     --cat-1: #93C5FD; --cat-2: #FDBA74; --cat-3: #5EEAD4; --cat-4: #F9A8D4; --cat-5: #C4B5FD; --cat-6: #FCD34D;
     --cat-7: #67E8F9; --cat-8: #FDA4AF; --cat-9: #BEF264; --cat-10: #F0ABFC; --cat-11: #D6D3D1; --cat-12: #6EE7B7;
     --tint: 20%;
@@ -63,7 +63,7 @@
   --foreground: #F5F7FF; --muted-foreground: #C3C9DE;
   --primary: #A5B4FC; --primary-hover: #C7D2FE; --primary-foreground: #0B1020; --ring: #A5B4FC;
   --income: #6EE7B7; --expense: #FDA4AF; --transfer: #C3C9DE;
-  --warning: #FCD34D; --danger: #FDA4AF; --danger-foreground: #0B1020; --success: #6EE7B7;
+  --warning: #FCD34D; --danger: #FDA4AF; --danger-foreground: #0B1020; --danger-banner: #DC2626; --danger-banner-mix: 30%; --success: #6EE7B7;
   --cat-1: #93C5FD; --cat-2: #FDBA74; --cat-3: #5EEAD4; --cat-4: #F9A8D4; --cat-5: #C4B5FD; --cat-6: #FCD34D;
   --cat-7: #67E8F9; --cat-8: #FDA4AF; --cat-9: #BEF264; --cat-10: #F0ABFC; --cat-11: #D6D3D1; --cat-12: #6EE7B7;
   --tint: 20%;
@@ -205,6 +205,9 @@ body.reduce-transparency .preview.on-surface::after,
 .solid {
   background: var(--glass-solid) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
 }
+/* A banner keeps its tint when solid, as in the app (§2.4, §9.1) */
+@media (prefers-reduced-transparency: reduce) { .v-banner { background: color-mix(in srgb, var(--bg) var(--mix), var(--glass-solid)); } }
+body.reduce-transparency .v-banner, .v-banner.solid { background: color-mix(in srgb, var(--bg) var(--mix), var(--glass-solid)) !important; }
 
 /* ---------- App primitives ---------- */
 svg.lucide { width: 16px; height: 16px; flex: none; }
@@ -303,10 +306,10 @@ svg.lucide { width: 16px; height: 16px; flex: none; }
 .v-progress.neutral > i { background: var(--muted-foreground); }
 .v-prog-row { display: flex; align-items: center; gap: 10px; }
 
-.v-banner { --c: var(--primary); display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 16px; flex-wrap: wrap; background: color-mix(in srgb, var(--c) 14%, var(--glass)); border-color: color-mix(in srgb, var(--c) 35%, var(--edge)); }
+.v-banner { --c: var(--primary); --bg: var(--c); --mix: 14%; display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 16px; flex-wrap: wrap; background: color-mix(in srgb, var(--bg) var(--mix), var(--glass)); border-color: color-mix(in srgb, var(--c) 35%, var(--edge)); }
 .v-banner > svg.lucide { color: var(--c); }
 .v-banner .msg { flex: 1 1 200px; min-width: 0; }
-.v-banner.warning { --c: var(--warning); } .v-banner.danger { --c: var(--danger); } .v-banner.info { --c: var(--primary); }
+.v-banner.warning { --c: var(--warning); } .v-banner.danger { --c: var(--danger); --bg: var(--danger-banner); --mix: var(--danger-banner-mix); } .v-banner.info { --c: var(--primary); }
 
 .v-toast { display: flex; gap: 10px; align-items: center; padding: 10px 12px 10px 14px; border-radius: 16px; max-width: 380px; }
 .v-toast > svg.lucide:first-child { color: var(--success); }

@@ -54,6 +54,8 @@
   --warning: #8a4500;
   --danger: #b4183a;
   --danger-foreground: #ffffff;
+  --danger-banner: #b4183a;
+  --danger-banner-mix: 14%;
   --success: #03684a;
   --cat-1: #1d4ed8;
   --cat-2: #c2410c;
@@ -105,6 +107,9 @@
   --warning: #fcd34d;
   --danger: #fda4af;
   --danger-foreground: #0b1020;
+  /* A deeper red: the light pink at 14% read as plain glass over the aurora (§3.3). */
+  --danger-banner: #dc2626;
+  --danger-banner-mix: 30%;
   --success: #6ee7b7;
   --cat-1: #93c5fd;
   --cat-2: #fdba74;
@@ -260,7 +265,8 @@
   backdrop-filter: none;
 }
 
-/* A banner (§9.1): its glass mixed with its meaning color at 14%, flat inside a panel. */
+/* A banner (§9.1): its glass mixed with its meaning color at 14% (danger: --danger-banner-mix),
+   flat inside a panel. */
 .glass-warning {
   --banner: var(--warning);
 }
@@ -268,16 +274,17 @@
   --banner: var(--primary);
 }
 .glass-danger {
-  --banner: var(--danger);
+  --banner: var(--danger-banner);
+  --banner-mix: var(--danger-banner-mix);
 }
 :is(.glass-warning, .glass-info, .glass-danger) {
-  background: color-mix(in srgb, var(--banner) 14%, var(--glass));
+  background: color-mix(in srgb, var(--banner) var(--banner-mix, 14%), var(--glass));
   @variant transparency-off {
-    background: color-mix(in srgb, var(--banner) 14%, var(--glass-solid));
+    background: color-mix(in srgb, var(--banner) var(--banner-mix, 14%), var(--glass-solid));
   }
 }
 :is(.glass, .glass-raised) :is(.glass-warning, .glass-info, .glass-danger) {
-  background: color-mix(in srgb, var(--banner) 14%, transparent);
+  background: color-mix(in srgb, var(--banner) var(--banner-mix, 14%), transparent);
 }
 
 @layer base {
