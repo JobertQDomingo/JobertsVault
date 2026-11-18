@@ -20,6 +20,7 @@ const settings: Settings = {
   autoUpdateEnabled: true,
   comparisonMode: "to_date",
   theme: "system",
+  reduceTransparency: false,
 };
 const saved = { ...settings, decimalsLocked: false };
 
@@ -125,6 +126,21 @@ test("a theme change alone leaves the ledger alone (SET-5)", async () => {
     ...saved,
     theme: "dark",
   });
+  expect(client.getQueryState(["ledger", "dashboard"])?.isInvalidated).toBe(
+    false,
+  );
+});
+
+test("a Reduce transparency change alone leaves the ledger alone (SET-8)", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({
+    ...saved,
+    reduceTransparency: true,
+  });
+  const client = new QueryClient();
+  client.setQueryData(["settings"], saved);
+  client.setQueryData(["ledger", "dashboard"], "totals");
+  const result = renderUpdate(client);
+  await result.current.mutateAsync({ reduceTransparency: true });
   expect(client.getQueryState(["ledger", "dashboard"])?.isInvalidated).toBe(
     false,
   );

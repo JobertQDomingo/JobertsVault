@@ -89,11 +89,23 @@ test("a raised element inside a panel keeps its material but isn't blurred again
   expect(raised).not.toContain("background");
 });
 
-test("transparency off makes glass solid", () => {
-  const start = css.indexOf("@media (prefers-reduced-transparency: reduce)");
-  expect(start).toBeGreaterThanOrEqual(0);
-  const block = css.slice(start, css.indexOf("\n}", start));
-  for (const part of [".glass", ".glass-raised", "var(--glass-solid)"])
-    expect(block).toContain(part);
-  expect(block).toMatch(/backdrop-filter:\s*none/);
+test("Windows and the switch share one transparency-off variant (§2.4, SET-8)", () => {
+  const variant = rule("@custom-variant transparency-off");
+  expect(variant).toContain("@media (prefers-reduced-transparency: reduce)");
+  expect(variant).toContain(
+    "&:where(.reduce-transparency, .reduce-transparency *)",
+  );
+  // Nothing else asks Windows, so the switch and the setting can't drift apart.
+  expect(css.split("prefers-reduced-transparency")).toHaveLength(2);
+});
+
+test("transparency off makes glass solid and blurs nothing", () => {
+  const off = /@variant transparency-off \{\s*([^}]*)\}/;
+  expect(rule(".glass,\n.glass-raised").match(off)?.[1]).toContain(
+    "background: var(--glass-solid)",
+  );
+  expect(rule("*").match(off)?.[1]).toContain("backdrop-filter: none");
+  expect(
+    rule(":is(.glass-warning, .glass-info, .glass-danger)").match(off)?.[1],
+  ).toContain("var(--glass-solid)");
 });
