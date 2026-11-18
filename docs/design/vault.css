@@ -305,7 +305,7 @@ svg.lucide { width: 16px; height: 16px; flex: none; }
 .v-progress.neutral > i { background: var(--muted-foreground); }
 .v-prog-row { display: flex; align-items: center; gap: 10px; }
 
-.v-banner { --c: var(--primary); --bg: var(--c); --mix: 14%; display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 16px; flex-wrap: wrap; background: color-mix(in srgb, var(--bg) var(--mix), var(--glass)); border-color: color-mix(in srgb, var(--c) 35%, var(--edge)); }
+.v-banner { --c: var(--primary); --bg: var(--c); --mix: 14%; display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 16px; flex-wrap: wrap; background: color-mix(in srgb, var(--bg) var(--mix), var(--glass)); border-color: color-mix(in srgb, var(--bg) 35%, var(--edge)); }
 .v-banner > svg.lucide { color: var(--c); }
 .v-banner .msg { flex: 1 1 200px; min-width: 0; }
 .v-banner.warning { --c: var(--warning); } .v-banner.danger { --c: var(--danger); --bg: var(--danger-banner); --mix: var(--danger-banner-mix); }

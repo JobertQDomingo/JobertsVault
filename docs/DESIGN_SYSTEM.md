@@ -126,7 +126,7 @@ All colors are **CSS variables** in `src/styles/globals.css`. Components use the
 | `--success` | Goal achieved, loan paid off, "You're debt-free", "Saved" toasts | `#03684A` | `#6EE7B7` | 5.0 / 7.9 |
 
 - **Tints:** each meaning color has a tint for chips and banners. It's the color mixed into transparent at **16%** in light mode and **20%** in dark (`--tint`).
-- **Banners** are panel glass with the meaning color mixed in at 14%, and a border with it mixed in at 35%. A `danger` banner mixes in `--danger-banner` at `--danger-banner-mix` instead, so in dark mode it reads as red and as more urgent than the amber `warning` banner beside it. Its contrast figures are `--foreground` text, the `secondary` Pay button's text and the `--danger` icon on the banner, at the worst spot and with transparency off.
+- **Banners** are panel glass with the meaning color mixed in at 14%, and a border with it mixed in at 35%. A `danger` banner mixes `--danger-banner` into its glass at `--danger-banner-mix` instead, and into its border at 35%, so in dark mode it reads as red and as more urgent than the amber `warning` banner beside it. Its contrast figures are `--foreground` text, the `secondary` Pay button's text and the `--danger` icon on the banner, at the worst spot and with transparency off.
 
 ### 3.4 Category palette (`cat-1` … `cat-12`)
 
@@ -450,3 +450,4 @@ Glass costs graphics power, so these rules keep the app smooth:
 | 2026-11-17 | Phase 5: the `StepIndicator`, `StatHexagon`, `LevelBadge` (and the sidebar's level chip), `LevelPath`, `FocusStrip` and focus offer card, the Level sidebar icon, and the level-up moment, the only animation longer than 200 ms. They use existing tokens only: the level is always `--primary`, never gold or a color of its own, and no stat has its own color. |
 | 2026-11-18 | Windows' transparency setting and the Reduce transparency switch share one `transparency-off` variant, and it unblurs the dialog backdrop too (§2.4) |
 | 2026-11-18 | The `danger` banner gets its own tint, `--danger-banner` at `--danger-banner-mix` (`#DC2626` at 30% in dark mode, unchanged in light), so an overdue loan payment reads as red beside a warning in dark mode (§3.3, LOAN-4) |
+| 2026-11-18 | The banners' 35% tinted border (§3.3) was in this doc and the preview but never built in the app. The owner chose to build it, for every tone |
