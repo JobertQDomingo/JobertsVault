@@ -519,11 +519,11 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
 
     <h3 class="sub">Banners and toasts</h3>
     <div class="preview stack">
-      <div class="v-banner warning"><i data-lucide="calendar-clock" class="s20"></i><div class="msg">Credit card payment due in 3 days: ₱640.00 owed</div><button class="v-btn primary sm" type="button">Pay bill</button></div>
+      <div class="v-banner warning"><i data-lucide="calendar-clock" class="s20"></i><div class="msg">Credit card payment due in 3 days: ₱640.00 owed</div><button class="v-btn secondary sm" type="button">Pay bill</button></div>
       <div class="v-banner danger"><i data-lucide="octagon-alert" class="s20"></i><div class="msg">Shopping is ₱30.00 over its October budget.</div></div>
       <div class="v-banner info"><i data-lucide="repeat" class="s20"></i><div class="msg">2 recurring transactions are due.</div><button class="v-btn secondary sm" type="button">Review</button></div>
-      <div class="v-banner warning"><i data-lucide="calendar-clock" class="s20"></i><div class="msg">E-wallet loan: ₱1,000.00 due Wed, Oct 28<div class="cap">E-wallet has ₱150.00. Move ₱850.00 there first.</div></div><button class="v-btn primary sm" type="button">Pay</button><span class="phase">P4</span></div>
-      <div class="v-banner danger"><i data-lucide="octagon-alert" class="s20"></i><div class="msg">E-wallet loan: ₱1,000.00 overdue since Mon, Oct 26, and 1 more overdue</div><button class="v-btn primary sm" type="button">Pay</button><span class="phase">P4</span></div>
+      <div class="v-banner warning"><i data-lucide="calendar-clock" class="s20"></i><div class="msg">E-wallet loan: ₱1,000.00 due Wed, Oct 28<div class="cap">E-wallet has ₱150.00. Move ₱850.00 there first.</div></div><button class="v-btn secondary sm" type="button">Pay</button><span class="phase">P4</span></div>
+      <div class="v-banner danger"><i data-lucide="octagon-alert" class="s20"></i><div class="msg">E-wallet loan: ₱1,000.00 overdue since Mon, Oct 26, and 1 more overdue</div><button class="v-btn secondary sm" type="button">Pay</button><span class="phase">P4</span></div>
       <div class="row" style="justify-content:flex-end">
         <div class="v-toast"><i data-lucide="circle-check"></i><span class="msg">Saved</span></div>
         <div class="v-toast"><i data-lucide="triangle-alert" style="color:var(--warning)"></i><span class="msg">Credit card: ₱3,240.00 this cycle, past your ₱3,000.00 soft level.</span></div>
@@ -626,6 +626,8 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
     else if (kind === "fill") body = '<div class="sw-glass"><span class="v-btn sm" style="background:' + value + ';color:var(--primary-foreground)">Hover</span></div>';
     else if (kind === "onprimary") body = '<div class="sw-glass"><span class="v-btn sm" style="background:var(--primary);color:' + value + '">Save</span></div>';
     else if (kind === "ondanger") body = '<div class="sw-glass"><span class="v-btn sm" style="background:var(--danger);color:' + value + '">Delete</span></div>';
+    else if (kind === "banner") body = '<div class="sw-glass" style="background:color-mix(in srgb, ' + value + ' var(--danger-banner-mix), var(--glass))">Overdue</div>';
+    else if (kind === "bannermix") body = '<div class="sw-glass" style="background:color-mix(in srgb, var(--danger-banner) ' + value + ', var(--glass))">Overdue</div>';
     else if (kind === "ring") body = '<div class="sw-glass"><span class="v-btn sm secondary" style="outline:2px solid ' + value + ';outline-offset:2px">Focused</span></div>';
     else body = '<div class="sw-glass" style="color:' + value + '">' + (name === "--expense" || name === "--danger" ? "−₱85.20" : name === "--income" || name === "--success" ? "+₱4,200" : "Aa ₱1,234") + '</div>';
     var r = ratio ? '<span class="aa">' + ratio + ' : 1</span>' : "";
@@ -662,6 +664,8 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
     ["--warning", "Budget ≥ 80%, due date, stale backup", "#8A4500", "#FCD34D", "text", "5.3", "8.4"],
     ["--danger", "Budget ≥ 100%, delete, errors", "#B4183A", "#FDA4AF", "text", "4.95", "6.4"],
     ["--danger-foreground", "Text on a danger button", "#FFFFFF", "#0B1020", "ondanger", "6.7", "10.0"],
+    ["--danger-banner", "The red mixed into a danger banner (text contrast shown)", "#B4183A", "#DC2626", "banner", "11.2", "9.4"],
+    ["--danger-banner-mix", "How much of it a danger banner mixes in", "14%", "30%", "bannermix"],
     ["--success", "Goal achieved, \"Saved\" toasts", "#03684A", "#6EE7B7", "text", "5.0", "7.9"]
   ], "sw-meaning");
 
