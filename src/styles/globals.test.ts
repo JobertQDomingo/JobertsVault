@@ -127,3 +127,13 @@ test("the danger banner has its own tint, deeper in dark mode (§3.3, LOAN-4)", 
   for (const tone of [".glass-warning", ".glass-info"])
     expect(rule(tone)).toContain("--banner-mix: 14%");
 });
+
+test("a banner's border is tinted with its color (§3.3)", () => {
+  expect(rule(":is(.glass-warning, .glass-info, .glass-danger)")).toContain(
+    "border-color: color-mix(in srgb, var(--banner) 35%, var(--edge))",
+  );
+  // Inside a panel it's flat and borderless: this rule must keep beating the one above.
+  expect(rule(":is(.glass, .glass-raised) .glass")).toContain(
+    "border-color: transparent",
+  );
+});

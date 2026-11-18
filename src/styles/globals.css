@@ -266,7 +266,7 @@
 }
 
 /* A banner (§9.1): its glass mixed with its meaning color at 14% (danger: --danger-banner-mix),
-   flat inside a panel. */
+   and its border at 35%. Flat and borderless inside a panel. */
 .glass-warning {
   --banner: var(--warning);
   --banner-mix: 14%;
@@ -281,6 +281,7 @@
 }
 :is(.glass-warning, .glass-info, .glass-danger) {
   background: color-mix(in srgb, var(--banner) var(--banner-mix), var(--glass));
+  border-color: color-mix(in srgb, var(--banner) 35%, var(--edge));
   @variant transparency-off {
     background: color-mix(
       in srgb,
