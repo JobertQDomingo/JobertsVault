@@ -37,7 +37,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
-      - run: rustup component add rustfmt clippy
+      # Runner images roll out with different Rust versions, and the version is part of the cache
+      # key, so without this a run on the other image misses the cache and builds from scratch.
+      - run: rustup update stable --no-self-update && rustup default stable && rustup component add rustfmt clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
@@ -63,4 +65,7 @@ jobs:
       - name: Both halves passed
         run: |
           echo "frontend: ${{ needs.frontend.result }}, rust: ${{ needs.rust.result }}"
-          test "${{ needs.frontend.result }}" = success && test "${{ needs.rust.result }}" = success
+          for job in "frontend:${{ needs.frontend.result }}" "rust:${{ needs.rust.result }}"; do
+            [ "${job#*:}" = success ] || { echo "::error::The ${job%%:*} job ended as ${job#*:}"; failed=1; }
+          done
+          exit ${failed:-0}
