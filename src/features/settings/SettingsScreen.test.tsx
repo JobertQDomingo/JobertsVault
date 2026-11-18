@@ -337,3 +337,17 @@ test("Appearance opens from the URL and saves the theme (SET-5)", async () => {
   await waitFor(() => expect(saves()).toEqual([{ ...STORED, theme: "dark" }]));
   await waitFor(() => expect(saved).toHaveBeenCalledWith("Saved"));
 });
+
+test("Appearance saves Reduce transparency (SET-8)", async () => {
+  const saved = vi.spyOn(notify, "success");
+  renderRoute("/settings?tab=appearance", ANSWERS);
+  const toggle = await screen.findByRole("switch", {
+    name: "Reduce transparency",
+  });
+  expect(toggle.getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(toggle);
+  await waitFor(() =>
+    expect(saves()).toEqual([{ ...STORED, reduceTransparency: true }]),
+  );
+  await waitFor(() => expect(saved).toHaveBeenCalledWith("Saved"));
+});

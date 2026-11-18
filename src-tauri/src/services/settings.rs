@@ -50,6 +50,8 @@ pub struct Settings {
     /// The comparison the dashboard's % change uses, and Reports by default (SET-7).
     pub comparison_mode: ComparisonMode,
     pub theme: Theme,
+    /// Solid panels and no blur, whatever Windows' transparency setting says (SET-8).
+    pub reduce_transparency: bool,
 }
 
 impl Default for Settings {
@@ -65,6 +67,7 @@ impl Default for Settings {
             auto_update_enabled: true,
             comparison_mode: ComparisonMode::ToDate,
             theme: Theme::System,
+            reduce_transparency: false,
         }
     }
 }
@@ -169,6 +172,10 @@ pub fn update(conn: &mut Connection, mut settings: Settings) -> Result<SettingsV
             comparison_mode_text(settings.comparison_mode).into(),
         ),
         ("theme", theme_text(settings.theme).into()),
+        (
+            "reduce_transparency",
+            settings.reduce_transparency.to_string(),
+        ),
     ] {
         repo::settings::set(&tx, key, &value)?;
     }
@@ -219,6 +226,7 @@ fn read(settings: &mut Settings, key: &str, value: &str) -> Option<()> {
                 .into_iter()
                 .find(|t| theme_text(*t) == value)?
         }
+        "reduce_transparency" => settings.reduce_transparency = flag()?,
         // Later phases' keys, and last_used_account_id, which transactions own.
         _ => {}
     }
@@ -300,6 +308,7 @@ mod tests {
             auto_update_enabled: true,
             comparison_mode: ComparisonMode::ToDate,
             theme: Theme::System,
+            reduce_transparency: false,
         };
         assert_eq!(Settings::default(), defaults);
         assert_eq!(
@@ -325,6 +334,7 @@ mod tests {
             auto_update_enabled: false,
             comparison_mode: ComparisonMode::Full,
             theme: Theme::Dark,
+            reduce_transparency: true,
         };
         let saved = update(&mut conn, changed.clone()).unwrap();
         let stored = repo::settings::get(&conn, "comparison_mode").unwrap();
@@ -488,6 +498,26 @@ mod tests {
             update(&mut conn, with).unwrap();
             assert_eq!(get(&conn).unwrap().settings.theme, theme);
         }
+    }
+
+    #[test]
+    fn reduce_transparency_is_stored_and_read_back() {
+        let mut conn = db();
+        for reduce_transparency in [true, false] {
+            let with = Settings {
+                reduce_transparency,
+                ..Settings::default()
+            };
+            update(&mut conn, with).unwrap();
+            assert_eq!(
+                get(&conn).unwrap().settings.reduce_transparency,
+                reduce_transparency
+            );
+        }
+        assert_eq!(
+            repo::settings::get(&conn, "reduce_transparency").unwrap(),
+            Some("false".into())
+        );
     }
 
     #[test]

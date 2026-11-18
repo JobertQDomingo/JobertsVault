@@ -11,4 +11,8 @@ export type Settings = { currencySymbol: string, currencyPosition: CurrencyPosit
 /**
  * The comparison the dashboard's % change uses, and Reports by default (SET-7).
  */
-comparisonMode: ComparisonMode, theme: Theme, };
+comparisonMode: ComparisonMode, theme: Theme, 
+/**
+ * Solid panels and no blur, whatever Windows' transparency setting says (SET-8).
+ */
+reduceTransparency: boolean, };

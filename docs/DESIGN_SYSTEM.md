@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Approved v1.2 |
 | **Style** | **Glassmorphism 2.0**: frosted glass panels floating over a soft colored light (the "aurora") |
-| **Last updated** | 2026-11-17 |
+| **Last updated** | 2026-11-18 |
 | **Related docs** | [PRD.md](PRD.md), [UI_FLOWS.md](UI_FLOWS.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 | **Built with** | Tailwind CSS 4 + shadcn/ui (Radix), lucide-react icons, Sora font (bundled) |
 
@@ -69,10 +69,10 @@ Inside a panel, things are **flat**:
 
 When Windows' **Transparency effects** setting is off, the app detects it through the CSS `prefers-reduced-transparency: reduce` media query:
 - Every panel and raised element becomes solid `--glass-solid`.
-- Blur is turned off.
+- Nothing is blurred, the dialog backdrop included.
 - The aurora, shapes, colors and layout stay the same.
 
-Settings → Appearance also has a **Reduce transparency** switch (SET-8, Phase 5), stored as `reduce_transparency`, that does the same for this app alone.
+Settings → Appearance also has a **Reduce transparency** switch (SET-8, Phase 5), stored as `reduce_transparency`, that does the same for this app alone. `FollowReduceTransparency`, in `App` above the router, keeps it as the `.reduce-transparency` class on `<html>`, set before the screens' first paint, so screens outside the shell (`/welcome`, `/check-in`) follow it too. Both come through one Tailwind variant, `transparency-off`, so the switch and the Windows setting can never look different. The "Checking for updates…" notice at startup comes before the settings load, so it follows Windows only.
 
 ---
 
@@ -166,9 +166,13 @@ Categories store a palette key, not a hex code (DATA_MODEL §3.2), so they switc
 @utility glass        { background: var(--glass);        border: 1px solid var(--edge); backdrop-filter: blur(22px) saturate(170%); box-shadow: var(--shadow-panel); }
 @utility glass-raised { background: var(--glass-strong); border: 1px solid var(--edge); backdrop-filter: blur(32px) saturate(180%); box-shadow: var(--shadow-raised); }
 
-@media (prefers-reduced-transparency: reduce) {
-  .glass, .glass-raised { background: var(--glass-solid); backdrop-filter: none; }
+/* §2.4: Windows' setting or the Reduce transparency switch (SET-8), through one variant */
+@custom-variant transparency-off {
+  @media (prefers-reduced-transparency: reduce) { @slot; }
+  &:where(.reduce-transparency, .reduce-transparency *) { @slot; }
 }
+.glass, .glass-raised { @variant transparency-off { background: var(--glass-solid); } }
+* { @variant transparency-off { backdrop-filter: none; } }
 
 @theme inline {
   --color-income: var(--income);
@@ -442,3 +446,4 @@ Glass costs graphics power, so these rules keep the app smooth:
 | 2026-11-17 | The theme switch (SET-5) sets the window's theme from Rust rather than the class from a frontend copy of the setting, so the first paint and the title bar are right too (§3.5) |
 | 2026-11-17 | Phase 5: the check-in is a full-window screen with one glass panel, never a dialog, so the forms it opens aren't glass inside glass (§2.3, ADR 0012) |
 | 2026-11-17 | Phase 5: the `StepIndicator`, `StatHexagon`, `LevelBadge` (and the sidebar's level chip), `LevelPath`, `FocusStrip` and focus offer card, the Level sidebar icon, and the level-up moment, the only animation longer than 200 ms. They use existing tokens only: the level is always `--primary`, never gold or a color of its own, and no stat has its own color. |
+| 2026-11-18 | Windows' transparency setting and the Reduce transparency switch share one `transparency-off` variant, and it unblurs the dialog backdrop too (§2.4) |

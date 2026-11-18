@@ -28,8 +28,9 @@ export function useUpdateSettings() {
     scope: { id: "settings" },
     onSuccess: (saved, change) => {
       client.setQueryData(queryKeys.settings, saved);
-      // The theme is only the look: Rust has already given it to the window.
-      if (Object.keys(change).every((key) => key === "theme")) return;
+      // The theme and transparency are only the look: no total depends on them.
+      const look = ["theme", "reduceTransparency"];
+      if (Object.keys(change).every((key) => look.includes(key))) return;
       // The week start and month start day change the totals (ARCHITECTURE §5.2).
       return client.invalidateQueries({ queryKey: queryKeys.ledger });
     },

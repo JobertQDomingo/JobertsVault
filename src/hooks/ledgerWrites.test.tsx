@@ -160,6 +160,7 @@ const settings: Settings = {
   autoUpdateEnabled: true,
   comparisonMode: "to_date",
   theme: "system",
+  reduceTransparency: false,
 };
 
 // Every write the app can make (ARCHITECTURE §4.5), with the arguments it sends to Rust.
