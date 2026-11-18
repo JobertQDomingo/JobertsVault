@@ -11,8 +11,9 @@ const TONES = {
 
 /**
  * A banner (DESIGN_SYSTEM §9.1): Level 1 glass tinted with its meaning color (`--warning`,
- * `--primary` for info, or `--danger-banner` at `--danger-banner-mix` for danger), an icon, the message, an optional second line in small
- * text and an optional action. Inside another panel it's a flat tint (§2.3).
+ * `--primary` for info, or `--danger-banner` at `--danger-banner-mix` for danger) and a border
+ * with it at 35%, an icon, the message, an optional second line in small text and an optional
+ * action. Inside another panel it's a flat tint with no border (§2.3).
  */
 export function Banner({
   children,
