@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Approved v1.3 |
 | **Style** | Glassmorphism 2.0 ([DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)) |
-| **Last updated** | 2026-11-17 |
+| **Last updated** | 2026-11-19 |
 | **Related docs** | [PRD.md](PRD.md), [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), [ARCHITECTURE.md](ARCHITECTURE.md) §5.4 (routes) |
 
 The sketches below are rough layouts, not pixel-perfect designs. Spacing, colors, glass levels and components come from DESIGN_SYSTEM.md. [design/ui-flows.html](design/ui-flows.html) shows every screen drawn in the real style, with consistent ₱ sample data. Open it in a browser.
@@ -369,12 +369,12 @@ Welcome to Jobert's Vault
 5. The card's details show the level under "This cycle" (soft in the muted text color, mid in `--warning` and hard in `--danger`, each with the level's name, and an icon from mid up), and so do its row in the Accounts list and the dashboard's card summary.
 
 ### F17: Finish a check-in (Phase 5, CHK-1 to CHK-9)
-1. **It appears by itself.** On Monday (or the first day of a new month), the app opens on the check-in (§8.7) instead of the dashboard. It also appears when the date changes while the app is open, the next time the window gets focus. There's nothing to click to start it, and no way to close or postpone it.
+1. **It appears by itself.** On Monday (or the first day of a new month), the app opens on the check-in (§8.7) instead of the dashboard. It also appears when the date changes while the app is open: the next time the window gets focus, or at midnight. There's nothing to click to start it, and no way to close or postpone it.
 2. **Go through the steps** with **Next** (Enter) and **Back**. Each step opens with one sentence that sums it up, with the figures below.
 3. **Log something on the way:** **+ Add** (Ctrl+N) opens quick-add over the check-in. After Save, the step's figures update. This is how a balance that doesn't match gets fixed in the Balance check step.
 4. **Act on what's due:** **Pay bill** in the Card step, and **Pay** and **Record now** in the Loans and bills step, open the same forms as the dashboard's banners (F2, F13, F14), over the check-in (CHK-9).
 5. **Pick a focus** in the last step. Nothing is preselected, and **Finish** is disabled until one is chosen.
-6. **Finish** saves the check-in and opens the dashboard, with a "Check-in done" toast. If an account was left as **Doesn't match**, it opens that account's details instead (the first such account in the step's order), with the toast "Check-in done. Check this account against your real balance." Finish sets the check-in query to none before it moves, so the guard doesn't send it back.
+6. **Finish** saves the check-in and opens the dashboard, with a "Check-in done" toast. If an account was left as **Doesn't match**, it opens that account's details instead (the first such account in the step's order), with the toast "Check-in done. Check this account against your real balance." Finish sets the check-in query to none before it moves, so the guard doesn't send it back. **If the save fails,** the check-in reloads and stays on its last step, and the error toast offers **Open the app anyway**: the only way past a due check-in, for this session only (ADR 0014).
 7. **Closing the app before Finish** saves nothing, so the check-in starts again from its first step at the next start.
 
 ### F18: A save reaches the focus (Phase 5, CHK-8)
@@ -555,8 +555,8 @@ A full-window screen with **no sidebar**, shown while a check-in is due (CHK-2).
 
 - **A step with nothing to show** still appears, with one line saying so. Only Goals can come and go, after a save.
 - **The forms** opened by + Add, Pay bill, Pay and Record now are the usual Level 2 dialogs over the screen. When one saves, the check-in's figures reload in place and the step stays where it is.
-- **Loading** is a skeleton of the panel. **An error** is the inline message with Retry (§9). The guard never traps the user behind a failed load: if `get_checkin` fails, the app opens normally and tries again on the next window focus. Until its first answer, a guarded route shows nothing, so the dashboard never flashes before the check-in.
-- **Finish** is F17. A failed save is a toast, and the check-in stays open on its last step.
+- **Loading** is a skeleton of the panel. **An error** is the inline message with Retry (§9). The guard never traps the user behind a failed load: if `get_checkin` fails, the app opens normally and tries again on the next window focus or at midnight. Until its first answer, a guarded route shows nothing, so the dashboard never flashes before the check-in.
+- **Finish** is F17. A failed save is an error toast, and the check-in stays open on its last step. It reloads at once, and a picked focus that's no longer offered is cleared, so a Finish refused because the day changed is fixed by picking again. The toast offers **Open the app anyway**, which lets the user past the check-in for this session only: nothing is saved, and it's back at the next start (ADR 0014).
 
 ### 8.8 Level (`/level`), Phase 5
 
@@ -750,3 +750,4 @@ Answered on 2026-11-17 (Phase 5, the check-in and the Vault level):
 69. **A failed load never locks the app.** If the check-in can't be loaded, the app opens normally and asks again on the next window focus (§8.7).
 70. **The first-launch form stays plain.** ONB-2's step indicator and tour were dropped (the owner, 2026-11-17): the only user is past it. This replaces item 1's "polished in Phase 5" (F5).
 71. **The check-in's step is kept in the URL by name**, not number, because the Goals step can appear after a save (§8.7).
+72. **A check-in that can't be saved doesn't lock the app** (the owner, 2026-11-19): a failed Finish reloads the check-in, clears a pick that's no longer offered, and offers "Open the app anyway" for that session only. The check-in is also asked for at midnight, not only on window focus (§8.7, F17, ADR 0014).

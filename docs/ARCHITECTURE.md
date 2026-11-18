@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.3 |
-| **Last updated** | 2026-11-18 |
+| **Last updated** | 2026-11-19 |
 | **Related docs** | [PRD.md](PRD.md), [DATA_MODEL.md](DATA_MODEL.md) |
 
 ---
@@ -80,7 +80,7 @@ Exact versions are pinned in `Cargo.lock` and `package-lock.json`, and upgraded 
 jobertsvault/
 ├─ README.md  CLAUDE.md  ROADMAP.md  RELEASING.md
 ├─ docs/                           # PRD, DATA_MODEL, ARCHITECTURE, DESIGN_SYSTEM, UI_FLOWS
-│  ├─ decisions/                   # decision records 0001–0013 (see docs/decisions/README.md)
+│  ├─ decisions/                   # decision records 0001–0014 (see docs/decisions/README.md)
 │  └─ design/                      # visual previews of the design system and UI flows
 ├─ assets/brand/                   # logo.svg, one-color marks, app-icon-1024.png
 ├─ .cargo/config.toml              # tells ts-rs to write to src/bindings/ (§4.6)
@@ -302,7 +302,7 @@ There's no global state library. With TanStack Query plus the URL, none is neede
 - The startup status and the app version use their own keys, `['startup']` and `['appVersion']`, because neither changes while the app runs.
 - The backup status uses `['backup']` (Phase 2): it describes this computer's backups, not the money data, and a restore keeps it. Back up now refreshes it and every `['ledger','dashboard']` query, for the dashboard's warning.
 - Settings use their own key `['settings']`. Changing settings also refreshes `['ledger']`, because things like the week start change the totals.
-- `refetchOnWindowFocus` stays on, so "today" moves forward if the app is left open past midnight.
+- `refetchOnWindowFocus` stays on, so "today" moves forward if the app is left open past midnight. From Phase 5 the check-in is also asked for at local midnight (§5.4).
 
 ### 5.3 Money in the UI
 
@@ -330,7 +330,7 @@ There's no global state library. With TanStack Query plus the URL, none is neede
 
 Quick-add (**Ctrl+N**) is a dialog that can be opened from any route, `/check-in` included. It isn't a page of its own.
 
-**The check-in guard (Phase 5, CHK-2).** While `get_checkin` returns a check-in, every route except `/welcome` redirects to `/check-in`, and `/check-in` redirects to `/` when it returns none. It's a route like `/welcome`, not a dialog, so quick-add and the pay forms open over it as ordinary dialogs and glass never sits inside glass (DESIGN_SYSTEM §2.3, [ADR 0012](decisions/0012-required-check-in.md)). On every window focus, `useProcessOnFocus` runs `process_recurring` first and then refreshes `['ledger','checkin']`, whatever it posted, so a date that changes while the app is open brings the check-in up with the recurring dates already in (§8). TanStack Query's own refetch on focus doesn't do this: it listens to `visibilitychange`, which switching windows may not fire. `useProcessOnFocus`, the quick-add provider and Ctrl+N are mounted above `AppShell`, since `/check-in` sits outside it like `/welcome`. Finish sets `['ledger','checkin']` to none before it navigates, so the guard doesn't send the user back.
+**The check-in guard (Phase 5, CHK-2).** While `get_checkin` returns a check-in, every route except `/welcome` redirects to `/check-in`, and `/check-in` redirects to `/` when it returns none. It's a route like `/welcome`, not a dialog, so quick-add and the pay forms open over it as ordinary dialogs and glass never sits inside glass (DESIGN_SYSTEM §2.3, [ADR 0012](decisions/0012-required-check-in.md)). On every window focus, `useProcessOnFocus` runs `process_recurring` first and then refreshes `['ledger','checkin']`, whatever it posted, so a date that changes while the app is open brings the check-in up with the recurring dates already in (§8). The same runs at local midnight while the app is open, so a period that comes due overnight shows without the window losing focus ([ADR 0014](decisions/0014-check-in-escape-on-failed-finish.md)). TanStack Query's own refetch on focus doesn't do this: it listens to `visibilitychange`, which switching windows may not fire. `useProcessOnFocus`, the quick-add provider and Ctrl+N are mounted above `AppShell`, since `/check-in` sits outside it like `/welcome`. Finish sets `['ledger','checkin']` to none before it navigates, so the guard doesn't send the user back. **A failed Finish** refetches `['ledger','checkin']` at once and clears a focus pick that's no longer among the offers, and its error toast offers **Open the app anyway**, which lifts the guard for this session only. That flag lives in memory, never in storage or the database, so the next start brings a due check-in back (ADR 0014).
 
 ## 6. Startup sequence
 
@@ -409,7 +409,7 @@ while occurrence(rule, next_index) ≤ today and the rule hasn't ended (end_date
 
 From Phase 4: "An unpaid loan payment changes no balance or total", "Deleting a loan payment's expense makes it unpaid again", "A bill due on a payday falls in the window that starts that day", "A card statement is billed once, on its due date", "Safe to spend holds back money for a later window that would run short", "Expected pay is the lowest of the last 3 payslips and the estimate", and "A payday recorded early is never created again".
 
-From Phase 5: "The week of Nov 9–15 is due on Mon, Nov 16, and not once its row exists", "A month and a week due together make one check-in with two rows", "Three weeks unopened leaves only the newest due", "A new database has no check-in", "Each stat at both ends of its scale", "A loan payment going overdue drops the level below 3", "A cap leaves out loan payments, recurring dates and payslip deductions", "A focus is graded once and keeps its grade after an old transaction is edited", "Finishing the same check-in twice is refused", and, on the frontend, "The check-in can't be closed, and Ctrl+N opens over it".
+From Phase 5: "The week of Nov 9–15 is due on Mon, Nov 16, and not once its row exists", "A month and a week due together make one check-in with two rows", "Three weeks unopened leaves only the newest due", "A new database has no check-in", "Each stat at both ends of its scale", "A loan payment going overdue drops the level below 3", "A cap leaves out loan payments, recurring dates and payslip deductions", "A focus is graded once and keeps its grade after an old transaction is edited", "Finishing the same check-in twice is refused", and, on the frontend, "The check-in can't be closed, and Ctrl+N opens over it", "Open the app anyway appears only after a failed Finish, and a reload brings the check-in back", "A refused Finish reloads the offers and clears a pick that's gone".
 
 **CI (required from Phase 0, GitHub Actions):** on every pull request and every push to `main`, two jobs run side by side. `rust`, on `windows-latest`, runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` and a check that the bindings are up to date. `frontend`, on `ubuntu-latest` because none of it depends on Windows and it's faster there, runs `npm run lint`, `npm run typecheck` and `npm test`. A third job, `check`, passes only when both do, and it's the status the `main` ruleset requires. A newer run on the same branch cancels the older one. CI doesn't build the installer. The Release workflow does that (§11.1), after running the same checks.
 
@@ -540,3 +540,4 @@ The reasoning behind the big decisions lives in [docs/decisions/](decisions/READ
 | [0011](decisions/0011-loans-are-payment-schedules.md) | Loans are lists of scheduled payments, not accounts |
 | [0012](decisions/0012-required-check-in.md) | The check-in is required, and still never blocks a save |
 | [0013](decisions/0013-levels-are-milestones.md) | Levels are milestones worked out from the data, not points |
+| [0014](decisions/0014-check-in-escape-on-failed-finish.md) | A check-in that can't be saved doesn't lock the app |

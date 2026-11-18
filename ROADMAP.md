@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Active |
-| **Last updated** | 2026-11-18 |
+| **Last updated** | 2026-11-19 |
 | **Current focus** | **Phase 5: Check-in & polish**: `docs/design/` previews of the Check-in and Level screens [CHK, LVL] |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
@@ -222,7 +222,7 @@ The owner approved the plan on 2026-11-17 ([ADR 0012](docs/decisions/0012-requir
 - [ ] Domain: focus offers, grading and the cap state, with tests for each of the five kinds, everyday spending, a `void` loan focus and the 80% and over boundaries (DATA_MODEL §5.22) [CHK-7] [CHK-8]
 - [ ] Domain: the win, personal bests, both streaks, the trend history and the focus record, with tests (DATA_MODEL §5.23) [CHK-6] [LVL-7] [LVL-8]
 - [ ] Service, repo and commands: `get_checkin`, `complete_checkin` and `get_vault_status`, `focuses` on `get_dashboard`, a focus counted as using its category or card and moved by a category merge, the `currency_decimals` lock, and GOL-7 recording `moved_on` and `moved_from`. Service tests: Finish writes every row in one database transaction, a second Finish is refused, a focus that isn't an offer is refused, and a graded focus keeps its grade after an old transaction is edited [CHK-1] [CHK-3] [CHK-4] [CHK-5] [CHK-7] [LVL-1] [LVL-2]
-- [ ] Check-in screen at `/check-in` with the `StepIndicator`, every step, the route guard and the startup order. It can't be closed, Ctrl+N opens over it and its figures refresh after a save, and a failed load opens the app normally (UI_FLOWS §8.7, F17) [CHK-2] [CHK-3] [CHK-4] [CHK-5] [CHK-6] [CHK-7]
+- [ ] Check-in screen at `/check-in` with the `StepIndicator`, every step, the route guard and the startup order. It can't be closed, Ctrl+N opens over it and its figures refresh after a save, a failed load opens the app normally, and a failed Finish reloads the offers and offers "Open the app anyway" for that session, with the check-in also asked for at midnight (UI_FLOWS §8.7, F17, ADR 0014) [CHK-2] [CHK-3] [CHK-4] [CHK-5] [CHK-6] [CHK-7]
 - [ ] Level screen at `/level` with the `LevelBadge`, `LevelPath` and `StatHexagon`, the next best move and the streaks, plus its sidebar item (UI_FLOWS §8.8) [LVL-3] [LVL-4] [LVL-7]
 - [ ] Sidebar level chip with its ring [LVL-5]
 - [ ] Dashboard focus strip, and the warning toast when a save takes a cap to 80% of its target or past it. Count the dashboard's blurred panels with every banner showing first: past the budget, the rows go flat in the Safe to spend card instead (UI_FLOWS §2, F18) [CHK-8]
