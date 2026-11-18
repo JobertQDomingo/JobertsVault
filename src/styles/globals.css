@@ -54,7 +54,7 @@
   --warning: #8a4500;
   --danger: #b4183a;
   --danger-foreground: #ffffff;
-  --danger-banner: #b4183a;
+  --danger-banner: var(--danger);
   --danger-banner-mix: 14%;
   --success: #03684a;
   --cat-1: #1d4ed8;
@@ -269,22 +269,28 @@
    flat inside a panel. */
 .glass-warning {
   --banner: var(--warning);
+  --banner-mix: 14%;
 }
 .glass-info {
   --banner: var(--primary);
+  --banner-mix: 14%;
 }
 .glass-danger {
   --banner: var(--danger-banner);
   --banner-mix: var(--danger-banner-mix);
 }
 :is(.glass-warning, .glass-info, .glass-danger) {
-  background: color-mix(in srgb, var(--banner) var(--banner-mix, 14%), var(--glass));
+  background: color-mix(in srgb, var(--banner) var(--banner-mix), var(--glass));
   @variant transparency-off {
-    background: color-mix(in srgb, var(--banner) var(--banner-mix, 14%), var(--glass-solid));
+    background: color-mix(
+      in srgb,
+      var(--banner) var(--banner-mix),
+      var(--glass-solid)
+    );
   }
 }
 :is(.glass, .glass-raised) :is(.glass-warning, .glass-info, .glass-danger) {
-  background: color-mix(in srgb, var(--banner) var(--banner-mix, 14%), transparent);
+  background: color-mix(in srgb, var(--banner) var(--banner-mix), transparent);
 }
 
 @layer base {

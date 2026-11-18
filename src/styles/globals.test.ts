@@ -109,3 +109,21 @@ test("transparency off makes glass solid and blurs nothing", () => {
     rule(":is(.glass-warning, .glass-info, .glass-danger)").match(off)?.[1],
   ).toContain("var(--glass-solid)");
 });
+
+test("the danger banner has its own tint, deeper in dark mode (§3.3, LOAN-4)", () => {
+  // The light pink --danger at 14% read as plain glass over the dark aurora.
+  for (const block of [":root", ".dark"])
+    expect(tokensIn(block)).toEqual(
+      expect.arrayContaining(["--danger-banner", "--danger-banner-mix"]),
+    );
+  const dark = rule(".dark");
+  expect(dark).toContain("--danger-banner: #dc2626;");
+  expect(dark).toContain("--danger-banner-mix: 30%;");
+  expect(rule(".glass-danger")).toContain("--banner: var(--danger-banner)");
+  expect(rule(".glass-danger")).toContain(
+    "--banner-mix: var(--danger-banner-mix)",
+  );
+  // Each tone sets its own amount, so a banner never inherits another's.
+  for (const tone of [".glass-warning", ".glass-info"])
+    expect(rule(tone)).toContain("--banner-mix: 14%");
+});

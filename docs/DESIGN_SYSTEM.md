@@ -121,7 +121,7 @@ All colors are **CSS variables** in `src/styles/globals.css`. Components use the
 | `--warning` | Budget ≥ 80%, due-date banners (card and loan), stale-backup notice | `#8A4500` | `#FCD34D` | 5.3 / 8.4 |
 | `--danger` | Budget ≥ 100%, an overdue loan payment, a pay window that runs short, delete, errors (same red as `--expense`) | `#B4183A` | `#FDA4AF` | 4.95 / 6.4 |
 | `--danger-foreground` | Text on a danger button | `#FFFFFF` | `#0B1020` | 6.7 / 10.0 |
-| `--danger-banner` | The red mixed into a `danger` banner (§9.1). Dark mode uses a deeper red than `--danger`, because the light pink at 14% read as plain glass over the aurora | `#B4183A` | `#DC2626` | 11.2 / 9.4 (text), 16.5 / 8.2 (Pay button), — / 5.3 (icon) |
+| `--danger-banner` | The red mixed into a `danger` banner (§9.1). Dark mode uses a deeper red than `--danger`, because the light pink at 14% read as plain glass over the aurora | `#B4183A` (`--danger`) | `#DC2626` | 11.2 / 9.4 (text), 16.5 / 8.2 (Pay button), 3.9 / 5.3 (icon) |
 | `--danger-banner-mix` | How much of `--danger-banner` a `danger` banner mixes in | `14%` | `30%` | — |
 | `--success` | Goal achieved, loan paid off, "You're debt-free", "Saved" toasts | `#03684A` | `#6EE7B7` | 5.0 / 7.9 |
 
