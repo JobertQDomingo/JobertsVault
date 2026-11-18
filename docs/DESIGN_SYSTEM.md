@@ -72,7 +72,7 @@ When Windows' **Transparency effects** setting is off, the app detects it throug
 - Nothing is blurred, the dialog backdrop included.
 - The aurora, shapes, colors and layout stay the same.
 
-Settings → Appearance also has a **Reduce transparency** switch (SET-8, Phase 5), stored as `reduce_transparency`, that does the same for this app alone. `AppShell` keeps it as the `.reduce-transparency` class on `<html>`, set before the shell's first paint. Both come through one Tailwind variant, `transparency-off`, so the switch and the Windows setting can never look different. The "Checking for updates…" notice at startup comes before the settings load, so it follows Windows only.
+Settings → Appearance also has a **Reduce transparency** switch (SET-8, Phase 5), stored as `reduce_transparency`, that does the same for this app alone. `FollowReduceTransparency`, in `App` above the router, keeps it as the `.reduce-transparency` class on `<html>`, set before the screens' first paint, so screens outside the shell (`/welcome`, `/check-in`) follow it too. Both come through one Tailwind variant, `transparency-off`, so the switch and the Windows setting can never look different. The "Checking for updates…" notice at startup comes before the settings load, so it follows Windows only.
 
 ---
 

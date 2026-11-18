@@ -1,4 +1,3 @@
-import { useLayoutEffect } from "react";
 import { Navigate, Outlet, useNavigate } from "react-router";
 import { useProcessOnFocus } from "@/hooks/useProcessOnFocus";
 import { useSettings } from "@/hooks/useSettings";
@@ -13,11 +12,6 @@ import { TopBar } from "./TopBar";
  */
 export function AppShell() {
   const settings = useSettings();
-  const reduce = settings.data?.reduceTransparency ?? false;
-  // Before the first paint, so a solid shell never starts as glass (DESIGN_SYSTEM §2.4, SET-8).
-  useLayoutEffect(() => {
-    document.documentElement.classList.toggle("reduce-transparency", reduce);
-  }, [reduce]);
   // The first launch goes to the setup form (ONB-1, ARCHITECTURE §6). The settings take
   // milliseconds; waiting for them means the dashboard never flashes first. If they fail, the
   // screens show their own errors.

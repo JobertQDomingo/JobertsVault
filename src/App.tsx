@@ -1,5 +1,6 @@
 import { RouterProvider } from "react-router";
 import { AuroraBackground } from "./components/AuroraBackground";
+import { FollowReduceTransparency } from "./components/FollowReduceTransparency";
 import { StartupErrorScreen } from "./components/StartupErrorScreen";
 import { StartupUpdate } from "./components/StartupUpdate";
 import { Toaster } from "./components/ui/toast";
@@ -22,9 +23,13 @@ export default function App() {
         // Never a blank window, even if the status itself can't be read.
         <StartupErrorScreen message={startup.error.message} />
       ) : status?.status === "ok" ? (
-        <StartupUpdate>
-          <RouterProvider router={router} />
-        </StartupUpdate>
+        <>
+          {/* The settings need the database, so only once startup is done. */}
+          <FollowReduceTransparency />
+          <StartupUpdate>
+            <RouterProvider router={router} />
+          </StartupUpdate>
+        </>
       ) : null}
     </>
   );

@@ -339,6 +339,7 @@ test("Appearance opens from the URL and saves the theme (SET-5)", async () => {
 });
 
 test("Appearance saves Reduce transparency (SET-8)", async () => {
+  const saved = vi.spyOn(notify, "success");
   renderRoute("/settings?tab=appearance", ANSWERS);
   const toggle = await screen.findByRole("switch", {
     name: "Reduce transparency",
@@ -348,4 +349,5 @@ test("Appearance saves Reduce transparency (SET-8)", async () => {
   await waitFor(() =>
     expect(saves()).toEqual([{ ...STORED, reduceTransparency: true }]),
   );
+  await waitFor(() => expect(saved).toHaveBeenCalledWith("Saved"));
 });

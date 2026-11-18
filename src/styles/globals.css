@@ -8,8 +8,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* Transparency off: Windows' Transparency effects setting, or the app's Reduce transparency
-   switch, which AppShell keeps as the .reduce-transparency class on <html> (§2.4, SET-8). One
-   variant, so the two can never look different. */
+   switch, which FollowReduceTransparency keeps as the .reduce-transparency class on <html>
+   (§2.4, SET-8). One variant, so the two can never look different. */
 @custom-variant transparency-off {
   @media (prefers-reduced-transparency: reduce) {
     @slot;

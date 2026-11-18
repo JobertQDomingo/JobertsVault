@@ -45,6 +45,8 @@ export function AppearanceTab({ settings }: { settings: SettingsView }) {
         <Switch
           id="set-transparency"
           checked={settings.reduceTransparency}
+          // Both clicks of a quick double toggle would read the old value and save the same one.
+          disabled={update.isPending}
           onCheckedChange={(reduceTransparency) => save({ reduceTransparency })}
         />
       </Row>
