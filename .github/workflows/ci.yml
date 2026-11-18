@@ -17,22 +17,32 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    runs-on: windows-latest
+  # The frontend and Rust halves don't depend on each other, so they run side by side.
+  # Lint, typecheck and Vitest (jsdom) don't depend on Windows, and npm is much faster on Linux.
+  frontend:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: lts/*
           cache: npm
-      - run: rustup component add rustfmt clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+
+  # Tauri needs extra system libraries on Linux, so the Rust half stays on Windows.
+  rust:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Runner images roll out with different Rust versions, and the version is part of the cache
+      # key, so without this a run on the other image misses the cache and builds from scratch.
+      - run: rustup update stable --no-self-update && rustup default stable && rustup component add rustfmt clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml
@@ -45,3 +55,17 @@ jobs:
             echo "::error::src/bindings is out of date. Run cargo test and commit the result."
             exit 1
           fi
+
+  # The one status the "Protect Main" ruleset requires. It passes only when both halves pass.
+  check:
+    needs: [frontend, rust]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Both halves passed
+        run: |
+          echo "frontend: ${{ needs.frontend.result }}, rust: ${{ needs.rust.result }}"
+          for job in "frontend:${{ needs.frontend.result }}" "rust:${{ needs.rust.result }}"; do
+            [ "${job#*:}" = success ] || { echo "::error::The ${job%%:*} job ended as ${job#*:}"; failed=1; }
+          done
+          exit ${failed:-0}
