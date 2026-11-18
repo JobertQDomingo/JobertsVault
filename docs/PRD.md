@@ -4,7 +4,7 @@
 |---|---|
 | **App name** | Jobert's Vault |
 | **Status** | Approved v1.3 |
-| **Last updated** | 2026-11-17 |
+| **Last updated** | 2026-11-19 |
 | **Platform** | Windows desktop app built with Tauri 2: React + TypeScript frontend, Rust backend, SQLite database |
 
 ---
@@ -294,7 +294,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | ID | Requirement | Priority |
 |---|---|---|
 | CHK-1 | **When it's due:** a weekly check-in covers the last completed week and is due from the first day of the new week. A monthly one covers the last completed month (by the month start day) and is due from the first day of the new month. When both are due they merge into one check-in that shows the month and settles both. If the app wasn't opened for several periods, only the newest completed one is reviewed. A period is reviewed only when at least one transaction is dated on or before its last day, so a new database gets no check-in. | P5 |
-| CHK-2 | **Required:** while a check-in is due, it takes over the whole window. It has no close button, Esc does nothing, and it can't be postponed. **+ Add** and Ctrl+N still work on top of it, so it never blocks logging a transaction (TXN-5), and its figures update after a save. Nothing is saved until **Finish**, so closing the app shows it again at the next start. It also appears when the date changes while the app is open. | P5 |
+| CHK-2 | **Required:** while a check-in is due, it takes over the whole window. It has no close button, Esc does nothing, and it can't be postponed. **+ Add** and Ctrl+N still work on top of it, so it never blocks logging a transaction (TXN-5), and its figures update after a save. Nothing is saved until **Finish**, so closing the app shows it again at the next start. It also appears when the date changes while the app is open: on the next window focus, or at midnight. If Finish fails to save, the error offers **Open the app anyway** for that session only, so a check-in that can't be saved never locks the app (ADR 0014). | P5 |
 | CHK-3 | **Steps:** one screen each, with **Next** and **Back** and a step indicator: Start, Money in and out (income, expense and net against the period before, the 3 largest categories, each budget kept or broken), Card (cycle spending against its levels, amount owed, due date, % of the limit used), Loans and bills (payments made, anything overdue, loans left, the debt-free date and whether it moved, then the coming paydays, bills, Safe to spend and any pay window that runs short), Goals, Stats and level, and Pick a focus. Each step opens with one sentence that sums it up. The Goals step shows in every monthly check-in, and in a weekly one only when a goal's date moved by itself (GOL-7) or a goal is Behind. | P5 |
 | CHK-4 | **Balance check:** a monthly check-in has a step listing every active account, and any archived one whose balance isn't 0, with its balance (the amount owed for a card). Each needs an answer, **Matches** or **Doesn't match**. A mismatch can be fixed on the spot with + Add. If one still doesn't match at Finish, the app opens that account's details. The answers aren't stored. | P5 |
 | CHK-5 | **Your year:** the first check-in finished in January has an extra step for the calendar year that just ended: income, expense and net against the year before, the largest categories, the loans paid off, and the level at the start and the end of the year. It's first due in January 2027. | P5 |
@@ -487,6 +487,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-17 | The stats and levels were tuned to the owner's situation (DATA_MODEL §9 items 128–135): they measure against take-home pay and leave borrowed money out of what was earned; Cashflow is full at 10% unspent; Debt reaches 0 when loans take 90% of take-home pay; Habit is full at 25 days logged of 30; a late payment has no grace; and the level names stay |
 | 2026-11-17 | ONB-2, the polished onboarding with a tour, is dropped: the only user is already set up and will never see the first-launch form again. ONB-1's plain form stays (the owner) |
 | 2026-11-17 | SET-5's theme is the window's theme, set by Rust, so the title bar follows it too (DESIGN_SYSTEM §3.5) |
+| 2026-11-19 | A check-in whose Finish fails offers "Open the app anyway" for that session, a refused Finish reloads the offers, and the check-in is also asked for at midnight (the owner, [ADR 0014](decisions/0014-check-in-escape-on-failed-finish.md)) |
 
 ---
 
