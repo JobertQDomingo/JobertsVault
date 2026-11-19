@@ -126,7 +126,7 @@ fn card_level(cards: &[CardOffer]) -> Option<Focus> {
 
 fn spending_cap(facts: &OfferFacts) -> Option<Focus> {
     (facts.for_week && facts.has_payday_rule && facts.per_day.0 > 0).then(|| Focus::SpendingCap {
-        target: Money(facts.per_day.0 * 7),
+        target: Money(facts.per_day.0.saturating_mul(7)),
     })
 }
 
@@ -143,7 +143,8 @@ fn category_cap(categories: &[CategorySpending]) -> Option<Focus> {
 }
 
 /// A focus's target with what the queries measured from `focus_start` to `focus_end`
-/// (§5.22's grading table). The caps' and card's `actual` is what `focus_actual` stores.
+/// (§5.22's grading table). Every kind's `actual` is what `focus_actual` stores; a
+/// `loan_on_time` focus stores none.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ended {
     CategoryCap {
@@ -585,5 +586,16 @@ mod tests {
         let max = cap(Money(i64::MAX), Money(1));
         assert_eq!((max.percent, max.state), (i64::MAX, CapState::Over));
         assert_eq!(cap(Money(i64::MAX), Money(i64::MAX)).state, CapState::Near);
+        let facts = OfferFacts {
+            has_payday_rule: true,
+            per_day: Money(i64::MAX),
+            ..none()
+        };
+        assert_eq!(
+            offers(&facts, &all_100())[0],
+            Focus::SpendingCap {
+                target: Money(i64::MAX)
+            }
+        );
     }
 }
