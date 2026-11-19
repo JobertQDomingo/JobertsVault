@@ -311,7 +311,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | LVL-2 | **Levels:** a fixed ladder of 10 levels, each a set of real conditions, such as nothing overdue, or savings that cover a month of spending. The level is the highest one whose conditions, and those of every level below it, are true today. It can go down, and the app says why. Nothing in the app raises a stat or a level except the money data and finishing check-ins on time. | P5 |
 | LVL-3 | A **Level** screen shows the ten levels as a path, with the next level's conditions as a checklist, and the six stats as a hexagon chart with last check-in's shape behind it. Every score is also written as a number with its change since the last check-in. | P5 |
 | LVL-4 | **Next best move:** one sentence naming the single action that would help most: paying what's overdue first, otherwise the first unmet condition of the next level, with the gap as an amount where there is one. | P5 |
-| LVL-5 | The sidebar shows the level ("Lv 4") with a ring for how many of the next level's conditions are met, on every screen. Clicking it opens the Level screen. | P5 |
+| LVL-5 | The sidebar shows the level (its number in a small hexagon) with a ring for how many of the next level's conditions are met, on every screen. Clicking it opens the Level screen. | P5 |
 | LVL-6 | **Level-up moment:** when a check-in finds the level higher than at the last check-in, the level badge plays one short animation, skipped when Windows has animations turned off. A lower level gets a plain sentence with the reason and no animation. | P5 |
 | LVL-7 | **Streaks:** the number of weekly check-ins in a row finished within 2 days of coming due, and the number of focuses kept in a row. | P5 |
 | LVL-8 | The Level screen shows the last 8 graded focuses as kept or missed, and a small trend line for each stat once there are 3 or more check-ins. | P5 |
@@ -488,6 +488,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-17 | ONB-2, the polished onboarding with a tour, is dropped: the only user is already set up and will never see the first-launch form again. ONB-1's plain form stays (the owner) |
 | 2026-11-17 | SET-5's theme is the window's theme, set by Rust, so the title bar follows it too (DESIGN_SYSTEM §3.5) |
 | 2026-11-19 | A check-in whose Finish fails offers "Open the app anyway" for that session, a refused Finish reloads the offers, and the check-in is also asked for at midnight (the owner, [ADR 0014](decisions/0014-check-in-escape-on-failed-finish.md)) |
+| 2026-11-19 | The sidebar's level chip (LVL-5) shows the number in a small hexagon rather than "Lv 4", which doesn't fit beside the app name (the owner, DESIGN_SYSTEM §9.2) |
 
 ---
 

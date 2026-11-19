@@ -363,6 +363,106 @@ svg.lucide { width: 16px; height: 16px; flex: none; }
 .cols.c2 { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); }
 .cols.c2e { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
+/* ---------- Phase 5: the check-in and the Vault level (DESIGN_SYSTEM §9.2) ---------- */
+.v-flat { background: var(--wash); border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.v-flat h3 { margin: 0; font-size: 16px; line-height: 24px; font-weight: 600; }
+.v-flat .ico { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--wash); color: var(--muted-foreground); }
+
+/* StepIndicator */
+.v-steps { display: flex; align-items: center; gap: 12px; }
+.v-steps .dots { display: flex; align-items: center; }
+/* A --wash track always has a 1 px inset --hairline edge, like the ProgressBar's, or it vanishes on glass */
+.v-steps .dot, .v-steps .line, .lv-path .n + .n::before, .lv-path .node { box-shadow: inset 0 0 0 1px var(--hairline); }
+.v-steps .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--wash); flex: none; }
+.v-steps .dot.done { background: var(--primary); box-shadow: none; }
+.v-steps .dot.now { width: 14px; height: 14px; border: 2px solid var(--primary); background: radial-gradient(circle, var(--primary) 3px, transparent 3.5px); box-shadow: none; }
+.v-steps .line { width: 24px; height: 2px; background: var(--wash); flex: none; }
+
+/* StatHexagon */
+svg.v-hex { width: 280px; height: 280px; flex: none; overflow: visible; }
+svg.v-hex .grid { fill: none; stroke: var(--wash); stroke-width: 1; }
+svg.v-hex .now { fill: color-mix(in srgb, var(--primary) 24%, transparent); stroke: var(--primary); stroke-width: 2; stroke-linejoin: round; }
+svg.v-hex .prev { fill: none; stroke: var(--muted-foreground); stroke-width: 1.5; stroke-dasharray: 4 3; }
+svg.v-hex text { font: 12px/16px var(--font-ui); fill: var(--muted-foreground); }
+.v-scores { display: grid; align-content: center; min-width: 0; }
+.v-scores .r { display: grid; grid-template-columns: 76px 36px 48px auto; gap: 8px; align-items: center; height: 32px; }
+.v-scores .r > b { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+svg.v-trend { width: 64px; height: 20px; }
+svg.v-trend polyline { fill: none; stroke: var(--primary); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+
+/* LevelBadge and the sidebar's level chip */
+.lv-badge { display: inline-flex; align-items: center; gap: 12px; }
+.lv-badge .nm { font-size: 18px; line-height: 28px; font-weight: 600; }
+.lv-hex { position: relative; isolation: isolate; width: 34.64px; height: 40px; display: inline-grid; place-items: center; flex: none; color: var(--primary-foreground); font-size: 18px; line-height: 28px; font-variant-numeric: tabular-nums; }
+.lv-hex > svg { position: absolute; inset: 0; width: 100%; height: 100%; fill: var(--primary); }
+.lv-hex > b { position: relative; font-weight: 600; }
+.lv-hex.zero { color: var(--muted-foreground); }
+.lv-hex.zero > svg { fill: var(--wash); }
+.lv-hex.sm { width: 22.52px; height: 26px; font-size: 12px; line-height: 16px; }
+.lv-chip { position: relative; width: 34px; height: 34px; display: inline-grid; place-items: center; flex: none; margin-left: auto; }
+.lv-chip > svg { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke-width: 2; }
+.lv-chip .track { stroke: var(--hairline); }
+.lv-chip .arc { stroke: var(--primary); stroke-linecap: round; }
+/* The level-up moment (§10): grows from 80% to 110% and settles over 600 ms while a soft glow fades */
+@keyframes lv-up { 0% { transform: scale(0.8); } 55% { transform: scale(1.1); } 100% { transform: scale(1); } }
+@keyframes lv-glow { from { opacity: 1; } to { opacity: 0; } }
+.lv-hex.up, .lv-hex.glow { overflow: visible; }
+.lv-hex.up { animation: lv-up 600ms ease-out both; }
+.lv-hex.up::before, .lv-hex.glow::before { content: ""; position: absolute; inset: -16px; z-index: -1; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--primary) 45%, transparent) 0%, transparent 70%); }
+.lv-hex.up::before { animation: lv-glow 600ms ease-out both; }
+.lv-hex.glow { transform: scale(0.8); }
+@media (prefers-reduced-motion: reduce) { .lv-hex.up, .lv-hex.up::before { animation: none; } .lv-hex.up::before { opacity: 0; } }
+
+/* LevelPath: nodes 64 px apart, joined by a line that is --primary up to the current level */
+.lv-path { display: flex; }
+.lv-path .n { width: 64px; flex: none; display: grid; justify-items: center; gap: 6px; position: relative; border-radius: 8px; }
+.lv-path .n + .n::before { content: ""; position: absolute; top: 9px; left: -22px; width: 44px; height: 2px; background: var(--wash); }
+.lv-path .n.on + .n.on::before { background: var(--primary); box-shadow: none; }
+.lv-path .node { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--wash); color: var(--muted-foreground); }
+.lv-path .node svg.lucide { width: 12px; height: 12px; }
+.lv-path .on .node { background: var(--primary); color: var(--primary-foreground); box-shadow: none; }
+.lv-path .now .node { box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
+.lv-path .no { font-size: 12px; line-height: 16px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.lv-path .now .no { color: var(--foreground); font-weight: 600; }
+.lv-path .n:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.lv-check { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.lv-check li { display: flex; gap: 8px; align-items: center; }
+.lv-check .met { color: var(--success); } .lv-check .unmet { color: var(--muted-foreground); }
+
+/* FocusStrip: a slim panel, one 40 px row per active focus */
+.v-focus { border-radius: 16px; padding: 0 16px; }
+.v-focus.flat { padding: 0; border-radius: 0; }
+.v-focus .fr { display: flex; align-items: center; gap: 10px; min-height: 40px; border-top: 1px solid var(--hairline); flex-wrap: wrap; }
+.v-focus .fr:first-child { border-top: 0; }
+.v-focus .fr > svg.lucide { color: var(--primary); }
+.v-focus .txt { flex: 1 1 0; min-width: 0; }
+.v-focus .fr .v-progress { flex: none; width: 160px; }
+.v-focus .pc { width: 40px; text-align: right; font-size: 12px; line-height: 16px; font-variant-numeric: tabular-nums; }
+/* Flat inside a panel (the Level screen, the check-in): a cap's bar sits under its sentence */
+.v-focus.flat .fr { padding: 10px 0; }
+.v-focus.flat .fr .txt { flex-basis: calc(100% - 26px); }
+.v-focus.flat .fr .v-progress { flex: 1; margin-left: 26px; }
+.focus-record { display: flex; gap: 4px; align-items: center; }
+.focus-record .kept { color: var(--success); } .focus-record .missed { color: var(--danger); }
+
+/* Focus offer card: one radio group, selected by a border and a check, never by tint alone */
+.v-offer { position: relative; display: grid; gap: 2px; background: var(--wash); border: 2px solid transparent; border-radius: 12px; padding: 12px 48px 12px 16px; cursor: pointer; }
+.v-offer b { font-weight: 600; }
+.v-offer .tick { position: absolute; top: 12px; right: 12px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--field-edge); display: grid; place-items: center; }
+.v-offer .tick svg.lucide { width: 12px; height: 12px; visibility: hidden; }
+.v-offer.on { border-color: var(--primary); }
+.v-offer.on .tick { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+.v-offer.on .tick svg.lucide { visibility: visible; }
+.v-offer.is-focus { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* The check-in: a full-window route with no sidebar, one panel 880 px wide */
+.ci { height: 100%; display: flex; flex-direction: column; gap: 12px; padding: 12px; }
+.ci .ttl { display: flex; align-items: center; gap: 12px; }
+.ci-panel { width: 880px; margin: 0 auto; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 20px; padding: 24px; }
+.ci-panel .say { font-size: 24px; line-height: 32px; margin: 0; font-weight: 700; letter-spacing: -0.02em; }
+.ci-body { flex: 1 1 auto; min-height: 0; display: grid; gap: 12px; align-content: start; }
+.ci-foot { display: flex; justify-content: space-between; }
+
 /* Phase switch: elements from later phases are hidden unless the page asks to show them */
 body:not(.show-later) .later { display: none !important; }
 .later { position: relative; }
