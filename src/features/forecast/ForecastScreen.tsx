@@ -107,8 +107,11 @@ export function ForecastScreen() {
   );
 }
 
-/** One `ForecastRow` per window or month (DESIGN_SYSTEM §9.2); one opens at a time. */
-function ForecastTable({
+/**
+ * One `ForecastRow` per window or month (DESIGN_SYSTEM §9.2); one opens at a time. The check-in
+ * shows its next 3 windows with it (UI_FLOWS §8.7).
+ */
+export function ForecastTable({
   forecast,
   grain,
   accounts,

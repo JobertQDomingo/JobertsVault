@@ -3,6 +3,7 @@ import type { DateMove } from "./DateMove";
 import type { Forecast } from "./Forecast";
 import type { LoanDue } from "./LoanDue";
 import type { LoansLeft } from "./LoansLeft";
+import type { Money } from "./Money";
 import type { PaidPayment } from "./PaidPayment";
 
 export type LoansStep = { 
@@ -10,6 +11,10 @@ export type LoansStep = {
  * The loan payments whose expense is dated in the period shown, by that date.
  */
 paid: Array<PaidPayment>, 
+/**
+ * Σ `paid`'s amounts.
+ */
+paidTotal: Money, 
 /**
  * As the dashboard has them.
  */

@@ -104,6 +104,8 @@ pub struct BudgetKept {
     pub amount: Money,
     /// `spent ≤ amount`.
     pub kept: bool,
+    /// How far `spent` went past `amount`, 0 when kept.
+    pub over: Money,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
@@ -112,6 +114,8 @@ pub struct BudgetKept {
 pub struct LoansStep {
     /// The loan payments whose expense is dated in the period shown, by that date.
     pub paid: Vec<PaidPayment>,
+    /// Σ `paid`'s amounts.
+    pub paid_total: Money,
     /// As the dashboard has them.
     pub loans_due: Vec<LoanDue>,
     pub loans_left: Option<LoansLeft>,
@@ -705,6 +709,10 @@ fn view(conn: &Connection, d: Due, today: NaiveDate) -> Result<Checkin, AppError
         },
         cards: active_cards(&facts.accounts).cloned().collect(),
         loans: LoansStep {
+            paid_total: Money(
+                paid.iter()
+                    .fold(0_i64, |sum, p| sum.saturating_add(p.amount.0)),
+            ),
             paid,
             loans_due,
             loans_left,
@@ -770,6 +778,7 @@ fn kept(conn: &Connection, period: &str, over: Period) -> Result<Vec<BudgetKept>
             spent,
             amount: Money(b.amount),
             kept: spent.0 <= b.amount,
+            over: Money(spent.0.saturating_sub(b.amount).max(0)),
         });
     }
     Ok(list)
@@ -1041,6 +1050,34 @@ mod tests {
     }
 
     #[test]
+    fn a_weekly_budget_is_kept_or_says_how_far_over_it_went() {
+        use crate::services::budgets::{self, BudgetFields, BudgetPeriod};
+        let mut conn = db();
+        spend(&mut conn, 500, "2026-11-10");
+        spend(&mut conn, 300, "2026-11-12");
+        let food = food(&conn);
+        for (category_id, amount) in [(Some(food), 700), (None, 1_000)] {
+            let fields = BudgetFields {
+                category_id,
+                period: BudgetPeriod::Weekly,
+                amount: Money(amount),
+            };
+            budgets::create(&mut conn, fields, now()).unwrap();
+        }
+        let c = get(&mut conn, d(2026, 11, 16)).unwrap().unwrap();
+        let shown: Vec<_> = c
+            .money
+            .budgets
+            .iter()
+            .map(|b| (b.category_id, b.kept, b.over))
+            .collect();
+        assert_eq!(
+            shown,
+            [(None, true, Money::ZERO), (Some(food), false, Money(100))]
+        );
+    }
+
+    #[test]
     fn a_loan_payment_due_this_week_is_offered_graded_and_listed_as_paid() {
         use crate::services::loans::{self, LoanFields, LoanPaymentFields, NewLoan};
         let mut conn = db();
@@ -1097,6 +1134,7 @@ mod tests {
             .map(|p| (p.payment_id, p.paid_on))
             .collect();
         assert_eq!(listed, [(payment, d(2026, 11, 19))]);
+        assert_eq!(c.loans.paid_total, Money(5_000));
         assert_eq!(c.loans.loans_left, None);
     }
 

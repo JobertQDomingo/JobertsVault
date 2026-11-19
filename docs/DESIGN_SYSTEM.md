@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Approved v1.2 |
 | **Style** | **Glassmorphism 2.0**: frosted glass panels floating over a soft colored light (the "aurora") |
-| **Last updated** | 2026-11-19 |
+| **Last updated** | 2026-11-20 |
 | **Related docs** | [PRD.md](PRD.md), [UI_FLOWS.md](UI_FLOWS.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 | **Built with** | Tailwind CSS 4 + shadcn/ui (Radix), lucide-react icons, Sora font (bundled) |
 
@@ -355,11 +355,11 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **Select / Combobox** | Its menu is Level 2 | You can type to filter. Category options show their chip. Archived options are hidden. |
 | **Autocomplete** | Its list is Level 2 | A text field that suggests what was entered before (the payee, TXN-6), in the select's list. Nothing is highlighted until ↓ or ↑, so Enter keeps the text as typed. |
 | **Date picker** | Its popover is Level 2 | Weeks start on the `week_start` setting (Monday by default). In the input, ↑ and ↓ move one day. From Phase 3 future days can be picked too (TXN-8). Only the period switcher's Custom range picker disables days after today. The selected day is solid `--primary`. |
-| **Segmented control** | Flat | A `--wash` track with 12 px radius. The selected segment is solid `--primary` with `--primary-foreground` text. |
+| **Segmented control** | Flat | A `--wash` track with 12 px radius. The selected segment is solid `--primary` with `--primary-foreground` text. The check-in's Balance check starts with neither segment selected (CHK-4). |
 | **Toolbar** | Level 1 | A small glass bar (16 px radius, 6 px padding) for controls that sit on the canvas: the period bar, the filter bar, report controls. Inside a card it becomes a flat `--wash`. |
 | **Dialog** | Level 2 | 24 px radius, max width 480 px (forms), 400 px (confirmations) or 640 px (a list whose rows have actions, such as the recurring dates due, which scrolls inside it past 60% of the window's height). The backdrop is `--overlay` plus a 6 px blur of the app behind. Esc closes it, and focus stays inside. |
 | **Confirm dialog** | Level 2 | A title, one sentence, `secondary` Cancel, and a `primary` or `destructive` button that names the action. |
-| **Toast** | Level 2 | Bottom-right, 16 px radius, several shown one above the other. Closes after 4 s. One with an action, such as **Open folder**, stays 10 s, and its action is a ghost `sm` button in `--primary` text. Errors stay until closed. From Phase 4, a warning (a card spending level reached, CC-11) has the `triangle-alert` icon in `--warning` and stays 8 s. From Phase 5, a focus reaching 80% of its target or going past it (CHK-8) is the same warning toast. |
+| **Toast** | Level 2 | Bottom-right, 16 px radius, several shown one above the other. Closes after 4 s. One with an action, such as **Open folder**, stays 10 s, and its action is a ghost `sm` button in `--primary` text. Errors stay until closed. A failed check-in Finish has the action **Open the app anyway** on its error toast (ADR 0014). From Phase 4, a warning (a card spending level reached, CC-11) has the `triangle-alert` icon in `--warning` and stays 8 s. From Phase 5, a focus reaching 80% of its target or going past it (CHK-8) is the same warning toast. |
 | **Banner** | Level 1, tinted | Panel glass mixed with the meaning color at 14%, and a border with it at 35% (§3.3). Has an icon, the message and an optional action. Variants: `warning`, `danger`, `info`. Inside another panel, the tint is flat (§2.3). `components/Banner.tsx` has `warning` (`.glass-warning`, the backup warning and the card due date) and `info` (`.glass-info`, tinted with `--primary` as in the mockups, the recurring dates due). From Phase 4 it also has `danger` (`.glass-danger`, an overdue loan payment, tinted with `--danger-banner` at `--danger-banner-mix`, §3.3), and uses `warning` for a loan payment due. A banner can have a second line in `small` text (`detail`), such as "Move ₱800.00 there first." |
 | **Tabs** | Flat | Inside Settings. A 2 px `--primary` underline marks the active tab. |
 | **Skeleton** | Flat | `--wash` blocks with no shimmer, shown only if loading takes more than **150 ms**. |
@@ -374,7 +374,7 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **`MoneyText`** | Displays an amount using the §7 rules. Props: `amount`, `kind` (`income` / `expense` / `transfer` / `balance` / `owed` / `net`), `size`. |
 | **`AmountInput`** | Converts what you type into centavos through `money.ts`. Right-aligned, tabular digits, never negative. |
 | **`PeriodSwitcher`** | A glass toolbar: `[Day│Week│Month│Year│Custom]  ◀  October 2026  ▶  [Today]`. "Today" is disabled when the current period is already selected. ▶ is disabled when the next period would start after today. |
-| **`StatCard`** | A label, a `display`-sized amount, and (from Phase 2) the % change (§7) with the dates compared with in `--muted-foreground`, such as "▲ 3.1% vs Sep 1–26", in `small` text. The **net cashflow** card is tinted with 12% of `--primary`. Clickable cards lift 2 px on hover. |
+| **`StatCard`** | A label, a `display`-sized amount, and (from Phase 2) the % change (§7) with the dates compared with in `--muted-foreground`, such as "▲ 3.1% vs Sep 1–26", in `small` text. The **net cashflow** card is tinted with 12% of `--primary`. Clickable cards lift 2 px on hover. Inside a panel (the check-in), it's a flat `--wash` card with 12 px corners and no tint. |
 | **`CategoryChip`** | The icon chip from §6, with the name next to it if needed. |
 | **`AccountRow`** | Account icon in a `--wash` square, the name, and the balance on the right. A credit card also shows "Available ₱X · Due Nov 5". |
 | **`TransactionRow`** | Category chip │ category, plus the payee and note in muted text │ account (or "Bank → Cash") │ amount, right-aligned. Hover adds `--glass-hover` and the edit and duplicate buttons. 52 px tall. |
@@ -454,3 +454,4 @@ Glass costs graphics power, so these rules keep the app smooth:
 | 2026-11-18 | The banners' 35% tinted border (§3.3) was in this doc and the preview but never built in the app. The owner chose to build it, for every tone |
 | 2026-11-19 | The sidebar's level chip shows the level number in its hexagon, not "Lv 4": there's about 40 px beside the app name, which holds the ring but not the text beside it (the owner, §9.2, PRD LVL-5) |
 | 2026-11-19 | Drawing the Phase 5 previews settled the sizes left open in §9.2 (the current step's dot, the line lengths, the path's spacing, the chip's ring, the strip's bar, the offer card's circle). A `--wash` track has the 1 px `--hairline` edge the ProgressBar's track already had (§2.1), and an unmet condition is a `circle` (§6) |
+| 2026-11-20 | Building the check-in: a `StatCard` inside a panel is flat and untinted, a `Segmented` can start with nothing selected (the Balance check), and an error toast can carry an action (Open the app anyway, ADR 0014) (§9.1, §9.2) |

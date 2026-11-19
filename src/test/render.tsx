@@ -54,7 +54,12 @@ export function renderRoute(
 ) {
   vi.mocked(invoke).mockImplementation((command: string, args?: unknown) =>
     Promise.resolve().then(() => {
-      const all: Answers = { get_settings: SETTINGS, ...answers };
+      const all: Answers = {
+        get_settings: SETTINGS,
+        // No check-in is due unless the test says so (CHK-2).
+        get_checkin: null,
+        ...answers,
+      };
       // A command the test didn't expect fails loudly instead of looking like an empty load.
       if (!(command in all)) throw new Error(`unanswered command: ${command}`);
       const answer = all[command];
@@ -63,6 +68,8 @@ export function renderRoute(
   );
   const client = createQueryClient();
   if (seedSettings) client.setQueryData(queryKeys.settings, SETTINGS);
+  // The guard's first answer, so a screen shows at once, as it does once the app has started.
+  if (!("get_checkin" in answers)) client.setQueryData(queryKeys.checkin, null);
   const router = createMemoryRouter(routes, { initialEntries: [url] });
   render(
     <QueryClientProvider client={client}>
