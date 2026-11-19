@@ -2,9 +2,11 @@
 //! Pure: the queries hand in the facts, and the stats come from `stats::stats`.
 
 use super::money::Money;
-use super::stats::{StatInputs, StatReason, Stats};
+use super::stats::{StatInputs, StatReason, Stats, stats};
 
-/// The facts §5.21 needs beyond the stats' own inputs (`StatInputs`).
+/// The facts §5.21 needs beyond the stats' own inputs (`StatInputs`). They must agree with
+/// those: `earned` covers the same `months`, `cards` the same active cards, and an overdue
+/// move is given exactly when `StatInputs` counts that kind as overdue.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LevelFacts {
     /// Any payday rule, a paused one included (§5.15).
@@ -23,7 +25,8 @@ pub struct LevelFacts {
     pub loan_free_days: Option<i64>,
     /// The earliest overdue loan payment (by due date, then id).
     pub overdue_payment: Option<OverduePayment>,
-    /// The overdue card statement with the earliest due date, then the lowest account id.
+    /// The active card's overdue statement with the earliest due date, then the lowest
+    /// account id.
     pub overdue_card: Option<OverdueCard>,
 }
 
@@ -53,7 +56,9 @@ pub struct OverdueCard {
     pub amount: Money,
 }
 
-/// §5.21's condition codes, in the table's order. On the wire each is its snake_case name.
+/// §5.21's condition codes, in the table's order. On the wire each is its name there
+/// (`logged_20`): serde's `snake_case` puts no `_` before a digit, so the five codes with a
+/// number need their own `rename`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConditionCode {
     Logged20,
@@ -75,7 +80,8 @@ pub enum ConditionCode {
 }
 
 /// One condition today. `gap` is never below 0, and is `None` where the table gives none or
-/// there's no figure yet. `account_id` is the failing card, for `card_under_mid` only.
+/// there's no figure yet. A distance is 0 once met; `earned_3_months`' gap is the months so
+/// far and `stats_80`'s the lowest score. `account_id` is the failing card, for `card_under_mid` only.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Condition {
     pub code: ConditionCode,
@@ -108,13 +114,16 @@ pub struct Levels {
     pub next_move: NextMove,
 }
 
-pub fn levels(facts: &LevelFacts, input: &StatInputs, stats: &Stats) -> Levels {
+/// The stats are worked out here from `input`, so `stats_80` and the move can't judge a
+/// different input from the rest of the ladder.
+pub fn levels(facts: &LevelFacts, input: &StatInputs) -> Levels {
+    let stats = &stats(input);
     let ladder = ladder(facts, input, stats);
     let level = ladder
         .iter()
         .take_while(|conds| conds.iter().all(|c| c.met))
         .count();
-    let next_conditions = ladder[level.min(9)].clone();
+    let next_conditions = ladder.into_iter().nth(level.min(9)).unwrap_or_default();
     let next_move = if let Some(p) = facts.overdue_payment {
         NextMove::PayOverdueLoan(p)
     } else if let Some(c) = facts.overdue_card {
@@ -165,7 +174,8 @@ fn ladder(facts: &LevelFacts, input: &StatInputs, stats: &Stats) -> [Vec<Conditi
     let avg = input.avg_spending();
     let earned_in_a_row = facts.earned.iter().take_while(|e| e.0 > 0).count() as i64;
     let loan_free = |days: i64| match facts.loan_free_days {
-        Some(d) => (d >= days, Some(days - d)),
+        // A borrowed_on after today (a clock set back) counts as 0 days.
+        Some(d) => (d >= days, Some(days - d.max(0))),
         None => (true, None),
     };
     let saved_gap = |gap: i64| (avg > 0).then_some(gap);
@@ -196,17 +206,14 @@ fn ladder(facts: &LevelFacts, input: &StatInputs, stats: &Stats) -> [Vec<Conditi
             None,
         )],
         vec![
-            cond(
-                Earned3Months,
-                facts.earned.len() == 3 && earned_in_a_row == 3,
-                Some(earned_in_a_row),
-            ),
+            cond(Earned3Months, earned_in_a_row >= 3, Some(earned_in_a_row)),
             cond(NoShortDay, !facts.has_short_day, None),
         ],
         vec![card_under_mid(&facts.cards)],
         vec![cond(
             TwoWeeksSaved,
-            avg > 0 && money * 2 >= avg,
+            // money × 2 ≥ avg, without the multiply that could overflow.
+            avg > 0 && money >= (avg + 1) / 2,
             saved_gap((avg + 1) / 2 - money),
         )],
         vec![
@@ -302,7 +309,7 @@ mod tests {
     }
 
     fn run(facts: &LevelFacts, input: &StatInputs) -> Levels {
-        levels(facts, input, &stats(input))
+        levels(facts, input)
     }
 
     /// The level after `change`, and the next level's first unmet condition.
@@ -372,6 +379,9 @@ mod tests {
     #[test]
     fn each_threshold_is_reached_exactly_at_its_figure() {
         assert_eq!(with(|_, i| i.logged_days = 20).level, 10);
+        // A streak below 0 (a clock set back) is 0 days, so 90 are still to go.
+        let l = with(|f, _| f.loan_free_days = Some(-5));
+        assert_eq!((l.level, first_unmet(&l).gap), (7, Some(90)));
         // 450 × 2 = 900: two weeks saved, but not a month.
         let l = with(|_, i| i.cash_balance = Money(450));
         assert_eq!(l.level, 8);
@@ -487,7 +497,7 @@ mod tests {
         facts.earned.clear();
         input.months = 0;
         let s = stats(&input);
-        let l = levels(&facts, &input, &s);
+        let l = levels(&facts, &input);
         assert_eq!(l.level, 3);
         assert_eq!(first_unmet(&l).code, EarnedMonth);
         let ladder = ladder(&facts, &input, &s);
