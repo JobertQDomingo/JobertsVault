@@ -210,15 +210,22 @@ pub fn personal_best(shown: PeriodTotals, earlier: &[PeriodTotals]) -> Option<Pe
     }
 }
 
+/// A week's check-in is on time when `completed_on ≤ period_end + 3`: the one rule for the
+/// check-in streak and Habit's `on_time_weeks` (§5.20, §5.23).
+pub fn on_time(period_end: NaiveDate, completed_on: NaiveDate) -> bool {
+    period_end
+        .checked_add_days(Days::new(3))
+        .is_some_and(|last| completed_on <= last)
+}
+
 /// `week_rows` holds `(period_start, completed_on)` of every week row. Counting back from the
-/// latest completed week, the weeks in a row finished by `period_end + 3`. The latest week
-/// with no row yet is passed over until it's too late to be on time.
+/// latest completed week, the weeks in a row finished on time. The latest week with no row
+/// yet is passed over until it's too late to be on time.
 pub fn checkin_streak(
     today: NaiveDate,
     settings: &PeriodSettings,
     week_rows: &[(NaiveDate, NaiveDate)],
 ) -> i64 {
-    let last_on_time = |w: &Period| w.end().checked_add_days(Days::new(3));
     let completed = |w: &Period| {
         week_rows
             .iter()
@@ -229,16 +236,13 @@ pub fn checkin_streak(
         .and_then(|current| current.previous(settings));
     if let Some(latest) = week
         && completed(&latest).is_none()
-        && last_on_time(&latest).is_some_and(|last| today <= last)
+        && on_time(latest.end(), today)
     {
         week = latest.previous(settings);
     }
     let mut streak = 0;
     while let Some(w) = week {
-        let on_time = completed(&w)
-            .zip(last_on_time(&w))
-            .is_some_and(|(on, last)| on <= last);
-        if !on_time {
+        if !completed(&w).is_some_and(|on| on_time(w.end(), on)) {
             break;
         }
         streak += 1;
@@ -270,13 +274,14 @@ pub fn focus_record<T>(
 }
 
 /// The trend lines' points (LVL-8): one per `completed_on`, the 12 latest, oldest first. A
-/// merged check-in's rows hold the same snapshot, so one of them stands for all. `latest_first`
-/// is sorted by `completed_on`.
+/// merged check-in's rows hold the same snapshot, so one of them stands for all. The rows may
+/// come in any order.
 pub fn history<T>(
-    latest_first: impl IntoIterator<Item = T>,
+    rows: impl IntoIterator<Item = T>,
     completed_on: impl Fn(&T) -> NaiveDate,
 ) -> Vec<T> {
-    let mut points: Vec<T> = latest_first.into_iter().collect();
+    let mut points: Vec<T> = rows.into_iter().collect();
+    points.sort_by_key(|p| std::cmp::Reverse(completed_on(p)));
     points.dedup_by(|a, b| completed_on(a) == completed_on(b));
     points.truncate(12);
     points.reverse();
@@ -654,6 +659,23 @@ mod tests {
         assert_eq!(some[2].start(), d(2026, 7, 1));
     }
 
+    #[test]
+    fn best_periods_follow_a_month_starting_on_the_25th() {
+        let s = settings(Weekday::Mon, 25);
+        let shown = Period::containing(PeriodKind::Month, d(2026, 10, 1), &s).unwrap();
+        // Shown: Sep 25 to Oct 24. A first transaction on Jul 24 keeps Jun 25 to Jul 24.
+        let earlier = best_periods(shown, &s, d(2026, 7, 24));
+        let spans: Vec<_> = earlier.iter().map(|p| (p.start(), p.end())).collect();
+        assert_eq!(
+            spans,
+            [
+                (d(2026, 8, 25), d(2026, 9, 24)),
+                (d(2026, 7, 25), d(2026, 8, 24)),
+                (d(2026, 6, 25), d(2026, 7, 24)),
+            ]
+        );
+    }
+
     // §5.23: streaks.
 
     /// The 2026 week starting on `start_day` (month, day), finished `done_after_end` days after
@@ -701,6 +723,28 @@ mod tests {
     }
 
     #[test]
+    fn a_sunday_week_start_moves_the_grace() {
+        let s = settings(Weekday::Sun, 1);
+        // Weeks Sun to Sat: Nov 8 to 14 is the latest on Tue Nov 17, and on time until Nov 17.
+        let rows = [(d(2026, 11, 1), d(2026, 11, 7))];
+        assert_eq!(checkin_streak(d(2026, 11, 17), &s, &rows), 1);
+        assert_eq!(checkin_streak(d(2026, 11, 18), &s, &rows), 0);
+        // A Monday-start row never lines up with a Sunday-start week.
+        let monday_rows = [(d(2026, 11, 2), d(2026, 11, 8))];
+        assert_eq!(checkin_streak(d(2026, 11, 17), &s, &monday_rows), 0);
+    }
+
+    #[test]
+    fn on_time_is_by_the_third_day_after_the_end() {
+        assert!(on_time(d(2026, 11, 15), d(2026, 11, 18)));
+        assert!(!on_time(d(2026, 11, 15), d(2026, 11, 19)));
+        assert!(
+            !on_time(NaiveDate::MAX, NaiveDate::MAX),
+            "no panic past chrono's range"
+        );
+    }
+
+    #[test]
     fn the_focus_streak_passes_over_void_and_stops_at_missed() {
         use FocusResult::{Kept, Missed, Void};
         assert_eq!(focus_streak([Kept, Void, Kept, Void, Missed, Kept]), 2);
@@ -736,11 +780,11 @@ mod tests {
 
     #[test]
     fn history_has_one_point_per_completed_on() {
-        // A merged week and month, finished the same day, then an earlier week.
+        // A merged week and month finished the same day, apart in the order given.
         let rows = [
             (PeriodKind::Month, d(2026, 11, 2)),
-            (PeriodKind::Week, d(2026, 11, 2)),
             (PeriodKind::Week, d(2026, 10, 26)),
+            (PeriodKind::Week, d(2026, 11, 2)),
         ];
         let points: Vec<NaiveDate> = history(rows, |(_, on)| *on)
             .into_iter()

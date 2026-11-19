@@ -1479,6 +1479,6 @@ Answered on 2026-11-19, building the level ladder (PR #121):
 
 142. **The next best move's own codes are `pay_overdue_loan` and `pay_overdue_card`.** A gap is never below 0, and there's none while there's no figure for one yet: the savings levels before any spending, the loan-free levels with no streak. The card move is for active cards only, as `overdue` counts them, so the move and level 3 always agree. With several cards overdue, it names the earliest due, then the lowest account id (§5.21).
 
-Answered on 2026-11-19, building the wins and streaks (T09):
+Answered on 2026-11-19, building the wins and streaks (PR #123):
 
 143. **Equal category falls go to the lower category id**, as equal rises do for the focus offers, so the win is always the same one for the same figures (§5.22, §5.23).

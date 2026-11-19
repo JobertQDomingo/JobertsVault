@@ -42,7 +42,7 @@ pub struct StatInputs {
     pub loan_due_this_month: Money,
     /// Active goals that are Behind (§5.17).
     pub goals_behind: i64,
-    /// Of the 4 latest completed weeks, those whose week row has `completed_on ≤ period_end + 3`.
+    /// Of the 4 latest completed weeks, those whose week row was finished on time (`checkin::on_time`).
     /// 0 to 4. Only for `get_checkin`'s status and the snapshot Finish stores, the check-in being
     /// finished counts as finished today; elsewhere only existing rows count.
     pub on_time_weeks: i64,
