@@ -1068,7 +1068,7 @@ A focus runs for the week or month that **contains the day the check-in was fini
 | `loan_on_time` | Bills | An active loan has an unpaid payment due in the focus period: the earliest one | That payment |
 | `card_level` | Card | An active card's level today isn't hard (§5.18): with several, the one with the lowest Card score of those (ties by account id) | The lowest of its three levels that's above its cycle spending today |
 | `spending_cap` | Cashflow | The focus is for a week, there's a payday rule, and `per day` (§5.15) is above 0 | `per day × 7` |
-| `category_cap` | Cashflow | An active expense category's everyday spending in the period reviewed rose over the period before it, where that earlier amount is above 0: the one with the largest rise (ties by category id) | Its everyday spending in that earlier period |
+| `category_cap` | Cashflow | An active expense category's everyday spending in the period reviewed rose over the period before it, where that earlier amount is above 0: the one with the largest rise in amount, not percent (ties by category id) | Its everyday spending in that earlier period |
 | `logging` | Habit | Always | 5 days for a week, 20 for a month |
 
 **Grading.** A focus is graded once `focus_end` is before today, by the next check-in that's finished. Finishing grades **every** ended focus that isn't graded yet. The Start step shows, of those, the one that ended latest, and nothing when there are none, so a focus graded at an earlier check-in never shows again. `get_checkin` works those grades out for the Start step without storing them; Finish works them out again and stores them.

@@ -7,6 +7,7 @@ pub mod card_cycle;
 pub mod category;
 pub mod checkin;
 pub mod csv;
+pub mod focus;
 pub mod forecast;
 pub mod goal;
 pub mod levels;
