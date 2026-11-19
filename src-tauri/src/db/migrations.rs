@@ -816,107 +816,183 @@ mod tests {
         assert!(insert("Visa", "credit_card", [Some(1), Some(2), Some(3)]).is_ok());
     }
 
-    /// A focus: kind, category, loan payment, target and result.
-    type Focus = (
-        Option<&'static str>,
-        Option<i64>,
-        Option<i64>,
-        Option<i64>,
-        Option<&'static str>,
-    );
+    /// Focus columns as `(column, SQL literal)` pairs.
+    type Cols = Vec<(&'static str, &'static str)>;
 
-    /// Inserts a check-in row for `kind` and `start` with `focus`. The rest of the row is a
-    /// valid snapshot.
+    /// A logging focus for the week of Nov 16, valid as it is.
+    fn logging() -> Cols {
+        vec![
+            ("focus_kind", "'logging'"),
+            ("focus_target", "5"),
+            ("focus_start", "'2026-11-16'"),
+            ("focus_end", "'2026-11-22'"),
+        ]
+    }
+
+    /// `cols` with `column` set to `value`, added when it isn't there.
+    fn with(mut cols: Cols, column: &'static str, value: &'static str) -> Cols {
+        cols.retain(|(c, _)| *c != column);
+        cols.push((column, value));
+        cols
+    }
+
+    /// Inserts a check-in row for `kind` and `start` with the extra `cols`. The rest of the
+    /// row is a valid snapshot. The SQL is built from the test's own literals only.
     fn insert_checkin(
         conn: &Connection,
         kind: &str,
         start: &str,
-        focus: Focus,
+        cols: &[(&str, &str)],
     ) -> rusqlite::Result<usize> {
-        let (focus_kind, category, payment, target, result) = focus;
+        let names: String = cols.iter().map(|(c, _)| format!(", {c}")).collect();
+        let values: String = cols.iter().map(|(_, v)| format!(", {v}")).collect();
         conn.execute(
-            "INSERT INTO checkins (kind, period_start, period_end, completed_on, level, stat_habit, focus_kind, focus_category_id, focus_loan_payment_id, focus_target, focus_result, created_at, updated_at) VALUES (?1, ?2, ?2, '2026-11-16', 4, 80, ?3, ?4, ?5, ?6, ?7, ?8, ?8)",
-            rusqlite::params![kind, start, focus_kind, category, payment, target, result, NOW],
+            &format!("INSERT INTO checkins (kind, period_start, period_end, completed_on, level, stat_habit, created_at, updated_at{names}) VALUES (?1, ?2, ?2, '2026-11-16', 4, 80, ?3, ?3{values})"),
+            rusqlite::params![kind, start, NOW],
         )
     }
 
     #[test]
-    fn a_period_is_checked_in_once_and_a_row_without_a_focus_has_no_focus_fields() {
+    fn a_checkin_row_holds_its_shape() {
         let conn = migrated();
-        let none = (None, None, None, None, None);
-        assert!(insert_checkin(&conn, "week", "2026-11-09", none).is_ok());
-        assert!(insert_checkin(&conn, "month", "2026-11-09", none).is_ok());
+        assert!(insert_checkin(&conn, "week", "2026-11-09", &[]).is_ok());
+        assert!(insert_checkin(&conn, "month", "2026-11-09", &[]).is_ok());
         assert!(
-            insert_checkin(&conn, "week", "2026-11-09", none).is_err(),
+            insert_checkin(&conn, "week", "2026-11-09", &[]).is_err(),
             "a period is never reviewed twice"
         );
-        for (kind, start, focus) in [
-            ("day", "2026-11-02", none),
-            ("week", "11/02/2026", none),
-            ("week", "2026-10-26", (None, Some(8), None, None, None)),
-            ("week", "2026-10-26", (None, None, None, Some(5), None)),
+        assert!(insert_checkin(&conn, "week", "11/02/2026", &[]).is_err());
+        let rejected: [(&str, Cols, &str); 13] = [
+            ("day", vec![], "an unknown kind"),
             (
                 "week",
-                "2026-10-26",
-                (Some("budget"), None, None, None, None),
+                vec![("focus_category_id", "8")],
+                "focus fields without a focus",
             ),
             (
                 "week",
-                "2026-10-26",
-                (Some("logging"), None, None, Some(0), None),
+                vec![("focus_target", "5")],
+                "focus fields without a focus",
+            ),
+            ("week", vec![("stat_debt", "-1")], "a stat below 0"),
+            ("week", vec![("stat_card", "101")], "a stat above 100"),
+            ("week", vec![("debt_free_on", "'soon'")], "a bad date"),
+            (
+                "week",
+                with(logging(), "focus_end", "'2026-11-2'"),
+                "a bad date",
             ),
             (
                 "week",
-                "2026-10-26",
-                (Some("logging"), None, None, Some(5), Some("late")),
+                with(logging(), "focus_kind", "'budget'"),
+                "an unknown focus",
             ),
-        ] {
+            (
+                "week",
+                with(logging(), "focus_target", "0"),
+                "a target of 0",
+            ),
+            (
+                "week",
+                with(logging(), "focus_result", "'late'"),
+                "an unknown result",
+            ),
+            (
+                "week",
+                with(logging(), "focus_start", "NULL"),
+                "a focus without its dates",
+            ),
+            ("year", logging(), "a year row with a focus"),
+            (
+                "week",
+                with(logging(), "focus_kind", "'category_cap'"),
+                "a cap without its category",
+            ),
+        ];
+        // Each case has a period of its own, so it can only fail on its own check.
+        let starts = (1..=12).map(|m| format!("2025-{m:02}-01"));
+        for ((kind, cols, why), start) in rejected
+            .into_iter()
+            .zip(starts.chain(["2024-01-01".into()]))
+        {
             assert!(
-                insert_checkin(&conn, kind, start, focus).is_err(),
-                "{kind} {start} {focus:?}"
+                insert_checkin(&conn, kind, &start, &cols).is_err(),
+                "{why}: {cols:?}"
             );
         }
         assert!(
             insert_checkin(
                 &conn,
                 "week",
-                "2026-10-26",
-                (Some("logging"), None, None, Some(5), Some("kept"))
+                "2024-02-05",
+                &with(logging(), "focus_kind", "'card_level'")
             )
-            .is_ok()
+            .is_err(),
+            "a card level without its card"
         );
+        for (start, cols) in [
+            ("2026-10-26", with(logging(), "focus_result", "'kept'")),
+            // A removed payment leaves the focus without one (ON DELETE SET NULL).
+            (
+                "2026-10-19",
+                with(
+                    with(logging(), "focus_kind", "'loan_on_time'"),
+                    "focus_target",
+                    "NULL",
+                ),
+            ),
+        ] {
+            assert!(
+                insert_checkin(&conn, "week", start, &cols).is_ok(),
+                "{cols:?}"
+            );
+        }
+        // The helper already sets the level, so this one is checked by an update.
         assert!(
             conn.execute("UPDATE checkins SET level = 11 WHERE id = 1", [])
-                .is_err()
-        );
-        assert!(
-            conn.execute("UPDATE checkins SET stat_card = 101 WHERE id = 1", [])
                 .is_err()
         );
     }
 
     #[test]
-    fn a_focus_puts_its_category_in_use_and_loses_a_removed_payment() {
+    fn a_focus_puts_its_category_and_card_in_use_and_loses_a_removed_payment() {
         let conn = migrated();
         add_loan(&conn);
-        insert_checkin(
-            &conn,
-            "week",
-            "2026-11-09",
-            (Some("category_cap"), Some(9), None, Some(50_000), None),
+        conn.execute(
+            "INSERT INTO accounts (name, kind, credit_limit, statement_day, due_day, spend_soft, spend_mid, spend_hard, created_at, updated_at) VALUES ('Visa', 'credit_card', 5000000, 15, 5, 1, 2, 3, ?1, ?1)",
+            [NOW],
         )
         .unwrap();
-        insert_checkin(
-            &conn,
-            "month",
-            "2026-11-01",
-            (Some("loan_on_time"), None, Some(1), None, None),
-        )
-        .unwrap();
-        assert!(
-            conn.execute("DELETE FROM categories WHERE id = 9", [])
-                .is_err()
+        let card = conn.last_insert_rowid();
+        let cap = with(
+            with(logging(), "focus_kind", "'category_cap'"),
+            "focus_category_id",
+            "9",
         );
+        insert_checkin(&conn, "week", "2026-11-09", &cap).unwrap();
+        let level = with(
+            with(logging(), "focus_kind", "'card_level'"),
+            "focus_account_id",
+            "2",
+        );
+        insert_checkin(&conn, "week", "2026-11-02", &level).unwrap();
+        let on_time = with(
+            with(
+                with(logging(), "focus_kind", "'loan_on_time'"),
+                "focus_target",
+                "NULL",
+            ),
+            "focus_loan_payment_id",
+            "1",
+        );
+        insert_checkin(&conn, "month", "2026-11-01", &on_time).unwrap();
+        assert_eq!(card, 2, "the card is account 2");
+        for delete in [
+            "DELETE FROM categories WHERE id = 9",
+            "DELETE FROM accounts WHERE id = 2",
+        ] {
+            assert!(conn.execute(delete, []).is_err(), "{delete}");
+        }
         conn.execute("DELETE FROM loans WHERE id = 1", []).unwrap();
         let payment: Option<i64> = conn
             .query_row(
@@ -969,12 +1045,23 @@ mod tests {
             .query_row("SELECT count(*) FROM checkins", [], |row| row.get(0))
             .unwrap();
         assert_eq!(checkins, 0, "nothing is checked in by the update");
-        assert!(
-            conn.execute(
-                "UPDATE goals SET moved_on = '2026-11-16', moved_from = '2027-02-01'",
-                []
-            )
-            .is_ok()
-        );
+        for (moved_on, moved_from, accepted) in [
+            ("'2026-11-16'", "NULL", false),
+            ("NULL", "'2027-02-01'", false),
+            ("'16/11/2026'", "'2027-02-01'", false),
+            ("'2026-11-16'", "'Feb 1'", false),
+            ("'2026-11-16'", "'2027-02-01'", true),
+            ("NULL", "NULL", true),
+        ] {
+            let result = conn.execute(
+                &format!("UPDATE goals SET moved_on = {moved_on}, moved_from = {moved_from}"),
+                [],
+            );
+            assert_eq!(
+                result.is_ok(),
+                accepted,
+                "{moved_on} {moved_from}: {result:?}"
+            );
+        }
     }
 }

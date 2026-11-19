@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.3 |
-| **Last updated** | 2026-11-17 |
+| **Last updated** | 2026-11-19 |
 | **Database** | SQLite (bundled with the app through `rusqlite`) |
 | **Related docs** | [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 
@@ -393,11 +393,13 @@ CREATE TABLE goals (
 - **Phase 5 (CHK-3, migration `0005`):** two nullable columns record the last time GOL-7 moved the date by itself (§5.17), so a check-in can show it:
 
   ```sql
-  ALTER TABLE goals ADD COLUMN moved_on   TEXT;   -- the local date of the move
-  ALTER TABLE goals ADD COLUMN moved_from TEXT;   -- the target date it had before
+  ALTER TABLE goals ADD COLUMN moved_on   TEXT CHECK (moved_on GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]');  -- the local date of the move
+  -- the target date it had before; a column's CHECK may name an earlier column, so both are set or neither is
+  ALTER TABLE goals ADD COLUMN moved_from TEXT CHECK ((moved_from IS NULL) = (moved_on IS NULL)
+    AND (moved_from IS NULL OR moved_from GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'));
   ```
 
-  GOL-7's move sets both, in the same database transaction as the save that caused it. An edit that changes the target date by hand clears both. They never feed a calculation.
+  GOL-7's move sets both, in the same database transaction as the save that caused it. An edit that changes the target date by hand clears both. The table refuses one without the other. GOL-7 only moves a goal with a target date, so `moved_from` always has one. They never feed a calculation.
 
 ### 4.5 `loans` (Phase 4)
 
@@ -512,15 +514,15 @@ CREATE TABLE checkins (
   stat_debt             INTEGER CHECK (stat_debt     BETWEEN 0 AND 100),
   stat_savings          INTEGER CHECK (stat_savings  BETWEEN 0 AND 100),
   stat_habit            INTEGER CHECK (stat_habit    BETWEEN 0 AND 100),
-  debt_free_on          TEXT,                                              -- §5.11, NULL = nothing left
+  debt_free_on          TEXT    CHECK (debt_free_on GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),  -- §5.11, NULL = nothing left
   -- focus (§5.22); every focus column is NULL when the row set none
   focus_kind            TEXT    CHECK (focus_kind IN ('category_cap','spending_cap','card_level','loan_on_time','logging')),
   focus_category_id     INTEGER REFERENCES categories(id)    ON DELETE RESTRICT,
   focus_account_id      INTEGER REFERENCES accounts(id)      ON DELETE RESTRICT,
   focus_loan_payment_id INTEGER REFERENCES loan_payments(id) ON DELETE SET NULL,
   focus_target          INTEGER CHECK (focus_target > 0),
-  focus_start           TEXT,
-  focus_end             TEXT,
+  focus_start           TEXT    CHECK (focus_start  GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+  focus_end             TEXT    CHECK (focus_end    GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
   focus_result          TEXT    CHECK (focus_result IN ('kept','missed','void')),  -- NULL = not graded yet
   focus_actual          INTEGER,
   created_at            TEXT    NOT NULL,
@@ -529,7 +531,10 @@ CREATE TABLE checkins (
   CHECK (focus_kind IS NOT NULL OR (
     focus_category_id IS NULL AND focus_account_id IS NULL AND focus_loan_payment_id IS NULL
     AND focus_target IS NULL AND focus_start IS NULL AND focus_end IS NULL
-    AND focus_result IS NULL AND focus_actual IS NULL))
+    AND focus_result IS NULL AND focus_actual IS NULL)),
+  CHECK (focus_kind IS NULL OR (kind <> 'year' AND focus_start IS NOT NULL AND focus_end IS NOT NULL)),
+  CHECK (focus_kind <> 'category_cap' OR focus_category_id IS NOT NULL),
+  CHECK (focus_kind <> 'card_level'   OR focus_account_id  IS NOT NULL)
 ) STRICT;
 
 CREATE INDEX idx_checkins_completed ON checkins(completed_on);
@@ -550,6 +555,7 @@ CREATE INDEX idx_checkins_completed ON checkins(completed_on);
 
 - **Finishing a check-in** writes its rows in one database transaction: one row per kind that was due, all with the same `completed_on` and snapshot, and the grade of every focus that has ended and isn't graded yet (§5.22).
 - **A check-in row is never edited afterwards, except to grade its focus, and never deleted.** There's no command for either.
+- **The table's checks hold the row's shape** as well as its values, since a stored row can't be put right later: every date is `YYYY-MM-DD`, a row without a focus has no focus fields, a year row has no focus, a focus has its `focus_start` and `focus_end`, a `category_cap` has its category, and a `card_level` has its card. A `loan_on_time` focus may lose its payment (`ON DELETE SET NULL`), so its payment isn't required.
 - A focus target that's an amount locks `currency_decimals` (§1).
 - A restore brings the check-ins with the rest of the data.
 
@@ -1463,3 +1469,7 @@ Answered on 2026-11-17, reviewing the Phase 5 docs before building (PR #111):
 138. **The Start step shows only a focus this check-in grades**, so one graded earlier never shows, or counts as the win, twice (§5.22).
 139. **A kind whose stat is none ranks as 100** among the focus offers, and a focus must match its offer's period too (§5.22, §6).
 140. **Divisions below 0 round toward minus infinity**, so a month a little over break-even scores 49 for Cashflow, never 50 (§5.20).
+
+Answered on 2026-11-19, building migration `0005` (PR #119):
+
+141. **The `checkins` table and the goals' `moved_on` and `moved_from` check the rules §4.4 and §4.9 state in words**: the date format, a year row with no focus, a focus with its dates, its category or its card, and both moved columns set or neither. A service bug is then refused instead of stored for good, since a check-in row is never edited (the owner's choice, §4.4, §4.9).
