@@ -20,10 +20,10 @@ use crate::domain::stats::{self, CardInput, Stat, StatInputs, StatReason, Stats}
 use crate::error::AppError;
 use crate::repo;
 use crate::repo::transactions::Filter;
-use crate::services::accounts::{self, AccountKind};
-use crate::services::forecast::{self, ForecastGrain};
-use crate::services::goals;
-use crate::services::loans::{self, LoanPaymentStatus};
+use crate::services::accounts::{self, Account, AccountKind};
+use crate::services::forecast::{self, Forecast, ForecastGrain};
+use crate::services::goals::{self, GoalProgress};
+use crate::services::loans::{self, LoanList, LoanPaymentStatus};
 use crate::services::period::{self, out_of_range};
 
 /// A focus's kind (DATA_MODEL §5.22), as `checkins.focus_kind` stores it.
@@ -192,17 +192,29 @@ pub struct VaultStatus {
 }
 
 /// What the stats and the ladder are worked out from for `today`.
+/// The lists are the ones the figures came from, so the check-in reads each once.
 pub(crate) struct Facts {
     pub inputs: StatInputs,
     pub level: LevelFacts,
     pub settings: PeriodSettings,
     /// Latest `completed_on` first.
     pub rows: Vec<repo::checkins::Row>,
+    /// Every week row's `(period_start, completed_on)`, with the week being finished, if any.
+    pub week_rows: Vec<(NaiveDate, NaiveDate)>,
+    pub earliest_transaction: Option<NaiveDate>,
+    pub accounts: Vec<Account>,
+    pub loans: LoanList,
+    pub goals: Vec<GoalProgress>,
+    pub forecast: Forecast,
 }
 
 pub fn get(conn: &mut Connection, today: NaiveDate) -> Result<VaultStatus, AppError> {
-    let facts = gather(conn, today)?;
-    status(conn, &facts, today)
+    // Reading the goals can mark one achieved, so it's a database transaction like `list_goals`.
+    let tx = conn.transaction()?;
+    let facts = gather(&tx, today, None)?;
+    let status = status(&tx, &facts, today)?;
+    tx.commit()?;
+    Ok(status)
 }
 
 /// The status from gathered facts.
@@ -231,7 +243,6 @@ pub(crate) fn status(
         }
     }
     graded.sort_by_key(|g| std::cmp::Reverse(g.focus.end));
-    let week_rows = week_rows(&facts.rows)?;
     Ok(VaultStatus {
         today,
         stats: views(&stats),
@@ -246,7 +257,7 @@ pub(crate) fn status(
         next_move: move_view(ladder.next_move),
         previous,
         focuses: active(conn, &facts.rows, today)?,
-        checkin_streak: checkin::checkin_streak(today, &facts.settings, &week_rows),
+        checkin_streak: checkin::checkin_streak(today, &facts.settings, &facts.week_rows),
         focus_streak: checkin::focus_streak(graded.iter().map(|g| g.result)),
         loan_free_days: facts.level.loan_free_days,
         focus_record: checkin::focus_record(graded, |g| g.result),
@@ -447,6 +458,16 @@ pub(crate) fn focus_of(row: &repo::checkins::Row) -> Result<Option<FocusFields>,
     }))
 }
 
+pub(crate) fn kind_text(kind: FocusKind) -> &'static str {
+    match kind {
+        FocusKind::CategoryCap => "category_cap",
+        FocusKind::SpendingCap => "spending_cap",
+        FocusKind::CardLevel => "card_level",
+        FocusKind::LoanOnTime => "loan_on_time",
+        FocusKind::Logging => "logging",
+    }
+}
+
 fn result_of(text: &str, row_id: i64) -> Result<FocusResult, AppError> {
     match text {
         "kept" => Ok(FocusResult::Kept),
@@ -475,17 +496,22 @@ pub(crate) fn week_rows(
         .collect()
 }
 
-/// Gathers §5.20's and §5.21's figures for `today` from the other services. Reading the goals
-/// marks a goal achieved, as `list_goals` does (GOL-4).
-pub(crate) fn gather(conn: &mut Connection, today: NaiveDate) -> Result<Facts, AppError> {
+/// Gathers §5.20's and §5.21's figures for `today` from the other services, in the caller's
+/// database transaction: reading the goals marks a goal achieved, as `list_goals` does (GOL-4).
+/// `finishing` is the start of the week a check-in is finishing, which counts as finished today
+/// for Habit and the check-in streak (§5.20).
+pub(crate) fn gather(
+    conn: &Connection,
+    today: NaiveDate,
+    finishing: Option<NaiveDate>,
+) -> Result<Facts, AppError> {
     let settings = period::period_settings(conn)?;
     let earliest_transaction = repo::checkins::earliest_transaction(conn)?
         .as_deref()
         .map(stored_date)
         .transpose()?;
     let rows = repo::checkins::all(conn)?;
-    let goals = goals::list(conn, today)?;
-    let conn = &*conn;
+    let goals = goals::list_in(conn, today)?;
     let accounts = accounts::list(conn, today)?.accounts;
     let loans = loans::list(conn, today)?;
     let forecast = forecast::get(conn, ForecastGrain::Window, today)?;
@@ -602,7 +628,8 @@ pub(crate) fn gather(conn: &mut Connection, today: NaiveDate) -> Result<Facts, A
                 .collect()
         })
         .unwrap_or_default();
-    let week_rows = week_rows(&rows)?;
+    let mut week_rows = week_rows(&rows)?;
+    week_rows.extend(finishing.map(|start| (start, today)));
     let on_time_weeks = completed_weeks
         .iter()
         .filter(|w| {
@@ -664,6 +691,12 @@ pub(crate) fn gather(conn: &mut Connection, today: NaiveDate) -> Result<Facts, A
         level,
         settings,
         rows,
+        week_rows,
+        earliest_transaction,
+        accounts,
+        loans,
+        goals,
+        forecast,
     })
 }
 

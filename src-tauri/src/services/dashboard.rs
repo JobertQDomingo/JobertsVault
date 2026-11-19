@@ -147,54 +147,7 @@ pub fn get(
         })
         .collect();
     cards_due.sort_by_key(|c| c.days);
-    let loans::LoanList { loans, summary } = loans::list(conn, today)?;
-    let all_overdue = loans
-        .iter()
-        .flat_map(|l| &l.payments)
-        .filter(|p| p.status == loans::LoanPaymentStatus::Unpaid)
-        .all(|p| p.overdue);
-    let mut loans_due: Vec<LoanDue> = loans
-        .into_iter()
-        // Defensive: an archived loan is paid off, so it has no next payment anyway.
-        .filter(|l| !l.archived)
-        .filter_map(|l| {
-            let next = l.next?;
-            let days = (next.due_date - today).num_days();
-            (days <= 5).then(|| LoanDue {
-                loan_id: l.id,
-                account_id: l.account_id,
-                payment_id: next.id,
-                amount: next.amount,
-                due_date: next.due_date,
-                days,
-                more_overdue: l
-                    .payments
-                    .iter()
-                    .filter(|p| p.overdue)
-                    .count()
-                    .saturating_sub(1),
-                move_first: None,
-                name: l.name,
-            })
-        })
-        .collect();
-    loans_due.sort_by_key(|l| (l.due_date, l.loan_id));
-    let dues: Vec<_> = loans_due.iter().map(|l| (l.account_id, l.amount)).collect();
-    let balance = |id| {
-        accounts
-            .iter()
-            .find(|a| a.id == id)
-            .map_or(Money::ZERO, |a| a.balance)
-    };
-    for (due, share) in loans_due.iter_mut().zip(loan::move_first(&dues, balance)) {
-        due.move_first = share;
-    }
-    // None exactly when no payment is unpaid.
-    let loans_left = summary.debt_free_on.map(|debt_free_on| LoansLeft {
-        total_left: summary.total_left,
-        debt_free_on,
-        overdue: all_overdue,
-    });
+    let (loans_due, loans_left) = loan_reminders(&accounts, &loans::list(conn, today)?, today);
     let recent = repo::transactions::recent(conn, &today.to_string(), 10)?
         .into_iter()
         .map(transactions::view)
@@ -223,6 +176,64 @@ pub fn get(
         recent,
         today,
     })
+}
+
+/// The loans' reminder banners, soonest first, and the line under the net balance (LOAN-4,
+/// LOAN-11), as the dashboard and the check-in's Loans and bills step show them.
+pub(crate) fn loan_reminders(
+    accounts: &[Account],
+    list: &loans::LoanList,
+    today: NaiveDate,
+) -> (Vec<LoanDue>, Option<LoansLeft>) {
+    let (loans, summary) = (&list.loans, &list.summary);
+    let all_overdue = loans
+        .iter()
+        .flat_map(|l| &l.payments)
+        .filter(|p| p.status == loans::LoanPaymentStatus::Unpaid)
+        .all(|p| p.overdue);
+    let mut loans_due: Vec<LoanDue> = loans
+        .iter()
+        // Defensive: an archived loan is paid off, so it has no next payment anyway.
+        .filter(|l| !l.archived)
+        .filter_map(|l| {
+            let next = l.next.as_ref()?;
+            let days = (next.due_date - today).num_days();
+            (days <= 5).then(|| LoanDue {
+                loan_id: l.id,
+                account_id: l.account_id,
+                payment_id: next.id,
+                amount: next.amount,
+                due_date: next.due_date,
+                days,
+                more_overdue: l
+                    .payments
+                    .iter()
+                    .filter(|p| p.overdue)
+                    .count()
+                    .saturating_sub(1),
+                move_first: None,
+                name: l.name.clone(),
+            })
+        })
+        .collect();
+    loans_due.sort_by_key(|l| (l.due_date, l.loan_id));
+    let dues: Vec<_> = loans_due.iter().map(|l| (l.account_id, l.amount)).collect();
+    let balance = |id| {
+        accounts
+            .iter()
+            .find(|a| a.id == id)
+            .map_or(Money::ZERO, |a| a.balance)
+    };
+    for (due, share) in loans_due.iter_mut().zip(loan::move_first(&dues, balance)) {
+        due.move_first = share;
+    }
+    // None exactly when no payment is unpaid.
+    let loans_left = summary.debt_free_on.map(|debt_free_on| LoansLeft {
+        total_left: summary.total_left,
+        debt_free_on,
+        overdue: all_overdue,
+    });
+    (loans_due, loans_left)
 }
 
 #[cfg(test)]

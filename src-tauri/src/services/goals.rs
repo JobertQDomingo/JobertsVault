@@ -46,6 +46,10 @@ pub struct Goal {
     pub achieved_at: Option<NaiveDate>,
     /// Hidden from the goal cards, under Show archived. Any goal can be archived.
     pub archived: bool,
+    /// The day GOL-7 last moved its target date by itself, and the date it had before; both none
+    /// once the user sets a date by hand (CHK-3, DATA_MODEL §4.4).
+    pub moved_on: Option<NaiveDate>,
+    pub moved_from: Option<NaiveDate>,
 }
 
 /// A goal and how close its account is to the target as of today (GOL-3, DATA_MODEL §5.7).
@@ -277,7 +281,8 @@ pub(crate) fn follow_forecast(
     let mut moved = Vec::new();
     for (row, g, check) in checked(conn, now.date_naive(), true)? {
         if let Check::Late(to) = check {
-            repo::goals::set_target_date(conn, row.id, &to.to_string(), &stamp)?;
+            let on = now.date_naive().to_string();
+            repo::goals::set_target_date(conn, row.id, &to.to_string(), &on, &stamp)?;
             moved.push(GoalMove {
                 id: row.id,
                 name: row.name,
@@ -294,11 +299,18 @@ pub(crate) fn follow_forecast(
 /// there (GOL-4).
 pub fn list(conn: &mut Connection, today: NaiveDate) -> Result<Vec<GoalProgress>, AppError> {
     let tx = conn.transaction()?;
-    let goals = repo::goals::all(&tx)?;
+    let list = list_in(&tx, today)?;
+    tx.commit()?;
+    Ok(list)
+}
+
+/// `list` inside the caller's database transaction, which the achieved marks are written in.
+pub(crate) fn list_in(tx: &Connection, today: NaiveDate) -> Result<Vec<GoalProgress>, AppError> {
+    let goals = repo::goals::all(tx)?;
     if goals.is_empty() {
         return Ok(Vec::new());
     }
-    let accounts = repo::accounts::all(&tx, today)?;
+    let accounts = repo::accounts::all(tx, today)?;
     let mut list = Vec::with_capacity(goals.len());
     for row in goals {
         let mut goal = view(row)?;
@@ -311,13 +323,13 @@ pub fn list(conn: &mut Connection, today: NaiveDate) -> Result<Vec<GoalProgress>
             })?;
         // An archived goal may have been given up, so it isn't marked.
         if !goal.archived && goal.achieved_at.is_none() && balance >= goal.fields.target_amount.0 {
-            repo::goals::set_achieved(&tx, goal.id, &today.to_string())?;
+            repo::goals::set_achieved(tx, goal.id, &today.to_string())?;
             goal.achieved_at = Some(today);
         }
         list.push(progress(goal, balance, today)?);
     }
     // After the achieved marks above, so a goal reached today is never behind.
-    for (row, _, check) in checked(&tx, today, false)? {
+    for (row, _, check) in checked(tx, today, false)? {
         let earliest_date = match check {
             Check::OnTrack => continue,
             Check::Late(date) => Some(date),
@@ -327,7 +339,6 @@ pub fn list(conn: &mut Connection, today: NaiveDate) -> Result<Vec<GoalProgress>
             p.behind = Some(Behind { earliest_date });
         }
     }
-    tx.commit()?;
     Ok(list)
 }
 
@@ -543,15 +554,20 @@ fn values(f: &GoalFields) -> repo::goals::Values<'_> {
 }
 
 fn view(row: repo::goals::Row) -> Result<Goal, AppError> {
-    let achieved_at = row
-        .achieved_at
-        .as_deref()
-        .map(|text| {
-            real_date(text).ok_or_else(|| AppError::Database {
-                message: format!("Goal {} has an invalid achieved date", row.id),
+    let date = |text: &Option<String>| {
+        text.as_deref()
+            .map(|text| {
+                real_date(text).ok_or_else(|| AppError::Database {
+                    message: format!("Goal {} has an invalid date", row.id),
+                })
             })
-        })
-        .transpose()?;
+            .transpose()
+    };
+    let (achieved_at, moved_on, moved_from) = (
+        date(&row.achieved_at)?,
+        date(&row.moved_on)?,
+        date(&row.moved_from)?,
+    );
     Ok(Goal {
         id: row.id,
         fields: GoalFields {
@@ -562,6 +578,8 @@ fn view(row: repo::goals::Row) -> Result<Goal, AppError> {
         },
         achieved_at,
         archived: row.archived,
+        moved_on,
+        moved_from,
     })
 }
 
@@ -757,6 +775,8 @@ mod tests {
                 fields: fields("Japan", 900, Some("2027-01-31"), bank),
                 achieved_at: None,
                 archived: false,
+                moved_on: None,
+                moved_from: None,
             }
         );
         let result = update(&mut conn, trip.id, fields("car", 900, date, bank), now());
@@ -1781,6 +1801,37 @@ mod tests {
         let saved = transactions::create(&mut conn, bill(pay, 100), now()).unwrap();
         assert_eq!(saved.goals_moved[0].to, d(2027, 3, 3));
         assert_eq!(date_of(&conn, trip), "2027-03-03");
+    }
+
+    #[test]
+    fn a_move_is_recorded_until_the_date_is_set_by_hand() {
+        let mut conn = db();
+        let pay = paid(&mut conn);
+        let trip = insert(&conn, fields("Trip", 3_000_000, Some("2026-12-01"), CASH));
+        transactions::create(&mut conn, bill(pay, 100), now()).unwrap();
+        let moved = get(&conn, trip).unwrap();
+        assert_eq!(moved.fields.target_date.as_deref(), Some("2027-03-03"));
+        assert_eq!(
+            (moved.moved_on, moved.moved_from),
+            (Some(d(2026, 11, 3)), Some(d(2026, 12, 1)))
+        );
+        // An edit that keeps the date keeps the move; a date set by hand clears it.
+        let kept = update(
+            &mut conn,
+            trip,
+            fields("Japan", 3_000_000, Some("2027-03-03"), CASH),
+            now(),
+        )
+        .unwrap();
+        assert_eq!(kept.moved_on, Some(d(2026, 11, 3)));
+        let set = update(
+            &mut conn,
+            trip,
+            fields("Japan", 3_000_000, Some("2027-06-01"), CASH),
+            now(),
+        )
+        .unwrap();
+        assert_eq!((set.moved_on, set.moved_from), (None, None));
     }
 
     #[test]

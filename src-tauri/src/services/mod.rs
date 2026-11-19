@@ -8,6 +8,7 @@ pub mod accounts;
 pub mod backup;
 pub mod budgets;
 pub mod categories;
+pub mod checkin;
 pub mod dashboard;
 pub mod export;
 pub mod forecast;

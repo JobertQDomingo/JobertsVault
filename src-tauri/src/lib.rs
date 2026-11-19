@@ -131,6 +131,8 @@ pub fn run() {
             commands::period::get_period,
             commands::dashboard::get_dashboard,
             commands::vault::get_vault_status,
+            commands::checkin::get_checkin,
+            commands::checkin::complete_checkin,
             commands::forecast::get_forecast,
             commands::reports::get_timeseries,
             commands::reports::get_category_breakdown,
