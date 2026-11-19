@@ -1,5 +1,6 @@
 //! The six stats and their reasons (LVL-1, DATA_MODEL §5.20). Integers only: every division
-//! rounds down, toward minus infinity below 0 (`div_euclid`).
+//! rounds down. Where the number divided can be below 0, that's toward minus infinity
+//! (`div_euclid`); elsewhere it's never below 0, so `/` is the same.
 
 use super::account::SpendLevel;
 use super::money::Money;
@@ -28,7 +29,8 @@ pub struct StatInputs {
     pub overdue_loan_payments: i64,
     /// Active cards whose latest statement still has something to pay and is past its due date.
     pub overdue_cards: i64,
-    /// Loan payments whose expense is dated after their `due_date`, within the last 90 days.
+    /// Loan payments whose expense is dated after their `due_date`, with the expense
+    /// dated from `today − 89` to `today`.
     pub paid_late_90: i64,
     /// Any loan at all, paid-off and archived ones included.
     pub has_loan: bool,
@@ -41,7 +43,8 @@ pub struct StatInputs {
     /// Active goals that are Behind (§5.17).
     pub goals_behind: i64,
     /// Of the 4 latest completed weeks, those whose week row has `completed_on ≤ period_end + 3`.
-    /// The check-in being finished counts as finished today.
+    /// 0 to 4. Only for `get_checkin`'s status and the snapshot Finish stores, the check-in being
+    /// finished counts as finished today; elsewhere only existing rows count.
     pub on_time_weeks: i64,
 }
 
@@ -56,7 +59,8 @@ pub struct CardInput {
     pub utilization_percent: i64,
 }
 
-/// The main thing holding a stat down (§5.20's reason table, in its order).
+/// The main thing holding a stat down (§5.20's reason table, in its order). On the wire each
+/// is its snake_case name there (`no_take_home`), not camelCase.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StatReason {
     NoTakeHome,
@@ -263,7 +267,8 @@ fn savings(input: &StatInputs) -> Option<Stat> {
 
 fn habit(input: &StatInputs) -> Stat {
     let days = (input.logged_days * 70 / 25).min(70);
-    let checkins = input.on_time_weeks * 30 / 4;
+    // Capped so an odd period edge (§5.19) can't push Habit past 100.
+    let checkins = input.on_time_weeks.min(4) * 30 / 4;
     let reason = if 70 - days >= 30 - checkins {
         StatReason::FewDaysLogged
     } else {
@@ -671,6 +676,7 @@ mod tests {
                 reason: None
             }
         );
+        assert_eq!(habit_at(25, 5).score, 100);
         assert_eq!(
             habit_at(30, 4),
             Stat {
