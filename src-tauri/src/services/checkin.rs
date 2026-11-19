@@ -321,7 +321,12 @@ fn due(conn: &Connection, today: NaiveDate) -> Result<Option<Due>, AppError> {
         let kind = match row.kind.as_str() {
             "week" => PeriodKind::Week,
             "month" => PeriodKind::Month,
-            _ => PeriodKind::Year,
+            "year" => PeriodKind::Year,
+            _ => {
+                return Err(AppError::Database {
+                    message: format!("Check-in {} has an unknown kind", row.id),
+                });
+            }
         };
         done.push((kind, vault::stored_date(&row.period_start)?));
     }
@@ -590,10 +595,19 @@ fn view(conn: &Connection, d: Due, today: NaiveDate) -> Result<Checkin, AppError
         })
         .collect();
     paid.sort_by_key(|p| (p.paid_on, p.payment_id));
-    let moved_from = previous
-        .and_then(|r| r.debt_free_on.as_deref())
-        .map(vault::stored_date)
-        .transpose()?;
+    // A date stored on or before the day that check-in was finished was "today", with everything
+    // overdue then, so it says nothing about a move (§5.19).
+    let moved_from = match previous {
+        Some(r) => {
+            let finished = vault::stored_date(&r.completed_on)?;
+            r.debt_free_on
+                .as_deref()
+                .map(vault::stored_date)
+                .transpose()?
+                .filter(|from| *from > finished)
+        }
+        None => None,
+    };
     let debt_free_moved = match (moved_from, facts.loans.summary.debt_free_on, &loans_left) {
         (Some(from), Some(to), Some(left)) if from != to && !left.overdue => {
             Some(DateMove { from, to })
@@ -1084,6 +1098,51 @@ mod tests {
             .collect();
         assert_eq!(listed, [(payment, d(2026, 11, 19))]);
         assert_eq!(c.loans.loans_left, None);
+    }
+
+    /// A loan the user already has, with one payment of 5,000.00 due on `due`.
+    fn add(conn: &mut Connection, category: i64, name: &str, due: &str) {
+        use crate::services::loans::{self, LoanFields, LoanPaymentFields, NewLoan};
+        let fields = LoanFields {
+            name: name.into(),
+            account_id: CASH,
+            category_id: category,
+            amount_borrowed: None,
+            borrowed_on: None,
+            payments: vec![LoanPaymentFields {
+                id: None,
+                due_date: due.into(),
+                amount: Money(5_000),
+            }],
+        };
+        let new = NewLoan {
+            is_new: false,
+            fields,
+        };
+        loans::create(conn, new, now()).unwrap();
+    }
+
+    #[test]
+    fn a_debt_free_date_stored_while_everything_was_overdue_never_counts_as_moved() {
+        let mut conn = db();
+        spend(&mut conn, 500, "2026-11-10");
+        let category: i64 = conn
+            .query_row("SELECT id FROM categories WHERE name = 'Loan'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        // Overdue on Nov 16, so the debt-free date stored that day is that day.
+        add(&mut conn, category, "Phone", "2026-11-12");
+        let first = d(2026, 11, 16);
+        let c = get(&mut conn, first).unwrap().unwrap();
+        complete(&mut conn, logging(&c), at(first)).unwrap();
+        add(&mut conn, category, "Laptop", "2027-06-01");
+        let c = get(&mut conn, d(2026, 11, 23)).unwrap().unwrap();
+        assert_eq!(
+            c.loans.loans_left.map(|l| l.debt_free_on),
+            Some(d(2027, 6, 1))
+        );
+        assert_eq!(c.loans.debt_free_moved, None);
     }
 
     #[test]

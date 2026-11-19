@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.3 |
-| **Last updated** | 2026-11-19 |
+| **Last updated** | 2026-11-20 |
 | **Database** | SQLite (bundled with the app through `rusqlite`) |
 | **Related docs** | [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 
@@ -956,7 +956,7 @@ shown  = month when the month is due, else week
   - The 3 largest expense categories are ranked like the breakdown (§5.10), each with its change (§5.4).
   - **Budgets kept or broken:** each weekly budget for a week, or each monthly budget for a month (§4.3), measured over the shown period: kept when `spent ≤ amount` (§5.6). Yearly budgets show in Your year.
 - **The Card step** shows each active card as it is today (§5.5, §5.18), not as it was at the period's end.
-- **The Loans and bills step** shows the loan payments whose expense is dated in the shown period, what's overdue today, `total left` and `debt-free on` (§5.11), and the forecast as it is today (§5.15). **The debt-free date moved** when it differs from `debt_free_on` on the latest earlier check-in row. Nothing is said when there's no earlier row, when either date is none, or when everything left is overdue (the date is then today, §5.11).
+- **The Loans and bills step** shows the loan payments whose expense is dated in the shown period, what's overdue today, `total left` and `debt-free on` (§5.11), and the forecast as it is today (§5.15). **The debt-free date moved** when it differs from `debt_free_on` on the latest earlier check-in row. Nothing is said when there's no earlier row, when either date is none, or when everything left is overdue, now or on that earlier row (the date is then that day, §5.11), so a stored date on or before its row's `completed_on` never counts as moved.
 - **The Goals step** lists every active goal with its progress (§5.7), marks the ones that are Behind (§5.17), and names each goal whose `moved_on` (§4.4) is on or after the shown period's start. It shows in a check-in whose month is due. When only the week is due, it shows only if some goal is Behind or was moved since the week's start.
 - **The Balance check step (CHK-4)** shows when the month is due. It lists every active account, and any archived one whose balance isn't 0, with its balance today (§5.1), a card as its amount owed. The answers are held by the screen and never sent or stored.
 - **Changing the week start or `month_start_day`** moves the periods, so the latest one may have no row and be reviewed again, and the on-time count and check-in streak (§5.20, §5.23) start over. That's accepted: the settings rarely change.
@@ -1487,3 +1487,7 @@ Answered on 2026-11-19, building the wins and streaks (PR #123):
 Answered on 2026-11-19, building the Vault level backend (PR #124):
 
 144. **A card's statement that closed before the card was added is never overdue** (the owner's choice, 2026-11-19). The app only knows what's owed on the day the card is added, not what was on the statement before it, so a card added after its due date would otherwise be overdue on day one: Bills at 75, the level stuck at 2 and "pay this card" as the next move. It applies to the Bills stat, level 3 and the next best move (§5.20, §5.21). The forecast still bills that statement as due today (§5.14), which errs toward holding money back. The day added is the local date of the card's `created_at`, the one time a timestamp feeds a figure (§1).
+
+Answered on 2026-11-20, building the check-in backend (PR #125):
+
+145. **A debt-free date stored while everything was overdue is never "moved"** (§5.19). §5.11 makes that date the day the check-in was finished, so comparing it with a later real date would report a move that never happened. A stored date on or before its row's `completed_on` is left out of the comparison.

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Active |
-| **Last updated** | 2026-11-19 |
+| **Last updated** | 2026-11-20 |
 | **Current focus** | **Phase 5: Check-in & polish**: check-in screen at `/check-in` with the `StepIndicator`, every step, the route guard and the startup order. It can't be closed, Ctrl+N opens over it and its figures refresh after a save, a failed load opens the app normally, and a failed Finish reloads the offers and offers "Open the app anyway" for that session, with the check-in also asked for at midnight (UI_FLOWS §8.7, F17, ADR 0014) [CHK-2] [CHK-3] [CHK-4] [CHK-5] [CHK-6] [CHK-7] |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 

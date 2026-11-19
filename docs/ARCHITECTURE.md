@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.3 |
-| **Last updated** | 2026-11-19 |
+| **Last updated** | 2026-11-20 |
 | **Related docs** | [PRD.md](PRD.md), [DATA_MODEL.md](DATA_MODEL.md) |
 
 ---
