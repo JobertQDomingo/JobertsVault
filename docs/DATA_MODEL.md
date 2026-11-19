@@ -1038,19 +1038,20 @@ Each condition has a code, and a level's conditions are checked in the order giv
 - **A condition about something the user doesn't have counts as met:** with no active card, level 6 asks nothing.
 - **A condition that needs history waits for it:** levels 4, 7 and 9 need one completed month, and level 5 needs three. Until then they aren't met.
 - **Level 0** is the start: no level's conditions are met yet. It has no name.
-- **The ring** on the sidebar chip (LVL-5) is the number of the next level's conditions that hold, out of how many it has (1 to 3, from the table: one `card_under_mid` covers every card). At level 10 it's full.
+- **The ring** on the sidebar chip (LVL-5) is the number of the next level's conditions that hold, out of how many it has (1 to 3, from the table: one `card_under_mid` covers every card). At level 10 it's full: level 10's 3 of 3.
+- **A gap is never below 0**, so a gap that's a distance is 0 once met. Two gaps aren't distances: `earned_3_months`' is the months so far, and `stats_80`'s is the lowest stat's score. `card_under_mid`'s gap also names its card. Some conditions have no gap while there's no figure for one yet: `two_weeks_saved` and `month_saved` while `avg_spending` is 0, and `loan_free_90` and `loan_free_365` when there's no loan-free streak. A tie for the lowest stat goes to the first in §5.20's order.
 - **The order** puts two weeks of savings before debt-free and one month after, so an emergency doesn't force a new loan (PRD §14). Three months stays the long-run aim: level 10 needs the Savings stat at 80, which is about 2.4 months of spending.
 - **Level 1 asks for 20 logged days, not Habit's 25.** Every level rests on level 1, so a week away from the app shouldn't drop them all to 0.
 - **`levelChange`** compares the level today with the latest earlier check-in row's: `up`, `down` or `same`. With no earlier row it's `same`, so the first check-in has no level-up moment. When it's `down`, the reason given is the first unmet condition of the level above today's, by its code.
 
 **The next best move** is one code with its figures, the first of these that applies:
 
-| # | When | Move |
-|---|---|---|
-| 1 | A loan payment is overdue | Pay it: the earliest overdue payment, with its loan and amount |
-| 2 | A card statement is unpaid past its due date | Pay that card's statement amount (§5.14) |
-| 3 | The level is below 10 | The first unmet condition of the next level, by its code, with its gap from the table where it has one |
-| 4 | The level is 10 | The reason of the lowest stat (§5.20) |
+| # | When | Code | Move |
+|---|---|---|---|
+| 1 | A loan payment is overdue | `pay_overdue_loan` | Pay it: the earliest overdue payment (by due date, then id), with its loan and amount |
+| 2 | An active card's statement is unpaid past its due date, as `overdue` counts it (§5.20) | `pay_overdue_card` | Pay that card's statement amount (§5.14). With several, the one with the earliest due date, then the lowest account id |
+| 3 | The level is below 10 | the condition's code | The first unmet condition of the next level, with its gap from the table where it has one |
+| 4 | The level is 10 | the stat's reason code | The reason of the lowest stat (§5.20), the first in §5.20's order on a tie. None when every stat that applies is 100, and the screen then says only "You're at the top level." |
 
 ### 5.22 Focus (CHK-7, CHK-8, Phase 5)
 
@@ -1473,3 +1474,7 @@ Answered on 2026-11-17, reviewing the Phase 5 docs before building (PR #111):
 Answered on 2026-11-19, building migration `0005` (PR #119):
 
 141. **The `checkins` table and the goals' `moved_on` and `moved_from` check the rules §4.4 and §4.9 state in words**: the date format, a year row with no focus, a focus with its dates, its category or its card, and both moved columns set or neither. A service bug is then refused instead of stored for good, since a check-in row is never edited (the owner's choice, §4.4, §4.9).
+
+Answered on 2026-11-19, building the level ladder (PR #121):
+
+142. **The next best move's own codes are `pay_overdue_loan` and `pay_overdue_card`.** A gap is never below 0, and there's none while there's no figure for one yet: the savings levels before any spending, the loan-free levels with no streak. The card move is for active cards only, as `overdue` counts them, so the move and level 3 always agree. With several cards overdue, it names the earliest due, then the lowest account id (§5.21).

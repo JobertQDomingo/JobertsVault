@@ -9,6 +9,7 @@ pub mod checkin;
 pub mod csv;
 pub mod forecast;
 pub mod goal;
+pub mod levels;
 pub mod loan;
 pub mod money;
 pub mod period;
