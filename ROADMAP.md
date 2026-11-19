@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-19 |
-| **Current focus** | **Phase 5: Check-in & polish**: domain, the win, personal bests, both streaks, the trend history and the focus record [CHK-6] [LVL-7] [LVL-8] |
+| **Current focus** | **Phase 5: Check-in & polish**: service, repo and commands `get_checkin`, `complete_checkin` and `get_vault_status` [CHK-1] [CHK-3] [CHK-4] [CHK-5] [CHK-7] [LVL-1] [LVL-2] |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -22,7 +22,7 @@ This file is the progress tracker.
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 16 / 16 |
 | **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 17 / 17 |
-| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 9 / 29 |
+| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 10 / 29 |
 
 ---
 
@@ -220,7 +220,7 @@ The owner approved the plan on 2026-11-17 ([ADR 0012](docs/decisions/0012-requir
 - [x] Domain: the six stats and their reason codes, with a test at both ends of every scale and for each "none" case (DATA_MODEL §5.20) [LVL-1]
 - [x] Domain: the level ladder, the ring and the next best move, with a test for every level, for a drop, and for a condition about something the user doesn't have (DATA_MODEL §5.21) [LVL-2] [LVL-4]
 - [x] Domain: focus offers, grading and the cap state, with tests for each of the five kinds, a `void` loan focus and the 80% and over boundaries (DATA_MODEL §5.22) [CHK-7] [CHK-8]
-- [ ] Domain: the win, personal bests, both streaks, the trend history and the focus record, with tests (DATA_MODEL §5.23) [CHK-6] [LVL-7] [LVL-8]
+- [x] Domain: the win, personal bests, both streaks, the trend history and the focus record, with tests (DATA_MODEL §5.23) [CHK-6] [LVL-7] [LVL-8]
 - [ ] Service, repo and commands: `get_checkin`, `complete_checkin` and `get_vault_status`, `focuses` on `get_dashboard`, a focus counted as using its category or card and moved by a category merge, the `currency_decimals` lock, and GOL-7 recording `moved_on` and `moved_from`. Service tests: Finish writes every row in one database transaction, a second Finish is refused, a focus that isn't an offer is refused, a cap counts everyday spending only (no loan payments, recurring dates or payslip deductions), and a graded focus keeps its grade after an old transaction is edited [CHK-1] [CHK-3] [CHK-4] [CHK-5] [CHK-7] [LVL-1] [LVL-2]
 - [ ] Check-in screen at `/check-in` with the `StepIndicator`, every step, the route guard and the startup order. It can't be closed, Ctrl+N opens over it and its figures refresh after a save, a failed load opens the app normally, and a failed Finish reloads the offers and offers "Open the app anyway" for that session, with the check-in also asked for at midnight (UI_FLOWS §8.7, F17, ADR 0014) [CHK-2] [CHK-3] [CHK-4] [CHK-5] [CHK-6] [CHK-7]
 - [ ] Level screen at `/level` with the `LevelBadge`, `LevelPath` and `StatHexagon`, the next best move and the streaks, plus its sidebar item (UI_FLOWS §8.8) [LVL-3] [LVL-4] [LVL-7]
