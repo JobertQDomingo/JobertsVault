@@ -281,6 +281,8 @@ const goal = (
     targetDate: null,
     achievedAt: null,
     archived: false,
+    movedOn: null,
+    movedFrom: null,
     progress: 0,
     remaining: over.targetAmount,
     percent: 0,

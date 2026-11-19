@@ -44,6 +44,11 @@ achievedAt: string | null,
  */
 archived: boolean, 
 /**
+ * The day GOL-7 last moved its target date by itself, and the date it had before; both none
+ * once the user sets a date by hand (CHK-3, DATA_MODEL §4.4).
+ */
+movedOn: string | null, movedFrom: string | null, 
+/**
  * 1–50 characters, unique ignoring case.
  */
 name: string, targetAmount: Money, 

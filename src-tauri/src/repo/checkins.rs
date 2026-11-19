@@ -124,3 +124,91 @@ const EVERYDAY: &str = "FROM transactions t
      WHERE t.kind = 'expense' AND t.date BETWEEN ?1 AND ?2 AND t.payslip_id IS NULL
        AND NOT EXISTS (SELECT 1 FROM loan_payments p WHERE p.transaction_id = t.id)
        AND NOT EXISTS (SELECT 1 FROM recurring_occurrences o WHERE o.transaction_id = t.id)";
+
+/// Everyday spending dated `start` to `end` for each category that has some.
+pub fn everyday_by_category(
+    conn: &Connection,
+    start: &str,
+    end: &str,
+) -> rusqlite::Result<Vec<(i64, i64)>> {
+    conn.prepare(&format!(
+        "SELECT t.category_id, SUM(t.amount) {EVERYDAY} AND t.category_id IS NOT NULL
+         GROUP BY t.category_id"
+    ))?
+    .query_map(params![start, end], |r| Ok((r.get(0)?, r.get(1)?)))?
+    .collect()
+}
+
+/// A focus as a new row stores it.
+pub struct NewFocus<'a> {
+    pub kind: &'a str,
+    pub category_id: Option<i64>,
+    pub account_id: Option<i64>,
+    pub loan_payment_id: Option<i64>,
+    pub target: Option<i64>,
+    pub start: &'a str,
+    pub end: &'a str,
+}
+
+/// The columns a finished check-in writes (§4.9).
+pub struct NewRow<'a> {
+    pub kind: &'a str,
+    pub period_start: &'a str,
+    pub period_end: &'a str,
+    pub completed_on: &'a str,
+    pub level: i64,
+    pub stats: [Option<i64>; 6],
+    pub debt_free_on: Option<&'a str>,
+    pub focus: Option<NewFocus<'a>>,
+}
+
+pub fn insert(conn: &Connection, v: &NewRow, now: &str) -> rusqlite::Result<i64> {
+    let f = v.focus.as_ref();
+    conn.execute(
+        "INSERT INTO checkins (kind, period_start, period_end, completed_on, level,
+             stat_cashflow, stat_bills, stat_card, stat_debt, stat_savings, stat_habit, debt_free_on,
+             focus_kind, focus_category_id, focus_account_id, focus_loan_payment_id, focus_target,
+             focus_start, focus_end, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18,
+                 ?19, ?20, ?20)",
+        params![
+            v.kind,
+            v.period_start,
+            v.period_end,
+            v.completed_on,
+            v.level,
+            v.stats[0],
+            v.stats[1],
+            v.stats[2],
+            v.stats[3],
+            v.stats[4],
+            v.stats[5],
+            v.debt_free_on,
+            f.map(|f| f.kind),
+            f.and_then(|f| f.category_id),
+            f.and_then(|f| f.account_id),
+            f.and_then(|f| f.loan_payment_id),
+            f.and_then(|f| f.target),
+            f.map(|f| f.start),
+            f.map(|f| f.end),
+            now
+        ],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+/// Stores a focus's grade, once: a row already graded is left as it is (§4.9).
+pub fn set_grade(
+    conn: &Connection,
+    id: i64,
+    result: &str,
+    actual: Option<i64>,
+    now: &str,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE checkins SET focus_result = ?2, focus_actual = ?3, updated_at = ?4
+         WHERE id = ?1 AND focus_result IS NULL",
+        params![id, result, actual, now],
+    )?;
+    Ok(())
+}

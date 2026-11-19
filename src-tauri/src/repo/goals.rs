@@ -9,6 +9,9 @@ pub struct Row {
     pub account_id: i64,
     pub achieved_at: Option<String>,
     pub archived: bool,
+    /// The day GOL-7 last moved its date, and the date it had before (DATA_MODEL §4.4).
+    pub moved_on: Option<String>,
+    pub moved_from: Option<String>,
 }
 
 /// The columns a create or an edit writes.
@@ -24,7 +27,9 @@ pub fn any(conn: &Connection) -> rusqlite::Result<bool> {
 }
 
 const SELECT: &str =
-    "SELECT id, name, target_amount, target_date, account_id, achieved_at, archived FROM goals";
+    "SELECT id, name, target_amount, target_date, account_id, achieved_at, archived, moved_on,
+            moved_from
+     FROM goals";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
     Ok(Row {
@@ -35,6 +40,8 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
         account_id: r.get(4)?,
         achieved_at: r.get(5)?,
         archived: r.get(6)?,
+        moved_on: r.get(7)?,
+        moved_from: r.get(8)?,
     })
 }
 
@@ -69,12 +76,15 @@ pub fn insert(conn: &Connection, v: &Values, now: &str) -> rusqlite::Result<i64>
 }
 
 /// A higher target amount or another account clears `achieved_at`, so the goal is checked again
-/// (GOL-4). A lower target on the same account keeps it: the goal was reached then too.
+/// (GOL-4). A lower target on the same account keeps it: the goal was reached then too. A new
+/// target date clears GOL-7's move, since the user chose it (DATA_MODEL §4.4).
 pub fn update(conn: &Connection, id: i64, v: &Values, now: &str) -> rusqlite::Result<()> {
     conn.execute(
         "UPDATE goals SET name = ?2, target_amount = ?3, target_date = ?4, account_id = ?5,
                           achieved_at = CASE WHEN ?3 <= target_amount AND account_id = ?5
                                              THEN achieved_at END,
+                          moved_on = CASE WHEN target_date IS ?4 THEN moved_on END,
+                          moved_from = CASE WHEN target_date IS ?4 THEN moved_from END,
                           updated_at = ?6
          WHERE id = ?1",
         params![
@@ -97,11 +107,18 @@ pub fn set_achieved(conn: &Connection, id: i64, on: &str) -> rusqlite::Result<()
     Ok(())
 }
 
-/// GOL-7: a save moved the goal's date later.
-pub fn set_target_date(conn: &Connection, id: i64, date: &str, now: &str) -> rusqlite::Result<()> {
+/// GOL-7: a save moved the goal's date later on `on`, the local date, keeping the date it had.
+pub fn set_target_date(
+    conn: &Connection,
+    id: i64,
+    date: &str,
+    on: &str,
+    now: &str,
+) -> rusqlite::Result<()> {
     conn.execute(
-        "UPDATE goals SET target_date = ?2, updated_at = ?3 WHERE id = ?1",
-        params![id, date, now],
+        "UPDATE goals SET moved_from = target_date, target_date = ?2, moved_on = ?3, updated_at = ?4
+         WHERE id = ?1",
+        params![id, date, on, now],
     )?;
     Ok(())
 }

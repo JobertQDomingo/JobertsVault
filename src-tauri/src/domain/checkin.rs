@@ -114,11 +114,28 @@ pub struct CategoryTotals {
     pub before: Money,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// On the wire, tagged by its `code` (`stat_rose`), with its figures beside it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(
+    tag = "code",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
+#[ts(export)]
 pub enum Win {
     FocusKept,
-    StatRose { stat: StatName, from: i64, to: i64 },
-    CategoryFell { category_id: i64, by: Money },
+    StatRose {
+        stat: StatName,
+        #[ts(type = "number")]
+        from: i64,
+        #[ts(type = "number")]
+        to: i64,
+    },
+    CategoryFell {
+        #[ts(type = "number")]
+        category_id: i64,
+        by: Money,
+    },
     SpendingFell,
     LoansPaidOnTime,
 }
@@ -193,7 +210,9 @@ pub struct PeriodTotals {
     pub net: Money,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
 pub enum PersonalBest {
     LowestExpense,
     HighestNet,
