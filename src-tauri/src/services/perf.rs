@@ -175,7 +175,7 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
     drop(conn);
     // A fresh connection, as at startup: SQLite's cache is empty, though Windows may still hold
     // the file in memory, so this times the queries, not reading the disk.
-    let conn = crate::db::open(&path).unwrap();
+    let mut conn = crate::db::open(&path).unwrap();
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0))
         .unwrap();
@@ -287,6 +287,10 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
             .safe_to_spend
             .is_some()
     );
+    // Phase 5: the Vault level, which the sidebar's level chip asks for on every screen.
+    time("vault status", || {
+        crate::services::vault::get(&mut conn, today()).unwrap()
+    });
     // TXN-6: one letter matches all 300 payees; "store 12" narrows to 11.
     for (label, prefix) in [("payees: \"s\"", "s"), ("payees: \"store 12\"", "store 12")] {
         time(label, || {

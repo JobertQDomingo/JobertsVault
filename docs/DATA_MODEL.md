@@ -19,7 +19,7 @@ This document describes every table and field, plus the rules for calculating ba
 | **Amount sign** | `transactions.amount` is always **positive**. The transaction's `kind` decides whether money goes in or out. |
 | **Decimal places** | `currency_decimals` (0 or 2) decides how minor units are displayed. It **can only be changed while no amount is stored**: no transactions, no recurring rules, no budgets, no goals, no loans, no check-in focus with an amount (§4.9), and no account with an opening balance other than 0 or a credit limit. Changing it afterwards would change the meaning of every stored amount. |
 | **Dates** | `TEXT` in `YYYY-MM-DD` format (ISO 8601), using the user's local calendar. This format sorts correctly as plain text. No time of day is stored. |
-| **Timestamps** | `created_at` / `updated_at` are `TEXT` in ISO 8601 UTC (`2026-10-26T09:30:00Z`). They're for record-keeping only and are never used in calculations. Services receive the current time as a `now` value, the same way they receive `today`. |
+| **Timestamps** | `created_at` / `updated_at` are `TEXT` in ISO 8601 UTC (`2026-10-26T09:30:00Z`). They're for record-keeping only and are never used in calculations, with one exception: a card's `created_at`, as a local date, is the day it was added, which the Bills stat's `overdue` needs (§5.20). Services receive the current time as a `now` value, the same way they receive `today`. |
 | **IDs** | `INTEGER PRIMARY KEY`, assigned by SQLite. |
 | **Booleans** | `INTEGER` 0 or 1, with a `CHECK` constraint. |
 | **Enums** | `TEXT` with a `CHECK (... IN (...))` constraint. The values are lowercase `snake_case`. |
@@ -981,8 +981,9 @@ earned(m) = net(m) − borrowed(m), for one month m   -- income − expense, wit
 money     = max(0, Σ balance(a, today) over every cash, bank and e-wallet account, archived ones included)   (§5.1)
 logged    = the number of dates from today − 29 to today with at least one transaction of any kind
 overdue   = the number of unpaid loan payments dated before today (§4.6)
-          + the number of active cards whose latest statement (§5.14) still has something to pay
-            and whose due date D₀ is before today
+          + the number of active cards whose latest statement (§5.14) still has something to pay,
+            whose due date D₀ is before today, and whose closing date C₀ isn't before the day the
+            card was added
 paid late(n) = the number of loan payments whose expense is dated after their due_date
                and within the last n days (today − (n − 1) to today)
 ```
@@ -1482,3 +1483,7 @@ Answered on 2026-11-19, building the level ladder (PR #121):
 Answered on 2026-11-19, building the wins and streaks (PR #123):
 
 143. **Equal category falls go to the lower category id**, as equal rises do for the focus offers, so the win is always the same one for the same figures (§5.22, §5.23).
+
+Answered on 2026-11-19, building the Vault level backend (PR #124):
+
+144. **A card's statement that closed before the card was added is never overdue** (the owner's choice, 2026-11-19). The app only knows what's owed on the day the card is added, not what was on the statement before it, so a card added after its due date would otherwise be overdue on day one: Bills at 75, the level stuck at 2 and "pay this card" as the next move. It applies to the Bills stat, level 3 and the next best move (§5.20, §5.21). The forecast still bills that statement as due today (§5.14), which errs toward holding money back. The day added is the local date of the card's `created_at`, the one time a timestamp feeds a figure (§1).

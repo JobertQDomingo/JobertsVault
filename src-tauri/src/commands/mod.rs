@@ -15,6 +15,7 @@ pub mod settings;
 pub mod system;
 pub mod transactions;
 pub mod updates;
+pub mod vault;
 
 #[cfg(test)]
 mod tests {

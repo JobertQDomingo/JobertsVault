@@ -2,6 +2,8 @@
 //! bests, streaks and history (CHK-6, LVL-7, LVL-8, §5.23).
 
 use chrono::{Datelike, Days, NaiveDate};
+use serde::Serialize;
+use ts_rs::TS;
 
 use super::focus::{FocusResult, PaymentDates};
 use super::money::Money;
@@ -50,7 +52,9 @@ pub fn due_periods(
 }
 
 /// The six stats, in §5.20's order.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
 pub enum StatName {
     Cashflow,
     Bills,

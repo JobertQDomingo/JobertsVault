@@ -51,6 +51,8 @@ export const queryKeys = {
     ["ledger", "payBillDefaults", cardId] as const,
   // Period dates follow the week and month start settings, which refresh the ledger.
   period: (query: PeriodQuery) => ["ledger", "period", query] as const,
+  // Every stat, the level and each focus's progress come from the money data (LVL-1, CHK-8).
+  vaultStatus: ["ledger", "vaultStatus"],
   dashboard: (query: PeriodQuery) => ["ledger", "dashboard", query] as const,
   // Every period's: a backup can lift the dashboard's warning (BAK-7).
   dashboards: ["ledger", "dashboard"],

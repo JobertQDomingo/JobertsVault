@@ -2,6 +2,9 @@
 //! rounds down. Where the number divided can be below 0, that's toward minus infinity
 //! (`div_euclid`); elsewhere it's never below 0, so `/` is the same.
 
+use serde::Serialize;
+use ts_rs::TS;
+
 use super::account::SpendLevel;
 use super::money::Money;
 
@@ -61,7 +64,9 @@ pub struct CardInput {
 
 /// The main thing holding a stat down (§5.20's reason table, in its order). On the wire each
 /// is its snake_case name there (`no_take_home`), not camelCase.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
 pub enum StatReason {
     NoTakeHome,
     SpendingOverIncome,

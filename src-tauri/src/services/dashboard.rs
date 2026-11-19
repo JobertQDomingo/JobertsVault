@@ -16,6 +16,7 @@ use crate::services::period::{self, PeriodQuery, PeriodView};
 use crate::services::recurring::{self, UpcomingDate};
 use crate::services::reports::{self, Comparison, Timeseries};
 use crate::services::transactions::{self, Transaction};
+use crate::services::vault::{self, ActiveFocus};
 
 /// Everything the dashboard shows, from one call so its numbers agree (ARCHITECTURE §4.5).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, TS)]
@@ -59,6 +60,9 @@ pub struct Dashboard {
     /// Safe to spend for today, whatever the period, as `get_forecast` returns it with no rows
     /// (SAFE-6).
     pub safe_to_spend: Forecast,
+    /// Every active check-in focus with its progress, as `get_vault_status` returns them, for the
+    /// focus strip (CHK-8).
+    pub focuses: Vec<ActiveFocus>,
     pub today: NaiveDate,
 }
 
@@ -207,6 +211,7 @@ pub fn get(
             rows: Vec::new(),
             ..forecast::get(conn, ForecastGrain::Window, today)?
         },
+        focuses: vault::focuses(conn, today)?,
         period,
         income,
         expense,

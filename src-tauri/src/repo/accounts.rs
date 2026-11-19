@@ -16,9 +16,11 @@ pub struct Row {
     pub archived: bool,
     /// Calculated as of the date asked for, never stored (DATA_MODEL §5.1).
     pub balance: i64,
-    /// Whether a transaction (as its source or a transfer's destination), a recurring rule, a goal
-    /// or a loan uses it.
+    /// Whether a transaction (as its source or a transfer's destination), a recurring rule, a goal,
+    /// a loan or a check-in focus uses it.
     pub in_use: bool,
+    /// ISO 8601 UTC (DATA_MODEL §1).
+    pub created_at: String,
 }
 
 /// The columns a create or an edit writes.
@@ -46,6 +48,8 @@ const SELECT: &str =
                        WHERE r.account_id = a.id OR r.to_account_id = a.id)
             OR EXISTS (SELECT 1 FROM goals g WHERE g.account_id = a.id)
             OR EXISTS (SELECT 1 FROM loans l WHERE l.account_id = a.id)
+            OR EXISTS (SELECT 1 FROM checkins k WHERE k.focus_account_id = a.id),
+            a.created_at
      FROM accounts a";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
@@ -62,6 +66,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Row> {
         spend_levels: [r.get(9)?, r.get(10)?, r.get(11)?],
         balance: r.get(12)?,
         in_use: r.get(13)?,
+        created_at: r.get(14)?,
     })
 }
 
