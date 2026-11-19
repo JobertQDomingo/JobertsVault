@@ -5,6 +5,7 @@ pub mod backup;
 pub mod budget;
 pub mod card_cycle;
 pub mod category;
+pub mod checkin;
 pub mod csv;
 pub mod forecast;
 pub mod goal;

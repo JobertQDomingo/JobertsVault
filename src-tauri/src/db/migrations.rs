@@ -27,6 +27,7 @@ pub fn migration_list(now: DateTime<Utc>) -> Vec<M<'static>> {
             },
         ),
         M::up(include_str!("../../migrations/0004_card_spend_levels.sql")),
+        M::up(include_str!("../../migrations/0005_checkins.sql")),
     ]
 }
 
@@ -78,7 +79,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 4);
+        assert_eq!(version, 5);
 
         let strict_tables: Vec<String> = conn
             .prepare("SELECT name FROM pragma_table_list WHERE schema = 'main' AND strict = 1 ORDER BY name")
@@ -93,6 +94,7 @@ mod tests {
                 "accounts",
                 "budgets",
                 "categories",
+                "checkins",
                 "goals",
                 "loan_payments",
                 "loans",
@@ -119,6 +121,14 @@ mod tests {
             )
             .unwrap();
         assert_eq!(loan_index, 1);
+        let checkin_index: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_schema WHERE type = 'index' AND name = 'idx_checkins_completed'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(checkin_index, 1);
         assert_eq!(
             indexes,
             [
@@ -804,5 +814,167 @@ mod tests {
             assert!(insert("X", kind, levels).is_err(), "{kind} {levels:?}");
         }
         assert!(insert("Visa", "credit_card", [Some(1), Some(2), Some(3)]).is_ok());
+    }
+
+    /// A focus: kind, category, loan payment, target and result.
+    type Focus = (
+        Option<&'static str>,
+        Option<i64>,
+        Option<i64>,
+        Option<i64>,
+        Option<&'static str>,
+    );
+
+    /// Inserts a check-in row for `kind` and `start` with `focus`. The rest of the row is a
+    /// valid snapshot.
+    fn insert_checkin(
+        conn: &Connection,
+        kind: &str,
+        start: &str,
+        focus: Focus,
+    ) -> rusqlite::Result<usize> {
+        let (focus_kind, category, payment, target, result) = focus;
+        conn.execute(
+            "INSERT INTO checkins (kind, period_start, period_end, completed_on, level, stat_habit, focus_kind, focus_category_id, focus_loan_payment_id, focus_target, focus_result, created_at, updated_at) VALUES (?1, ?2, ?2, '2026-11-16', 4, 80, ?3, ?4, ?5, ?6, ?7, ?8, ?8)",
+            rusqlite::params![kind, start, focus_kind, category, payment, target, result, NOW],
+        )
+    }
+
+    #[test]
+    fn a_period_is_checked_in_once_and_a_row_without_a_focus_has_no_focus_fields() {
+        let conn = migrated();
+        let none = (None, None, None, None, None);
+        assert!(insert_checkin(&conn, "week", "2026-11-09", none).is_ok());
+        assert!(insert_checkin(&conn, "month", "2026-11-09", none).is_ok());
+        assert!(
+            insert_checkin(&conn, "week", "2026-11-09", none).is_err(),
+            "a period is never reviewed twice"
+        );
+        for (kind, start, focus) in [
+            ("day", "2026-11-02", none),
+            ("week", "11/02/2026", none),
+            ("week", "2026-10-26", (None, Some(8), None, None, None)),
+            ("week", "2026-10-26", (None, None, None, Some(5), None)),
+            (
+                "week",
+                "2026-10-26",
+                (Some("budget"), None, None, None, None),
+            ),
+            (
+                "week",
+                "2026-10-26",
+                (Some("logging"), None, None, Some(0), None),
+            ),
+            (
+                "week",
+                "2026-10-26",
+                (Some("logging"), None, None, Some(5), Some("late")),
+            ),
+        ] {
+            assert!(
+                insert_checkin(&conn, kind, start, focus).is_err(),
+                "{kind} {start} {focus:?}"
+            );
+        }
+        assert!(
+            insert_checkin(
+                &conn,
+                "week",
+                "2026-10-26",
+                (Some("logging"), None, None, Some(5), Some("kept"))
+            )
+            .is_ok()
+        );
+        assert!(
+            conn.execute("UPDATE checkins SET level = 11 WHERE id = 1", [])
+                .is_err()
+        );
+        assert!(
+            conn.execute("UPDATE checkins SET stat_card = 101 WHERE id = 1", [])
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn a_focus_puts_its_category_in_use_and_loses_a_removed_payment() {
+        let conn = migrated();
+        add_loan(&conn);
+        insert_checkin(
+            &conn,
+            "week",
+            "2026-11-09",
+            (Some("category_cap"), Some(9), None, Some(50_000), None),
+        )
+        .unwrap();
+        insert_checkin(
+            &conn,
+            "month",
+            "2026-11-01",
+            (Some("loan_on_time"), None, Some(1), None, None),
+        )
+        .unwrap();
+        assert!(
+            conn.execute("DELETE FROM categories WHERE id = 9", [])
+                .is_err()
+        );
+        conn.execute("DELETE FROM loans WHERE id = 1", []).unwrap();
+        let payment: Option<i64> = conn
+            .query_row(
+                "SELECT focus_loan_payment_id FROM checkins WHERE kind = 'month'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(payment, None, "the focus is kept and graded void later");
+    }
+
+    #[test]
+    fn an_existing_database_is_backed_up_then_gets_the_checkins_and_keeps_its_data() {
+        let dir = crate::test_support::TempDir::new("mig-0005");
+        let backups = dir.path().join("pre-migration");
+        let mut conn = open(&dir.path().join("test.db")).unwrap();
+        let all = migrations(Utc.with_ymd_and_hms(2026, 10, 26, 9, 30, 0).unwrap());
+        all.to_version(&mut conn, 4).unwrap();
+        add_basics(&conn);
+        conn.execute(
+            "INSERT INTO goals (name, target_amount, target_date, account_id, created_at, updated_at) VALUES ('Trip', 100, '2027-03-01', 2, ?1, ?1)",
+            [NOW],
+        )
+        .unwrap();
+
+        prepare(&mut conn, &all, &backups, crate::test_support::now()).unwrap();
+
+        let copy = Connection::open(backups.join(format!(
+            "{}-pre-migration-v4-2026-11-03_1405.db",
+            crate::db::NAME
+        )))
+        .unwrap();
+        let copy_version: i64 = copy
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(copy_version, 4, "BAK-5: the copy is from before 0005");
+        let version: i64 = conn
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 5);
+        let goal: (String, Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT target_date, moved_on, moved_from FROM goals WHERE name = 'Trip'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(goal, ("2027-03-01".to_owned(), None, None));
+        let checkins: i64 = conn
+            .query_row("SELECT count(*) FROM checkins", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(checkins, 0, "nothing is checked in by the update");
+        assert!(
+            conn.execute(
+                "UPDATE goals SET moved_on = '2026-11-16', moved_from = '2027-02-01'",
+                []
+            )
+            .is_ok()
+        );
     }
 }
