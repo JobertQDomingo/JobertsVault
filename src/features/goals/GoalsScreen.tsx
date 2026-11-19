@@ -185,6 +185,13 @@ export function GoalsScreen() {
   );
 }
 
+/** A goal's Behind line (GOL-7), or none. The check-in's Goals step shows it too. */
+export const behindText = (goal: GoalProgress) =>
+  goal.behind &&
+  (goal.behind.earliestDate
+    ? `Behind: the earliest realistic date is now ${formatDate(goal.behind.earliestDate)}`
+    : "Behind: nothing can be set aside right now");
+
 /** "Save ₱433.34/month to reach it", "Target date passed", or nothing (GOL-3). */
 function plan(goal: GoalProgress, money: (amount: number) => string) {
   if (goal.achievedAt) return null;
@@ -211,11 +218,7 @@ function Card({
   const money = (amount: number) => formatMoney(amount, settings);
   const account = accounts.find((a) => a.id === goal.accountId)?.name ?? "";
   const next = plan(goal, money);
-  const behind =
-    goal.behind &&
-    (goal.behind.earliestDate
-      ? `Behind: the earliest realistic date is now ${formatDate(goal.behind.earliestDate)}`
-      : "Behind: nothing can be set aside right now");
+  const behind = behindText(goal);
   return (
     // The name's button stretches over the whole card, so the progress bar stays outside it.
     <li className="relative grid content-start gap-2.5 rounded-control bg-wash p-4 pt-3 transition-colors duration-150 hover:bg-glass-hover">

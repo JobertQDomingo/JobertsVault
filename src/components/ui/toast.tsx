@@ -43,7 +43,7 @@ export const notify = {
     toast(message, { duration: 8_000, className: "whitespace-pre-line" }),
   /** Something to know about a save that went ahead, such as a card spending level (CC-11). */
   warning: (message: string) => toast.warning(message, { duration: 8_000 }),
-  // Errors stay until closed, so they can't be missed.
-  error: (message: string) =>
-    toast.error(message, { duration: Infinity, closeButton: true }),
+  // Errors stay until closed, so they can't be missed. A failed Finish offers a way on (ADR 0014).
+  error: (message: string, action?: { label: string; onClick: () => void }) =>
+    toast.error(message, { duration: Infinity, closeButton: true, action }),
 };

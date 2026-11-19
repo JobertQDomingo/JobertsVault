@@ -18,6 +18,7 @@ function renderAt(url: string) {
   vi.mocked(invoke).mockResolvedValue(null);
   const client = createQueryClient();
   client.setQueryData(queryKeys.settings, SETTINGS);
+  client.setQueryData(queryKeys.checkin, null);
   router = createMemoryRouter(routes, { initialEntries: [url] });
   render(
     <QueryClientProvider client={client}>

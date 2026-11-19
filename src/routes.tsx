@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, type RouteObject } from "react-router";
-import { AppShell } from "./components/AppShell";
+import { AppShell, Root } from "./components/AppShell";
+import { CheckinScreen } from "./features/check-in/CheckinScreen";
 import { AccountDetailsScreen } from "./features/accounts/AccountDetailsScreen";
 import { AccountsScreen } from "./features/accounts/AccountsScreen";
 import { BudgetsScreen } from "./features/budgets/BudgetsScreen";
@@ -18,64 +19,72 @@ export const routes: RouteObject[] = [
   // The first-launch form fills the window, without the sidebar (ONB-1).
   { path: "welcome", element: <WelcomeScreen /> },
   {
-    element: <AppShell />,
+    // Quick-add, Ctrl+N and the check-in guard, over the shell and the check-in (ARCHITECTURE §5.4).
+    element: <Root />,
     children: [
+      // A full-window route like /welcome, so quick-add opens over it as a plain dialog (CHK-2).
+      { path: "check-in", element: <CheckinScreen /> },
       {
-        index: true,
-        element: <DashboardScreen />,
-        handle: { title: "Dashboard" },
+        element: <AppShell />,
+        children: [
+          {
+            index: true,
+            element: <DashboardScreen />,
+            handle: { title: "Dashboard" },
+          },
+          {
+            path: "transactions",
+            element: <TransactionsScreen />,
+            handle: { title: "Transactions" },
+          },
+          {
+            path: "accounts",
+            element: <AccountsScreen />,
+            handle: { title: "Accounts" },
+          },
+          {
+            path: "accounts/:id",
+            element: <AccountDetailsScreen />,
+            handle: { title: "Accounts" },
+          },
+          {
+            path: "reports",
+            element: <ReportsScreen />,
+            handle: { title: "Reports" },
+          },
+          {
+            path: "recurring",
+            element: <RecurringScreen />,
+            handle: { title: "Recurring" },
+          },
+          {
+            path: "budgets",
+            element: <BudgetsScreen />,
+            handle: { title: "Budgets" },
+          },
+          {
+            path: "goals",
+            element: <GoalsScreen />,
+            handle: { title: "Goals" },
+          },
+          {
+            path: "debt-free",
+            element: <DebtFreeScreen />,
+            handle: { title: "Debt-free" },
+          },
+          {
+            path: "forecast",
+            element: <ForecastScreen />,
+            handle: { title: "Forecast" },
+          },
+          {
+            path: "settings",
+            element: <SettingsScreen />,
+            handle: { title: "Settings" },
+          },
+          { path: "*", element: <Navigate to="/" replace /> },
+        ],
       },
-      {
-        path: "transactions",
-        element: <TransactionsScreen />,
-        handle: { title: "Transactions" },
-      },
-      {
-        path: "accounts",
-        element: <AccountsScreen />,
-        handle: { title: "Accounts" },
-      },
-      {
-        path: "accounts/:id",
-        element: <AccountDetailsScreen />,
-        handle: { title: "Accounts" },
-      },
-      {
-        path: "reports",
-        element: <ReportsScreen />,
-        handle: { title: "Reports" },
-      },
-      {
-        path: "recurring",
-        element: <RecurringScreen />,
-        handle: { title: "Recurring" },
-      },
-      {
-        path: "budgets",
-        element: <BudgetsScreen />,
-        handle: { title: "Budgets" },
-      },
-      {
-        path: "goals",
-        element: <GoalsScreen />,
-        handle: { title: "Goals" },
-      },
-      {
-        path: "debt-free",
-        element: <DebtFreeScreen />,
-        handle: { title: "Debt-free" },
-      },
-      {
-        path: "forecast",
-        element: <ForecastScreen />,
-        handle: { title: "Forecast" },
-      },
-      {
-        path: "settings",
-        element: <SettingsScreen />,
-        handle: { title: "Settings" },
-      },
-      { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
 ];

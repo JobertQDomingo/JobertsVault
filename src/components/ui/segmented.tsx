@@ -3,8 +3,9 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * A flat `--wash` track whose selected segment is solid accent (DESIGN_SYSTEM §9.1). Exactly
- * one segment is always selected. Arrow keys move between segments.
+ * A flat `--wash` track whose selected segment is solid accent (DESIGN_SYSTEM §9.1). Once one
+ * is selected, one always is; a null `value` starts with none (the Balance check, CHK-4). Arrow
+ * keys move between segments.
  */
 export function Segmented<V extends string>({
   value,
@@ -15,7 +16,7 @@ export function Segmented<V extends string>({
   disabled,
   "aria-label": ariaLabel,
 }: {
-  value: V;
+  value: V | null;
   onChange: (value: V) => void;
   /** The selected segment was clicked again (the period bar reopens Custom's picker). */
   onReselect?: () => void;
@@ -27,7 +28,7 @@ export function Segmented<V extends string>({
   return (
     <ToggleGroup.Root
       type="single"
-      value={value}
+      value={value ?? ""}
       // Radix sends "" when the selected segment is clicked again; keep the selection instead.
       onValueChange={(next: string) =>
         next ? onChange(next as V) : onReselect?.()

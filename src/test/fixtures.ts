@@ -3,6 +3,8 @@ import type { Account } from "@/bindings/Account";
 import type { Breakdown } from "@/bindings/Breakdown";
 import type { BudgetProgress } from "@/bindings/BudgetProgress";
 import type { Category } from "@/bindings/Category";
+import type { Checkin } from "@/bindings/Checkin";
+import type { CheckinStatus } from "@/bindings/CheckinStatus";
 import type { CategoryList } from "@/bindings/CategoryList";
 import type { Comparison } from "@/bindings/Comparison";
 import type { Dashboard } from "@/bindings/Dashboard";
@@ -12,6 +14,7 @@ import type { LoanList } from "@/bindings/LoanList";
 import type { LoanPreview } from "@/bindings/LoanPreview";
 import type { LoanPayment } from "@/bindings/LoanPayment";
 import type { UpcomingDate } from "@/bindings/UpcomingDate";
+import type { Offer } from "@/bindings/Offer";
 import type { PaymentMethod } from "@/bindings/PaymentMethod";
 import type { PeriodView } from "@/bindings/PeriodView";
 import type { Timeseries } from "@/bindings/Timeseries";
@@ -600,5 +603,157 @@ export const LOAN_PREVIEW: LoanPreview = {
       leftAfter: -1000,
       shortBy: 18000,
     },
+  ],
+};
+
+const CHECKIN_TODAY = "2026-11-16";
+
+/** The Stats and level step on Mon, Nov 16: level 4 held, against the Nov 9 check-in. */
+export const CHECKIN_STATUS: CheckinStatus = {
+  levelChange: "same",
+  today: CHECKIN_TODAY,
+  stats: [
+    { stat: "cashflow", score: 72, reason: "little_left" },
+    { stat: "bills", score: 100, reason: null },
+    { stat: "card", score: 48, reason: "card_past_soft" },
+    { stat: "debt", score: 40, reason: "loans_due" },
+    { stat: "savings", score: 22, reason: "cushion_low" },
+    { stat: "habit", score: 90, reason: "few_days_logged" },
+  ],
+  level: 4,
+  nextLevel: {
+    level: 5,
+    conditions: [
+      { code: "earned_3_months", met: false, gap: 1, accountId: null },
+      { code: "no_short_day", met: true, gap: null, accountId: null },
+    ],
+    met: 1,
+    total: 2,
+  },
+  levelReason: null,
+  nextMove: {
+    kind: "condition",
+    condition: { code: "earned_3_months", met: false, gap: 1, accountId: null },
+  },
+  previous: {
+    completedOn: "2026-11-09",
+    level: 4,
+    stats: [66, 100, 58, 37, 20, 85],
+    debtFreeOn: "2027-02-28",
+  },
+  focuses: [],
+  checkinStreak: 4,
+  focusStreak: 2,
+  loanFreeDays: 51,
+  focusRecord: [],
+  history: [],
+};
+
+const offer = (over: Partial<Offer> & Pick<Offer, "kind">): Offer => ({
+  loanId: null,
+  dueDate: null,
+  level: null,
+  basis: null,
+  categoryId: null,
+  accountId: null,
+  loanPaymentId: null,
+  target: null,
+  start: CHECKIN_TODAY,
+  end: "2026-11-22",
+  ...over,
+});
+
+/** `get_checkin` on Mon, Nov 16: the week of Nov 9–15, with a win, a best and a missed focus. */
+export const CHECKIN: Checkin = {
+  kinds: ["week"],
+  period: { start: "2026-11-09", end: "2026-11-15" },
+  compare: { start: "2026-11-02", end: "2026-11-08" },
+  today: CHECKIN_TODAY,
+  start: {
+    win: { code: "category_fell", categoryId: 1, by: 64000 },
+    personalBest: "lowest_expense",
+    lastFocus: {
+      result: "missed",
+      actual: 172000,
+      kind: "category_cap",
+      categoryId: 2,
+      accountId: null,
+      loanPaymentId: null,
+      target: 150000,
+      start: "2026-11-09",
+      end: "2026-11-15",
+    },
+  },
+  money: {
+    comparison: {
+      ...COMPARISON,
+      inProgress: false,
+      mode: "full",
+      currentStart: "2026-11-09",
+      currentEnd: "2026-11-15",
+      compareStart: "2026-11-02",
+      compareEnd: "2026-11-08",
+      today: CHECKIN_TODAY,
+    },
+    topCategories: COMPARISON.expenseCategories,
+    budgets: [
+      {
+        budgetId: 1,
+        categoryId: 2,
+        spent: 153000,
+        amount: 150000,
+        kept: false,
+        over: 3000,
+      },
+      {
+        budgetId: 2,
+        categoryId: null,
+        spent: 100000,
+        amount: 500000,
+        kept: true,
+        over: 0,
+      },
+    ],
+  },
+  cards: [ACCOUNTS[3]],
+  loans: {
+    paid: [{ loanId: 1, paymentId: 13, amount: 100000, paidOn: "2026-11-10" }],
+    paidTotal: 100000,
+    loansDue: [],
+    loansLeft: { totalLeft: 800000, debtFreeOn: "2027-03-28", overdue: false },
+    debtFreeMoved: { from: "2027-02-28", to: "2027-03-28" },
+    forecast: { ...DASHBOARD.safeToSpend, today: CHECKIN_TODAY },
+  },
+  goals: null,
+  balances: null,
+  year: null,
+  status: CHECKIN_STATUS,
+  offers: [
+    offer({ kind: "logging", target: 5 }),
+    offer({
+      kind: "category_cap",
+      categoryId: 2,
+      target: 150000,
+      basis: 150000,
+    }),
+    offer({
+      kind: "loan_on_time",
+      loanId: 1,
+      loanPaymentId: 14,
+      dueDate: "2026-11-28",
+    }),
+  ],
+};
+
+/** The month and the week due together on Sun, Nov 1: one merged check-in, titled the month's. */
+export const MONTHLY_CHECKIN: Checkin = {
+  ...CHECKIN,
+  kinds: ["week", "month"],
+  period: { start: "2026-10-01", end: "2026-10-31" },
+  goals: [GOALS[0]],
+  balances: [
+    { accountId: 1, balance: 32000, amountOwed: null },
+    { accountId: 3, balance: 15000, amountOwed: null },
+    { accountId: 4, balance: -64000, amountOwed: 64000 },
   ],
 };

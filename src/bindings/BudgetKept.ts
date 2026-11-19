@@ -12,4 +12,8 @@ categoryId: number | null, spent: Money, amount: Money,
 /**
  * `spent ≤ amount`.
  */
-kept: boolean, };
+kept: boolean, 
+/**
+ * How far `spent` went past `amount`, 0 when kept.
+ */
+over: Money, };
