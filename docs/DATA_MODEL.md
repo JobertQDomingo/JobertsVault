@@ -1102,7 +1102,7 @@ When a save raises a cap's state, the app shows a warning toast. It never blocks
 |---|---|---|
 | 1 | The focus was kept | The focus the Start step shows is graded `kept` |
 | 2 | A stat rose | A stat is 5 or more above its value on the latest earlier check-in row: the largest rise (ties in §5.20's order) |
-| 3 | A category fell | An expense category's amount fell from the period before: the largest fall, with the amount |
+| 3 | A category fell | An expense category's amount fell from the period before: the largest fall (ties to the lower category id), with the amount |
 | 4 | Spending fell | The period's expense is below the period before's, which is above 0 |
 | 5 | Loans paid on time | At least one loan payment was due in the period, leaving out paid-before ones (§4.6), and each has an expense dated on or before its `due_date` |
 
@@ -1478,3 +1478,7 @@ Answered on 2026-11-19, building migration `0005` (PR #119):
 Answered on 2026-11-19, building the level ladder (PR #121):
 
 142. **The next best move's own codes are `pay_overdue_loan` and `pay_overdue_card`.** A gap is never below 0, and there's none while there's no figure for one yet: the savings levels before any spending, the loan-free levels with no streak. The card move is for active cards only, as `overdue` counts them, so the move and level 3 always agree. With several cards overdue, it names the earliest due, then the lowest account id (§5.21).
+
+Answered on 2026-11-19, building the wins and streaks (PR #123):
+
+143. **Equal category falls go to the lower category id**, as equal rises do for the focus offers, so the win is always the same one for the same figures (§5.22, §5.23).
