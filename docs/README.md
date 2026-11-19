@@ -22,7 +22,7 @@ The design system and UI flows also exist as visual pages, drawn with the real t
 | Page | Shows |
 |---|---|
 | [design/design-system.html](design/design-system.html) | Every token, the glass layers, type, icons, the logo and every component, in light and dark mode |
-| [design/ui-flows.html](design/ui-flows.html) | Every screen at the real 1440 × 900 window size, the key flows and the Phase 2–4 screens. The Phase 5 check-in and Level screens are still to be drawn (ROADMAP §5.1). |
+| [design/ui-flows.html](design/ui-flows.html) | Every screen at the real 1440 × 900 window size, the key flows, the Phase 2–4 screens, and the Phase 5 check-in and Level screens |
 
 - **To view them:** open the `.html` file from your local clone in a browser. GitHub shows `.html` files as code, not as pages.
 - **They need internet** to load the Sora font and the icons. Offline, they fall back to the system font and show no icons. (The app itself bundles everything, and only goes online to check for updates.)
