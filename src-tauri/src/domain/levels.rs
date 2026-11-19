@@ -1,6 +1,9 @@
 //! The level ladder, the ring and the next best move (LVL-2, LVL-4, DATA_MODEL §5.21).
 //! Pure: the queries hand in the facts, and the stats come from `stats::stats`.
 
+use serde::Serialize;
+use ts_rs::TS;
+
 use super::money::Money;
 use super::stats::{StatInputs, StatReason, Stats, stats};
 
@@ -59,34 +62,45 @@ pub struct OverdueCard {
 /// §5.21's condition codes, in the table's order. On the wire each is its name there
 /// (`logged_20`): serde's `snake_case` puts no `_` before a digit, so the five codes with a
 /// number need their own `rename`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
 pub enum ConditionCode {
+    #[serde(rename = "logged_20")]
     Logged20,
     PaydayRule,
     Budget,
     NothingOverdue,
     NoneLate,
     EarnedMonth,
+    #[serde(rename = "earned_3_months")]
     Earned3Months,
     NoShortDay,
     CardUnderMid,
     TwoWeeksSaved,
     LoansPaid,
+    #[serde(rename = "loan_free_90")]
     LoanFree90,
     MonthSaved,
+    #[serde(rename = "stats_80")]
     Stats80,
     NoGoalBehind,
+    #[serde(rename = "loan_free_365")]
     LoanFree365,
 }
 
 /// One condition today. `gap` is never below 0, and is `None` where the table gives none or
 /// there's no figure yet. A distance is 0 once met; `earned_3_months`' gap is the months so
 /// far and `stats_80`'s the lowest score. `account_id` is the failing card, for `card_under_mid` only.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct Condition {
     pub code: ConditionCode,
     pub met: bool,
+    #[ts(type = "number | null")]
     pub gap: Option<i64>,
+    #[ts(type = "number | null")]
     pub account_id: Option<i64>,
 }
 

@@ -408,6 +408,7 @@ export const DASHBOARD: Dashboard = {
     earlyPayday: null,
     rows: [],
   },
+  focuses: [],
   today: TODAY,
 };
 

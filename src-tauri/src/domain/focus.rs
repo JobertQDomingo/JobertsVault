@@ -3,6 +3,8 @@
 //! recurring dates and payslip deductions) is worked out by the query, never here.
 
 use chrono::NaiveDate;
+use serde::Serialize;
+use ts_rs::TS;
 
 use super::account::{SpendLevel, SpendLevels, spend_level};
 use super::money::Money;
@@ -177,7 +179,9 @@ pub struct PaymentDates {
     pub paid_on: Option<NaiveDate>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
 pub enum FocusResult {
     Kept,
     Missed,
@@ -204,7 +208,9 @@ pub fn grade(ended: &Ended) -> FocusResult {
 }
 
 /// Sets a cap's bar color: amber when near, red when over.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
 pub enum CapState {
     Ok,
     Near,

@@ -182,6 +182,13 @@ pub fn effect(flow: Flow, from: Place) -> Option<Effect> {
     }
 }
 
+/// What's still to pay on the latest statement (§5.14): what was owed at its close less what paid
+/// the card since, never below 0 and never more than what's owed now.
+pub fn latest_bill(card: &CardState) -> Money {
+    let closed = card.owed_at_close.0.saturating_sub(card.paid_since_close.0);
+    Money(closed.clamp(0, card.owed_now.0.max(0)))
+}
+
 /// The latest statement: its closing date C₀ (today or earlier) and D₀, the first due date after
 /// it, which pays it. The service reads `owed_at_close` and `paid_since_close` for C₀.
 pub fn first_statement(
@@ -239,8 +246,7 @@ pub fn card_bills(
         }
     };
     // The latest statement, due today once its due date has passed (anything overdue is).
-    let closed = card.owed_at_close.0.saturating_sub(card.paid_since_close.0);
-    let mut billed = closed.clamp(0, card.owed_now.0.max(0));
+    let mut billed = latest_bill(card).0;
     bill_on(first_due.max(today), billed);
     let mut paid_close = first_close;
     for k in 1.. {

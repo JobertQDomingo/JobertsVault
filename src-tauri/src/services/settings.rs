@@ -102,6 +102,7 @@ fn decimals_locked(conn: &Connection) -> Result<bool, AppError> {
         || repo::budgets::any(conn)?
         || repo::goals::any(conn)?
         || repo::loans::any(conn)?
+        || repo::checkins::any_amount(conn)?
         || repo::accounts::any_with_amount(conn)?)
 }
 

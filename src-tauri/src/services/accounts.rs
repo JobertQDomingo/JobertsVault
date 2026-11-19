@@ -270,7 +270,7 @@ pub fn delete(conn: &mut Connection, id: i64, now: DateTime<Local>) -> Result<()
     let row = stored(&tx, id, now.date_naive())?;
     if row.in_use {
         return Err(AppError::Conflict {
-            message: "This account has transactions, recurring rules, goals or loans, so it can only be archived"
+            message: "This account has transactions, recurring rules, goals, loans or a check-in focus, so it can only be archived"
                 .into(),
         });
     }

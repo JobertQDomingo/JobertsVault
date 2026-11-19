@@ -23,6 +23,7 @@ pub mod reports;
 pub mod settings;
 pub mod system;
 pub mod transactions;
+pub mod vault;
 
 /// A Validation error on `field`, the camelCase name the form uses for `setError`.
 fn invalid(field: &str, message: &str) -> AppError {

@@ -518,17 +518,7 @@ pub(crate) fn gather(
         let (Some(statement_day), Some(due_day)) = (card.statement_day, card.due_day) else {
             continue;
         };
-        let (_, close) =
-            f::first_statement(statement_day, due_day, today).ok_or_else(out_of_range)?;
-        let at_close = repo::accounts::find(conn, card.id, close)?.map_or(0, |a| a.balance);
-        let state = CardState {
-            account_id: card.id,
-            statement_day,
-            due_day,
-            owed_now: Money(card.balance.saturating_neg()),
-            owed_at_close: Money(at_close.saturating_neg().max(0)),
-            paid_since_close: Money(repo::accounts::paid_into_card(conn, card.id, close, today)?),
-        };
+        let (state, _) = card_state(conn, card, statement_day, due_day, today)?;
         names.insert(
             Source::Card(card.id),
             ("Credit card payment".into(), card.id),
@@ -555,6 +545,28 @@ pub(crate) fn gather(
         paydays,
         early,
     })
+}
+
+/// A card as its bills start from today, and D₀, the due date of its latest statement (§5.14).
+pub(crate) fn card_state(
+    conn: &Connection,
+    card: &repo::accounts::Row,
+    statement_day: u8,
+    due_day: u8,
+    today: NaiveDate,
+) -> Result<(CardState, NaiveDate), AppError> {
+    let (due, close) =
+        f::first_statement(statement_day, due_day, today).ok_or_else(out_of_range)?;
+    let at_close = repo::accounts::find(conn, card.id, close)?.map_or(0, |a| a.balance);
+    let state = CardState {
+        account_id: card.id,
+        statement_day,
+        due_day,
+        owed_now: Money(card.balance.saturating_neg()),
+        owed_at_close: Money(at_close.saturating_neg().max(0)),
+        paid_since_close: Money(repo::accounts::paid_into_card(conn, card.id, close, today)?),
+    };
+    Ok((state, due))
 }
 
 /// The app's months from today to the horizon's end, the first starting today and the last

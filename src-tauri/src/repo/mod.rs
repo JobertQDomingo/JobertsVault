@@ -3,6 +3,7 @@
 pub mod accounts;
 pub mod budgets;
 pub mod categories;
+pub mod checkins;
 pub mod goals;
 pub mod loans;
 pub mod payment_methods;
