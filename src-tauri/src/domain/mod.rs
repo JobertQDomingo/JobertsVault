@@ -14,4 +14,5 @@ pub mod money;
 pub mod period;
 pub mod recurrence;
 pub mod report;
+pub mod stats;
 pub mod window;

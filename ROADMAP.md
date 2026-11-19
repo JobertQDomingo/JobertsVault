@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-19 |
-| **Current focus** | **Phase 5: Check-in & polish**: domain, the six stats and their reason codes [LVL-1] |
+| **Current focus** | **Phase 5: Check-in & polish**: domain, the level ladder, the ring and the next best move [LVL-2] [LVL-4] |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -22,7 +22,7 @@ This file is the progress tracker.
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 16 / 16 |
 | **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 17 / 17 |
-| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 6 / 29 |
+| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 7 / 29 |
 
 ---
 
@@ -217,7 +217,7 @@ The owner approved the plan on 2026-11-17 ([ADR 0012](docs/decisions/0012-requir
   - CLAUDE.md's "Domain rules that are easy to get wrong", and README.md
 - [x] `docs/design/` previews: draw the Check-in screen (the Card, Balance check, Stats and level, and Pick a focus steps), the Level screen, the dashboard's focus strip and the sidebar's level chip in `ui-flows.html`, and the six new components in `design-system.html`, in light and dark (docs/README)
 - [x] Migration `0005_checkins.sql` (DATA_MODEL §4.9, §4.4), and the domain rule for which periods are due, with tests: a Monday week start, `month_start_day` above 1, a week and a month due together, January and the year, three weeks unopened, a period already finished, and a database with no transactions [CHK-1] [CHK-5]
-- [ ] Domain: the six stats and their reason codes, with a test at both ends of every scale and for each "none" case (DATA_MODEL §5.20) [LVL-1]
+- [x] Domain: the six stats and their reason codes, with a test at both ends of every scale and for each "none" case (DATA_MODEL §5.20) [LVL-1]
 - [ ] Domain: the level ladder, the ring and the next best move, with a test for every level, for a drop, and for a condition about something the user doesn't have (DATA_MODEL §5.21) [LVL-2] [LVL-4]
 - [ ] Domain: focus offers, grading and the cap state, with tests for each of the five kinds, everyday spending, a `void` loan focus and the 80% and over boundaries (DATA_MODEL §5.22) [CHK-7] [CHK-8]
 - [ ] Domain: the win, personal bests, both streaks, the trend history and the focus record, with tests (DATA_MODEL §5.23) [CHK-6] [LVL-7] [LVL-8]
