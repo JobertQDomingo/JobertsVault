@@ -197,7 +197,7 @@ fn card(cards: &[CardInput]) -> Option<Stat> {
         .map(|(s, _)| s)
 }
 
-fn one_card(card: &CardInput) -> Stat {
+pub(crate) fn one_card(card: &CardInput) -> Stat {
     let (level_points, past) = match card.level {
         SpendLevel::None => (100, StatReason::CardHighUse),
         SpendLevel::Soft => (70, StatReason::CardPastSoft),
