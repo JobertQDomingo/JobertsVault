@@ -584,9 +584,11 @@ pub(crate) fn gather(conn: &mut Connection, today: NaiveDate) -> Result<Facts, A
         });
         let row = repo::accounts::find(conn, a.id, today)?
             .ok_or_else(|| crate::services::not_found("account", a.id))?;
-        let (state, due) = forecast::card_state(conn, &row, statement_day, due_day, today)?;
+        let (state, due, close) = forecast::card_state(conn, &row, statement_day, due_day, today)?;
         let amount = latest_bill(&state);
-        if amount > Money::ZERO && due < today {
+        // A statement that closed before the card was added says nothing about what was on it
+        // (DATA_MODEL §9 item 144).
+        if amount > Money::ZERO && due < today && close >= added_on(&row.created_at)? {
             overdue_cards.push((due, a.id, amount));
         }
     }
@@ -690,6 +692,15 @@ fn completed_cycles(
         )?));
     }
     Ok(totals)
+}
+
+/// The local date of a `created_at` stamp.
+fn added_on(created_at: &str) -> Result<NaiveDate, AppError> {
+    chrono::DateTime::parse_from_rfc3339(created_at)
+        .map(|t| t.with_timezone(&chrono::Local).date_naive())
+        .map_err(|_| AppError::Database {
+            message: "A stored timestamp is invalid".into(),
+        })
 }
 
 pub(crate) fn stored_date(text: &str) -> Result<NaiveDate, AppError> {
@@ -960,21 +971,27 @@ mod tests {
     #[test]
     fn a_card_statement_unpaid_past_its_due_date_is_the_next_move() {
         let mut conn = db();
+        // Added Nov 3 (`now`).
         let card = card(&mut conn);
         let food = id_of(&conn, "categories", "Food & Groceries");
-        // Oct 10 is in the cycle that closed Oct 20 and was due Nov 5.
-        spend(&mut conn, 10_000, "2026-10-10", card, food);
+        // Oct 10 is in the cycle that closed Oct 20, before the card was added, and was due Nov 5:
+        // nothing says what was really on that statement, so it isn't overdue.
+        spend(&mut conn, 3_000, "2026-10-10", card, food);
         let s = get(&mut conn, d(2026, 11, 10)).unwrap();
+        assert_eq!(s.stats[1].score, Some(100));
+        // Nov 10 is in the cycle that closes Nov 20, due Dec 5.
+        spend(&mut conn, 10_000, "2026-11-10", card, food);
+        let s = get(&mut conn, d(2026, 12, 6)).unwrap();
         assert_eq!(s.stats[1].reason, Some(StatReason::CardOverdue));
         assert_eq!(
             s.next_move,
             NextMoveView::PayOverdueCard {
                 account_id: card,
-                amount: Money(10_000),
+                amount: Money(13_000),
             }
         );
         // Not overdue on its due date.
-        let s = get(&mut conn, d(2026, 11, 5)).unwrap();
+        let s = get(&mut conn, d(2026, 12, 5)).unwrap();
         assert_eq!(s.stats[1].score, Some(100));
     }
 
