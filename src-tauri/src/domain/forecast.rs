@@ -744,6 +744,25 @@ mod tests {
     }
 
     #[test]
+    fn the_latest_bill_is_what_closed_less_what_paid_it_within_what_is_owed_now() {
+        let bill = |owed_now, owed_at_close, paid_since_close| {
+            latest_bill(&CardState {
+                owed_at_close: Money(owed_at_close),
+                paid_since_close: Money(paid_since_close),
+                ..card(owed_now)
+            })
+            .0
+        };
+        assert_eq!(bill(30_000, 20_000, 5_000), 15_000);
+        // Paying more than the statement leaves nothing on it.
+        assert_eq!(bill(30_000, 20_000, 25_000), 0);
+        // Owing less now than at the close (a refund since) caps it.
+        assert_eq!(bill(8_000, 20_000, 0), 8_000);
+        // A card in credit owes nothing.
+        assert_eq!(bill(-1_000, 20_000, 0), 0);
+    }
+
+    #[test]
     fn a_closed_statement_is_billed_less_what_was_paid_since() {
         // Today Nov 25: the Nov 20 statement closed owing 640.00, and 140.00 is paid since.
         let today = d(2026, 11, 25);
