@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Fragment, useEffect, useEffectEvent, useState } from "react";
+import { Fragment, useEffect, useEffectEvent, useRef, useState } from "react";
 import { useOutletContext, useSearchParams } from "react-router";
 import logo from "../../../assets/brand/logo.svg";
 import type { Checkin } from "@/bindings/Checkin";
@@ -75,7 +75,9 @@ export function CheckinScreen() {
   const loans = useLoans();
   const settings = useSettings();
   const data = checkin.data;
-  const failed = [categories, accounts, loans].filter((q) => q.isError);
+  const failed = [categories, accounts, loans, settings].filter(
+    (q) => q.isError,
+  );
   const title = data
     ? unitOf(data) === "month"
       ? `Monthly check-in · ${formatPeriodLabel("month", data.period.start, data.period.end)}`
@@ -152,9 +154,15 @@ function Flow({
           ? data.year
           : true,
   );
-  // The step is kept by name, so one that appears or goes after a save doesn't move the user.
+  const answered = (data.balances ?? []).every((b) => answers[b.accountId]);
+  // The step is kept by name, so one that appears or goes after a save doesn't move the user,
+  // except past a Balance check not yet answered, which can appear when a month comes due (CHK-4).
   const asked = ORDER.indexOf(params.get("step") as Name);
-  const step = steps.find((s) => ORDER.indexOf(s) >= asked) ?? steps[0];
+  const found = steps.find((s) => ORDER.indexOf(s) >= asked) ?? steps[0];
+  const step =
+    !answered && ORDER.indexOf(found) > ORDER.indexOf("balance")
+      ? "balance"
+      : found;
   const at = steps.indexOf(step);
   // A pick that's no longer offered (after a refused Finish reloads them) is no pick (ADR 0014).
   const picked = data.offers.find((o) => keyOf(o) === pickKey);
@@ -169,6 +177,8 @@ function Flow({
   };
   const { say, body } = STEPS[step].build(ctx);
 
+  // A failed Finish's toast, closed when Finish is tried again, so its way out can't outlive it.
+  const failure = useRef<string | number>(undefined);
   const complete = useCompleteCheckin(() => {
     const off = data.balances?.find((b) => answers[b.accountId] === "mismatch");
     // None at once, before the refresh, and the guard moves on to where Finish goes (F17).
@@ -183,7 +193,7 @@ function Flow({
   const last = step === "focus";
   const ready =
     step === "balance"
-      ? (data.balances ?? []).every((b) => answers[b.accountId])
+      ? answered
       : last
         ? !!picked && !complete.isPending
         : true;
@@ -193,10 +203,11 @@ function Flow({
   const next = () => {
     if (!ready) return;
     if (!last) return go(steps[at + 1]);
+    notify.dismiss(failure.current);
     complete.mutate(picked!, {
       onError: (error) => {
         refetch();
-        notify.error(
+        failure.current = notify.error(
           error.message,
           guard.openAnyway && {
             label: "Open the app anyway",
@@ -212,12 +223,22 @@ function Flow({
     "Alt+ArrowLeft": back,
     "Alt+ArrowRight": () => {},
     "Alt+Home": () => {},
+    // There's no search here: not WebView2's find bar either.
+    "Ctrl+F": () => {},
   });
   // Enter presses Next, unless it's on a button or field of its own, or a dialog is open.
   const onEnter = useEffectEvent(next);
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
-      if (e.key !== "Enter" || e.ctrlKey || e.altKey || e.shiftKey || e.metaKey)
+      // A held Enter moves one step, so no step goes by unread.
+      if (
+        e.key !== "Enter" ||
+        e.repeat ||
+        e.ctrlKey ||
+        e.altKey ||
+        e.shiftKey ||
+        e.metaKey
+      )
         return;
       const busy =
         "button,a,input,textarea,select,[role=dialog],[role=alertdialog],[role=menu]";

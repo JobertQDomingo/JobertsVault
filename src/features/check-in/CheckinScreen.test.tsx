@@ -365,6 +365,16 @@ test("a refused Finish reloads the offers, clears a pick that's gone, and offers
   );
   expect(stepLine()).toContain("Pick a focus");
   expect(button("Finish").hasAttribute("disabled")).toBe(true);
+  // A second try closes the first failure's toast, so only one way out is ever on screen.
+  fireEvent.click(screen.getAllByRole("radio")[0]);
+  fireEvent.click(button("Finish"));
+  await waitFor(() =>
+    expect(
+      screen.getAllByText("Pick one of the offered focuses."),
+    ).toHaveLength(1),
+  );
+  await new Promise((r) => setTimeout(r, 450));
+  expect(screen.getAllByText("Open the app anyway")).toHaveLength(1);
   fireEvent.click(screen.getByText("Open the app anyway"));
   await waitFor(() => expect(path(router)).toBe("/"));
   await screen.findByRole("navigation");
@@ -374,4 +384,74 @@ test("a refused Finish reloads the offers, clears a pick that's gone, and offers
   const restart = renderRoute("/", { ...NAMES, get_checkin: moved });
   await waitFor(() => expect(path(restart.router)).toBe("/check-in"));
   expect(await screen.findByText(/^Step 1 of/)).toBeTruthy();
+});
+
+test("a reload that fails keeps an open check-in, rather than opening the app", async () => {
+  let fail = false;
+  const { router, client } = open(() => {
+    if (fail) throw { code: "database", message: "busy" };
+    return CHECKIN;
+  });
+  await screen.findByText(/^Step 1 of/);
+  fail = true;
+  await act(() => client.invalidateQueries({ queryKey: ["ledger"] }));
+  await new Promise((r) => setTimeout(r, 20));
+  expect(path(router)).toBe("/check-in");
+});
+
+test("a Balance check that appears after a save can't be skipped from a later step (CHK-4)", async () => {
+  renderRoute("/check-in?step=focus", {
+    ...NAMES,
+    get_checkin: MONTHLY_CHECKIN,
+  });
+  await screen.findByText(/^Step \d+ of/);
+  expect(stepLine()).toBe("Step 6 of 8 · Balance check");
+});
+
+test("overdue counts every overdue payment, not only one per loan", async () => {
+  open({
+    ...CHECKIN,
+    loans: {
+      ...CHECKIN.loans,
+      loansDue: [
+        {
+          loanId: 2,
+          name: "Bank loan",
+          accountId: 2,
+          paymentId: 21,
+          amount: 100000,
+          dueDate: "2026-10-10",
+          days: -37,
+          moreOverdue: 2,
+          moveFirst: null,
+        },
+      ],
+    },
+  });
+  await goTo("Loans and bills");
+  expect(say()).toBe("3 loan payments are overdue.");
+});
+
+test("settings that fail to load show the error with Retry, not a skeleton forever", async () => {
+  renderRoute(
+    "/check-in",
+    {
+      ...NAMES,
+      get_checkin: CHECKIN,
+      get_settings: () => {
+        throw { code: "database", message: "busy" };
+      },
+    },
+    { seedSettings: false },
+  );
+  expect(await screen.findByRole("button", { name: /Retry/ })).toBeTruthy();
+});
+
+test("holding Enter moves one step, not through them all", async () => {
+  open(CHECKIN);
+  await screen.findByText(/^Step 1 of/);
+  fireEvent.keyDown(document.body, { key: "Enter" });
+  fireEvent.keyDown(document.body, { key: "Enter", repeat: true });
+  fireEvent.keyDown(document.body, { key: "Enter", repeat: true });
+  expect(stepLine()).toBe("Step 2 of 6 · Money in and out");
 });

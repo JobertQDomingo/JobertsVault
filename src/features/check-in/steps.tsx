@@ -464,7 +464,10 @@ export function loansStep(ctx: Ctx): Step {
     ctx.data.loans;
   const { today } = ctx.data;
   const unit = unitOf(ctx.data);
-  const overdue = loansDue.filter((d) => d.days < 0).length;
+  // Each row is a loan's earliest overdue payment; its others are `moreOverdue` (a count, not money).
+  const overdue = loansDue
+    .filter((d) => d.days < 0)
+    .reduce((n, d) => n + 1 + d.moreOverdue, 0);
   const paidLine = `${plural(paid.length, "loan payment", "loan payments")} paid, ${money(ctx, paidTotal)}.`;
   const say = overdue
     ? overdue === 1

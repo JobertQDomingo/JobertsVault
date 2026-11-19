@@ -46,4 +46,7 @@ export const notify = {
   // Errors stay until closed, so they can't be missed. A failed Finish offers a way on (ADR 0014).
   error: (message: string, action?: { label: string; onClick: () => void }) =>
     toast.error(message, { duration: Infinity, closeButton: true, action }),
+  /** Closes a toast by the id `error` returned; none does nothing. */
+  dismiss: (id: string | number | undefined) =>
+    id !== undefined && toast.dismiss(id),
 };

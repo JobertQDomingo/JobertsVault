@@ -25,7 +25,11 @@ export type GuardContext = {
  */
 export function Root() {
   const settings = useSettings();
-  if (settings.isPending) return null;
+  // Only the first answer is waited for. A failed one reads as pending again each time a screen
+  // mounts its own settings query, which would unmount that screen and loop.
+  const [answered, setAnswered] = useState(false);
+  if (!answered && !settings.isPending) setAnswered(true);
+  if (!answered && settings.isPending) return null;
   if (settings.data?.onboardingCompleted === false)
     return <Navigate to="/welcome" replace />;
   return (
@@ -37,8 +41,8 @@ export function Root() {
 
 /**
  * The check-in guard (CHK-2): while one is due, every route goes to `/check-in`, and `/check-in`
- * goes to `/` once none is. A failed load opens the app normally, and the next focus or midnight
- * asks again. "Open the app anyway" lifts it until the next start: it's held here, never stored.
+ * goes to `/` once none is. A failed first load opens the app normally, and the next focus or
+ * midnight asks again. "Open the app anyway" lifts it until the next start: it's held here, never stored.
  */
 function Guard() {
   const { add } = useQuickAdd();
@@ -48,17 +52,19 @@ function Guard() {
   const [exit, setExit] = useState("/");
   useProcessOnFocus();
   useShortcuts({ "Ctrl+N": add });
+  // A failed load has no data, so the app opens. A failed reload keeps the data it had, so a
+  // check-in already shown stays (TanStack keeps it), as a failed Finish must (ADR 0014).
+  const due = !!checkin.data && !anyway;
+  // Each check-in leaves for the dashboard unless its own Finish says otherwise. Finish sets the
+  // exit and clears the check-in together, so this never undoes it.
+  if (due && exit !== "/") setExit("/");
   const onCheckin = pathname === "/check-in";
   const context: GuardContext = {
     leaveTo: setExit,
-    openAnyway: () => {
-      setExit("/");
-      setAnyway(true);
-    },
+    openAnyway: () => setAnyway(true),
   };
   // Until the first answer a guarded route shows nothing, so the dashboard never flashes first.
   if (checkin.isPending) return onCheckin ? <Outlet context={context} /> : null;
-  const due = !!checkin.data && !checkin.isError && !anyway;
   if (due !== onCheckin)
     return <Navigate to={due ? "/check-in" : exit} replace />;
   return <Outlet context={context} />;
