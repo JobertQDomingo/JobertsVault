@@ -456,6 +456,7 @@ const READS = [
   "useGoals",
   "useLoans",
   "useLoanPreview",
+  "useLoanRowsTotal",
   "useSettings",
 ];
 

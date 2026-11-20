@@ -25,7 +25,11 @@ import {
 import { Field, Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import { notify } from "@/components/ui/toast";
-import { useCreateLoan, useUpdateLoan } from "@/hooks/useLoans";
+import {
+  useCreateLoan,
+  useLoanRowsTotal,
+  useUpdateLoan,
+} from "@/hooks/useLoans";
 import {
   addMonths,
   formatInputDate,
@@ -270,6 +274,15 @@ export function LoanDialog({
 
   const money = (amount: number) => formatMoney(amount, settings);
   const existing = isNew === "existing";
+  const paidBefore = (r: Row) =>
+    existing && r.dueDate !== "" && r.dueDate < cutoff;
+  // The running total (F12): each row as it shows, paid or not, for the backend to add up.
+  const sum = useLoanRowsTotal(
+    payments.map((r) => ({
+      amount: r.amount ?? 0,
+      paid: r.paidOn !== null || paidBefore(r),
+    })),
+  ).data;
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -468,9 +481,7 @@ export function LoanDialog({
                       )}
                     />
                     <span className="text-small text-muted-foreground">
-                      {existing && current.dueDate && current.dueDate < cutoff
-                        ? "Paid before"
-                        : ""}
+                      {paidBefore(current) ? "Paid before" : ""}
                     </span>
                     <Button
                       variant="ghost"
@@ -484,6 +495,16 @@ export function LoanDialog({
                 );
               })}
             </ul>
+            <p
+              data-testid="loan-total"
+              aria-live="polite"
+              className="text-small font-semibold tabular-nums"
+            >
+              {sum &&
+                (sum.left === sum.total
+                  ? `Total ${money(sum.total)}`
+                  : `Total ${money(sum.total)} · Still to pay ${money(sum.left)}`)}
+            </p>
             {rowsError && (
               <p
                 id="loan-rows-message"

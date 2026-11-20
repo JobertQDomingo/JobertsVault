@@ -3,6 +3,7 @@ import type { ComparisonMode } from "@/bindings/ComparisonMode";
 import type { ForecastGrain } from "@/bindings/ForecastGrain";
 import type { GoalDraft } from "@/bindings/GoalDraft";
 import type { LoanDraft } from "@/bindings/LoanDraft";
+import type { LoanRowAmount } from "@/bindings/LoanRowAmount";
 import type { PayslipFields } from "@/bindings/PayslipFields";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
 import type { TransactionFilter } from "@/bindings/TransactionFilter";
@@ -34,6 +35,8 @@ export const queryKeys = {
   // Before you borrow reads the loans and the forecast, so every write moves it (LOAN-9).
   loanPreview: (draft: LoanDraft | null) =>
     ["ledger", "loanPreview", draft] as const,
+  loanRowsTotal: (rows: LoanRowAmount[]) =>
+    ["ledger", "loanRowsTotal", rows] as const,
   // Every balance, transaction, rule, loan and payslip moves it (SAFE-1 to SAFE-7).
   forecast: (grain: ForecastGrain) => ["ledger", "forecast", grain] as const,
   // A payslip's rows are transactions; its defaults come from the last payslip (PAY-2).

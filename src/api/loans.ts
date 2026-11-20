@@ -3,6 +3,8 @@ import type { LoanDraft } from "@/bindings/LoanDraft";
 import type { LoanFields } from "@/bindings/LoanFields";
 import type { LoanList } from "@/bindings/LoanList";
 import type { LoanPreview } from "@/bindings/LoanPreview";
+import type { LoanRowAmount } from "@/bindings/LoanRowAmount";
+import type { LoanRowsTotal } from "@/bindings/LoanRowsTotal";
 import type { NewLoan } from "@/bindings/NewLoan";
 import type { Saved } from "@/bindings/Saved";
 import type { Transaction } from "@/bindings/Transaction";
@@ -49,3 +51,7 @@ export const markLoanPaymentUnpaid = (paymentId: number) =>
 /** What a loan would do to the debt-free date, Safe to spend and each pay window. Saves nothing (LOAN-9, LOAN-10). */
 export const previewLoan = (draft: LoanDraft) =>
   call<LoanPreview>("preview_loan", { draft });
+
+/** The loan form's running total, so the frontend never adds up money (F12). */
+export const totalLoanPayments = (rows: LoanRowAmount[]) =>
+  call<LoanRowsTotal>("total_loan_payments", { rows });

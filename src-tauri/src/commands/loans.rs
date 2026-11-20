@@ -3,7 +3,9 @@ use tauri::State;
 use crate::domain::loan::LoanPreview;
 use crate::error::AppError;
 use crate::services::goals::Saved;
-use crate::services::loans::{Loan, LoanDraft, LoanFields, LoanList, NewLoan};
+use crate::services::loans::{
+    Loan, LoanDraft, LoanFields, LoanList, LoanRowAmount, LoanRowsTotal, NewLoan,
+};
 use crate::services::transactions::{Transaction, TransactionFields};
 use crate::state::AppState;
 use crate::{log, services};
@@ -70,6 +72,12 @@ pub fn mark_loan_payment_unpaid(
 ) -> Result<(), AppError> {
     services::loans::mark_unpaid(&mut *state.conn()?, payment_id, chrono::Local::now())
         .inspect_err(|err| log::record(&state.log_path, err))
+}
+
+/// The loan form's running total as the user types (CLAUDE.md rule 2).
+#[tauri::command(async)]
+pub fn total_loan_payments(rows: Vec<LoanRowAmount>) -> LoanRowsTotal {
+    services::loans::total(&rows)
 }
 
 /// Before you borrow (LOAN-9) and the new-loan confirm (LOAN-10): saves nothing.

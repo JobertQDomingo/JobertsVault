@@ -1,5 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import type { LoanDraft } from "@/bindings/LoanDraft";
+import type { LoanRowAmount } from "@/bindings/LoanRowAmount";
 import {
   archiveLoan,
   createLoan,
@@ -8,6 +10,7 @@ import {
   markLoanPaymentPaid,
   markLoanPaymentUnpaid,
   previewLoan,
+  totalLoanPayments,
   unarchiveLoan,
   updateLoan,
 } from "@/api/loans";
@@ -28,6 +31,24 @@ export const useLoanPreview = (draft: LoanDraft | null) =>
     queryFn: () => previewLoan(draft ?? { payments: [] }),
     enabled: draft !== null,
   });
+
+/** The loan form's running total (F12), asked 250 ms after the rows stop changing, as Net pay is. */
+export function useLoanRowsTotal(rows: LoanRowAmount[]) {
+  const [asked, setAsked] = useState(rows);
+  const key = JSON.stringify(rows);
+  useEffect(() => {
+    const timer = setTimeout(
+      () => setAsked(JSON.parse(key) as LoanRowAmount[]),
+      250,
+    );
+    return () => clearTimeout(timer);
+  }, [key]);
+  return useQuery({
+    queryKey: queryKeys.loanRowsTotal(asked),
+    queryFn: () => totalLoanPayments(asked),
+    placeholderData: keepPreviousData,
+  });
+}
 
 // Ledger writes: a loan's amounts lock the decimals and put its account and category in use.
 export const useCreateLoan = () => useLedgerMutation(createLoan);
