@@ -398,7 +398,7 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 - **Timing:** 150–200 ms, ease-out.
 - **Hover and press:** clickable cards lift 2 px on hover. Buttons shrink to 97% while pressed.
 - **Dialogs** fade in while growing from 98% to full size in 180 ms, and the backdrop fades in with them.
-- **The level-up moment (Phase 5, LVL-6):** the one place a little more is allowed. When a check-in finds a higher level, the `LevelBadge` grows from 80% to 110% and settles at full size over 600 ms, ease-out, while a soft `--primary` glow behind it fades out. It plays once, when the step is first shown. A lower level, the stat bars, the hexagon and the level path never animate.
+- **The level-up moment (Phase 5, LVL-6):** the one place a little more is allowed. When a check-in finds a higher level, the `LevelBadge`'s hexagon grows from 80% to 110% and settles at full size over 600 ms, ease-out, while a soft `--primary` glow behind it fades out, and its title beside it stays still. It plays once, when the step is first shown (UI_FLOWS §11 item 90). A lower level, the stat bars, the `StatHexagon` and the level path never animate.
 - **What never moves:** the aurora, and numbers (they never count up).
 - `prefers-reduced-motion` turns all of this off.
 

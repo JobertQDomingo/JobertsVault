@@ -63,6 +63,8 @@ export type Ctx = {
   /** The picked offer, or none. */
   picked: Offer | undefined;
   pick: (offer: Offer) => void;
+  /** The level rose and Stats and level hasn't been left yet, so the badge plays once (LVL-6). */
+  levelUp: boolean;
 };
 
 export type Answer = "match" | "mismatch";
@@ -671,7 +673,7 @@ export function statsStep(ctx: Ctx): Step {
           </div>
         </Flat>
         <Flat className="gap-2.5 px-6">
-          <LevelBadge level={s.level} />
+          <LevelBadge level={s.level} levelUp={ctx.levelUp} />
           <p className="tabular-nums">{move}</p>
           <p className="text-small text-muted-foreground">
             {`${plural(s.checkinStreak, "check-in", "check-ins")} in a row on time · ${plural(s.focusStreak, "focus", "focuses")} kept in a row`}

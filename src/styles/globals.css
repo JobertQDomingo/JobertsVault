@@ -214,6 +214,22 @@
       opacity: 0;
     }
   }
+  /* §10, LVL-6: the one longer motion. The badge grows from 80% past full size and settles,
+     while a soft --primary glow behind it fades out. A filter, never backdrop-filter (§11). */
+  --animate-level-up: level-up 600ms ease-out;
+  @keyframes level-up {
+    from {
+      scale: 0.8;
+      filter: drop-shadow(0 0 12px var(--primary));
+    }
+    60% {
+      scale: 1.1;
+    }
+    to {
+      scale: 1;
+      filter: drop-shadow(0 0 0 transparent);
+    }
+  }
 }
 
 /* Level 1: sidebar, top bar, toolbars, cards, banners (§2.1). */
