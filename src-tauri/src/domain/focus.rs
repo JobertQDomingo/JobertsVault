@@ -10,7 +10,8 @@ use super::account::{SpendLevel, SpendLevels, spend_level};
 use super::money::Money;
 use super::stats::{CardInput, Stat, Stats, one_card};
 
-/// The facts §5.22's offer table needs, for the period the focus would run in.
+/// The facts §5.22's offer table needs, for the period the focus would run in. "So far" is
+/// from the period's start to today: every offer must still be keepable when it's offered.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OfferFacts {
     /// The focus would run for a week; else for a month.
@@ -25,6 +26,12 @@ pub struct OfferFacts {
     pub per_day: Money,
     /// Every active expense category.
     pub categories: Vec<CategorySpending>,
+    /// Everyday spending so far.
+    pub spent_so_far: Money,
+    /// The days from today to the period's end, today included.
+    pub days_left: i64,
+    /// The dates before today in the period with at least one transaction.
+    pub logged_before_today: i64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,6 +51,8 @@ pub struct CategorySpending {
     pub reviewed: Money,
     /// Its everyday spending in the period before that one.
     pub before: Money,
+    /// Its everyday spending so far in the period the focus would run in.
+    pub so_far: Money,
 }
 
 /// One focus, as offered and as stored in `checkins`' focus columns.
@@ -82,7 +91,8 @@ pub fn offers(facts: &OfferFacts, stats: &Stats) -> Vec<Focus> {
         Some((
             stats.habit.score,
             Focus::Logging {
-                target: if facts.for_week { 5 } else { 20 },
+                target: (if facts.for_week { 5 } else { 20 })
+                    .min(facts.logged_before_today + facts.days_left),
             },
         )),
     ]
@@ -128,15 +138,21 @@ fn card_level(cards: &[CardOffer]) -> Option<Focus> {
 
 fn spending_cap(facts: &OfferFacts) -> Option<Focus> {
     (facts.for_week && facts.has_payday_rule && facts.per_day.0 > 0).then(|| Focus::SpendingCap {
-        target: Money(facts.per_day.0.saturating_mul(7)),
+        target: Money(
+            facts
+                .spent_so_far
+                .0
+                .saturating_add(facts.per_day.0.saturating_mul(facts.days_left)),
+        ),
     })
 }
 
-/// The largest rise in amount (ties by category id) over an earlier period above 0.
+/// The largest rise in amount (ties by category id) over an earlier period above 0, leaving
+/// out a category already over that amount so far.
 fn category_cap(categories: &[CategorySpending]) -> Option<Focus> {
     categories
         .iter()
-        .filter(|c| c.before.0 > 0 && c.reviewed > c.before)
+        .filter(|c| c.before.0 > 0 && c.reviewed > c.before && c.so_far <= c.before)
         .max_by_key(|c| (c.reviewed.0 - c.before.0, std::cmp::Reverse(c.category_id)))
         .map(|c| Focus::CategoryCap {
             category_id: c.category_id,
@@ -280,6 +296,9 @@ mod tests {
             has_payday_rule: false,
             per_day: Money(0),
             categories: vec![],
+            spent_so_far: Money(0),
+            days_left: 7,
+            logged_before_today: 0,
         }
     }
 
@@ -303,6 +322,7 @@ mod tests {
             category_id,
             reviewed: Money(reviewed),
             before: Money(before),
+            so_far: Money(0),
         }
     }
 
@@ -315,6 +335,7 @@ mod tests {
             has_payday_rule: true,
             per_day: Money(50_000),
             categories: vec![cat(4, 2_000, 1_000)],
+            ..none()
         }
     }
 
@@ -325,9 +346,29 @@ mod tests {
         assert_eq!(offers(&none(), &all_100()), [Focus::Logging { target: 5 }]);
         let month = OfferFacts {
             for_week: false,
+            days_left: 30,
             ..none()
         };
         assert_eq!(offers(&month, &all_100()), [Focus::Logging { target: 20 }]);
+    }
+
+    #[test]
+    fn logging_asks_for_at_most_the_days_still_reachable() {
+        let at = |for_week, logged_before_today, days_left| {
+            let facts = OfferFacts {
+                for_week,
+                logged_before_today,
+                days_left,
+                ..none()
+            };
+            offers(&facts, &all_100())
+        };
+        // Saturday, nothing logged since Monday: 2 days are left.
+        assert_eq!(at(true, 0, 2), [Focus::Logging { target: 2 }]);
+        assert_eq!(at(true, 3, 3), [Focus::Logging { target: 5 }]);
+        assert_eq!(at(true, 4, 1), [Focus::Logging { target: 5 }]);
+        assert_eq!(at(false, 4, 10), [Focus::Logging { target: 14 }]);
+        assert_eq!(at(false, 15, 10), [Focus::Logging { target: 20 }]);
     }
 
     #[test]
@@ -406,6 +447,18 @@ mod tests {
                 target: Money(350_000)
             }
         );
+        // Finished on a Friday: what was spent since Monday, then per day for Friday to Sunday.
+        let friday = OfferFacts {
+            spent_so_far: Money(100_000),
+            days_left: 3,
+            ..facts.clone()
+        };
+        assert_eq!(
+            offers(&friday, &all_100())[0],
+            Focus::SpendingCap {
+                target: Money(250_000)
+            }
+        );
         for not in [
             OfferFacts {
                 for_week: false,
@@ -444,6 +497,28 @@ mod tests {
             offers(&facts, &all_100())[0],
             Focus::CategoryCap {
                 category_id: 3,
+                target: Money(1_000)
+            }
+        );
+    }
+
+    #[test]
+    fn category_cap_leaves_out_a_category_already_over_its_target() {
+        let so_far = |c: CategorySpending, so_far| CategorySpending {
+            so_far: Money(so_far),
+            ..c
+        };
+        let facts = OfferFacts {
+            categories: vec![
+                so_far(cat(3, 3_000, 1_000), 1_001), // the largest rise, but already over
+                so_far(cat(5, 1_500, 1_000), 1_000), // at its target: still keepable
+            ],
+            ..none()
+        };
+        assert_eq!(
+            offers(&facts, &all_100())[0],
+            Focus::CategoryCap {
+                category_id: 5,
                 target: Money(1_000)
             }
         );

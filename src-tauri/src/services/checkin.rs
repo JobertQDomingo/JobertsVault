@@ -384,7 +384,10 @@ fn offers(
         .iter()
         .filter(|l| !l.archived)
         .flat_map(|l| l.payments.iter().map(move |p| (l.id, p)))
-        .filter(|(_, p)| p.status == LoanPaymentStatus::Unpaid && in_period(p.due_date))
+        // One already past its due date can't be paid on time any more.
+        .filter(|(_, p)| {
+            p.status == LoanPaymentStatus::Unpaid && in_period(p.due_date) && p.due_date >= today
+        })
         .min_by_key(|(_, p)| (p.due_date, p.id));
     let cards: Vec<(CardOffer, SpendLevels)> = active_cards(&facts.accounts)
         .filter_map(|a| {
@@ -413,6 +416,10 @@ fn offers(
             .collect())
     };
     let (reviewed, earlier) = (by_category(shown)?, by_category(before)?);
+    let (start, to_today) = (period.start().to_string(), today.to_string());
+    let so_far: HashMap<i64, i64> = repo::checkins::everyday_by_category(conn, &start, &to_today)?
+        .into_iter()
+        .collect();
     let categories = repo::categories::all(conn)?
         .into_iter()
         .filter(|c| c.kind == "expense" && !c.archived)
@@ -420,6 +427,7 @@ fn offers(
             category_id: c.id,
             reviewed: Money(reviewed.get(&c.id).copied().unwrap_or(0)),
             before: Money(earlier.get(&c.id).copied().unwrap_or(0)),
+            so_far: Money(so_far.get(&c.id).copied().unwrap_or(0)),
         })
         .collect();
     let per_day = facts.forecast.per_day.unwrap_or(Money::ZERO);
@@ -430,6 +438,15 @@ fn offers(
         has_payday_rule: facts.level.has_payday_rule,
         per_day,
         categories,
+        spent_so_far: Money(repo::checkins::everyday_spending(
+            conn, &start, &to_today, None,
+        )?),
+        days_left: (period.end() - today).num_days() + 1,
+        logged_before_today: repo::checkins::logged_days(
+            conn,
+            &start,
+            &(today - chrono::Days::new(1)).to_string(),
+        )?,
     };
     let fields = |kind, target: Option<i64>| FocusFields {
         kind,
@@ -956,10 +973,11 @@ mod tests {
         );
         assert_eq!(c.goals, Some(Vec::new()));
         let focus = logging(&c);
-        // A month's focus runs for the current month, and asks for 20 days.
+        // A month's focus runs for the current month. It asks for the days still reachable:
+        // Nov 10, logged, and the 15 days from Nov 16 to 30.
         assert_eq!(
             (focus.start, focus.end, focus.target),
-            (d(2026, 11, 1), d(2026, 11, 30), Some(20))
+            (d(2026, 11, 1), d(2026, 11, 30), Some(16))
         );
         let written = complete(&mut conn, focus, at(today)).unwrap();
         let kinds: Vec<_> = written.iter().map(|w| w.kind).collect();
@@ -1136,6 +1154,64 @@ mod tests {
         assert_eq!(listed, [(payment, d(2026, 11, 19))]);
         assert_eq!(c.loans.paid_total, Money(5_000));
         assert_eq!(c.loans.loans_left, None);
+    }
+
+    #[test]
+    fn a_late_check_in_offers_only_what_can_still_be_kept() {
+        let mut conn = db();
+        let salary: i64 = conn
+            .query_row("SELECT id FROM categories WHERE name = 'Salary'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        let income = TransactionFields {
+            kind: TransactionKind::Income,
+            ..fields(1_000_000, "2026-11-09", salary)
+        };
+        transactions::create(&mut conn, income, now()).unwrap();
+        // Food rose from 200 to 1,100 in the week reviewed, and 300 since Monday is already
+        // over the 200 a category cap would ask for.
+        spend(&mut conn, 200, "2026-11-04");
+        spend(&mut conn, 500, "2026-11-10");
+        spend(&mut conn, 600, "2026-11-12");
+        spend(&mut conn, 300, "2026-11-17");
+        let loan_category: i64 = conn
+            .query_row("SELECT id FROM categories WHERE name = 'Loan'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        // Due Tuesday and still unpaid: it can't be paid on time any more.
+        add(&mut conn, loan_category, "Phone", "2026-11-17");
+        let rule = crate::services::recurring::RecurringRuleFields {
+            transaction: TransactionFields {
+                kind: TransactionKind::Income,
+                ..fields(420_000, "2026-12-01", salary)
+            },
+            frequency: crate::domain::recurrence::Frequency::Monthly,
+            interval: 1,
+            end_date: None,
+            max_occurrences: None,
+            mode: crate::services::recurring::RecurringMode::Confirm,
+            is_payday: true,
+        };
+        crate::services::recurring::create(&mut conn, rule, now()).unwrap();
+
+        let friday = d(2026, 11, 20);
+        let c = get(&mut conn, friday).unwrap().unwrap();
+        let kinds: Vec<_> = c.offers.iter().map(|o| o.focus.kind).collect();
+        assert_eq!(kinds.len(), 2, "{kinds:?}");
+        assert!(kinds.contains(&FocusKind::SpendingCap) && kinds.contains(&FocusKind::Logging));
+        let cap = c
+            .offers
+            .iter()
+            .find(|o| o.focus.kind == FocusKind::SpendingCap)
+            .unwrap();
+        // What was spent since Monday, then per day for Friday to Sunday.
+        let per_day = cap.basis.unwrap();
+        assert!(per_day > Money::ZERO);
+        assert_eq!(cap.focus.target, Some(300 + per_day.0 * 3));
+        // Nov 17 is logged, and 3 days are left: 4 at most.
+        assert_eq!(logging(&c).target, Some(4));
     }
 
     /// A loan the user already has, with one payment of 5,000.00 due on `due`.
