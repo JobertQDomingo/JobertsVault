@@ -213,6 +213,9 @@ pub struct Offer {
     pub level: Option<SpendLevel>,
     /// A cap: the earlier period's spending (`category_cap`) or `perDay` (`spending_cap`).
     pub basis: Option<Money>,
+    /// `spending_cap`: the everyday spending already recorded for the week, which its target
+    /// includes.
+    pub spent: Option<Money>,
 }
 
 /// A row `complete_checkin` wrote.
@@ -389,25 +392,26 @@ fn offers(
             p.status == LoanPaymentStatus::Unpaid && in_period(p.due_date) && p.due_date >= today
         })
         .min_by_key(|(_, p)| (p.due_date, p.id));
-    let cards: Vec<(CardOffer, SpendLevels)> = active_cards(&facts.accounts)
-        .filter_map(|a| {
-            let card = a.card.as_ref()?;
-            let levels = SpendLevels {
-                soft: a.spend_soft?,
-                mid: a.spend_mid?,
-                hard: a.spend_hard?,
-            };
-            Some((
-                CardOffer {
-                    account_id: a.id,
-                    levels,
-                    spent: card.cycle_spending,
-                    utilization_percent: card.utilization_percent,
-                },
+    let mut cards: Vec<(CardOffer, SpendLevels)> = Vec::new();
+    for a in active_cards(&facts.accounts) {
+        let (Some(card), Some(soft), Some(mid), Some(hard)) =
+            (a.card.as_ref(), a.spend_soft, a.spend_mid, a.spend_hard)
+        else {
+            continue;
+        };
+        let levels = SpendLevels { soft, mid, hard };
+        let peak = vault::card_peak(conn, a.id, period.start(), period.end())?;
+        cards.push((
+            CardOffer {
+                account_id: a.id,
                 levels,
-            ))
-        })
-        .collect();
+                spent: card.cycle_spending,
+                peak: Money(peak),
+                utilization_percent: card.utilization_percent,
+            },
+            levels,
+        ));
+    }
     let before = shown.previous(settings).ok_or_else(out_of_range)?;
     let by_category = |p: Period| -> Result<HashMap<i64, i64>, AppError> {
         let (start, end) = (p.start().to_string(), p.end().to_string());
@@ -416,8 +420,9 @@ fn offers(
             .collect())
     };
     let (reviewed, earlier) = (by_category(shown)?, by_category(before)?);
-    let (start, to_today) = (period.start().to_string(), today.to_string());
-    let so_far: HashMap<i64, i64> = repo::checkins::everyday_by_category(conn, &start, &to_today)?
+    // What's already recorded for the period, future-dated rows included: grading counts them.
+    let (start, end) = (period.start().to_string(), period.end().to_string());
+    let so_far: HashMap<i64, i64> = repo::checkins::everyday_by_category(conn, &start, &end)?
         .into_iter()
         .collect();
     let categories = repo::categories::all(conn)?
@@ -431,6 +436,7 @@ fn offers(
         })
         .collect();
     let per_day = facts.forecast.per_day.unwrap_or(Money::ZERO);
+    let spent = Money(repo::checkins::everyday_spending(conn, &start, &end, None)?);
     let offer_facts = OfferFacts {
         for_week,
         loan_payment_id: payment.map(|(_, p)| p.id),
@@ -438,9 +444,7 @@ fn offers(
         has_payday_rule: facts.level.has_payday_rule,
         per_day,
         categories,
-        spent_so_far: Money(repo::checkins::everyday_spending(
-            conn, &start, &to_today, None,
-        )?),
+        spent_so_far: spent,
         days_left: (period.end() - today).num_days() + 1,
         logged_before_today: repo::checkins::logged_days(
             conn,
@@ -463,6 +467,7 @@ fn offers(
         due_date: None,
         level: None,
         basis: None,
+        spent: None,
     };
     Ok(focus::offers(&offer_facts, &stats::stats(&facts.inputs))
         .into_iter()
@@ -491,6 +496,7 @@ fn offers(
             }
             Focus::SpendingCap { target } => Offer {
                 basis: Some(per_day),
+                spent: Some(spent),
                 ..offer(fields(FocusKind::SpendingCap, Some(target.0)))
             },
             Focus::CategoryCap {
@@ -1175,6 +1181,8 @@ mod tests {
         spend(&mut conn, 500, "2026-11-10");
         spend(&mut conn, 600, "2026-11-12");
         spend(&mut conn, 300, "2026-11-17");
+        // Future-dated: grading counts it on Saturday, so the spending cap does too.
+        spend(&mut conn, 50, "2026-11-21");
         let loan_category: i64 = conn
             .query_row("SELECT id FROM categories WHERE name = 'Loan'", [], |r| {
                 r.get(0)
@@ -1182,6 +1190,8 @@ mod tests {
             .unwrap();
         // Due Tuesday and still unpaid: it can't be paid on time any more.
         add(&mut conn, loan_category, "Phone", "2026-11-17");
+        // Due today: still on time.
+        add(&mut conn, loan_category, "Car", "2026-11-20");
         let rule = crate::services::recurring::RecurringRuleFields {
             transaction: TransactionFields {
                 kind: TransactionKind::Income,
@@ -1199,17 +1209,30 @@ mod tests {
         let friday = d(2026, 11, 20);
         let c = get(&mut conn, friday).unwrap().unwrap();
         let kinds: Vec<_> = c.offers.iter().map(|o| o.focus.kind).collect();
-        assert_eq!(kinds.len(), 2, "{kinds:?}");
-        assert!(kinds.contains(&FocusKind::SpendingCap) && kinds.contains(&FocusKind::Logging));
+        assert_eq!(kinds.len(), 3, "{kinds:?}");
+        for kind in [
+            FocusKind::LoanOnTime,
+            FocusKind::SpendingCap,
+            FocusKind::Logging,
+        ] {
+            assert!(kinds.contains(&kind), "{kinds:?}");
+        }
+        let loan = c
+            .offers
+            .iter()
+            .find(|o| o.focus.kind == FocusKind::LoanOnTime)
+            .unwrap();
+        assert_eq!(loan.due_date, Some(friday));
         let cap = c
             .offers
             .iter()
             .find(|o| o.focus.kind == FocusKind::SpendingCap)
             .unwrap();
-        // What was spent since Monday, then per day for Friday to Sunday.
+        // What's recorded for the week, then per day for Friday to Sunday.
         let per_day = cap.basis.unwrap();
         assert!(per_day > Money::ZERO);
-        assert_eq!(cap.focus.target, Some(300 + per_day.0 * 3));
+        assert_eq!(cap.spent, Some(Money(350)));
+        assert_eq!(cap.focus.target, Some(350 + per_day.0 * 3));
         // Nov 17 is logged, and 3 days are left: 4 at most.
         assert_eq!(logging(&c).target, Some(4));
     }

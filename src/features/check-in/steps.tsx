@@ -809,7 +809,9 @@ export function focusStep(ctx: Ctx): Step {
             o.kind === "category_cap"
               ? `That's what you spent the ${unit} before`
               : o.kind === "spending_cap"
-                ? `Your Safe to spend, ${money(ctx, o.basis ?? 0)} a day`
+                ? (o.spent ?? 0) > 0
+                  ? `${money(ctx, o.spent ?? 0)} spent so far, then your Safe to spend, ${money(ctx, o.basis ?? 0)} a day`
+                  : `Your Safe to spend, ${money(ctx, o.basis ?? 0)} a day`
                 : HELPS[o.kind];
           return (
             <div

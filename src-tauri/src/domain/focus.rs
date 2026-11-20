@@ -11,7 +11,8 @@ use super::money::Money;
 use super::stats::{CardInput, Stat, Stats, one_card};
 
 /// The facts §5.22's offer table needs, for the period the focus would run in. "So far" is
-/// from the period's start to today: every offer must still be keepable when it's offered.
+/// what's already recorded for that period, future-dated rows included, since grading counts
+/// them once their date arrives: every offer must still be keepable when it's offered.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OfferFacts {
     /// The focus would run for a week; else for a month.
@@ -40,6 +41,8 @@ pub struct CardOffer {
     pub levels: SpendLevels,
     /// Its cycle spending today (§5.18).
     pub spent: Money,
+    /// Its highest cycle spending so far in the focus period, as grading measures it.
+    pub peak: Money,
     /// As in `CardInput`, for its Card score.
     pub utilization_percent: i64,
 }
@@ -110,22 +113,22 @@ fn loan_on_time(facts: &OfferFacts) -> Option<Focus> {
         .map(|payment_id| Focus::LoanOnTime { payment_id })
 }
 
-/// The card below hard with the lowest Card score (ties by account id), aiming at the lowest
-/// of its levels still above its spending.
+/// The card whose peak is below hard with the lowest Card score (ties by account id), aiming at
+/// the lowest of its levels still above that peak. The peak includes today's cycle, so it's
+/// never below `spent`.
 fn card_level(cards: &[CardOffer]) -> Option<Focus> {
-    let (card, level) = cards
+    let card = cards
         .iter()
-        .map(|c| (c, spend_level(c.spent, c.levels)))
-        .filter(|(_, level)| *level != SpendLevel::Hard)
-        .min_by_key(|(c, level)| {
+        .filter(|c| spend_level(c.peak, c.levels) != SpendLevel::Hard)
+        .min_by_key(|c| {
             let input = CardInput {
                 account_id: c.account_id,
-                level: *level,
+                level: spend_level(c.spent, c.levels),
                 utilization_percent: c.utilization_percent,
             };
             (one_card(&input).score, c.account_id)
         })?;
-    let target = match level {
+    let target = match spend_level(card.peak, card.levels) {
         SpendLevel::None => card.levels.soft,
         SpendLevel::Soft => card.levels.mid,
         _ => card.levels.hard,
@@ -313,6 +316,7 @@ mod tests {
             account_id,
             levels: LEVELS,
             spent: Money(spent),
+            peak: Money(spent),
             utilization_percent,
         }
     }
@@ -403,6 +407,30 @@ mod tests {
         assert_eq!(at(300_000), target(400_000));
         assert_eq!(at(400_000), target(500_000));
         assert_eq!(at(499_999), target(500_000));
+    }
+
+    #[test]
+    fn card_level_aims_above_an_earlier_cycle_in_the_period_that_spent_more() {
+        // This cycle has 500, but a cycle that closed earlier in the period reached mid.
+        let earlier = |peak| OfferFacts {
+            cards: vec![CardOffer {
+                peak: Money(peak),
+                ..card(3, 500, 0)
+            }],
+            ..none()
+        };
+        assert_eq!(
+            offers(&earlier(450_000), &all_100())[0],
+            Focus::CardLevel {
+                account_id: 3,
+                target: Money(500_000)
+            }
+        );
+        // Already at hard: it can't be kept, so it isn't offered.
+        assert_eq!(
+            offers(&earlier(500_000), &all_100()),
+            [Focus::Logging { target: 5 }]
+        );
     }
 
     #[test]

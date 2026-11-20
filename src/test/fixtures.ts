@@ -655,6 +655,7 @@ const offer = (over: Partial<Offer> & Pick<Offer, "kind">): Offer => ({
   dueDate: null,
   level: null,
   basis: null,
+  spent: null,
   categoryId: null,
   accountId: null,
   loanPaymentId: null,
