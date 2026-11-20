@@ -566,6 +566,14 @@ test("Recent transactions shows as many whole rows as fit beside the right colum
   expect(await recentFitting(400)).toBe(7);
 });
 
+test("Recent transactions shows up to 20 beside a tall column (DSH-8)", async () => {
+  const twenty = Array.from({ length: 20 }, (_, i) => ({
+    ...RECENT[0],
+    id: 100 + i,
+  }));
+  expect(await recentFitting(1100, twenty)).toBe(20);
+});
+
 test("Recent transactions always shows at least 5 rows (DSH-8)", async () => {
   expect(await recentFitting(100)).toBe(5);
 });
