@@ -161,7 +161,7 @@ Priority: **P1** is in the MVP (Phase 1), **P2** is in Phase 2 (reports), **P3**
 | DSH-5 | A credit card summary: amount owed, available credit and due date. | P1 |
 | DSH-6 | Budget progress bars for the current period. | P3 |
 | DSH-7 | Upcoming recurring transactions for the next 7 days. | P3 |
-| DSH-8 | The most recent transactions: at least 5, and up to 10 when there's room beside the right column. | P1 |
+| DSH-8 | The most recent transactions: at least 5, and up to 20 when there's room beside the right column. | P1 |
 
 ### 7.6 Reports
 
@@ -490,6 +490,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-19 | A check-in whose Finish fails offers "Open the app anyway" for that session, a refused Finish reloads the offers, and the check-in is also asked for at midnight (the owner, [ADR 0014](decisions/0014-check-in-escape-on-failed-finish.md)) |
 | 2026-11-19 | The sidebar's level chip (LVL-5) shows the number in a small hexagon rather than "Lv 4", which doesn't fit beside the app name (the owner, DESIGN_SYSTEM §9.2) |
 | 2026-11-20 | Every focus offer (CHK-7) can still be kept when it's offered: a spending cap counts what was spent so far plus Safe to spend's per day for the days left, a category cap already over and a loan payment already past due aren't offered, and logging asks for at most the days still reachable (the owner, DATA_MODEL §9 item 146) |
+| 2026-11-20 | DSH-8 shows up to 20 recent transactions, not 10: with the focus rows and several accounts, the right column grew taller than 10 rows and left empty space under the last one (the owner, UI_FLOWS §11 item 92) |
 
 ---
 
