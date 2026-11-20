@@ -22,7 +22,7 @@ const ANSWERS: Answers = {
 };
 
 const SUGGESTED =
-  "The most you could set aside is about ₱10,000.00 a month, so the earliest realistic date is Feb 3, 2027.";
+  "The most you could set aside is about ₱10,000.00 a month. The earliest realistic date is Feb 3, 2027.";
 
 /** Opens New goal and fills the target and the account, which asks for a suggestion. */
 const startGoal = async () => {
