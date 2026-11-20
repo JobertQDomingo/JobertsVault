@@ -24,7 +24,7 @@ import {
   SpendLevelTag,
 } from "@/components/SpendLevel";
 import { StatCard } from "@/components/StatCard";
-import { StatHexagon } from "@/components/StatHexagon";
+import { StatHexagon, StatScores } from "@/components/StatHexagon";
 import { Segmented } from "@/components/ui/segmented";
 import { BudgetName } from "@/features/budgets/BudgetName";
 import { ForecastTable } from "@/features/forecast/ForecastScreen";
@@ -39,7 +39,12 @@ import {
 } from "@/lib/dates";
 import { formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
-import { DROP_REASONS, nextMoveText, STAT_LABELS } from "@/lib/vault";
+import {
+  DROP_REASONS,
+  focusText,
+  nextMoveText,
+  STAT_LABELS,
+} from "@/lib/vault";
 
 /** Everything a step needs: the check-in, the names it refers to, and the screen's own state. */
 export type Ctx = {
@@ -127,34 +132,25 @@ function winText(win: Win, ctx: Ctx) {
 }
 
 /** A focus as one sentence, capitalized and with no full stop (UI_FLOWS §8.7's offers). */
-function focusText(f: FocusFields & Partial<Pick<Offer, "level">>, ctx: Ctx) {
-  const unit = addDays(f.start, 6) === f.end ? "week" : "month";
-  const target = f.target ?? 0;
-  switch (f.kind) {
-    case "category_cap":
-      return `Keep ${categoryName(ctx, f.categoryId)} under ${money(ctx, target)}`;
-    case "spending_cap":
-      return `Spend under ${money(ctx, target)} this ${unit}`;
-    case "card_level": {
-      // Named only when there's more than one card to tell apart.
-      const card =
-        ctx.data.cards.length > 1
-          ? `${accountName(ctx, f.accountId)}'s`
-          : "your";
-      return f.level
-        ? `Stay under ${card} ${money(ctx, target)} ${f.level} level this cycle`
-        : `Stay under ${money(ctx, target)} on ${accountName(ctx, f.accountId)} this cycle`;
-    }
-    case "loan_on_time": {
-      const due = payment(ctx, f.loanPaymentId);
-      return due?.p
-        ? `Pay ${due.loan.name} by ${weekdayDate(due.p.dueDate, ctx.data.today)}`
-        : "Pay a loan payment on time";
-    }
-    case "logging":
-      return `Log on at least ${target} days this ${unit}`;
-  }
-}
+const focusSentence = (
+  f: FocusFields & Partial<Pick<Offer, "level">>,
+  ctx: Ctx,
+) =>
+  focusText(
+    f,
+    {
+      money: (amount) => money(ctx, amount),
+      category: (id) => categoryName(ctx, id),
+      account: (id) => accountName(ctx, id),
+      cards: ctx.data.cards.length,
+      payment: (id) => {
+        const due = payment(ctx, id);
+        return due?.p && { loan: due.loan.name, dueDate: due.p.dueDate };
+      },
+      today: ctx.data.today,
+    },
+    f.level,
+  );
 
 function resultText(f: GradedFocus, ctx: Ctx) {
   const actual = f.actual ?? 0;
@@ -193,7 +189,7 @@ export function start(ctx: Ctx): Step {
         ) : null}
         <span className="tabular-nums">
           {`Last ${addDays(lastFocus.start, 6) === lastFocus.end ? "week" : "month"}'s focus: `}
-          {`${focusText(lastFocus, ctx).replace(/^./, (c) => c.toLowerCase())}. `}
+          {`${focusSentence(lastFocus, ctx).replace(/^./, (c) => c.toLowerCase())}. `}
           {resultText(lastFocus, ctx)}
         </span>
       </p>
@@ -666,23 +662,7 @@ export function statsStep(ctx: Ctx): Step {
         <Flat className="grid-cols-[280px_minmax(0,1fr)] items-center gap-10 px-6 py-5">
           <StatHexagon stats={s.stats} previous={prev} />
           <div className="grid content-center">
-            {s.stats.map(({ stat, score }, i) => {
-              const was = prev?.[i] ?? null;
-              const change =
-                score !== null && was !== null ? score - was : null;
-              return (
-                <div
-                  key={stat}
-                  className="grid h-8 grid-cols-[76px_36px_48px] items-center gap-2"
-                >
-                  <span>{STAT_LABELS[stat]}</span>
-                  <b className="text-right font-semibold tabular-nums">
-                    {score ?? "—"}
-                  </b>
-                  {prev && <Points change={change} />}
-                </div>
-              );
-            })}
+            <StatScores stats={s.stats} previous={prev} />
             {s.previous && (
               <p className="mt-2 text-small text-muted-foreground">
                 {`Against the last check-in, ${weekdayDate(s.previous.completedOn, ctx.data.today)}`}
@@ -700,27 +680,6 @@ export function statsStep(ctx: Ctx): Step {
       </>
     ),
   };
-}
-
-/** `▲ 6`, `▼ 10` or `—` against the last check-in, with the arrow spelled out. */
-function Points({ change }: { change: number | null }) {
-  if (!change)
-    return (
-      <span className="text-muted-foreground">{change === 0 ? "0" : "—"}</span>
-    );
-  const up = change > 0;
-  return (
-    <span
-      className={cn(
-        "font-semibold tabular-nums",
-        up ? "text-income" : "text-expense",
-      )}
-    >
-      <span aria-hidden>{up ? "▲ " : "▼ "}</span>
-      <span className="sr-only">{up ? "Up " : "Down "}</span>
-      {Math.abs(change)}
-    </span>
-  );
 }
 
 // ── Pick a focus ─────────────────────────────────────────────────────────────────────────────
@@ -783,7 +742,9 @@ export function focusStep(ctx: Ctx): Step {
                 on ? "border-primary" : "border-transparent",
               )}
             >
-              <b className="font-semibold tabular-nums">{focusText(o, ctx)}</b>
+              <b className="font-semibold tabular-nums">
+                {focusSentence(o, ctx)}
+              </b>
               <span className="text-small text-muted-foreground tabular-nums">
                 {basis}
               </span>

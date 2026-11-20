@@ -6,6 +6,7 @@ import {
   RadarChart,
 } from "recharts";
 import type { StatName } from "@/bindings/StatName";
+import { cn } from "@/lib/utils";
 import { STAT_LABELS } from "@/lib/vault";
 
 /**
@@ -87,5 +88,62 @@ export function StatHexagon({
         </tbody>
       </table>
     </>
+  );
+}
+
+/**
+ * The six scores beside the chart: the name, the score ("—" when it doesn't apply) and, from the
+ * first check-in on, `▲ 6`, `▼ 10` or `—` against it (UI_FLOWS §8.7–8.8).
+ */
+export function StatScores({
+  stats,
+  previous,
+}: {
+  stats: { stat: StatName; score: number | null }[];
+  previous?: (number | null)[] | null;
+}) {
+  return stats.map(({ stat, score }, i) => {
+    const was = previous?.[i] ?? null;
+    return (
+      <div
+        key={stat}
+        className="grid h-8 grid-cols-[76px_36px_48px] items-center gap-2"
+      >
+        <span>{STAT_LABELS[stat]}</span>
+        <b className="text-right font-semibold tabular-nums">{score ?? "—"}</b>
+        {previous &&
+          (score === null ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            <Points change={was === null ? null : score - was} />
+          ))}
+      </div>
+    );
+  });
+}
+
+/** `▲ 6` or `▼ 10`, the arrow spelled out for screen readers; `—` when it's the same or unknown. */
+function Points({ change }: { change: number | null }) {
+  if (!change)
+    return (
+      <span className="text-muted-foreground">
+        —
+        <span className="sr-only">
+          {change === 0 ? " No change" : " No earlier score"}
+        </span>
+      </span>
+    );
+  const up = change > 0;
+  return (
+    <span
+      className={cn(
+        "font-semibold tabular-nums",
+        up ? "text-income" : "text-expense",
+      )}
+    >
+      <span aria-hidden>{up ? "▲ " : "▼ "}</span>
+      <span className="sr-only">{up ? "Up " : "Down "}</span>
+      {Math.abs(change)}
+    </span>
   );
 }

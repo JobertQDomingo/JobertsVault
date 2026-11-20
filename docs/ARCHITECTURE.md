@@ -101,7 +101,7 @@ jobertsvault/
 │  │  ├─ dashboard/  transactions/  accounts/  settings/  onboarding/
 │  │  ├─ reports/  recurring/  budgets/  goals/  loans/  forecast/
 │  │  ├─ check-in/  level/         # Phase 5: the required check-in and the Level screen
-│  ├─ components/                  # From Phase 5 also StatHexagon.tsx and LevelBadge.tsx, shared by the check-in and Level
+│  ├─ components/                  # From Phase 5 also StatHexagon.tsx, LevelBadge.tsx, LevelPath.tsx and FocusRows.tsx
 │  │  ├─ ui/                       # shadcn/ui building blocks
 │  │  └─ MoneyText.tsx  AmountInput.tsx  PeriodSwitcher.tsx  QuickAddDialog.tsx …
 │  ├─ lib/

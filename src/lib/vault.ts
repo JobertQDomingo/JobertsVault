@@ -1,9 +1,12 @@
 // The Vault level's words (UI_FLOWS §8.7–8.8): the backend sends codes, and this file is the one
 // place that turns them into text, so the check-in and the Level screen say the same thing.
+import type { Condition } from "@/bindings/Condition";
 import type { ConditionCode } from "@/bindings/ConditionCode";
+import type { FocusFields } from "@/bindings/FocusFields";
 import type { NextMoveView } from "@/bindings/NextMoveView";
 import type { StatName } from "@/bindings/StatName";
 import type { StatReason } from "@/bindings/StatReason";
+import { addDays, weekdayDate } from "@/lib/dates";
 
 /** Levels 1 to 10 (DATA_MODEL §5.21). Level 0 has no name. */
 export const LEVEL_NAMES = [
@@ -160,6 +163,116 @@ function conditionMove(
       return gap === null
         ? "go a year without a new loan"
         : `go a year without a new loan, ${days(gap)} to go`;
+  }
+}
+
+/** Each level's conditions, levels 1 to 10, in DATA_MODEL §5.21's order. */
+export const LEVEL_CONDITIONS: ConditionCode[][] = [
+  ["logged_20"],
+  ["payday_rule", "budget"],
+  ["nothing_overdue", "none_late"],
+  ["earned_month"],
+  ["earned_3_months", "no_short_day"],
+  ["card_under_mid"],
+  ["two_weeks_saved"],
+  ["loans_paid", "loan_free_90"],
+  ["month_saved"],
+  ["stats_80", "no_goal_behind", "loan_free_365"],
+];
+
+/** A condition on the Level screen's checklist and path (UI_FLOWS §8.8). */
+export const CONDITIONS: Record<ConditionCode, string> = {
+  logged_20: "Log on 20 of the last 30 days",
+  payday_rule: "Mark your pay as a payday",
+  budget: "Set a budget",
+  nothing_overdue: "Nothing overdue",
+  none_late: "No loan payment paid late in the last 30 days",
+  earned_month: "Earn more than you spent last month",
+  earned_3_months: "Earn more than you spend 3 months in a row",
+  no_short_day: "No pay window runs short in the next 12 months",
+  card_under_mid: "Every card under its mid level for 3 cycles",
+  two_weeks_saved: "Two weeks of spending saved",
+  loans_paid: "Pay off every loan",
+  loan_free_90: "90 days without a new loan",
+  month_saved: "A month of spending saved",
+  stats_80: "Every stat at 80 or more",
+  no_goal_behind: "No goal behind",
+  loan_free_365: "A year without a new loan",
+};
+
+/** An unmet condition's gap, after "·": "₱8,000.00 left", "30 days to go". None when it has none. */
+export function conditionGap(
+  { code, met, gap, accountId }: Condition,
+  { money, account }: Pick<Names, "money" | "account">,
+) {
+  if (met || gap === null) return null;
+  switch (code) {
+    case "logged_20":
+      return gap ? `${days(gap)} more to log` : null;
+    case "earned_3_months":
+      return `${gap} of 3 so far`;
+    case "card_under_mid":
+      return gap && accountId !== null
+        ? `${account(accountId)} is ${money(gap)} over now`
+        : null;
+    case "two_weeks_saved":
+    case "month_saved":
+      return `${money(gap)} to go`;
+    case "loans_paid":
+      return `${money(gap)} left`;
+    case "loan_free_90":
+    case "loan_free_365":
+      return `${days(gap)} to go`;
+    case "stats_80":
+      return `the lowest is ${gap}`;
+    default:
+      return null;
+  }
+}
+
+/** What a focus's sentence needs to name things (UI_FLOWS §8.7's offers, §2's strip). */
+export type FocusNames = {
+  money: (amount: number) => string;
+  category: (id: number | null) => string;
+  account: (id: number | null) => string;
+  /** Active cards: a card is named only when there's more than one. */
+  cards: number;
+  payment: (id: number | null) => { loan: string; dueDate: string } | undefined;
+  today: string;
+};
+
+/** "week" or "month", from the dates a focus runs for. */
+export const focusUnit = (f: Pick<FocusFields, "start" | "end">) =>
+  addDays(f.start, 6) === f.end ? "week" : "month";
+
+/** A focus as one sentence, capitalized and with no full stop. `level` names a card level. */
+export function focusText(
+  f: FocusFields,
+  names: FocusNames,
+  level?: string | null,
+) {
+  const unit = focusUnit(f);
+  const target = f.target ?? 0;
+  const { money } = names;
+  switch (f.kind) {
+    case "category_cap":
+      return `Keep ${names.category(f.categoryId)} under ${money(target)}`;
+    case "spending_cap":
+      return `Spend under ${money(target)} this ${unit}`;
+    case "card_level": {
+      const card = names.cards > 1 ? `${names.account(f.accountId)}'s` : "your";
+      return level
+        ? `Stay under ${card} ${money(target)} ${level} level this cycle`
+        : `Stay under ${money(target)} on ${names.account(f.accountId)} this cycle`;
+    }
+    case "loan_on_time": {
+      const due = names.payment(f.loanPaymentId);
+      return due
+        ? `Pay ${due.loan} by ${weekdayDate(due.dueDate, names.today)}`
+        : "Pay a loan payment on time";
+    }
+    case "logging":
+      return `Log on at least ${target} days this ${unit}`;
   }
 }
 
