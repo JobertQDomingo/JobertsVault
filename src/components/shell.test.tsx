@@ -1,10 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createQueryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
+import { SHORTCUTS } from "@/lib/shortcuts";
 import { routes } from "@/routes";
 import { AppShell } from "./AppShell";
 import { QuickAddProvider, useQuickAdd } from "./QuickAddProvider";
@@ -204,6 +211,32 @@ test("Ctrl+1–4 follow the key's place, so other keyboard layouts work", async 
   await waitFor(() => expect(title()).toBe("Dashboard"));
   press("'", { ctrlKey: true, code: "Digit4" });
   await waitFor(() => expect(title()).toBe("Reports"));
+});
+
+test("? shows every shortcut of UI_FLOWS §10, on any screen and any layout", async () => {
+  renderAt("/settings");
+  expect(press("?", { shiftKey: true })).toBe(false);
+  const dialog = await screen.findByRole("dialog", {
+    name: "Keyboard shortcuts",
+  });
+  expect(dialog.querySelectorAll("tbody tr")).toHaveLength(SHORTCUTS.length);
+  expect(within(dialog).getAllByText("Alt+←")).toHaveLength(2);
+  expect(within(dialog).getByText(/^While a check-in is due/)).toBeTruthy();
+  fireEvent.keyDown(dialog, { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  // Some layouts type ? without Shift.
+  press("?");
+  expect(await screen.findByRole("dialog")).toBeTruthy();
+});
+
+test("? types into a field instead of opening the shortcuts", async () => {
+  renderAt("/");
+  const field = document.body.appendChild(document.createElement("input"));
+  field.focus();
+  expect(fireEvent.keyDown(field, { key: "?", shiftKey: true })).toBe(true);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  field.remove();
 });
 
 test("Alt+← and Alt+→ never go Back or Forward, even on screens without a period", () => {
