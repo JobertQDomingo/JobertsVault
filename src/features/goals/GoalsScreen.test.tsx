@@ -22,7 +22,7 @@ const ANSWERS: Answers = {
 };
 
 const SUGGESTED =
-  "You can set aside about ₱10,000.00 a month. The earliest realistic date is Feb 3, 2027.";
+  "The most you could set aside is about ₱10,000.00 a month. The earliest realistic date is Feb 3, 2027.";
 
 /** Opens New goal and fills the target and the account, which asks for a suggestion. */
 const startGoal = async () => {
@@ -67,7 +67,7 @@ test("each goal shows its account, % done, what's left, the target date and the 
     "84",
   );
   trip.getByText("₱8,410.75 of ₱10,000.00 · ₱1,589.25 left");
-  trip.getByText("Save ₱264.88/month to reach it");
+  trip.getByText("Save ₱264.88/month to reach it on time");
   expect(trip.queryByText("Achieved")).toBeNull();
   // Archived goals are folded away, and the rest keep the backend's order.
   expect(
@@ -310,7 +310,7 @@ test("a room of 0 says no date is realistic yet", async () => {
 
 test.each([
   "Enter a target date",
-  "That's too soon. The earliest you can reach this is Feb 3, 2027, saving about ₱10,000.00 a month.",
+  "That's too soon. Even setting aside the most you could, about ₱10,000.00 a month, the earliest you can reach this is Feb 3, 2027.",
   "Mark your pay as a payday first, so the app can work out a realistic date.",
 ])(
   "the backend's %s shows under the date in place of the line",

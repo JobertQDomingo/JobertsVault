@@ -192,11 +192,11 @@ export const behindText = (goal: GoalProgress) =>
     ? `Behind: the earliest realistic date is now ${formatDate(goal.behind.earliestDate)}`
     : "Behind: nothing can be set aside right now");
 
-/** "Save ₱433.34/month to reach it", "Target date passed", or nothing (GOL-3). */
+/** "Save ₱433.34/month to reach it on time", "Target date passed", or nothing (GOL-3). */
 function plan(goal: GoalProgress, money: (amount: number) => string) {
   if (goal.achievedAt) return null;
   if (goal.monthlyNeeded !== null)
-    return `Save ${money(goal.monthlyNeeded)}/month to reach it`;
+    return `Save ${money(goal.monthlyNeeded)}/month to reach it on time`;
   return goal.monthsLeft === 0 ? "Target date passed" : null;
 }
 

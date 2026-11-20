@@ -268,5 +268,5 @@ function SuggestionLine({
     );
   if (suggestion.earliestDate === null)
     return "You can't set anything aside each month right now, so no date is realistic yet.";
-  return `You can set aside about ${formatMoney(suggestion.monthlyRoom, settings)} a month. The earliest realistic date is ${formatDate(suggestion.earliestDate)}.`;
+  return `The most you could set aside is about ${formatMoney(suggestion.monthlyRoom, settings)} a month. The earliest realistic date is ${formatDate(suggestion.earliestDate)}.`;
 }
