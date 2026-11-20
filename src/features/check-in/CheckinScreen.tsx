@@ -9,6 +9,7 @@ import type { GuardContext } from "@/components/AppShell";
 import { ErrorState } from "@/components/ErrorState";
 import { GlassPanel } from "@/components/GlassPanel";
 import { Loading, Skeleton } from "@/components/Loading";
+import { useQuickAdd } from "@/components/QuickAddProvider";
 import { TopBar } from "@/components/TopBar";
 import { Button } from "@/components/ui/button";
 import { notify } from "@/components/ui/toast";
@@ -16,6 +17,7 @@ import { useAccounts } from "@/hooks/useAccounts";
 import { useCategories } from "@/hooks/useCategories";
 import { useCheckin, useCompleteCheckin } from "@/hooks/useCheckin";
 import { useLoans } from "@/hooks/useLoans";
+import { useDueOccurrences } from "@/hooks/useRecurring";
 import { useSettings } from "@/hooks/useSettings";
 import { useShortcuts } from "@/hooks/useShortcuts";
 import { formatPeriodLabel, formatSpan } from "@/lib/dates";
@@ -74,6 +76,8 @@ export function CheckinScreen() {
   const accounts = useAccounts();
   const loans = useLoans();
   const settings = useSettings();
+  // Only for Record now: while it loads, or if it fails, the step just has no button (CHK-9).
+  const paydays = (useDueOccurrences().data ?? []).filter((o) => o.isPayday);
   const data = checkin.data;
   const failed = [categories, accounts, loans, settings].filter(
     (q) => q.isError,
@@ -114,6 +118,7 @@ export function CheckinScreen() {
               categories: categories.data.categories,
               accounts: accounts.data.accounts,
               loans: loans.data.loans,
+              paydays,
             }}
           />
         ) : (
@@ -134,7 +139,7 @@ function Flow({
   refetch,
 }: {
   data: Checkin;
-  base: Pick<Ctx, "categories" | "accounts" | "loans"> & {
+  base: Pick<Ctx, "categories" | "accounts" | "loans" | "paydays"> & {
     settings: SettingsView;
   };
   refetch: () => void;
@@ -144,6 +149,8 @@ function Flow({
   const guard = useOutletContext<Partial<GuardContext>>();
   const [answers, setAnswers] = useState<Record<number, Answer>>({});
   const [pickKey, setPickKey] = useState<string | null>(null);
+  const [paidHere, setPaidHere] = useState<number[]>([]);
+  const quickAdd = useQuickAdd();
 
   const steps = ORDER.filter((s) =>
     s === "goals"
@@ -186,6 +193,15 @@ function Flow({
     picked,
     pick: (o) => setPickKey(keyOf(o)),
     levelUp,
+    paidHere,
+    payBill: quickAdd.payBill,
+    pay: (id) => {
+      // Kept only once it's paid, so a cancelled form changes nothing.
+      setPaidHere((was) => (was.includes(id) ? was : [...was, id]));
+      quickAdd.markPaid(id);
+    },
+    recordPayslip: (o) =>
+      quickAdd.payslip({ ruleId: o.ruleId, date: o.transaction.date }),
   };
   const { say, body } = STEPS[step].build(ctx);
 
