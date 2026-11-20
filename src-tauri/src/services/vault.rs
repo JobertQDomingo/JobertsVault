@@ -378,7 +378,7 @@ pub(crate) fn measure(
             actual: Money(card_peak(
                 conn,
                 focus.account_id.ok_or_else(missing)?,
-                focus,
+                focus.start,
                 upto,
             )?),
         },
@@ -401,12 +401,12 @@ pub(crate) fn measure(
     })
 }
 
-/// The highest, over every statement cycle of the card with a day in the focus period, of its
-/// expenses dated in that cycle up to `upto` (§5.22).
-fn card_peak(
+/// The highest, over every statement cycle of the card with a day in the focus period starting
+/// on `start`, of its expenses dated in that cycle up to `upto` (§5.22).
+pub(crate) fn card_peak(
     conn: &Connection,
     card: i64,
-    focus: &FocusFields,
+    start: NaiveDate,
     upto: NaiveDate,
 ) -> Result<i64, AppError> {
     let Some(row) = repo::accounts::find(conn, card, upto)? else {
@@ -416,7 +416,7 @@ fn card_peak(
         return Ok(0);
     };
     let mut peak = 0;
-    let mut cycle = card_cycle(statement_day, due_day, focus.start).ok_or_else(out_of_range)?;
+    let mut cycle = card_cycle(statement_day, due_day, start).ok_or_else(out_of_range)?;
     while cycle.start <= upto {
         let spent =
             repo::accounts::expenses_between(conn, card, cycle.start, cycle.end.min(upto), None)?;

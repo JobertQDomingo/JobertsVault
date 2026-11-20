@@ -4,7 +4,7 @@
 |---|---|
 | **App name** | Jobert's Vault |
 | **Status** | Approved v1.3 |
-| **Last updated** | 2026-11-19 |
+| **Last updated** | 2026-11-20 |
 | **Platform** | Windows desktop app built with Tauri 2: React + TypeScript frontend, Rust backend, SQLite database |
 
 ---
@@ -299,7 +299,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | CHK-4 | **Balance check:** a monthly check-in has a step listing every active account, and any archived one whose balance isn't 0, with its balance (the amount owed for a card). Each needs an answer, **Matches** or **Doesn't match**. A mismatch can be fixed on the spot with + Add. If one still doesn't match at Finish, the app opens that account's details. The answers aren't stored. | P5 |
 | CHK-5 | **Your year:** the first check-in finished in January has an extra step for the calendar year that just ended: income, expense and net against the year before, the largest categories, the loans paid off, and the level at the start and the end of the year. It's first due in January 2027. | P5 |
 | CHK-6 | **Wins first:** the Start step names one thing that went well, when there is one: the last focus was kept, a stat rose, a category's spending fell, total spending fell, or every loan payment was paid on time. With none, the line is left out; finishing the check-in is never the win. A **personal best** shows too when the period set one: the lowest spending or the highest net cashflow of the last 12 periods of its kind. | P5 |
-| CHK-7 | **Focus:** the last step offers up to 3 targets worked out from the user's data, and the user must pick one to finish; nothing is preselected. The kinds are a category cap ("Keep Dining Out under ₱1,500.00 this week"), a spending cap for the week from Safe to spend, staying under a card spending level, paying a loan payment on time, and logging on enough days. A weekly check-in sets a focus for the current week, and a monthly or merged one for the current month. Once a focus has ended, the Start step of the next check-in says whether it was kept, and that result is stored. | P5 |
+| CHK-7 | **Focus:** the last step offers up to 3 targets worked out from the user's data, and the user must pick one to finish; nothing is preselected. The kinds are a category cap ("Keep Dining Out under ₱1,500.00 this week"), a spending cap for the week from Safe to spend, staying under a card spending level, paying a loan payment on time, and logging on enough days. Every offer can still be kept on the day it's offered, however late in the period the check-in is finished. A weekly check-in sets a focus for the current week, and a monthly or merged one for the current month. Once a focus has ended, the Start step of the next check-in says whether it was kept, and that result is stored. | P5 |
 | CHK-8 | **Focus on the dashboard:** while a focus is active, the dashboard shows it with its progress. Saving an expense that takes a category cap or spending cap to 80% of its target, or past it, shows a warning toast. It never blocks the save or asks to confirm. | P5 |
 | CHK-9 | **Act from the check-in:** the Card step has **Pay bill**, and the Loans and bills step has **Pay** on a due or overdue loan payment and **Record now** on a due or early payday. They open the existing forms over the check-in. | P5 |
 
@@ -489,6 +489,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-17 | SET-5's theme is the window's theme, set by Rust, so the title bar follows it too (DESIGN_SYSTEM §3.5) |
 | 2026-11-19 | A check-in whose Finish fails offers "Open the app anyway" for that session, a refused Finish reloads the offers, and the check-in is also asked for at midnight (the owner, [ADR 0014](decisions/0014-check-in-escape-on-failed-finish.md)) |
 | 2026-11-19 | The sidebar's level chip (LVL-5) shows the number in a small hexagon rather than "Lv 4", which doesn't fit beside the app name (the owner, DESIGN_SYSTEM §9.2) |
+| 2026-11-20 | Every focus offer (CHK-7) can still be kept when it's offered: a spending cap counts what was spent so far plus Safe to spend's per day for the days left, a category cap already over and a loan payment already past due aren't offered, and logging asks for at most the days still reachable (the owner, DATA_MODEL §9 item 146) |
 
 ---
 

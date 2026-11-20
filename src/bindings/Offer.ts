@@ -18,7 +18,12 @@ level: SpendLevel | null,
 /**
  * A cap: the earlier period's spending (`category_cap`) or `perDay` (`spending_cap`).
  */
-basis: Money | null, kind: FocusKind, categoryId: number | null, accountId: number | null, loanPaymentId: number | null, 
+basis: Money | null, 
+/**
+ * `spending_cap`: the everyday spending already recorded for the week, which its target
+ * includes.
+ */
+spent: Money | null, kind: FocusKind, categoryId: number | null, accountId: number | null, loanPaymentId: number | null, 
 /**
  * Minor units for a cap or a card level, days for logging, none for `loan_on_time`.
  */

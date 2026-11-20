@@ -1064,13 +1064,22 @@ A focus runs for the week or month that **contains the day the check-in was fini
 
 **Offers.** Each kind is tied to a stat. The kinds that apply are ordered by their stat's score today, lowest first (ties in the order below), and the first 3 are offered. A kind whose stat is none ranks as if it were 100. Logging always applies, so there's always at least one.
 
+**Every offer can still be kept on the day it's offered.** A check-in can be finished late in the period, and what was recorded since the period started already counts, so a target is fitted to what's left of the period, or the offer is left out:
+
+```
+recorded   = what's already recorded for the focus period, future-dated rows included (grading counts
+             them once their date arrives, and Safe to spend has already set them aside, §5.15)
+days left  = the days from today to the focus period's end, today included
+reach      = the dates before today in the focus period with at least one transaction + days left
+```
+
 | Kind | Stat | Applies when | Target |
 |---|---|---|---|
-| `loan_on_time` | Bills | An active loan has an unpaid payment due in the focus period: the earliest one | That payment |
-| `card_level` | Card | An active card's level today isn't hard (§5.18): with several, the one with the lowest Card score of those (ties by account id) | The lowest of its three levels that's above its cycle spending today |
-| `spending_cap` | Cashflow | The focus is for a week, there's a payday rule, and `per day` (§5.15) is above 0 | `per day × 7` |
-| `category_cap` | Cashflow | An active expense category's everyday spending in the period reviewed rose over the period before it, where that earlier amount is above 0: the one with the largest rise in amount, not percent (ties by category id) | Its everyday spending in that earlier period |
-| `logging` | Habit | Always | 5 days for a week, 20 for a month |
+| `loan_on_time` | Bills | An active loan has an unpaid payment due in the focus period, today or later: the earliest one | That payment |
+| `card_level` | Card | An active card's `peak` isn't at hard (§5.18), where `peak` is the highest recorded cycle spending, over every statement cycle with a day in the focus period, as grading measures it: with several, the one with the lowest Card score (ties by account id) | The lowest of its three levels that's above its `peak` |
+| `spending_cap` | Cashflow | The focus is for a week, there's a payday rule, and `per day` (§5.15) is above 0 | The week's recorded everyday spending `+ per day × days left` |
+| `category_cap` | Cashflow | An active expense category's everyday spending in the period reviewed rose over the period before it, where that earlier amount is above 0, and its recorded everyday spending in the focus period isn't above that earlier amount: the one with the largest rise in amount, not percent (ties by category id) | Its everyday spending in that earlier period |
+| `logging` | Habit | Always | `min(5, reach)` days for a week, `min(20, reach)` for a month |
 
 **Grading.** A focus is graded once `focus_end` is before today, by the next check-in that's finished. Finishing grades **every** ended focus that isn't graded yet. The Start step shows, of those, the one that ended latest, and nothing when there are none, so a focus graded at an earlier check-in never shows again. `get_checkin` works those grades out for the Start step without storing them; Finish works them out again and stores them.
 
@@ -1491,3 +1500,8 @@ Answered on 2026-11-19, building the Vault level backend (PR #124):
 Answered on 2026-11-20, building the check-in backend (PR #125):
 
 145. **A debt-free date stored while everything was overdue is never "moved"** (§5.19). §5.11 makes that date the day the check-in was finished, so comparing it with a later real date would report a move that never happened. A stored date on or before its row's `completed_on` is left out of the comparison.
+
+Answered on 2026-11-20, testing on a copy of the owner's data (T18):
+
+146. **Every focus offer can still be kept on the day it's offered** (the owner's choice, 2026-11-20). A weekly check-in finished late in the week offered a spending cap of `per day × 7` and a category cap that the week's spending had already passed, so the focus started red. The spending cap is now what's recorded for the week plus `per day` for each day left; a card level is aimed above the highest cycle spending in the period, and a category cap already over its target, a card already at hard and a loan payment already past its due date aren't offered; and logging asks for at most the days still reachable, so there's always an offer to pick (§5.22).
+147. **A first month that's only partly tracked counts in full** (the owner's choice, 2026-11-20). A user who starts mid-month gets Cashflow, Debt and Savings from that month, so Debt can read low while the month's loan payments are measured against part of a month's pay. It corrects itself after the first full month, and leaving such months out would show "—" for a month longer (§5.20).

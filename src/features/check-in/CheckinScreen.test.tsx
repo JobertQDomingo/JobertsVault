@@ -321,6 +321,28 @@ async function pickFocus() {
   expect(button("Finish").hasAttribute("disabled")).toBe(false);
 }
 
+test("a spending cap says what's already spent once there's some (CHK-7)", async () => {
+  const cap = {
+    ...CHECKIN.offers[0],
+    kind: "spending_cap" as const,
+    basis: 56000,
+  };
+  open({
+    ...CHECKIN,
+    offers: [
+      { ...cap, target: 392000, spent: 0 },
+      { ...cap, target: 298000, spent: 130000 },
+    ],
+  });
+  await goTo("Pick a focus");
+  expect(screen.getByText("Your Safe to spend, ₱560.00 a day")).toBeTruthy();
+  expect(
+    screen.getByText(
+      "₱1,300.00 spent so far, then your Safe to spend, ₱560.00 a day",
+    ),
+  ).toBeTruthy();
+});
+
 test("Finish waits for a pick, saves it and opens the dashboard (CHK-7, F17)", async () => {
   let done = false;
   const complete = vi.fn(() => {
