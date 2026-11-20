@@ -2,13 +2,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { beforeEach, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createQueryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
 import { routes } from "@/routes";
 import { AppShell } from "./AppShell";
 import { QuickAddProvider, useQuickAdd } from "./QuickAddProvider";
-import { SETTINGS } from "@/test/render";
+import { CHECKIN_STATUS } from "@/test/fixtures";
+import { renderRoute, SETTINGS } from "@/test/render";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
@@ -228,4 +229,36 @@ test("editing opens the dialog as Edit transaction, whatever the id", async () =
   expect(
     await screen.findByRole("dialog", { name: "Edit transaction" }),
   ).toBeTruthy();
+});
+
+describe("the level chip (LVL-5)", () => {
+  const { levelChange: _, ...STATUS } = CHECKIN_STATUS;
+  const chip = () =>
+    screen.queryByRole("img", { name: /^Level \d+, \d+ of \d+ conditions met/ });
+
+  test("isn't shown while the status loads", () => {
+    vi.mocked(invoke).mockReturnValue(new Promise(() => {}));
+    renderAt("/");
+    expect(chip()).toBeNull();
+  });
+
+  test("names the level and the ring, opens /level, and follows a save", async () => {
+    let level = 4;
+    const { router, client } = renderRoute("/transactions", {
+      get_vault_status: () => ({ ...STATUS, level }),
+    });
+    await waitFor(() =>
+      expect(chip()?.getAttribute("aria-label")).toBe(
+        "Level 4, 1 of 2 conditions met for level 5",
+      ),
+    );
+    // A save refreshes every ['ledger'] query, the status among them.
+    level = 5;
+    await client.invalidateQueries({ queryKey: queryKeys.ledger });
+    await waitFor(() =>
+      expect(chip()?.getAttribute("aria-label")).toMatch(/^Level 5,/),
+    );
+    fireEvent.click(screen.getByRole("link", { name: /^Level 5,/ }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/level"));
+  });
 });
