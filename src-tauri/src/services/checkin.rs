@@ -898,6 +898,23 @@ mod tests {
     }
 
     #[test]
+    fn a_month_lists_every_active_goal_in_its_goals_step() {
+        let mut conn = db();
+        spend(&mut conn, 1_000, "2026-10-20");
+        let goal = repo::goals::Values {
+            name: "Trip",
+            target_amount: 100_000,
+            target_date: None,
+            account_id: CASH,
+        };
+        let id = repo::goals::insert(&conn, &goal, "2026-11-03T00:00:00Z").unwrap();
+        let c = get(&mut conn, d(2026, 11, 2)).unwrap().unwrap();
+        assert!(c.kinds.contains(&CheckinKind::Month));
+        let listed: Vec<i64> = c.goals.unwrap().iter().map(|g| g.goal.id).collect();
+        assert_eq!(listed, [id]);
+    }
+
+    #[test]
     fn a_new_database_has_no_check_in() {
         let mut conn = db();
         assert_eq!(get(&mut conn, d(2026, 11, 16)).unwrap(), None);
