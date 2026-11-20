@@ -10,6 +10,7 @@ import { DashboardScreen } from "./features/dashboard/DashboardScreen";
 import { GoalsScreen } from "./features/goals/GoalsScreen";
 import { ForecastScreen } from "./features/forecast/ForecastScreen";
 import { DebtFreeScreen } from "./features/loans/DebtFreeScreen";
+import { LevelScreen } from "./features/level/LevelScreen";
 import { RecurringScreen } from "./features/recurring/RecurringScreen";
 import { ReportsScreen } from "./features/reports/ReportsScreen";
 import { TransactionsScreen } from "./features/transactions/TransactionsScreen";
@@ -76,6 +77,11 @@ export const routes: RouteObject[] = [
             path: "forecast",
             element: <ForecastScreen />,
             handle: { title: "Forecast" },
+          },
+          {
+            path: "level",
+            element: <LevelScreen />,
+            handle: { title: "Vault level" },
           },
           {
             path: "settings",

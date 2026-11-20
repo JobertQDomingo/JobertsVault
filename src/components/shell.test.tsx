@@ -47,6 +47,7 @@ test("the sidebar lists the screens built so far and marks the current one", () 
     "Goals",
     "Debt-free",
     "Forecast",
+    "Level",
     "Settings",
   ]);
   expect(link("Dashboard").getAttribute("aria-current")).toBe("page");
@@ -54,7 +55,7 @@ test("the sidebar lists the screens built so far and marks the current one", () 
   expect(screen.getByText("Jobert's Vault")).toBeTruthy();
 });
 
-test.each(["Recurring", "Budgets", "Goals", "Debt-free", "Forecast"])(
+test.each(["Recurring", "Budgets", "Goals", "Debt-free", "Forecast", "Level"])(
   "the %s screen is marked current and has no shortcut (UI_FLOWS §10, §11 item 19)",
   (name) => {
     renderAt(`/${name.toLowerCase()}`);
