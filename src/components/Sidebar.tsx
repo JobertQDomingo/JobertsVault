@@ -12,10 +12,12 @@ import {
   Target,
   type LucideIcon,
 } from "lucide-react";
-import { NavLink } from "react-router";
+import { Link, NavLink } from "react-router";
 import logo from "../../assets/brand/logo.svg";
 import { cn } from "@/lib/utils";
+import { useVaultStatus } from "@/hooks/useCheckin";
 import { GlassPanel } from "./GlassPanel";
+import { LevelChip } from "./LevelBadge";
 
 function Item({
   to,
@@ -52,11 +54,23 @@ function Item({
 
 /** The logo, every screen in UI_FLOWS §1 and Settings at the bottom. */
 export function Sidebar() {
+  // The Level screen's cached query; nothing shows while it loads (UI_FLOWS §1).
+  const { data: status } = useVaultStatus();
   return (
     <GlassPanel className="flex flex-col px-2.5 py-3.5">
       <div className="flex items-center gap-2.5 px-2 pt-1 pb-4 font-bold tracking-[-0.01em]">
         <img src={logo} alt="" className="size-[30px]" />
         Jobert's Vault
+        {status && (
+          <Link to="/level" className="ml-auto rounded-full">
+            <LevelChip
+              level={status.level}
+              met={status.nextLevel.met}
+              total={status.nextLevel.total}
+              next={status.nextLevel.level}
+            />
+          </Link>
+        )}
       </div>
       <nav aria-label="Main" className="flex flex-1 flex-col gap-0.5">
         <Item to="/" icon={LayoutDashboard} label="Dashboard" shortcut="1" />
