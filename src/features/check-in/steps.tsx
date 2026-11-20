@@ -6,6 +6,8 @@ import type { Category } from "@/bindings/Category";
 import type { CategoryLine } from "@/bindings/CategoryLine";
 import type { Checkin } from "@/bindings/Checkin";
 import type { Comparison } from "@/bindings/Comparison";
+import type { DueOccurrence } from "@/bindings/DueOccurrence";
+import type { LoanPayment } from "@/bindings/LoanPayment";
 import type { FocusFields } from "@/bindings/FocusFields";
 import type { GradedFocus } from "@/bindings/GradedFocus";
 import type { Offer } from "@/bindings/Offer";
@@ -26,6 +28,7 @@ import {
 import { StatCard } from "@/components/StatCard";
 import { StatHexagon, StatScores } from "@/components/StatHexagon";
 import { Segmented } from "@/components/ui/segmented";
+import { Button } from "@/components/ui/button";
 import { BudgetName } from "@/features/budgets/BudgetName";
 import { ForecastTable } from "@/features/forecast/ForecastScreen";
 import { behindText } from "@/features/goals/GoalsScreen";
@@ -55,8 +58,16 @@ export type Ctx = {
   loans: {
     id: number;
     name: string;
-    payments: { id: number; dueDate: string }[];
+    payments: Pick<LoanPayment, "id" | "dueDate" | "paidAmount" | "paidOn">[];
   }[];
+  /** The paydays `list_due_occurrences` gives, due ones first, for Record now (CHK-9). */
+  paydays: DueOccurrence[];
+  /** The loan payments Pay was clicked for in this check-in, so a paid one stays in place. */
+  paidHere: number[];
+  /** The dashboard's own forms, opened over the check-in (CHK-9). */
+  payBill: (cardId: number) => void;
+  pay: (paymentId: number) => void;
+  recordPayslip: (payday: DueOccurrence) => void;
   /** The Balance check's answers, by account id. Held by the screen, never sent (CHK-4). */
   answers: Record<number, Answer>;
   answer: (accountId: number, value: Answer) => void;
@@ -439,16 +450,28 @@ export function cardStep(ctx: Ctx): Step {
               {`Soft ${money(ctx, a.spendSoft)} · Mid ${money(ctx, a.spendMid ?? 0)} · Hard ${money(ctx, a.spendHard ?? 0)}`}
             </Muted>
           )}
-          <Muted>
-            {[
-              `${money(ctx, card.amountOwed)} owed`,
-              a.creditLimit !== null &&
-                `${card.utilizationPercent}% of your limit`,
-              formatDue(card.dueDate, ctx.data.today),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </Muted>
+          <div className="flex items-center justify-between gap-3">
+            <Muted>
+              {[
+                `${money(ctx, card.amountOwed)} owed`,
+                a.creditLimit !== null &&
+                  `${card.utilizationPercent}% of your limit`,
+                formatDue(card.dueDate, ctx.data.today),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </Muted>
+            {/* Secondary, since Next is the step's main button (CHK-9). */}
+            {card.amountOwed > 0 && (
+              <Button
+                size="sm"
+                aria-label={`Pay bill for ${a.name}`}
+                onClick={() => ctx.payBill(a.id)}
+              >
+                Pay bill
+              </Button>
+            )}
+          </div>
         </Flat>
       );
     }),
@@ -467,37 +490,85 @@ export function loansStep(ctx: Ctx): Step {
     .filter((d) => d.days < 0)
     .reduce((n, d) => n + 1 + d.moreOverdue, 0);
   const paidLine = `${plural(paid.length, "loan payment", "loan payments")} paid, ${money(ctx, paidTotal)}.`;
+  // Paid from this check-in after the period, so not in its `paid`, but kept in place as paid.
+  // One dated back into the period is already in `paid`.
+  const paidNow = ctx.paidHere
+    .map((id) => payment(ctx, id))
+    .filter(
+      (x) =>
+        x?.p?.paidOn &&
+        x.p.paidOn > ctx.data.period.end &&
+        !loansDue.some((d) => d.paymentId === x.p!.id),
+    )
+    .map((x) => ({ name: x!.loan.name, ...x!.p! }));
   const say = overdue
     ? overdue === 1
       ? "A loan payment is overdue."
       : `${overdue} loan payments are overdue.`
-    : paid.length
-      ? paidLine
-      : loansLeft
-        ? `No loan payments were paid this ${unit}.`
-        : "No loans to pay.";
+    : paidNow.some((p) => p.dueDate < today)
+      ? "You paid what was overdue."
+      : paid.length
+        ? paidLine
+        : loansLeft
+          ? `No loan payments were paid this ${unit}.`
+          : "No loans to pay.";
   const short = forecast.short;
+  const payday = ctx.paydays[0];
   return {
     say,
     body: (
       <>
-        {(loansLeft || loansDue.length > 0 || paid.length > 0) && (
+        {(loansLeft ||
+          loansDue.length > 0 ||
+          paid.length > 0 ||
+          paidNow.length > 0) && (
           <Flat title="Loans">
-            {overdue > 0 && paid.length > 0 && <Muted>{paidLine}</Muted>}
-            {loansDue.map((d) => (
-              <p
-                key={d.paymentId}
-                className={cn(
-                  "flex items-center gap-1.5 tabular-nums",
-                  d.days < 0 && "font-semibold text-danger",
-                )}
-              >
-                {d.days < 0 && (
-                  <TriangleAlert aria-hidden className="size-4 shrink-0" />
-                )}
-                {`${d.name}: ${money(ctx, d.amount)} ${d.days < 0 ? formatOverdue(d.dueDate, today) : formatDue(d.dueDate, today)}`}
+            {say !== paidLine && paid.length > 0 && <Muted>{paidLine}</Muted>}
+            {paidNow.map((p) => (
+              <p key={p.id} className="flex items-center gap-1.5 tabular-nums">
+                <Check aria-hidden className="size-4 shrink-0 text-success" />
+                {`${p.name}: ${money(ctx, p.paidAmount ?? 0)} paid ${p.paidOn === today ? "today" : weekdayDate(p.paidOn!, today)}`}
               </p>
             ))}
+            {loansDue.map((d) => {
+              const account = ctx.accounts.find((a) => a.id === d.accountId);
+              return (
+                <div
+                  key={d.paymentId}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <div className="grid gap-0.5">
+                    <p
+                      className={cn(
+                        "flex items-center gap-1.5 tabular-nums",
+                        d.days < 0 && "font-semibold text-danger",
+                      )}
+                    >
+                      {d.days < 0 && (
+                        <TriangleAlert
+                          aria-hidden
+                          className="size-4 shrink-0"
+                        />
+                      )}
+                      {`${d.name}: ${money(ctx, d.amount)} ${d.days < 0 ? formatOverdue(d.dueDate, today) : formatDue(d.dueDate, today)}`}
+                    </p>
+                    {/* What the dashboard's banner says when the account is short (LOAN-4). */}
+                    {d.moveFirst !== null && account && (
+                      <p className="text-small text-muted-foreground tabular-nums">
+                        {`${account.name} has ${money(ctx, account.balance)}. Move ${money(ctx, d.moveFirst)} there first.`}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    aria-label={`Pay ${d.name}`}
+                    onClick={() => ctx.pay(d.paymentId)}
+                  >
+                    Pay
+                  </Button>
+                </div>
+              );
+            })}
             {loansLeft && (
               <Muted>
                 {`Loans left: ${money(ctx, loansLeft.totalLeft)} · `}
@@ -516,8 +587,22 @@ export function loansStep(ctx: Ctx): Step {
             <Muted>Mark your pay as a payday to see what's coming.</Muted>
           ) : (
             <>
-              {forecast.nextPayday && (
-                <p>{`Next payday: ${weekdayDate(forecast.nextPayday.date, today)}`}</p>
+              {payday ? (
+                // A due payday first, else one 1–3 days ahead, as the Due dialog lists them (F14).
+                <div className="flex items-center justify-between gap-3">
+                  <p>
+                    {payday.early
+                      ? `Payday ${weekdayDate(payday.transaction.date, today)}. Paid early?`
+                      : `Payday ${payday.transaction.date === today ? "today" : weekdayDate(payday.transaction.date, today)}`}
+                  </p>
+                  <Button size="sm" onClick={() => ctx.recordPayslip(payday)}>
+                    Record now
+                  </Button>
+                </div>
+              ) : (
+                forecast.nextPayday && (
+                  <p>{`Next payday: ${weekdayDate(forecast.nextPayday.date, today)}`}</p>
+                )
               )}
               <Muted>
                 {`${money(ctx, forecast.safeToSpend)} safe to spend until ${forecast.windowEnd === today ? "today" : weekdayDate(forecast.windowEnd, today)} · ${money(ctx, forecast.perDay ?? 0)} a day`}

@@ -9,12 +9,17 @@ import {
 } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import type { Checkin } from "@/bindings/Checkin";
+import type { DueOccurrence } from "@/bindings/DueOccurrence";
 import {
   ACCOUNT_LIST,
   CATEGORIES,
   CHECKIN,
+  DEFAULTS,
+  LOAN_CATEGORIES,
   LOANS,
   MONTHLY_CHECKIN,
+  PAY_BILL_DEFAULTS,
+  PAYMENT_METHODS,
 } from "@/test/fixtures";
 import { renderRoute, type Answers } from "@/test/render";
 
@@ -28,6 +33,7 @@ const NAMES: Answers = {
   list_categories: CATEGORIES,
   list_accounts: ACCOUNT_LIST,
   list_loans: LOANS,
+  list_due_occurrences: [],
 };
 
 function open(checkin: Checkin | (() => Checkin | null), more: Answers = {}) {
@@ -496,4 +502,269 @@ test("holding Enter moves one step, not through them all", async () => {
   fireEvent.keyDown(document.body, { key: "Enter", repeat: true });
   fireEvent.keyDown(document.body, { key: "Enter", repeat: true });
   expect(stepLine()).toBe("Step 2 of 6 · Money in and out");
+});
+
+// ── Acting from the check-in (CHK-9) ─────────────────────────────────────────────────────────
+
+const FORMS: Answers = {
+  list_payment_methods: PAYMENT_METHODS,
+  get_pay_bill_defaults: { ...PAY_BILL_DEFAULTS, today: CHECKIN.today },
+  get_transaction_defaults: { ...DEFAULTS, today: CHECKIN.today },
+  suggest_payees: [],
+};
+
+test("Pay bill shows on a card with something owed and opens the transfer over the check-in", async () => {
+  const [card] = CHECKIN.cards;
+  const clear = { ...card, id: 6, name: "Store card" };
+  clear.card = { ...card.card!, amountOwed: 0 };
+  const { router } = open({ ...CHECKIN, cards: [card, clear] }, FORMS);
+  await goTo("Card");
+  expect(screen.getAllByRole("button", { name: /^Pay bill/ })).toHaveLength(1);
+  fireEvent.click(button("Pay bill for Credit card"));
+  const dialog = await screen.findByRole("dialog", { name: "Pay credit card" });
+  await waitFor(() =>
+    expect(
+      (
+        within(dialog).getByRole("textbox", {
+          name: "Amount",
+        }) as HTMLInputElement
+      ).value,
+    ).toBe("640.00"),
+  );
+  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(path(router)).toBe("/check-in");
+  expect(stepLine()).toContain("Card");
+});
+
+const BANK_DUE = {
+  loanId: 2,
+  name: "Bank loan",
+  accountId: 2,
+  paymentId: 21,
+  amount: 100000,
+  dueDate: "2026-10-10",
+  days: -37,
+  moreOverdue: 0,
+  moveFirst: null,
+};
+
+test("Pay shows on each due or overdue payment, and one paid here stays as paid", async () => {
+  const soon = {
+    ...BANK_DUE,
+    loanId: 1,
+    name: "E-wallet loan",
+    accountId: 3,
+    paymentId: 14,
+    dueDate: "2026-11-18",
+    days: 2,
+  };
+  let checkin: Checkin = {
+    ...CHECKIN,
+    loans: { ...CHECKIN.loans, loansDue: [BANK_DUE, soon] },
+  };
+  let loans = LOANS;
+  const { client } = open(() => checkin, {
+    ...FORMS,
+    list_categories: LOAN_CATEGORIES,
+    list_loans: () => loans,
+  });
+  await goTo("Loans and bills");
+  expect(screen.getAllByRole("button", { name: /^Pay / })).toHaveLength(2);
+  fireEvent.click(screen.getAllByRole("button", { name: /^Pay / })[0]);
+  const form = await screen.findByRole("dialog", {
+    name: /^Mark paid: Bank loan/,
+  });
+  fireEvent.click(within(form).getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  // Opened again after the cancel, then saved: it's still one payment.
+  fireEvent.click(screen.getAllByRole("button", { name: /^Pay / })[0]);
+  const again = await screen.findByRole("dialog", {
+    name: /^Mark paid: Bank loan/,
+  });
+  // Closed here as a save closes it; the save itself is the backend's answer below.
+  fireEvent.click(await within(again).findByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+  // The save, as the backend answers it afterwards: the payment is paid and no longer due.
+  const [ewallet, bank, phone] = LOANS.loans;
+  loans = {
+    ...LOANS,
+    loans: [
+      ewallet,
+      {
+        ...bank,
+        payments: bank.payments.map((p) =>
+          p.id === 21
+            ? {
+                ...p,
+                status: "paid",
+                overdue: false,
+                paidAmount: 105000,
+                paidOn: CHECKIN.today,
+              }
+            : p,
+        ),
+      },
+      phone,
+    ],
+  };
+  checkin = { ...CHECKIN, loans: { ...CHECKIN.loans, loansDue: [soon] } };
+  await act(() => client.invalidateQueries({ queryKey: ["ledger"] }));
+  await waitFor(() => expect(say()).toBe("You paid what was overdue."));
+  expect(screen.getByText("Bank loan: ₱1,050.00 paid today")).toBeTruthy();
+  // The period's own paid line still shows under the new sentence.
+  expect(screen.getByText("1 loan payment paid, ₱1,000.00.")).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: /^Pay / })).toHaveLength(1);
+  expect(stepLine()).toContain("Loans and bills");
+});
+
+test("a payment Pay was cancelled for stays unpaid, with Pay", async () => {
+  open(
+    { ...CHECKIN, loans: { ...CHECKIN.loans, loansDue: [BANK_DUE] } },
+    { ...FORMS, list_categories: LOAN_CATEGORIES },
+  );
+  await goTo("Loans and bills");
+  fireEvent.click(button("Pay Bank loan"));
+  const form = await screen.findByRole("dialog", {
+    name: /^Mark paid: Bank loan/,
+  });
+  fireEvent.click(within(form).getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(say()).toBe("A loan payment is overdue.");
+  expect(screen.queryByText(/paid today/)).toBeNull();
+  expect(button("Pay Bank loan")).toBeTruthy();
+});
+
+// A payday rule, so Coming up has its lines (today is Mon, Nov 16).
+const PAYDAY_CHECKIN: Checkin = {
+  ...CHECKIN,
+  loans: {
+    ...CHECKIN.loans,
+    forecast: {
+      ...CHECKIN.loans.forecast,
+      safeToSpend: 840000,
+      perDay: 84000,
+      windowEnd: "2026-11-29",
+      daysLeft: 14,
+      nextPayday: { ruleId: 3, date: "2026-11-30" },
+    },
+  },
+};
+
+const payday = (date: string, early: boolean): DueOccurrence => ({
+  id: early ? null : 13,
+  ruleId: 3,
+  isPayday: true,
+  early,
+  transaction: {
+    kind: "income",
+    amount: 420000,
+    date,
+    accountId: 2,
+    toAccountId: null,
+    categoryId: 3,
+    payee: "Employer",
+    paymentMethodId: null,
+    note: null,
+  },
+});
+
+test.each([
+  ["a due payday", [payday("2026-11-15", false)], "Payday Sun, Nov 15"],
+  ["one due today", [payday("2026-11-16", false)], "Payday today"],
+  [
+    "one 1–3 days ahead",
+    [payday("2026-11-18", true)],
+    "Payday Wed, Nov 18. Paid early?",
+  ],
+])("Record now shows on %s and opens its payslip", async (_, due, line) => {
+  const water = { ...payday("2026-11-14", false), id: 9, ruleId: 1 };
+  open(PAYDAY_CHECKIN, {
+    // Only paydays count: a due bill isn't one.
+    list_due_occurrences: [{ ...water, isPayday: false }, ...due],
+    get_payslip_defaults: () => new Promise(() => {}),
+  });
+  await goTo("Loans and bills");
+  expect(await screen.findByText(line)).toBeTruthy();
+  expect(screen.queryByText(/^Next payday/)).toBeNull();
+  fireEvent.click(button("Record now"));
+  await waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith("get_payslip_defaults", {
+      ruleId: 3,
+      date: due[0].transaction.date,
+    }),
+  );
+  expect(await screen.findByRole("dialog")).toBeTruthy();
+});
+
+test("with no payday due or near, there's no Record now", async () => {
+  open(PAYDAY_CHECKIN, { list_due_occurrences: [] });
+  await goTo("Loans and bills");
+  expect(screen.getByText("Next payday: Mon, Nov 30")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Record now" })).toBeNull();
+});
+
+test("a payment dated back into the period is in its paid line, not listed again", async () => {
+  let checkin: Checkin = {
+    ...CHECKIN,
+    loans: { ...CHECKIN.loans, loansDue: [BANK_DUE] },
+  };
+  let loans = LOANS;
+  const { client } = open(() => checkin, {
+    ...FORMS,
+    list_categories: LOAN_CATEGORIES,
+    list_loans: () => loans,
+  });
+  await goTo("Loans and bills");
+  fireEvent.click(button("Pay Bank loan"));
+  const form = await screen.findByRole("dialog", {
+    name: /^Mark paid: Bank loan/,
+  });
+  fireEvent.click(await within(form).findByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  const [ewallet, bank, phone] = LOANS.loans;
+  loans = {
+    ...LOANS,
+    loans: [
+      ewallet,
+      {
+        ...bank,
+        payments: bank.payments.map((p) =>
+          p.id === 21
+            ? { ...p, status: "paid", paidAmount: 100000, paidOn: "2026-11-14" }
+            : p,
+        ),
+      },
+      phone,
+    ],
+  };
+  checkin = {
+    ...CHECKIN,
+    loans: {
+      ...CHECKIN.loans,
+      paid: [
+        ...CHECKIN.loans.paid,
+        { loanId: 2, paymentId: 21, amount: 100000, paidOn: "2026-11-14" },
+      ],
+      paidTotal: 200000,
+    },
+  };
+  await act(() => client.invalidateQueries({ queryKey: ["ledger"] }));
+  await waitFor(() => expect(say()).toBe("2 loan payments paid, ₱2,000.00."));
+  expect(screen.queryByText(/Bank loan: .* paid/)).toBeNull();
+});
+
+test("a payment whose account is short says what to move there first, as the banner does", async () => {
+  open({
+    ...CHECKIN,
+    loans: {
+      ...CHECKIN.loans,
+      loansDue: [{ ...BANK_DUE, accountId: 3, moveFirst: 85000 }],
+    },
+  });
+  await goTo("Loans and bills");
+  expect(
+    screen.getByText("E-wallet has ₱150.00. Move ₱850.00 there first."),
+  ).toBeTruthy();
 });
