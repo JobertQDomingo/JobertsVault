@@ -191,7 +191,8 @@ export function LevelScreen() {
       <div className="grid grid-cols-2 items-start gap-3">
         <GlassPanel className="grid gap-3 p-5">
           <h3 className="text-h3">Stats</h3>
-          <div className="grid grid-cols-[280px_minmax(0,1fr)] items-center gap-6">
+          {/* gap-3 leaves room for the trend column: 280 + 12 + 248 fills the 540 px inside. */}
+          <div className="grid grid-cols-[280px_minmax(0,1fr)] items-center gap-3">
             <StatHexagon stats={s.stats} previous={s.previous?.stats} />
             <div className="grid content-center">
               <StatScores
