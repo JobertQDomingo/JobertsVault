@@ -11,12 +11,16 @@ import type { ShortcutKey } from "@/lib/shortcuts";
  */
 export function useShortcuts(keys: Partial<Record<ShortcutKey, () => void>>) {
   const onKeyDown = useEffectEvent((e: KeyboardEvent) => {
-    // Digits by the key's place: on AZERTY, Ctrl and the 1 key types "&".
-    const key = e.code.startsWith("Digit")
-      ? e.code.slice(5)
-      : e.key.length === 1
-        ? e.key.toUpperCase()
-        : e.key;
+    // Digits by the key's place: on AZERTY, Ctrl and the 1 key types "&". `?` by its character,
+    // since Canadian French types it with Shift and the 6 key.
+    const key =
+      e.key === "?"
+        ? "?"
+        : e.code.startsWith("Digit")
+          ? e.code.slice(5)
+          : e.key.length === 1
+            ? e.key.toUpperCase()
+            : e.key;
     const name = [
       e.ctrlKey && "Ctrl",
       e.altKey && "Alt",

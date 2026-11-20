@@ -66,9 +66,9 @@ export const SHORTCUTS = [
 
 export type ShortcutKey = (typeof SHORTCUTS)[number]["keys"][number];
 
-/** UI_FLOWS §10's sentence under the table. */
+/** UI_FLOWS §10's sentences under the table, without their references. */
 export const CHECKIN_NOTE =
-  "While a check-in is due, Ctrl+N and ? still work, and Ctrl+1 … Ctrl+4, Ctrl+, and Esc do nothing.";
+  "While a check-in is due, Ctrl+N and ? still work, each opening its dialog over the check-in, and Ctrl+1 … Ctrl+4, Ctrl+, and Esc do nothing. Neither one navigates, so neither can skip the check-in, and Esc closes only the dialog.";
 
 const SHOWN: Record<string, string> = {
   ArrowLeft: "←",

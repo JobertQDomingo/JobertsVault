@@ -494,7 +494,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-20 | A monthly check-in leaves the Goals step out when there's no active goal, instead of a step saying only "No goals yet.", and the first check-in says "You're at level 0." (the owner, after testing on real data; UI_FLOWS §11 item 93) |
 | 2026-11-20 | The Add and Edit loan forms total their payment rows as they're typed (LOAN-1), with what's still to pay beside it once a row counts as paid, since a lender app shows what's left. The backend adds them up; it's a check, never a rule (UI_FLOWS §11 item 95) |
 | 2026-11-21 | HMO joins the PAY-3 deduction categories, added by migration 0006 to a database without one, as Phase 4 added its own; one the user already made is kept as it is (DATA_MODEL §7, UI_FLOWS §11 item 97) |
-| 2026-11-21 | `?` opens the keyboard shortcuts on every screen, the check-in included, over it like quick-add (the owner, 2026-11-19). The shortcut review added no `Ctrl+` number for the screens built since Phase 2 (UI_FLOWS §10, §11 item 98) |
+| 2026-11-21 | `?` opens the keyboard shortcuts on every screen past the first-launch setup form, the check-in included, over it like quick-add (the owner, 2026-11-19). The shortcut review added no `Ctrl+` number for the screens built since Phase 2 (UI_FLOWS §10, §11 item 98) |
 
 ---
 

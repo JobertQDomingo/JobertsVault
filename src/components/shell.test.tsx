@@ -229,6 +229,14 @@ test("? shows every shortcut of UI_FLOWS §10, on any screen and any layout", as
   expect(await screen.findByRole("dialog")).toBeTruthy();
 });
 
+test("? opens the shortcuts where it's on a number key (Canadian French Shift+6)", async () => {
+  renderAt("/");
+  expect(press("?", { shiftKey: true, code: "Digit6" })).toBe(false);
+  expect(
+    await screen.findByRole("dialog", { name: "Keyboard shortcuts" }),
+  ).toBeTruthy();
+});
+
 test("? types into a field instead of opening the shortcuts", async () => {
   renderAt("/");
   const field = document.body.appendChild(document.createElement("input"));
