@@ -15,6 +15,7 @@ import {
   CATEGORIES,
   CHECKIN,
   DEFAULTS,
+  GOALS,
   LOAN_CATEGORIES,
   LOANS,
   MONTHLY_CHECKIN,
@@ -201,10 +202,10 @@ test("Money in and out shows a budget broken by how much, and one kept", async (
 });
 
 test("the Goals step shows only when the backend sends it (CHK-3)", async () => {
-  open({ ...CHECKIN, goals: [] });
+  open({ ...CHECKIN, goals: [GOALS[0]] });
   await screen.findByText("Step 1 of 7 · Start");
   await goTo("Goals");
-  expect(say()).toBe("No goals yet.");
+  expect(say()).toBe("Your goals are on track.");
 });
 
 test("Next waits for an answer on every Balance check row, and they're never sent (CHK-4)", async () => {
@@ -296,13 +297,14 @@ test("opened straight on Stats and level, a rise plays once too (LVL-6)", async 
   expect(levelUpPlaying()).toBe(false);
 });
 
-test("the first check-in has no level-up moment (LVL-6)", async () => {
+test('the first check-in has no level-up moment and no "still" (LVL-6)', async () => {
   open({
     ...CHECKIN,
     status: { ...CHECKIN.status, previous: null, levelChange: "same" },
   });
   await goTo("Stats and level");
   expect(levelUpPlaying()).toBe(false);
+  expect(say()).toBe("You're at level 4.");
 });
 
 async function pickFocus() {

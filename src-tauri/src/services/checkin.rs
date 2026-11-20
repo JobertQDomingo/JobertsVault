@@ -644,14 +644,15 @@ fn view(conn: &Connection, d: Due, today: NaiveDate) -> Result<Checkin, AppError
     let mut forecast = facts.forecast.clone();
     forecast.rows.truncate(3);
 
-    // Goals: always with a month; with only a week, when one is Behind or was moved in it.
+    // Goals: with a month when there's an active one; with only a week, when one is Behind or
+    // was moved in it.
     let active_goals: Vec<GoalProgress> = facts
         .goals
         .iter()
         .filter(|g| !g.goal.archived)
         .cloned()
         .collect();
-    let goals_show = due.month.is_some()
+    let goals_show = (due.month.is_some() && !active_goals.is_empty())
         || active_goals
             .iter()
             .any(|g| g.behind.is_some() || g.goal.moved_on.is_some_and(|on| on >= shown.start()));
@@ -977,7 +978,8 @@ mod tests {
                 .iter()
                 .any(|b| b.account_id == CASH && b.balance == Money(-1_500))
         );
-        assert_eq!(c.goals, Some(Vec::new()));
+        // No active goal: no Goals step, even with the month.
+        assert_eq!(c.goals, None);
         let focus = logging(&c);
         // A month's focus runs for the current month. It asks for the days still reachable:
         // Nov 10, logged, and the 15 days from Nov 16 to 30.
