@@ -1,4 +1,6 @@
-import { Check, Circle } from "lucide-react";
+import { Check, Circle, X } from "lucide-react";
+import { Tooltip } from "radix-ui";
+import type { GradedFocus } from "@/bindings/GradedFocus";
 import { ErrorState } from "@/components/ErrorState";
 import { FocusRows } from "@/components/FocusRows";
 import { GlassPanel } from "@/components/GlassPanel";
@@ -17,6 +19,7 @@ import {
   conditionGap,
   cardLevel,
   focusNames,
+  focusText,
   levelTitle,
   nextMoveText,
   weakest,
@@ -24,6 +27,61 @@ import {
 
 const plural = (n: number, one: string, many: string) =>
   n === 1 ? `1 ${one}` : `${n} ${many}`;
+
+/**
+ * "Last 8" and the latest graded focuses, oldest first, as 16 px check and x icons (LVL-8). Each is
+ * a tab stop whose label and tooltip name the focus and its result, so color is never the only cue.
+ */
+function FocusRecord({
+  record,
+  text,
+}: {
+  /** Latest first, void ones already left out (DATA_MODEL §5.23). */
+  record: GradedFocus[];
+  text: (f: GradedFocus) => string;
+}) {
+  return (
+    <Tooltip.Provider delayDuration={300}>
+      <div className="flex items-center gap-2.5">
+        <span className="text-small text-muted-foreground">Last 8</span>
+        <ul aria-label="Last 8 focuses" className="flex gap-1">
+          {[...record].reverse().map((f) => {
+            const kept = f.result === "kept";
+            const label = `${text(f)} · ${kept ? "Kept" : "Missed"}`;
+            return (
+              <li key={`${f.kind}-${f.start}-${f.end}`}>
+                <Tooltip.Root>
+                  <Tooltip.Trigger asChild>
+                    <span
+                      tabIndex={0}
+                      role="img"
+                      aria-label={label}
+                      className="block rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+                    >
+                      {kept ? (
+                        <Check aria-hidden className="size-4 text-success" />
+                      ) : (
+                        <X aria-hidden className="size-4 text-danger" />
+                      )}
+                    </span>
+                  </Tooltip.Trigger>
+                  <Tooltip.Portal>
+                    <Tooltip.Content
+                      sideOffset={6}
+                      className="glass-raised z-50 max-w-72 rounded-toolbar px-3 py-2 text-small tabular-nums"
+                    >
+                      {label}
+                    </Tooltip.Content>
+                  </Tooltip.Portal>
+                </Tooltip.Root>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </Tooltip.Provider>
+  );
+}
 
 /**
  * `/level` (UI_FLOWS §8.8, LVL-3, LVL-4, LVL-7): the level path and the next level's checklist,
@@ -73,6 +131,7 @@ export function LevelScreen() {
     list,
     loans.data.loans,
   );
+  const level = cardLevel(list);
   const move = nextMoveText(s.nextMove, {
     money,
     account: names.account,
@@ -135,7 +194,11 @@ export function LevelScreen() {
           <div className="grid grid-cols-[280px_minmax(0,1fr)] items-center gap-6">
             <StatHexagon stats={s.stats} previous={s.previous?.stats} />
             <div className="grid content-center">
-              <StatScores stats={s.stats} previous={s.previous?.stats} />
+              <StatScores
+                stats={s.stats}
+                previous={s.previous?.stats}
+                history={s.history}
+              />
             </div>
           </div>
           {lowest?.reason && <p>{weakest(lowest.reason)}</p>}
@@ -143,15 +206,17 @@ export function LevelScreen() {
         <GlassPanel className="grid gap-4 p-5">
           <h3 className="text-h3">Focus</h3>
           {s.focuses.length ? (
-            <FocusRows
-              focuses={s.focuses}
-              names={names}
-              level={cardLevel(list)}
-            />
+            <FocusRows focuses={s.focuses} names={names} level={level} />
           ) : (
             <p className="text-muted-foreground">
               No focus right now. You'll pick one at your next check-in.
             </p>
+          )}
+          {s.focusRecord.length > 0 && (
+            <FocusRecord
+              record={s.focusRecord}
+              text={(f) => focusText(f, names, level(f))}
+            />
           )}
           <div className="grid gap-1 tabular-nums">
             <p>{`${plural(s.focusStreak, "focus", "focuses")} kept in a row`}</p>
