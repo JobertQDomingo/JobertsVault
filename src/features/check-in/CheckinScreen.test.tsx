@@ -135,6 +135,19 @@ test("Esc, Ctrl+1 to Ctrl+4 and Ctrl+, don't leave it, and Ctrl+N opens quick-ad
   expect(path(router)).toBe("/check-in");
 });
 
+test("? opens the shortcuts over it, and Esc closes only them (UI_FLOWS §11 item 98)", async () => {
+  const { router } = open(CHECKIN);
+  await screen.findByText(/^Step 1 of/);
+  fireEvent.keyDown(window, { key: "?", shiftKey: true });
+  const dialog = await screen.findByRole("dialog", {
+    name: "Keyboard shortcuts",
+  });
+  fireEvent.keyDown(dialog, { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(path(router)).toBe("/check-in");
+  expect(stepLine()).toMatch(/^Step 1 of/);
+});
+
 test("after a save the figures reload and the step stays (CHK-2)", async () => {
   let checkin = CHECKIN;
   const { client } = open(() => checkin);
@@ -373,6 +386,20 @@ test("↑ and ↓ move the pick between the offers", async () => {
     .getAllByRole("radio")
     .map((r) => r.getAttribute("aria-checked"));
   expect(checked).toEqual(["false", "false", "true"]);
+});
+
+test("Alt+← on a focused offer is only Back, and leaves the pick alone", async () => {
+  open(CHECKIN);
+  await goTo("Pick a focus");
+  fireEvent.click(screen.getAllByRole("radio")[1]);
+  const offer = screen.getAllByRole("radio")[1];
+  offer.focus();
+  fireEvent.keyDown(offer, { key: "ArrowLeft", altKey: true });
+  await waitFor(() => expect(stepLine()).not.toContain("Pick a focus"));
+  await goTo("Pick a focus");
+  expect(
+    screen.getAllByRole("radio").map((r) => r.getAttribute("aria-checked")),
+  ).toEqual(["false", "true", "false"]);
 });
 
 test("an account left as Doesn't match opens its details after Finish", async () => {

@@ -101,7 +101,7 @@ jobertsvault/
 │  │  ├─ dashboard/  transactions/  accounts/  settings/  onboarding/
 │  │  ├─ reports/  recurring/  budgets/  goals/  loans/  forecast/
 │  │  ├─ check-in/  level/         # Phase 5: the required check-in and the Level screen
-│  ├─ components/                  # From Phase 5 also StatHexagon.tsx, LevelBadge.tsx, LevelPath.tsx and FocusRows.tsx
+│  ├─ components/                  # From Phase 5 also StatHexagon.tsx, LevelBadge.tsx, LevelPath.tsx, FocusRows.tsx and ShortcutHelp.tsx
 │  │  ├─ ui/                       # shadcn/ui building blocks
 │  │  └─ MoneyText.tsx  AmountInput.tsx  PeriodSwitcher.tsx  QuickAddDialog.tsx …
 │  ├─ lib/
@@ -109,6 +109,7 @@ jobertsvault/
 │  │  ├─ dates.ts                  # formatting 'YYYY-MM-DD' for display, and date picker conversion
 │  │  ├─ categoryIcons.ts          # the curated icon list (DESIGN_SYSTEM §6)
 │  │  ├─ vault.ts                  # Phase 5: the level names and the move, reason and level-drop wording
+│  │  ├─ shortcuts.ts              # Phase 5: the keyboard shortcuts (UI_FLOWS §10), read by useShortcuts and the ? dialog
 │  │  ├─ queryKeys.ts  queryClient.ts  theme.ts  …
 │  │  └─ utils.ts                  # cn(), the class name helper shadcn/ui expects
 │  ├─ styles/globals.css           # design tokens (CSS variables)

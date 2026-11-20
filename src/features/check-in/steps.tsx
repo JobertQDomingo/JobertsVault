@@ -788,7 +788,8 @@ export function focusStep(ctx: Ctx): Step {
     const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[
       e.key
     ];
-    if (!step) return;
+    // Alt+← is Back (CheckinScreen), not a move.
+    if (!step || e.altKey || e.ctrlKey || e.metaKey) return;
     e.preventDefault();
     const next = at < 0 ? 0 : (at + step + offers.length) % offers.length;
     ctx.pick(offers[next]);

@@ -5,6 +5,7 @@ import { useProcessOnFocus } from "@/hooks/useProcessOnFocus";
 import { useSettings } from "@/hooks/useSettings";
 import { useShortcuts } from "@/hooks/useShortcuts";
 import { QuickAddProvider, useQuickAdd } from "./QuickAddProvider";
+import { ShortcutHelp } from "./ShortcutHelp";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
@@ -19,8 +20,8 @@ export type GuardContext = {
 
 /**
  * Above both the app shell and `/check-in` (ARCHITECTURE §5.4): the first launch goes to the setup
- * form (ONB-1, §6), then quick-add, Ctrl+N and the focus refresh work on every screen, the check-in
- * included. The settings take milliseconds; waiting for them means the dashboard never flashes
+ * form (ONB-1, §6), then quick-add, Ctrl+N, the `?` shortcuts and the focus refresh work on every
+ * screen, the check-in included. The settings take milliseconds; waiting for them means the dashboard never flashes
  * first. If they fail, the screens show their own errors.
  */
 export function Root() {
@@ -35,6 +36,7 @@ export function Root() {
   return (
     <QuickAddProvider>
       <Guard />
+      <ShortcutHelp />
     </QuickAddProvider>
   );
 }
