@@ -25,7 +25,11 @@ import {
 import { Field, Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import { notify } from "@/components/ui/toast";
-import { useCreateLoan, useUpdateLoan } from "@/hooks/useLoans";
+import {
+  useCreateLoan,
+  useLoanRowsTotal,
+  useUpdateLoan,
+} from "@/hooks/useLoans";
 import {
   addMonths,
   formatInputDate,
@@ -270,6 +274,16 @@ export function LoanDialog({
 
   const money = (amount: number) => formatMoney(amount, settings);
   const existing = isNew === "existing";
+  const paidBefore = (r: Row) =>
+    existing && r.dueDate !== "" && r.dueDate < cutoff;
+  // The running total (F12): each row as it shows, paid or not, for the backend to add up.
+  const totalRows = payments.map((r) => ({
+    amount: r.amount ?? 0,
+    paid: Boolean(r.paidOn) || paidBefore(r),
+  }));
+  // Two figures once any row shows as paid, even one with no amount yet (F12).
+  const anyPaid = totalRows.some((r) => r.paid);
+  const sum = useLoanRowsTotal(totalRows).data;
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -468,9 +482,7 @@ export function LoanDialog({
                       )}
                     />
                     <span className="text-small text-muted-foreground">
-                      {existing && current.dueDate && current.dueDate < cutoff
-                        ? "Paid before"
-                        : ""}
+                      {paidBefore(current) ? "Paid before" : ""}
                     </span>
                     <Button
                       variant="ghost"
@@ -484,6 +496,16 @@ export function LoanDialog({
                 );
               })}
             </ul>
+            <p
+              data-testid="loan-total"
+              aria-live="polite"
+              className="text-small font-semibold tabular-nums"
+            >
+              {sum &&
+                (anyPaid
+                  ? `Total ${money(sum.total)} · Still to pay ${money(sum.left)}`
+                  : `Total ${money(sum.total)}`)}
+            </p>
             {rowsError && (
               <p
                 id="loan-rows-message"

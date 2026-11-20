@@ -142,6 +142,47 @@ test("a loan I already have marks rows before today Paid before, and doesn't sta
   await waitFor(() => expect(value("Date borrowed")).toBe("11/05/2026"));
 });
 
+test("the total follows the rows as they're typed, added, edited and removed, from the backend (F12)", async () => {
+  await openAdd();
+  const total = () => dialog().getByTestId("loan-total");
+  await waitFor(() => expect(total().textContent).toBe("Total ₱0.00"));
+  type("Payment 1 amount", "1000");
+  await waitFor(() => expect(total().textContent).toBe("Total ₱1,000.00"));
+  fireEvent.click(dialog().getByRole("button", { name: "Add payment" }));
+  await waitFor(() => expect(total().textContent).toBe("Total ₱2,000.00"));
+  type("Payment 2 amount", "500");
+  await waitFor(() => expect(total().textContent).toBe("Total ₱1,500.00"));
+  fireEvent.click(dialog().getByRole("button", { name: "Remove payment 1" }));
+  await waitFor(() => expect(total().textContent).toBe("Total ₱500.00"));
+  // The frontend only sends the rows; the backend adds them up (CLAUDE.md rule 2).
+  expect(calls("total_loan_payments").pop()).toEqual({
+    rows: [{ amount: 50000, paid: false }],
+  });
+});
+
+test("on a loan I already have, a paid-before row splits the total from what's still to pay", async () => {
+  await openAdd();
+  type("Payment 1 date", "10/28/2026");
+  fireEvent.blur(dialog().getByRole("textbox", { name: "Payment 1 date" }));
+  type("Payment 1 amount", "1000");
+  fireEvent.click(dialog().getByRole("button", { name: "Add payment" }));
+  fireEvent.click(
+    dialog().getByRole("radio", { name: "A loan I already have" }),
+  );
+  await waitFor(() =>
+    expect(dialog().getByTestId("loan-total").textContent).toBe(
+      "Total ₱2,000.00 · Still to pay ₱1,000.00",
+    ),
+  );
+  // A paid-before row with no amount yet still shows both figures (F12).
+  type("Payment 1 amount", "");
+  await waitFor(() =>
+    expect(dialog().getByTestId("loan-total").textContent).toBe(
+      "Total ₱1,000.00 · Still to pay ₱1,000.00",
+    ),
+  );
+});
+
 test("Save sends the loan and its rows, empty optional fields as none, and says Loan added", async () => {
   await openAdd();
   type("Name", "E-wallet loan");
@@ -218,6 +259,19 @@ test("a row's error shows under the list and marks the row it names", async () =
       .getByRole("textbox", { name: "Payment 1 amount" })
       .getAttribute("aria-invalid"),
   ).toBeNull();
+});
+
+test("editing: the total counts the locked paid and paid-before rows, and still to pay doesn't (F12)", async () => {
+  await openEdit("E-wallet loan");
+  const total = () => dialog().getByTestId("loan-total").textContent;
+  // 8 rows of ₱1,000.00: two paid before the app, one marked paid in it.
+  await waitFor(() =>
+    expect(total()).toBe("Total ₱8,000.00 · Still to pay ₱5,000.00"),
+  );
+  fireEvent.click(dialog().getByRole("button", { name: "Remove payment 3" }));
+  await waitFor(() =>
+    expect(total()).toBe("Total ₱7,000.00 · Still to pay ₱4,000.00"),
+  );
 });
 
 test("editing: paid rows are locked and left out, the rest keep their ids, and This is can't change (F12 step 3)", async () => {

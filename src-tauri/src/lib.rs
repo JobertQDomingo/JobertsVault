@@ -208,6 +208,7 @@ pub fn run() {
             commands::loans::mark_loan_payment_paid,
             commands::loans::mark_loan_payment_unpaid,
             commands::loans::preview_loan,
+            commands::loans::total_loan_payments,
             commands::payslips::get_payslip_defaults,
             commands::payslips::preview_payslip,
             commands::payslips::record_payslip,

@@ -383,6 +383,40 @@ pub fn mark_unpaid(
     Ok(())
 }
 
+/// One row of the loan form, for its running total: `paid` is what the row shows (a locked
+/// "Paid" row, or "Paid before").
+#[derive(Clone, Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LoanRowAmount {
+    pub amount: Money,
+    pub paid: bool,
+}
+
+/// The loan form's running total (UI_FLOWS F12): every row, and the rows not paid.
+#[derive(Clone, Debug, PartialEq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct LoanRowsTotal {
+    pub total: Money,
+    pub left: Money,
+}
+
+/// Adds up whatever was typed, so the form shows it without working it out itself (LOAN-1).
+pub fn total(rows: &[LoanRowAmount]) -> LoanRowsTotal {
+    let sum = |paid: Option<bool>| {
+        rows.iter()
+            .filter(|r| paid.is_none_or(|p| r.paid == p))
+            .fold(Money::ZERO, |sum, r| {
+                Money(sum.0.saturating_add(r.amount.0))
+            })
+    };
+    LoanRowsTotal {
+        total: sum(None),
+        left: sum(Some(false)),
+    }
+}
+
 /// What the draft would do to the debt-free date, Safe to spend and each pay window, saving
 /// nothing (LOAN-9, LOAN-10, DATA_MODEL §5.16).
 pub fn preview(
@@ -700,6 +734,33 @@ mod tests {
     const SALARY: i64 = 1;
     const FOOD: i64 = 8;
     const LOAN: i64 = 25;
+
+    #[test]
+    fn total_adds_every_row_and_leaves_the_paid_ones_out_of_left() {
+        let row = |amount, paid| LoanRowAmount {
+            amount: Money(amount),
+            paid,
+        };
+        assert_eq!(
+            total(&[row(800_000, true), row(800_000, false), row(0, false)]),
+            LoanRowsTotal {
+                total: Money(1_600_000),
+                left: Money(800_000),
+            }
+        );
+        assert_eq!(
+            total(&[]),
+            LoanRowsTotal {
+                total: Money::ZERO,
+                left: Money::ZERO,
+            }
+        );
+        // Whatever was typed never overflows.
+        assert_eq!(
+            total(&[row(i64::MAX, false), row(1, false)]).total,
+            Money(i64::MAX)
+        );
+    }
 
     fn field_of<T: Debug>(result: Result<T, AppError>) -> String {
         match result {
