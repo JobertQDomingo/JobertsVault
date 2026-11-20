@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.3 |
-| **Last updated** | 2026-11-20 |
+| **Last updated** | 2026-11-21 |
 | **Related docs** | [PRD.md](PRD.md), [DATA_MODEL.md](DATA_MODEL.md) |
 
 ---
@@ -116,7 +116,7 @@ jobertsvault/
 └─ src-tauri/                      # ── Backend ──
    ├─ Cargo.toml  tauri.conf.json
    ├─ capabilities/default.json    # the minimum permissions the frontend needs
-   ├─ migrations/                  # 0001_initial.sql  0002_planning.sql  0003_loans_payroll.sql  0004_card_spend_levels.sql  0005_checkins.sql
+   ├─ migrations/                  # 0001_initial.sql  0002_planning.sql  0003_loans_payroll.sql  0004_card_spend_levels.sql  0005_checkins.sql  0006_hmo_category.sql
    └─ src/
       ├─ main.rs                   # entry point
       ├─ lib.rs                    # builds the app, registers commands, startup steps

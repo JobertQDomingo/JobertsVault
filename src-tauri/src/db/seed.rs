@@ -216,8 +216,8 @@ mod tests {
                 &conn,
                 "SELECT count(*) FROM categories WHERE kind = 'expense'"
             ),
-            17 + 7,
-            "the 17 from 0001, then Loan and the payslip deductions from 0003"
+            17 + 7 + 1,
+            "the 17 from 0001, then Loan and the payslip deductions from 0003, then HMO from 0006"
         );
         assert_eq!(
             count(&conn, "SELECT count(*) FROM categories WHERE archived = 1"),
@@ -261,8 +261,8 @@ mod tests {
             );
             let conn = state.conn().unwrap();
             assert_eq!(count(&conn, "SELECT count(*) FROM accounts"), 1);
-            // 7 income and 17 expense from 0001, and the 7 expense ones 0003 adds.
-            assert_eq!(count(&conn, "SELECT count(*) FROM categories"), 31);
+            // 7 income and 17 expense from 0001, the 7 expense ones 0003 adds and 0006's HMO.
+            assert_eq!(count(&conn, "SELECT count(*) FROM categories"), 32);
             assert_eq!(count(&conn, "SELECT count(*) FROM payment_methods"), 6);
         }
     }

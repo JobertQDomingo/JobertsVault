@@ -4,7 +4,7 @@
 |---|---|
 | **App name** | Jobert's Vault |
 | **Status** | Approved v1.3 |
-| **Last updated** | 2026-11-20 |
+| **Last updated** | 2026-11-21 |
 | **Platform** | Windows desktop app built with Tauri 2: React + TypeScript frontend, Rust backend, SQLite database |
 
 ---
@@ -274,7 +274,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 |---|---|---|
 | PAY-1 | An income recurring rule can be marked **This is a payday**. A payday rule is always in Confirm mode, and its amount is the user's estimate of the net pay (SAFE-4). A salary rule that isn't marked a payday can still be posted automatically, as in user story 4. It then starts no pay window, and the forecast counts its amount like any other recurring income. | P4 |
 | PAY-2 | Confirming a payday opens a **payslip** form: the gross pay and any number of deduction lines, each with a deduction category and an amount > 0. The net pay is shown as the user types and must be more than 0. The form starts from the last payslip of the same payday rule, gross and lines included, or else the last one in the same income category, or else empty. Saving records the gross as income in the rule's category and each line as an expense, on the rule's account and the payslip's date. The rows of one payslip are edited and deleted together. | P4 |
-| PAY-3 | Preset expense categories for deductions: SSS, PhilHealth, Pag-IBIG, Withholding tax, Salary loan and Other deductions. They count like any other expense. A loan repaid through payroll is only a deduction line, never a loan in §7.14. | P4 |
+| PAY-3 | Preset expense categories for deductions: SSS, PhilHealth, Pag-IBIG, Withholding tax, HMO (added in Phase 5), Salary loan and Other deductions. They count like any other expense. A loan repaid through payroll is only a deduction line, never a loan in §7.14. | P4 |
 | PAY-4 | A payday appears in the "Recurring transactions due" list up to 3 days before its date, with **Record now**. The payslip takes the real date, and that payday is then settled, so it can't be recorded twice. | P4 |
 
 ### 7.16 Safe to spend
@@ -493,6 +493,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-20 | DSH-8 shows up to 20 recent transactions, not 10: with the focus rows and several accounts, the right column grew taller than 10 rows and left empty space under the last one (the owner, UI_FLOWS §11 item 92) |
 | 2026-11-20 | A monthly check-in leaves the Goals step out when there's no active goal, instead of a step saying only "No goals yet.", and the first check-in says "You're at level 0." (the owner, after testing on real data; UI_FLOWS §11 item 93) |
 | 2026-11-20 | The Add and Edit loan forms total their payment rows as they're typed (LOAN-1), with what's still to pay beside it once a row counts as paid, since a lender app shows what's left. The backend adds them up; it's a check, never a rule (UI_FLOWS §11 item 95) |
+| 2026-11-21 | HMO joins the PAY-3 deduction categories, added by migration 0006 to a database without one, as Phase 4 added its own; one the user already made is kept as it is (DATA_MODEL §7, UI_FLOWS §11 item 97) |
 
 ---
 
@@ -503,3 +504,5 @@ None at the moment. All earlier questions have been answered and are recorded in
 **Expense:** Food & Groceries, Dining Out, Transportation, Rent/Housing, Utilities (electricity, water, internet), Phone, Shopping, Health & Medical, Insurance, Entertainment, Subscriptions, Personal Care, Education, Gifts & Donations, Travel, Fees & Charges, Other expense
 
 **Added in Phase 4 (expense):** Loan (the default category for loan payments, LOAN-3), and the deduction categories SSS, PhilHealth, Pag-IBIG, Withholding tax, Salary loan and Other deductions (PAY-3). An existing database gets any of these it doesn't already have.
+
+**Added in Phase 5 (expense):** HMO, a deduction category (PAY-3). An existing database gets it unless it already has an expense category of that name, ignoring case.

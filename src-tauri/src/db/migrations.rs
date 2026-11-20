@@ -28,6 +28,7 @@ pub fn migration_list(now: DateTime<Utc>) -> Vec<M<'static>> {
         ),
         M::up(include_str!("../../migrations/0004_card_spend_levels.sql")),
         M::up(include_str!("../../migrations/0005_checkins.sql")),
+        M::up(include_str!("../../migrations/0006_hmo_category.sql")),
     ]
 }
 
@@ -79,7 +80,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 5);
+        assert_eq!(version, 6);
 
         let strict_tables: Vec<String> = conn
             .prepare("SELECT name FROM pragma_table_list WHERE schema = 'main' AND strict = 1 ORDER BY name")
@@ -683,6 +684,8 @@ mod tests {
                 ("Withholding tax", "receipt", "cat-9", 21),
                 ("Salary loan", "banknote", "cat-10", 22),
                 ("Other deductions", "ellipsis", "cat-12", 23),
+                // 0006: every color is now used twice, so the tie goes to the lowest number.
+                ("HMO", "pill", "cat-1", 24),
             ]),
             "DATA_MODEL §7: each takes the least-used color of the active expense categories"
         );
@@ -730,10 +733,108 @@ mod tests {
                 ("Withholding tax", "receipt", "cat-8", 20),
                 ("Salary loan", "banknote", "cat-9", 21),
                 ("Other deductions", "ellipsis", "cat-10", 22),
+                // 0006: cat-12 is the one color used only once.
+                ("HMO", "pill", "cat-12", 23),
             ]),
             "an archived category doesn't count toward the colors, and an income one doesn't block an expense one"
         );
     }
+
+    /// The expense categories named HMO, ignoring case: every column, the id first.
+    #[allow(clippy::type_complexity)]
+    fn hmo_rows(conn: &Connection) -> Vec<(i64, String, String, String, i64, i64, String, String)> {
+        conn.prepare(
+            "SELECT id, name, icon, color, sort_order, archived, created_at, updated_at FROM categories WHERE kind = 'expense' AND name = 'HMO'",
+        )
+        .unwrap()
+        .query_map([], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+                row.get(5)?,
+                row.get(6)?,
+                row.get(7)?,
+            ))
+        })
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap()
+    }
+
+    #[test]
+    fn an_hmo_the_user_made_is_kept_as_it_is() {
+        // The owner's own, as it was made by hand, then other spellings and an archived one.
+        for (name, icon, color, archived) in [
+            ("HMO", "heart-pulse", "cat-9", 0),
+            ("hmo", "shield", "cat-3", 0),
+            ("Hmo", "coins", "cat-5", 1),
+        ] {
+            let mut conn = open(Path::new(":memory:")).unwrap();
+            let all = migrations(Utc.with_ymd_and_hms(2026, 10, 26, 9, 30, 0).unwrap());
+            all.to_version(&mut conn, 5).unwrap();
+            conn.execute(
+                "INSERT INTO categories (name, kind, color, icon, sort_order, archived, created_at, updated_at) VALUES (?1, 'expense', ?2, ?3, 21, ?4, ?5, ?5)",
+                rusqlite::params![name, color, icon, archived, NOW],
+            )
+            .unwrap();
+            let before = hmo_rows(&conn);
+
+            all.to_latest(&mut conn).unwrap();
+
+            assert_eq!(
+                hmo_rows(&conn),
+                before,
+                "{name} is kept, and no second HMO is added"
+            );
+        }
+    }
+
+    #[test]
+    fn an_existing_database_is_backed_up_then_gets_hmo_last() {
+        let dir = crate::test_support::TempDir::new("mig-0006");
+        let backups = dir.path().join("pre-migration");
+        let mut conn = open(&dir.path().join("test.db")).unwrap();
+        let all = migrations(Utc.with_ymd_and_hms(2026, 10, 26, 9, 30, 0).unwrap());
+        all.to_version(&mut conn, 5).unwrap();
+        add_basics(&conn);
+        // An income HMO doesn't block the expense one, and an archived color doesn't count.
+        conn.execute(
+            "INSERT INTO categories (name, kind, color, icon, archived, sort_order, created_at, updated_at) VALUES ('HMO', 'income', 'cat-12', 'gift', 0, 9, ?1, ?1), ('Old', 'expense', 'cat-1', 'coins', 1, 30, ?1, ?1)",
+            [NOW],
+        )
+        .unwrap();
+
+        prepare(&mut conn, &all, &backups, crate::test_support::now()).unwrap();
+
+        let copy = Connection::open(backups.join(format!(
+            "{}-pre-migration-v5-2026-11-03_1405.db",
+            crate::db::NAME
+        )))
+        .unwrap();
+        let copy_version: i64 = copy
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(copy_version, 5, "BAK-5: the copy is from before 0006");
+        let rows = hmo_rows(&conn);
+        assert_eq!(rows.len(), 1);
+        let (_, name, icon, color, sort_order, archived, created_at, _) = &rows[0];
+        assert_eq!(
+            (
+                name.as_str(),
+                icon.as_str(),
+                color.as_str(),
+                *sort_order,
+                *archived
+            ),
+            ("HMO", "pill", "cat-1", 31, 0),
+            "after the archived one's 30, in the lowest of the colors used twice"
+        );
+        assert_eq!(created_at.len(), "2026-10-26T09:30:00Z".len());
+    }
+
     /// Migrates to version 3, adds a card and a bank with `decimals` stored, then runs 0004.
     fn levels_after_0004(decimals: Option<&str>) -> Vec<(String, [Option<i64>; 3])> {
         let mut conn = open(Path::new(":memory:")).unwrap();
@@ -1032,7 +1133,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |row| row.get(0))
             .unwrap();
-        assert_eq!(version, 5);
+        assert_eq!(version, 6);
         let goal: (String, Option<String>, Option<String>) = conn
             .query_row(
                 "SELECT target_date, moved_on, moved_from FROM goals WHERE name = 'Trip'",

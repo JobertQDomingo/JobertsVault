@@ -54,15 +54,17 @@ type Values = {
 
 /**
  * The PAY-3 deduction categories, listed first in a line's category list (UI_FLOWS F14). Matched
- * by name, so a renamed one is listed with the other expense categories (UI_FLOWS §11).
+ * by name ignoring case, as the migrations that add them do, so a renamed one is listed with the
+ * other expense categories (UI_FLOWS §11).
  */
 const DEDUCTIONS = [
-  "SSS",
-  "PhilHealth",
-  "Pag-IBIG",
-  "Withholding tax",
-  "Salary loan",
-  "Other deductions",
+  "sss",
+  "philhealth",
+  "pag-ibig",
+  "withholding tax",
+  "hmo",
+  "salary loan",
+  "other deductions",
 ];
 
 const NET_ERROR = "Deductions can't add up to the gross pay or more";
@@ -243,7 +245,7 @@ function PayslipForm({
     };
   });
   const rank = (c: Category) => {
-    const i = DEDUCTIONS.indexOf(c.name);
+    const i = DEDUCTIONS.indexOf(c.name.toLowerCase());
     return i === -1 ? DEDUCTIONS.length : i;
   };
   const categoryOptions = offered(
