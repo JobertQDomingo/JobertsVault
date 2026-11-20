@@ -64,6 +64,7 @@ export function FocusRows({
             {f.percent !== null && (
               <ProgressBar
                 percent={f.percent}
+                state={f.state}
                 aria-label={`${text}: ${f.percent}%`}
                 className="pl-6"
               />

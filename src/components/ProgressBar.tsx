@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from "react";
+import type { CapState } from "@/bindings/CapState";
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,10 +12,13 @@ export function ProgressBar({
   label,
   tone = "limit",
   done = false,
+  state,
   className,
   "aria-label": ariaLabel,
 }: {
   percent: number;
+  /** A focus cap's color from the backend: red only once spending is past the target (§5.22). */
+  state?: CapState | null;
   tone?: "limit" | "goal";
   done?: boolean;
   label?: ReactNode;
@@ -22,8 +26,13 @@ export function ProgressBar({
   "aria-label"?: string;
 }) {
   const labelId = useId();
-  const limitColor =
-    percent >= 100 ? "bg-danger" : percent >= 80 ? "bg-warning" : "bg-primary";
+  const limitColor = state
+    ? { ok: "bg-primary", near: "bg-warning", over: "bg-danger" }[state]
+    : percent >= 100
+      ? "bg-danger"
+      : percent >= 80
+        ? "bg-warning"
+        : "bg-primary";
   const goalColor = done ? "bg-success" : "bg-primary";
   const color = tone === "goal" ? goalColor : limitColor;
   return (

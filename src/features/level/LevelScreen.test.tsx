@@ -137,6 +137,8 @@ test("a stat that doesn't apply has no corner and shows —", async () => {
   });
   await screen.findByText("Level 4 · In the black");
   expect(row("Card").textContent).toBe("Card——");
+  const table = screen.getByRole("table", { name: "Stats" });
+  expect(within(table).getAllByRole("row")[3].textContent).toBe("Card—58");
   // Five corners: the chart's labels name only the stats that apply.
   expect(
     document.querySelectorAll(".recharts-polar-angle-axis-tick"),
@@ -241,6 +243,46 @@ test("the active focuses, the month's first, with a cap's bar under its sentence
   const bar = screen.getByRole("progressbar");
   expect(bar.getAttribute("aria-valuenow")).toBe("42");
   expect(screen.queryByText(/No focus right now/)).toBeNull();
+});
+
+test("a cap at exactly its target is amber, not red, and a card focus off its levels names its amount", async () => {
+  show({
+    focuses: [
+      focus({
+        kind: "category_cap",
+        categoryId: 2,
+        target: 150000,
+        actual: 150000,
+        percent: 100,
+        state: "near",
+      }),
+      focus({ kind: "card_level", accountId: 4, target: 350000, actual: 1000 }),
+    ],
+  });
+  const bar = await screen.findByRole("progressbar");
+  expect((bar.firstElementChild as HTMLElement).className).toContain(
+    "bg-warning",
+  );
+  expect(
+    screen.getByText(/Stay under ₱3,500.00 on Credit card/).textContent,
+  ).toBe(
+    "This week's focus: Stay under ₱3,500.00 on Credit card · ₱10.00 this cycle",
+  );
+});
+
+test("a stat with no score at the last check-in says so to screen readers", async () => {
+  show({
+    previous: {
+      completedOn: "2026-11-09",
+      level: 4,
+      stats: [null, 100, 58, 37, 20, 85],
+      debtFreeOn: null,
+    },
+  });
+  await screen.findByText("Level 4 · In the black");
+  expect(row("Cashflow").textContent).toBe("Cashflow72— No earlier score");
+  const table = screen.getByRole("table", { name: "Stats" });
+  expect(within(table).getAllByRole("row")[1].textContent).toBe("Cashflow72—");
 });
 
 test("a failed load is the inline message with Retry", async () => {

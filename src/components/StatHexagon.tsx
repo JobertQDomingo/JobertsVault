@@ -111,11 +111,12 @@ export function StatScores({
       >
         <span>{STAT_LABELS[stat]}</span>
         <b className="text-right font-semibold tabular-nums">{score ?? "—"}</b>
-        {previous && (
-          <Points
-            change={score !== null && was !== null ? score - was : null}
-          />
-        )}
+        {previous &&
+          (score === null ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            <Points change={was === null ? null : score - was} />
+          ))}
       </div>
     );
   });
@@ -126,7 +127,10 @@ function Points({ change }: { change: number | null }) {
   if (!change)
     return (
       <span className="text-muted-foreground">
-        —{change === 0 && <span className="sr-only"> No change</span>}
+        —
+        <span className="sr-only">
+          {change === 0 ? " No change" : " No earlier score"}
+        </span>
       </span>
     );
   const up = change > 0;

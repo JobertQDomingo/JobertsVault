@@ -27,7 +27,9 @@ export function LevelPath({ level }: { level: number }) {
                   aria-hidden
                   className={cn(
                     "absolute top-[9px] right-full h-0.5 w-11",
-                    reached ? "bg-primary" : "bg-wash",
+                    reached
+                      ? "bg-primary"
+                      : "bg-wash shadow-[inset_0_0_0_1px_var(--hairline)]",
                   )}
                 />
               )}
@@ -35,6 +37,7 @@ export function LevelPath({ level }: { level: number }) {
                 <Tooltip.Trigger asChild>
                   <span
                     tabIndex={0}
+                    role="img"
                     aria-label={`${levelTitle(n)}, ${state}`}
                     className={cn(
                       "grid size-5 place-items-center rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/40 [&_svg]:size-3",
