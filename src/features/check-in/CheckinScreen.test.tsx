@@ -274,6 +274,22 @@ test("a level that rose plays the level-up moment once, not again after Back (LV
   expect(levelUpPlaying()).toBe(false);
 });
 
+test("opened straight on Stats and level, a rise plays once too (LVL-6)", async () => {
+  renderRoute("/check-in?step=stats", {
+    ...NAMES,
+    get_checkin: {
+      ...CHECKIN,
+      status: { ...CHECKIN.status, level: 5, levelChange: "up" },
+    },
+  });
+  await screen.findByText(/^Step \d+ of \d+ · Stats and level/);
+  expect(levelUpPlaying()).toBe(true);
+  next();
+  fireEvent.click(button("Back"));
+  expect(stepLine()).toContain("Stats and level");
+  expect(levelUpPlaying()).toBe(false);
+});
+
 test("the first check-in has no level-up moment (LVL-6)", async () => {
   open({
     ...CHECKIN,

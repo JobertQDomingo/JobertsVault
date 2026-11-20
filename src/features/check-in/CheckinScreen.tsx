@@ -166,12 +166,16 @@ function Flow({
   const at = steps.indexOf(step);
   // A pick that's no longer offered (after a refused Finish reloads them) is no pick (ADR 0014).
   const picked = data.offers.find((o) => keyOf(o) === pickKey);
-  // Leaving Stats and level once ends the level-up moment, so Back and Next don't replay it (LVL-6).
+  // The level-up moment is decided as Stats and level opens, so a refresh on it can't start or cut
+  // it, and leaving the step once ends it, so Back and Next don't replay it (LVL-6).
+  const rose = data.status.levelChange === "up";
   const [shown, setShown] = useState(step);
+  const [levelUp, setLevelUp] = useState(step === "stats" && rose);
   const [played, setPlayed] = useState(false);
   if (shown !== step) {
     setShown(step);
-    if (shown === "stats") setPlayed(true);
+    setPlayed(played || shown === "stats");
+    setLevelUp(step === "stats" && rose && !played);
   }
 
   const ctx: Ctx = {
@@ -181,7 +185,7 @@ function Flow({
     answer: (id, value) => setAnswers((was) => ({ ...was, [id]: value })),
     picked,
     pick: (o) => setPickKey(keyOf(o)),
-    levelUp: data.status.levelChange === "up" && !played,
+    levelUp,
   };
   const { say, body } = STEPS[step].build(ctx);
 
