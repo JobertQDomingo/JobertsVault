@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-20 |
-| **Current focus** | **Phase 5: Check-in & polish**: the card edit form's "Amount owed now" [CC-1, CC-8] |
+| **Current focus** | **Phase 5: Check-in & polish**: the add loan form's running total [LOAN-1] |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -22,7 +22,7 @@ This file is the progress tracker.
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 16 / 16 |
 | **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 17 / 17 |
-| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 19 / 29 |
+| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 20 / 29 |
 
 ---
 
@@ -233,7 +233,7 @@ The owner approved the plan on 2026-11-17 ([ADR 0012](docs/decisions/0012-requir
 
 ### 5.2 Polish
 The first four were found while testing Phase 4 on the owner's data and left for this phase, like the overdue banner in 5.0. None is a bug that loses or miscounts money. Each one updates its doc first.
-- [ ] Card edit form: "Amount owed now" shows the opening amount, not what the card owes today, and UI_FLOWS §5.2 says otherwise. Settle which is right with the owner, then make the doc and the form agree [CC-1] [CC-8]
+- [x] Card edit form: "Amount owed now" shows the opening amount, not what the card owes today, and UI_FLOWS §5.2 says otherwise. Settle which is right with the owner, then make the doc and the form agree. The edit form now says "Opening amount owed", with what's owed today under it [CC-1] [CC-8]
 - [ ] Add loan form: a running total of the typed payment rows, worked out by the backend, to check against the lender app before saving [LOAN-1]
 - [ ] Goal dialog and goal card show two monthly figures for one date: the too-soon message's "saving about ₱X a month" (the monthly room) and the card's "Save ₱Y/month" (what the date needs). Make the wording tell them apart [GOL-3] [GOL-6]
 - [ ] HMO preset deduction category, added by a new migration to a database that doesn't have one yet, like Phase 4's categories [PAY-3]

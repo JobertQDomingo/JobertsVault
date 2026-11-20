@@ -200,6 +200,7 @@ test("any other error offers Retry", async () => {
 });
 
 test("Edit opens the account's dialog with the type locked", async () => {
+  // UI_FLOWS §5.2: a card's edit form holds the opening amount owed, with today's under it.
   renderRoute("/accounts/4", answers());
   await openMenu();
   fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
@@ -209,7 +210,8 @@ test("Edit opens the account's dialog with the type locked", async () => {
   expect(
     (
       dialog.getByRole("textbox", {
-        name: "Amount owed now",
+        name: "Opening amount owed",
+        description: "Owed today: ₱640.00",
       }) as HTMLInputElement
     ).value,
   ).toBe("0.00");

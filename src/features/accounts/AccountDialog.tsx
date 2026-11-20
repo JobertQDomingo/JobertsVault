@@ -17,7 +17,7 @@ import { Field, Input } from "@/components/ui/input";
 import { notify } from "@/components/ui/toast";
 import { useCreateAccount, useUpdateAccount } from "@/hooks/useAccounts";
 import { useSettings } from "@/hooks/useSettings";
-import { parseAmount } from "@/lib/money";
+import { formatMoney, parseAmount } from "@/lib/money";
 import { showSaveError } from "@/lib/saveError";
 
 type Values = {
@@ -91,7 +91,8 @@ export function AccountDialog({
 }) {
   // A new card starts at 3,000, 4,000 and 5,000 in the main unit (DATA_MODEL §2). The app
   // waits for the settings before any screen, so they're here.
-  const decimals = useSettings().data?.currencyDecimals ?? 2;
+  const settings = useSettings().data;
+  const decimals = settings?.currencyDecimals ?? 2;
   const { control, register, handleSubmit, setError, formState } =
     useForm<Values>({
       defaultValues: account
@@ -175,7 +176,11 @@ export function AccountDialog({
       )}
     />
   );
-  const amount = (name: "openingBalance" | "creditLimit", label: string) => (
+  const amount = (
+    name: "openingBalance" | "creditLimit",
+    label: string,
+    help?: string,
+  ) => (
     <Controller
       control={control}
       name={name}
@@ -184,6 +189,7 @@ export function AccountDialog({
           label={label}
           htmlFor={`acct-${name}`}
           error={errors[name]?.message}
+          help={help}
           className={ROW}
         >
           <AmountInput
@@ -238,9 +244,18 @@ export function AccountDialog({
                 </Field>
               )}
             />
+            {/* A card's field is its opening amount owed, which is today's only on a new card
+                (UI_FLOWS §5.2, §11 item 94). */}
             {amount(
               "openingBalance",
-              card ? "Amount owed now" : "Opening balance",
+              !card
+                ? "Opening balance"
+                : account
+                  ? "Opening amount owed"
+                  : "Amount owed now",
+              account?.card && settings
+                ? `Owed today: ${formatMoney(account.card.amountOwed, settings)}`
+                : undefined,
             )}
             {card && (
               <>
