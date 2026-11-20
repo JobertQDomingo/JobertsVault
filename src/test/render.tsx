@@ -58,6 +58,8 @@ export function renderRoute(
         get_settings: SETTINGS,
         // No check-in is due unless the test says so (CHK-2).
         get_checkin: null,
+        // The sidebar's level chip asks on every screen; null hides it.
+        get_vault_status: null,
         ...answers,
       };
       // A command the test didn't expect fails loudly instead of looking like an empty load.

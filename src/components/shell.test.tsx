@@ -236,16 +236,21 @@ describe("the level chip (LVL-5)", () => {
   const chip = () =>
     screen.queryByRole("img", { name: /^Level \d+, \d+ of \d+ conditions met/ });
 
-  test("isn't shown while the status loads", () => {
-    vi.mocked(invoke).mockReturnValue(new Promise(() => {}));
-    renderAt("/");
+  test("isn't shown while the status loads", async () => {
+    renderRoute("/settings", { get_vault_status: () => new Promise(() => {}) });
+    await screen.findByRole("navigation");
+    await new Promise((r) => setTimeout(r, 50));
     expect(chip()).toBeNull();
   });
 
   test("names the level and the ring, opens /level, and follows a save", async () => {
     let level = 4;
     const { router, client } = renderRoute("/transactions", {
-      get_vault_status: () => ({ ...STATUS, level }),
+      get_vault_status: () => ({
+        ...STATUS,
+        level,
+        nextLevel: { ...STATUS.nextLevel, level: level + 1 },
+      }),
     });
     await waitFor(() =>
       expect(chip()?.getAttribute("aria-label")).toBe(
@@ -256,7 +261,9 @@ describe("the level chip (LVL-5)", () => {
     level = 5;
     await client.invalidateQueries({ queryKey: queryKeys.ledger });
     await waitFor(() =>
-      expect(chip()?.getAttribute("aria-label")).toMatch(/^Level 5,/),
+      expect(chip()?.getAttribute("aria-label")).toBe(
+        "Level 5, 1 of 2 conditions met for level 6",
+      ),
     );
     fireEvent.click(screen.getByRole("link", { name: /^Level 5,/ }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/level"));
