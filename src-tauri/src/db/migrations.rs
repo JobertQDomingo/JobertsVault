@@ -740,10 +740,11 @@ mod tests {
         );
     }
 
-    /// The expense categories named HMO, ignoring case: everything but the id.
-    fn hmo_rows(conn: &Connection) -> Vec<(String, String, String, i64, i64, String)> {
+    /// The expense categories named HMO, ignoring case: every column, the id first.
+    #[allow(clippy::type_complexity)]
+    fn hmo_rows(conn: &Connection) -> Vec<(i64, String, String, String, i64, i64, String, String)> {
         conn.prepare(
-            "SELECT name, icon, color, sort_order, archived, created_at FROM categories WHERE kind = 'expense' AND name = 'HMO'",
+            "SELECT id, name, icon, color, sort_order, archived, created_at, updated_at FROM categories WHERE kind = 'expense' AND name = 'HMO'",
         )
         .unwrap()
         .query_map([], |row| {
@@ -754,6 +755,8 @@ mod tests {
                 row.get(3)?,
                 row.get(4)?,
                 row.get(5)?,
+                row.get(6)?,
+                row.get(7)?,
             ))
         })
         .unwrap()
@@ -817,7 +820,7 @@ mod tests {
         assert_eq!(copy_version, 5, "BAK-5: the copy is from before 0006");
         let rows = hmo_rows(&conn);
         assert_eq!(rows.len(), 1);
-        let (name, icon, color, sort_order, archived, created_at) = &rows[0];
+        let (_, name, icon, color, sort_order, archived, created_at, _) = &rows[0];
         assert_eq!(
             (
                 name.as_str(),
