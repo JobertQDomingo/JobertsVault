@@ -255,6 +255,32 @@ test("a level that fell names why", async () => {
   });
   await goTo("Stats and level");
   expect(say()).toBe("Level 2 now: a payment is overdue.");
+  expect(levelUpPlaying()).toBe(false);
+});
+
+const levelUpPlaying = () => !!document.querySelector(".animate-level-up");
+
+test("a level that rose plays the level-up moment once, not again after Back (LVL-6)", async () => {
+  open({
+    ...CHECKIN,
+    status: { ...CHECKIN.status, level: 5, levelChange: "up" },
+  });
+  await goTo("Stats and level");
+  expect(say()).toBe("You reached level 5.");
+  expect(levelUpPlaying()).toBe(true);
+  next();
+  fireEvent.click(button("Back"));
+  expect(stepLine()).toContain("Stats and level");
+  expect(levelUpPlaying()).toBe(false);
+});
+
+test("the first check-in has no level-up moment (LVL-6)", async () => {
+  open({
+    ...CHECKIN,
+    status: { ...CHECKIN.status, previous: null, levelChange: "same" },
+  });
+  await goTo("Stats and level");
+  expect(levelUpPlaying()).toBe(false);
 });
 
 async function pickFocus() {

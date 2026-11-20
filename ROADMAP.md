@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-20 |
-| **Current focus** | **Phase 5: Check-in & polish**: Level-up moment in the check-in's Stats and level step [LVL-6] |
+| **Current focus** | **Phase 5: Check-in & polish**: Pay bill, Pay and Record now inside the check-in [CHK-9] |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -22,7 +22,7 @@ This file is the progress tracker.
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 16 / 16 |
 | **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 17 / 17 |
-| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 16 / 29 |
+| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 17 / 29 |
 
 ---
 
@@ -227,7 +227,7 @@ The owner approved the plan on 2026-11-17 ([ADR 0012](docs/decisions/0012-requir
 - [x] Sidebar level chip with its ring [LVL-5]
 - [x] Dashboard focus strip, and the warning toast when a save takes a cap to 80% of its target or past it. Count the dashboard's blurred panels with every banner showing first: past the budget, the rows go flat in the Safe to spend card instead (UI_FLOWS §2, F18). It was past the budget, so the rows were built in the card [CHK-8]
 - [x] Focus record and stat trend lines on the Level screen [LVL-8]
-- [ ] Level-up moment in the check-in's Stats and level step, skipped with `prefers-reduced-motion` [LVL-6]
+- [x] Level-up moment in the check-in's Stats and level step, skipped with `prefers-reduced-motion` [LVL-6]
 - [ ] Pay bill, Pay and Record now inside the check-in, opening the existing forms over it [CHK-9]
 - [ ] Test the check-in and the Vault level on a copy of the installed app's data: finish a merged, a weekly and a monthly check-in (the January step is covered by service tests, since the real app can't be given a January date), and check that every stat and the level read right for the real figures (a formula that doesn't is changed in DATA_MODEL §5.20–5.21 first). If the monthly check-in feels long, fold Card into Loans and bills. Log every bug and issue, and fix them. The copy and the log stay out of the repo.
 
