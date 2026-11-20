@@ -505,7 +505,8 @@ fn check_date(
     Err(invalid(
         "targetDate",
         &format!(
-            "That's too soon. The earliest you can reach this is {}, saving about {monthly} a month.",
+            "That's too soon. Even setting aside the most you could, about {monthly} a month, the \
+             earliest you can reach this is {}.",
             earliest.format("%b %-d, %Y")
         ),
     ))
@@ -1127,8 +1128,8 @@ mod tests {
         "Mark your pay as a payday first, so the app can work out a realistic date.";
     const NO_ROOM: &str = "You can't set anything aside each month right now, so no date is \
                            realistic yet. Free up money first.";
-    const TOO_SOON: &str = "That's too soon. The earliest you can reach this is Feb 3, 2027, \
-                            saving about ₱10,000.00 a month.";
+    const TOO_SOON: &str = "That's too soon. Even setting aside the most you could, about \
+                            ₱10,000.00 a month, the earliest you can reach this is Feb 3, 2027.";
 
     fn draft(target: i64, account_id: i64, goal_id: Option<i64>) -> GoalDraft {
         GoalDraft {
@@ -1296,8 +1297,8 @@ mod tests {
         let trip = fields("Trip", 3_000_000, Some("2027-02-02"), CASH);
         assert_eq!(
             message(create(&mut conn, trip, now())),
-            "That's too soon. The earliest you can reach this is Feb 3, 2027, saving about \
-             1,000,000\u{a0}$ a month."
+            "That's too soon. Even setting aside the most you could, about 1,000,000\u{a0}$ a \
+             month, the earliest you can reach this is Feb 3, 2027."
         );
     }
 
@@ -1320,8 +1321,8 @@ mod tests {
         update(&mut conn, trip, japan("2027-02-03"), now()).unwrap();
         assert_eq!(
             message(update(&mut conn, trip, japan("2027-02-04"), now())),
-            "That's too soon. The earliest you can reach this is Mar 3, 2027, saving about \
-             ₱7,500.00 a month."
+            "That's too soon. Even setting aside the most you could, about ₱7,500.00 a month, \
+             the earliest you can reach this is Mar 3, 2027."
         );
         update(&mut conn, trip, japan("2027-03-03"), now()).unwrap();
     }
@@ -1355,8 +1356,8 @@ mod tests {
         let trip = |date| fields("Trip", 500_000, Some(date), savings);
         assert_eq!(
             message(create(&mut conn, trip("2026-11-02"), now())),
-            "That's too soon. The earliest you can reach this is Nov 3, 2026, saving about \
-             ₱10,000.00 a month."
+            "That's too soon. Even setting aside the most you could, about ₱10,000.00 a month, \
+             the earliest you can reach this is Nov 3, 2026."
         );
         create(&mut conn, trip("2026-11-03"), now()).unwrap();
     }
