@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.3 |
-| **Last updated** | 2026-11-20 |
+| **Last updated** | 2026-11-21 |
 | **Database** | SQLite (bundled with the app through `rusqlite`) |
 | **Related docs** | [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 
@@ -1233,6 +1233,14 @@ Income and expense colors are **numbered separately**, because the breakdown cha
 
 Every icon is already on the curated list (DESIGN_SYSTEM §6). These are ordinary expense categories: they can be renamed, recolored, archived, merged or deleted like any other.
 
+**Added in Phase 5 (PRD Appendix A):** migration 0006 adds HMO by the same rule: only to a database with no expense category of that name (ignoring case, archived ones included), after the existing expense categories, in the least-used color of the active ones. A category the user already made, such as their own "HMO", is kept exactly as it is. The SQL writes its palette out, so it never changes with the app's.
+
+| Name | Icon | Color (on a new database) | Used for |
+|---|---|---|---|
+| HMO | `pill` | `cat-1` blue, since every color is used twice by then | Payslip deductions (PAY-3) |
+
+Its `created_at` and `updated_at` are the time the migration ran.
+
 ---
 
 ## 8. Migrations
@@ -1251,6 +1259,7 @@ Every icon is already on the curated list (DESIGN_SYSTEM §6). These are ordinar
 | `0003_loans_payroll.sql` | 4 | loans, loan_payments, `transactions.payslip_id`, `recurring_rules.is_payday`, and the Phase 4 categories a database doesn't have yet (§7), all in the migration's one database transaction |
 | `0004_card_spend_levels.sql` | 4 | `accounts.spend_soft`, `spend_mid` and `spend_hard`, with existing cards set to 3,000, 4,000 and 5,000 in the main currency unit (CC-10, §2) |
 | `0005_checkins.sql` | 5 | checkins and its index (§4.9), and `goals.moved_on` and `moved_from` (§4.4) |
+| `0006_hmo_category.sql` | 5 | the HMO deduction category, for a database that doesn't have one yet (§7). No schema change |
 
 ### CSV export format (BAK-6, Phase 2)
 

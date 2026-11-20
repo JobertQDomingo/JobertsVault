@@ -32,6 +32,8 @@ const WITH_DEDUCTIONS = {
     expense(6, "Utilities"),
     expense(7, "SSS"),
     expense(8, "PhilHealth"),
+    // A user's own spelling: matched ignoring case, as migration 0006 matches it (PAY-3).
+    expense(9, "hmo"),
   ],
 };
 
@@ -110,6 +112,7 @@ test("the deduction categories come first, then the other expense categories", a
   expect(options).toEqual([
     "SSS",
     "PhilHealth",
+    "hmo",
     "Food & Groceries",
     "Dining Out",
     "Transportation",

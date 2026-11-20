@@ -399,8 +399,8 @@ mod tests {
     fn the_seed_is_listed_with_default_colors() {
         let conn = db();
         let all = list(&conn).unwrap();
-        // 7 income, 17 expense, and the 7 expense ones migration 0003 adds.
-        assert_eq!(all.categories.len(), 31);
+        // 7 income, 17 expense, the 7 expense ones migration 0003 adds and 0006's HMO.
+        assert_eq!(all.categories.len(), 32);
         assert_eq!(
             all.categories[0],
             Category {
@@ -419,13 +419,13 @@ mod tests {
             names(&conn, CategoryKind::Expense)[..3],
             ["Food & Groceries", "Dining Out", "Transportation"]
         );
-        // Income leaves cat-1 unused. With 0003's seven, every expense color is used twice, so
-        // the tie goes to the lowest number.
+        // Income leaves cat-1 unused. With 0003's seven, every expense color is used twice, and
+        // 0006's HMO takes the lowest, cat-1, so the next tie goes to cat-2.
         assert_eq!(
             all.default_colors,
             DefaultColors {
                 income: "cat-1".into(),
-                expense: "cat-1".into(),
+                expense: "cat-2".into(),
             }
         );
     }
@@ -452,12 +452,12 @@ mod tests {
         assert_eq!(
             snacks,
             Category {
-                id: 32,
+                id: 33,
                 name: "Snacks".into(),
                 kind: CategoryKind::Expense,
                 color: "cat-6".into(),
                 icon: "coffee".into(),
-                sort_order: 24,
+                sort_order: 25,
                 archived: false,
                 transaction_count: 0,
                 in_use: false,
