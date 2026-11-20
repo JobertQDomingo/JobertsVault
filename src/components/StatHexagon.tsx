@@ -5,6 +5,7 @@ import {
   Radar,
   RadarChart,
 } from "recharts";
+import type { Snapshot } from "@/bindings/Snapshot";
 import type { StatName } from "@/bindings/StatName";
 import { cn } from "@/lib/utils";
 import { STAT_LABELS } from "@/lib/vault";
@@ -93,21 +94,31 @@ export function StatHexagon({
 
 /**
  * The six scores beside the chart: the name, the score ("—" when it doesn't apply) and, from the
- * first check-in on, `▲ 6`, `▼ 10` or `—` against it (UI_FLOWS §8.7–8.8).
+ * first check-in on, `▲ 6`, `▼ 10` or `—` against it (UI_FLOWS §8.7–8.8). Given `history`, from 3
+ * check-ins on each row ends with its trend line (LVL-8).
  */
 export function StatScores({
   stats,
   previous,
+  history,
 }: {
   stats: { stat: StatName; score: number | null }[];
   previous?: (number | null)[] | null;
+  /** The latest snapshots, oldest first. */
+  history?: Snapshot[];
 }) {
+  const trends = !!history && history.length >= 3;
   return stats.map(({ stat, score }, i) => {
     const was = previous?.[i] ?? null;
     return (
       <div
         key={stat}
-        className="grid h-8 grid-cols-[76px_36px_48px] items-center gap-2"
+        className={cn(
+          "grid h-8 items-center gap-2",
+          trends
+            ? "grid-cols-[76px_36px_48px_64px]"
+            : "grid-cols-[76px_36px_48px]",
+        )}
       >
         <span>{STAT_LABELS[stat]}</span>
         <b className="text-right font-semibold tabular-nums">{score ?? "—"}</b>
@@ -117,9 +128,49 @@ export function StatScores({
           ) : (
             <Points change={was === null ? null : score - was} />
           ))}
+        {trends && <Trend points={history.map((h) => h.stats[i] ?? null)} />}
       </div>
     );
   });
+}
+
+/**
+ * A stat's snapshots as a 64 × 20 px line with no axes or dots (UI_FLOWS §8.8), scaled to its own
+ * range but never less than 20 points tall, so a flat line sits in the middle. A snapshot where the
+ * stat didn't apply breaks the line, so it never suggests a value there. Hidden from screen readers:
+ * the score and its change say it.
+ */
+function Trend({ points }: { points: (number | null)[] }) {
+  const known = points.filter((p) => p !== null);
+  const span = Math.max(Math.max(...known) - Math.min(...known), 20);
+  const bottom = (Math.max(...known) + Math.min(...known) - span) / 2;
+  const step = 62 / Math.max(points.length - 1, 1);
+  // Runs of points between the gaps; 1 px inside each edge, so the 1.5 px stroke isn't clipped.
+  const runs: string[][] = [[]];
+  points.forEach((p, i) => {
+    if (p === null) runs.push([]);
+    else
+      runs[runs.length - 1].push(
+        `${1 + i * step},${19 - ((p - bottom) / span) * 18}`,
+      );
+  });
+  return (
+    <svg aria-hidden data-trend width={64} height={20}>
+      {runs
+        .filter((run) => run.length >= 2)
+        .map((run) => (
+          <polyline
+            key={run[0]}
+            points={run.join(" ")}
+            fill="none"
+            stroke="var(--primary)"
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        ))}
+    </svg>
+  );
 }
 
 /** `▲ 6` or `▼ 10`, the arrow spelled out for screen readers; `—` when it's the same or unknown. */

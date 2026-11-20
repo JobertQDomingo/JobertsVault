@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { act, screen, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
 import type { ActiveFocus } from "@/bindings/ActiveFocus";
+import type { GradedFocus } from "@/bindings/GradedFocus";
 import type { VaultStatus } from "@/bindings/VaultStatus";
 import {
   ACCOUNT_LIST,
@@ -295,4 +296,97 @@ test("a failed load is the inline message with Retry", async () => {
     list_loans: LOANS,
   });
   expect(await screen.findByRole("button", { name: /retry/i })).toBeTruthy();
+});
+
+const graded = (
+  over: Partial<GradedFocus> & Pick<GradedFocus, "kind" | "result">,
+): GradedFocus => ({
+  actual: null,
+  categoryId: null,
+  accountId: null,
+  loanPaymentId: null,
+  target: null,
+  start: "2026-11-09",
+  end: "2026-11-15",
+  ...over,
+});
+
+test("the focus record lists the graded focuses oldest first, each named with its result (LVL-8)", async () => {
+  show({
+    // Latest first, as get_vault_status gives it.
+    focusRecord: [
+      graded({ kind: "logging", result: "kept", target: 5, actual: 6 }),
+      graded({
+        kind: "category_cap",
+        result: "missed",
+        categoryId: 2,
+        target: 150000,
+        actual: 160000,
+        start: "2026-11-02",
+        end: "2026-11-08",
+      }),
+    ],
+  });
+  const record = await screen.findByRole("list", { name: "Last 8 focuses" });
+  const icons = within(record).getAllByRole("img");
+  expect(icons.map((i) => i.getAttribute("aria-label"))).toEqual([
+    "Keep Dining Out under ₱1,500.00 · Missed",
+    "Log on at least 5 days this week · Kept",
+  ]);
+  expect(icons[0].tabIndex).toBe(0);
+  act(() => icons[1].focus());
+  expect((await screen.findByRole("tooltip")).textContent).toBe(
+    "Log on at least 5 days this week · Kept",
+  );
+});
+
+test("with no graded focus there's no record", async () => {
+  show();
+  await screen.findByText("2 focuses kept in a row");
+  expect(screen.queryByText("Last 8")).toBeNull();
+});
+
+const snapshot = (completedOn: string, stats: (number | null)[]) => ({
+  completedOn,
+  level: 4,
+  stats,
+  debtFreeOn: null,
+});
+
+test("from 3 check-ins on, each stat ends with a trend line; a flat one sits in the middle (LVL-8)", async () => {
+  show({
+    history: [
+      snapshot("2026-10-26", [40, 100, 70, 30, null, 80]),
+      snapshot("2026-11-02", [62, 100, 58, null, 18, 82]),
+      snapshot("2026-11-09", [66, 100, 58, 37, 20, 85]),
+    ],
+  });
+  await screen.findByText("Level 4 · In the black");
+  const lines = [...document.querySelectorAll("svg[data-trend]")].map(
+    (svg) => svg.querySelector("polyline")?.getAttribute("points") ?? null,
+  );
+  expect(lines).toHaveLength(6);
+  // Bills never moved: it spans 20 points around 100, so every point is at the middle, y = 10.
+  expect(lines[1]).toBe("1,10 32,10 63,10");
+  // Cashflow spans more than 20 points, so its lowest is at the bottom and its highest at the top,
+  // each 1 px in.
+  expect(lines[0]?.split(" ")[0]).toBe("1,19");
+  expect(lines[0]?.split(" ")[2]).toBe("63,1");
+  // Savings didn't apply at the first check-in, so its line starts at the second.
+  expect(lines[4]?.split(" ")).toHaveLength(2);
+  // Debt didn't apply at the middle one: its two lone points aren't joined across the gap.
+  expect(lines[3]).toBeNull();
+  // The trend is extra: the score and its change still say it in text.
+  expect(row("Cashflow").textContent).toBe("Cashflow72▲ Up 6");
+});
+
+test("with fewer than 3 check-ins there are no trend lines", async () => {
+  show({
+    history: [
+      snapshot("2026-11-02", [62, 100, 58, 35, 18, 82]),
+      snapshot("2026-11-09", [66, 100, 58, 37, 20, 85]),
+    ],
+  });
+  await screen.findByText("Level 4 · In the black");
+  expect(document.querySelector("svg[data-trend]")).toBeNull();
 });
