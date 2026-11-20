@@ -162,7 +162,7 @@ function Flow({
 
   const steps = ORDER.filter((s) =>
     s === "goals"
-      ? data.goals
+      ? data.goals?.length
       : s === "balance"
         ? data.balances
         : s === "year"

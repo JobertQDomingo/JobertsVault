@@ -635,14 +635,12 @@ export function goalsStep(ctx: Ctx): Step {
   const goals = ctx.data.goals ?? [];
   const behind = goals.filter((g) => g.behind).length;
   return {
-    say:
-      goals.length === 0
-        ? "No goals yet."
-        : behind
-          ? behind === 1
-            ? "1 goal is behind."
-            : `${behind} goals are behind.`
-          : "Your goals are on track.",
+    // The backend leaves the step out when there's no active goal (DATA_MODEL §5.19).
+    say: behind
+      ? behind === 1
+        ? "1 goal is behind."
+        : `${behind} goals are behind.`
+      : "Your goals are on track.",
     body: goals.map((g) => {
       // Named when it moved by itself since the period shown began (DATA_MODEL §5.19).
       const moved =
@@ -736,7 +734,9 @@ export function statsStep(ctx: Ctx): Step {
         ? s.levelReason
           ? `Level ${s.level} now: ${DROP_REASONS[s.levelReason]}.`
           : `Level ${s.level} now.`
-        : `You're still at level ${s.level}.`;
+        : s.previous
+          ? `You're still at level ${s.level}.`
+          : `You're at level ${s.level}.`;
   const move = nextMoveText(s.nextMove, {
     money: (amount) => money(ctx, amount),
     loan: (id) => loanName(ctx, id),
