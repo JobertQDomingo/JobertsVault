@@ -4,6 +4,7 @@ import { render } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { vi } from "vitest";
+import type { LoanRowAmount } from "@/bindings/LoanRowAmount";
 import type { SettingsView } from "@/bindings/SettingsView";
 import { createQueryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
@@ -60,6 +61,12 @@ export function renderRoute(
         get_checkin: null,
         // The sidebar's level chip asks on every screen; null hides it.
         get_vault_status: null,
+        // The loan form's running total asks as it opens: a stand-in for the backend's sum.
+        total_loan_payments: ({ rows }: { rows: LoanRowAmount[] }) => {
+          const sum = (list: LoanRowAmount[]) =>
+            list.reduce((s, r) => s + r.amount, 0);
+          return { total: sum(rows), left: sum(rows.filter((r) => !r.paid)) };
+        },
         ...answers,
       };
       // A command the test didn't expect fails loudly instead of looking like an empty load.

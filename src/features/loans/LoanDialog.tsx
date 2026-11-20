@@ -277,12 +277,13 @@ export function LoanDialog({
   const paidBefore = (r: Row) =>
     existing && r.dueDate !== "" && r.dueDate < cutoff;
   // The running total (F12): each row as it shows, paid or not, for the backend to add up.
-  const sum = useLoanRowsTotal(
-    payments.map((r) => ({
-      amount: r.amount ?? 0,
-      paid: r.paidOn !== null || paidBefore(r),
-    })),
-  ).data;
+  const totalRows = payments.map((r) => ({
+    amount: r.amount ?? 0,
+    paid: Boolean(r.paidOn) || paidBefore(r),
+  }));
+  // Two figures once any row shows as paid, even one with no amount yet (F12).
+  const anyPaid = totalRows.some((r) => r.paid);
+  const sum = useLoanRowsTotal(totalRows).data;
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -501,9 +502,9 @@ export function LoanDialog({
               className="text-small font-semibold tabular-nums"
             >
               {sum &&
-                (sum.left === sum.total
-                  ? `Total ${money(sum.total)}`
-                  : `Total ${money(sum.total)} · Still to pay ${money(sum.left)}`)}
+                (anyPaid
+                  ? `Total ${money(sum.total)} · Still to pay ${money(sum.left)}`
+                  : `Total ${money(sum.total)}`)}
             </p>
             {rowsError && (
               <p

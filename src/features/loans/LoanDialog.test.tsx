@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
-import type { LoanRowAmount } from "@/bindings/LoanRowAmount";
 import type { NewLoan } from "@/bindings/NewLoan";
 import {
   ACCOUNT_LIST,
@@ -30,12 +29,6 @@ const ANSWERS: Answers = {
   }),
   update_loan: () => LOANS.loans[0],
   preview_loan: LOAN_PREVIEW,
-  // A stand-in for the backend's sum (total_loan_payments).
-  total_loan_payments: ({ rows }: { rows: LoanRowAmount[] }) => {
-    const sum = (list: LoanRowAmount[]) =>
-      list.reduce((s, r) => s + r.amount, 0);
-    return { total: sum(rows), left: sum(rows.filter((r) => !r.paid)) };
-  },
 };
 
 const calls = (command: string) =>
@@ -179,6 +172,13 @@ test("on a loan I already have, a paid-before row splits the total from what's s
   await waitFor(() =>
     expect(dialog().getByTestId("loan-total").textContent).toBe(
       "Total ₱2,000.00 · Still to pay ₱1,000.00",
+    ),
+  );
+  // A paid-before row with no amount yet still shows both figures (F12).
+  type("Payment 1 amount", "");
+  await waitFor(() =>
+    expect(dialog().getByTestId("loan-total").textContent).toBe(
+      "Total ₱1,000.00 · Still to pay ₱1,000.00",
     ),
   );
 });

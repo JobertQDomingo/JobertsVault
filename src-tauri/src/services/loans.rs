@@ -732,6 +732,8 @@ mod tests {
     // Loan 25, the first category 0003 adds. `now()` is 2026-11-03.
     const CASH: i64 = 1;
     const SALARY: i64 = 1;
+    const FOOD: i64 = 8;
+    const LOAN: i64 = 25;
 
     #[test]
     fn total_adds_every_row_and_leaves_the_paid_ones_out_of_left() {
@@ -759,8 +761,6 @@ mod tests {
             Money(i64::MAX)
         );
     }
-    const FOOD: i64 = 8;
-    const LOAN: i64 = 25;
 
     fn field_of<T: Debug>(result: Result<T, AppError>) -> String {
         match result {
