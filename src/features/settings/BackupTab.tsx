@@ -175,6 +175,7 @@ function RestoreRow({ folder }: { folder?: string }) {
   const inspect = useMutation({ mutationFn: inspectBackup });
   // On the mutation, not `mutate`, so they still run if this tab has been left meanwhile.
   const restore = useLedgerMutation(restoreBackup, {
+    nudge: false,
     onSuccess: () => {
       navigate("/");
       notify.success("Backup restored");

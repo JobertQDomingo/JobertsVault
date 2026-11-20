@@ -17,13 +17,17 @@ beforeEach(() => {
   vi.mocked(invoke).mockReset();
 });
 
-const save = async (goalsMoved: GoalMove[], client = new QueryClient()) => {
+const save = async (
+  goalsMoved: GoalMove[],
+  client = new QueryClient(),
+  nudge?: boolean,
+) => {
   render(<Toaster />);
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
   const { result } = renderHook(
-    () => useLedgerMutation(async () => ({ id: 7, goalsMoved })),
+    () => useLedgerMutation(async () => ({ id: 7, goalsMoved }), { nudge }),
     { wrapper },
   );
   await act(() => result.current.mutateAsync(undefined));
@@ -57,7 +61,11 @@ const dining = (over: Partial<ActiveFocus>) =>
   });
 
 /** A save with `before` cached and `after` what `get_vault_status` answers next. */
-async function nudge(before: ActiveFocus[], after: ActiveFocus[]) {
+async function nudge(
+  before: ActiveFocus[],
+  after: ActiveFocus[],
+  on?: boolean,
+) {
   const warning = vi.spyOn(notify, "warning");
   const client = new QueryClient();
   client.setQueryData(queryKeys.settings, SETTINGS);
@@ -71,7 +79,7 @@ async function nudge(before: ActiveFocus[], after: ActiveFocus[]) {
       return { ...CHECKIN_STATUS, focuses: after };
     throw new Error(`unexpected ${cmd}`);
   });
-  await save([], client);
+  await save([], client, on);
   const said = warning.mock.calls.map((c) => c[0]);
   warning.mockRestore();
   return said;
@@ -123,5 +131,16 @@ test("a card-level focus has no focus toast: the card's levels warn (F18 step 4)
     activeFocus({ kind: "card_level", accountId: 4, target: 400000, actual });
   // A cap's state is all it compares, and a card level has none.
   expect(await nudge([card(100000)], [card(450000)])).toEqual([]);
+  expect(invoke).not.toHaveBeenCalled();
+});
+
+test("a restore never warns, whatever the restored focus's state (nudge: false)", async () => {
+  expect(
+    await nudge(
+      [dining({ actual: 100000, percent: 66, state: "ok" })],
+      [dining({ actual: 172000, percent: 114, state: "over" })],
+      false,
+    ),
+  ).toEqual([]);
   expect(invoke).not.toHaveBeenCalled();
 });

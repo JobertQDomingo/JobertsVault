@@ -641,3 +641,27 @@ test("with no active focus there are no focus rows (CHK-8)", async () => {
   await screen.findByText("Safe to spend");
   expect(screen.queryByText(/'s focus: /)).toBeNull();
 });
+
+test("a cap's row doesn't wait for the loans, which only a loan payment's sentence needs", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: {
+      ...DASHBOARD,
+      focuses: [
+        activeFocus({
+          kind: "spending_cap",
+          target: 150000,
+          actual: 1000,
+          percent: 0,
+          state: "ok",
+        }),
+      ],
+    },
+  });
+  expect(
+    await screen.findByText(/^This week's focus: Spend under ₱1,500.00/),
+  ).toBeTruthy();
+  expect(
+    vi.mocked(invoke).mock.calls.some(([cmd]) => cmd === "list_loans"),
+  ).toBe(false);
+});

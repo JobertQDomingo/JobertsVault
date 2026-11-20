@@ -22,15 +22,22 @@ import { queryKeys } from "@/lib/queryKeys";
  */
 export function useLedgerMutation<TArgs, TResult>(
   mutationFn: (args: TArgs) => Promise<TResult>,
-  then: { onSuccess?: () => void; onError?: (error: Error) => void } = {},
+  then: {
+    onSuccess?: () => void;
+    onError?: (error: Error) => void;
+    /** Off for a restore: it swaps the data, it doesn't spend toward a focus. */
+    nudge?: boolean;
+  } = {},
 ) {
   const client = useQueryClient();
   return useMutation({
     mutationFn,
-    onSuccess: async (result) => {
-      const before = client.getQueryData<VaultStatus | null>(
-        queryKeys.vaultStatus,
-      );
+    // Taken before the write, so a refetch while it runs can't hide or fake a rise.
+    onMutate: () =>
+      then.nudge === false
+        ? undefined
+        : client.getQueryData<VaultStatus | null>(queryKeys.vaultStatus),
+    onSuccess: async (result, _args, before) => {
       await Promise.all([
         client.invalidateQueries({ queryKey: queryKeys.ledger }),
         client.invalidateQueries({ queryKey: queryKeys.settings }),

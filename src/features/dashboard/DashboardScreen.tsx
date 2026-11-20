@@ -284,8 +284,8 @@ function DashboardBody({
 /**
  * The active focuses for today, the month's first, flat at the top of the Safe to spend card:
  * the dashboard is already past the blur budget, so they don't get a panel of their own (UI_FLOWS
- * §2, DESIGN_SYSTEM §11). Nothing shows until the loans load, nor on an error loading them:
- * the Level screen, which the rows open, shows that.
+ * §2, DESIGN_SYSTEM §11). A loan payment's rows wait for the loans, and hide on an error loading
+ * them: the Level screen, which the rows open, shows that.
  */
 function DashboardFocus({
   data: { focuses, accounts, today },
@@ -294,20 +294,22 @@ function DashboardFocus({
   data: Dashboard;
   categories: Category[];
 }) {
-  const loans = useLoans().data;
+  // Only a loan payment's sentence needs the loans, so nothing else waits for them.
+  const needsLoans = focuses.some((f) => f.kind === "loan_on_time");
+  const loans = useLoans(needsLoans).data;
   const settings = useSettings().data;
-  if (!focuses.length || !loans || !settings) return null;
+  if (!focuses.length || (needsLoans && !loans) || !settings) return null;
   const names = focusNames(
     today,
     (amount) => formatMoney(amount, settings),
     categories,
     accounts,
-    loans.loans,
+    loans?.loans ?? [],
   );
   return (
     <Link
       to="/level"
-      className="block border-b border-hairline px-[18px] py-3 transition-colors duration-150 hover:bg-glass-hover"
+      className="block border-b border-hairline px-[18px] py-3 transition-colors duration-150 outline-none hover:bg-glass-hover focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:ring-inset"
     >
       <FocusRows focuses={focuses} names={names} level={cardLevel(accounts)} />
     </Link>
