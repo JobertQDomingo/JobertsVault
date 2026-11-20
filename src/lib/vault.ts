@@ -1,6 +1,9 @@
 // The Vault level's words (UI_FLOWS §8.7–8.8): the backend sends codes, and this file is the one
 // place that turns them into text, so the check-in and the Level screen say the same thing.
+import type { Account } from "@/bindings/Account";
+import type { Category } from "@/bindings/Category";
 import type { Condition } from "@/bindings/Condition";
+import type { Loan } from "@/bindings/Loan";
 import type { ConditionCode } from "@/bindings/ConditionCode";
 import type { FocusFields } from "@/bindings/FocusFields";
 import type { NextMoveView } from "@/bindings/NextMoveView";
@@ -240,6 +243,40 @@ export type FocusNames = {
   payment: (id: number | null) => { loan: string; dueDate: string } | undefined;
   today: string;
 };
+
+/** The names a focus's sentence needs, from the lists the screen loaded. */
+export function focusNames(
+  today: string,
+  money: FocusNames["money"],
+  categories: Category[],
+  accounts: Account[],
+  loans: Loan[],
+): FocusNames {
+  return {
+    money,
+    category: (id) => categories.find((c) => c.id === id)?.name ?? "A category",
+    account: (id) => accounts.find((a) => a.id === id)?.name ?? "Your card",
+    cards: accounts.filter((a) => a.kind === "credit_card" && !a.archived)
+      .length,
+    payment: (id) => {
+      for (const loan of loans) {
+        const p = loan.payments.find((p) => p.id === id);
+        if (p) return { loan: loan.name, dueDate: p.dueDate };
+      }
+    },
+    today,
+  };
+}
+
+/** A card-level focus names its level when its target is one of the card's three. */
+export const cardLevel =
+  (accounts: Account[]) => (f: Pick<FocusFields, "accountId" | "target">) => {
+    const a = accounts.find((a) => a.id === f.accountId);
+    if (!a || f.target === null) return null;
+    if (f.target === a.spendSoft) return "soft";
+    if (f.target === a.spendMid) return "mid";
+    return f.target === a.spendHard ? "hard" : null;
+  };
 
 /** "week" or "month", from the dates a focus runs for. */
 export const focusUnit = (f: Pick<FocusFields, "start" | "end">) =>

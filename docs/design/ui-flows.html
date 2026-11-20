@@ -101,7 +101,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
   <!-- 1–2. Shell + Dashboard -->
   <section class="s" id="dashboard">
     <h2><span class="sec-no">§1–2</span> App shell and dashboard <span class="phase p1">Phase 1</span></h2>
-    <p class="sec-intro">The window is a fixed 1440 × 900. Everything floats as glass over the aurora with 12 px gaps: the sidebar, the top bar, the period bar and the cards. The sidebar lists the screens, with Settings at the bottom, and the current screen gets a soft indigo tint. The top bar always has <b>+ Add</b> (<span class="kbd">Ctrl</span> <span class="kbd">N</span>). Turn on <b>Show Phase 2–5 additions</b> in the bar above to see what later phases add, outlined with dashes, such as the Phase 5 focus strip, the Level item and the level chip beside the app name. Screens from later phases stay hidden in the sidebar until they're built.</p>
+    <p class="sec-intro">The window is a fixed 1440 × 900. Everything floats as glass over the aurora with 12 px gaps: the sidebar, the top bar, the period bar and the cards. The sidebar lists the screens, with Settings at the bottom, and the current screen gets a soft indigo tint. The top bar always has <b>+ Add</b> (<span class="kbd">Ctrl</span> <span class="kbd">N</span>). Turn on <b>Show Phase 2–5 additions</b> in the bar above to see what later phases add, outlined with dashes, such as the Phase 5 focus rows at the top of Safe to spend, the Level item and the level chip beside the app name. Screens from later phases stay hidden in the sidebar until they're built.</p>
     <div class="frame-fit" data-fit>
       <div class="preview shot">
         <div class="v-shell">
@@ -118,10 +118,6 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
               <div class="v-banner warning later later-tag"><i data-lucide="triangle-alert" class="s20"></i><div class="msg">No backup in the last 7 days.</div><button class="v-btn secondary sm" type="button">Back up now</button><span class="phase">P2</span></div>
               <div class="v-banner warning later later-tag"><i data-lucide="credit-card" class="s20"></i><div class="msg">Credit card payment due in 3 days: ₱640.00 owed</div><button class="v-btn secondary sm" type="button">Pay bill</button><span class="phase">P3</span></div>
               <div class="v-banner info later later-tag"><i data-lucide="repeat" class="s20"></i><div class="msg">2 recurring transactions are due.</div><button class="v-btn secondary sm" type="button">Review</button><span class="phase">P3</span></div>
-              <div class="v-card v-focus later later-tag" role="link">
-                <div class="fr"><i data-lucide="target"></i><span class="txt">This month's focus: Pay E-wallet loan by Wed, Oct 28 <span class="muted">· not paid yet</span></span><span class="phase">P5</span></div>
-                <div class="fr"><i data-lucide="target"></i><span class="txt num">This week's focus: Keep Food &amp; Groceries under ₱96.40 <span class="muted">· ₱85.20 so far</span></span><div class="v-progress warn"><i style="width:88.4%"></i></div><span class="pc">88%</span></div>
-              </div>
               <div class="cols c3">
                 <div class="v-card v-stat"><span class="lab"><i data-lucide="arrow-down-left" class="s14 inc"></i>Income</span><span class="display inc">+₱4,200.00</span><span class="chg later"><span class="pct good">▲ 3.1%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
                 <div class="v-card v-stat"><span class="lab"><i data-lucide="arrow-up-right" class="s14 exp"></i>Expense</span><span class="display exp">−₱2,950.40</span><span class="chg later"><span class="pct good">▼ 8.0%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
@@ -144,6 +140,10 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
                 </div>
                 <div class="stack">
                   <div class="v-card v-stat later later-tag">
+                    <div class="v-focus flat later later-tag" role="link" style="border-bottom:1px solid var(--hairline);margin-bottom:6px">
+                      <div class="fr"><i data-lucide="target"></i><span class="txt">This month's focus: Pay E-wallet loan by Wed, Oct 28 <span class="muted">· not paid yet</span></span><span class="phase">P5</span></div>
+                      <div class="fr"><i data-lucide="target"></i><span class="txt num">This week's focus: Keep Food &amp; Groceries under ₱96.40 <span class="muted">· ₱85.20 so far</span></span><div class="v-progress warn"><i style="width:88.4%"></i></div><span class="pc">88%</span></div>
+                    </div>
                     <span class="lab" style="justify-content:space-between"><span>Safe to spend until Tue, Nov 24</span><span class="row" style="gap:10px"><a class="v-link" href="#forecast">View forecast</a><span class="phase">P4</span></span></span>
                     <span class="display">₱3,508.77</span>
                     <span class="cap num">₱116.95 a day · 30 days left</span>

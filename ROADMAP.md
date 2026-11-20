@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-20 |
-| **Current focus** | **Phase 5: Check-in & polish**: Dashboard focus strip and the focus nudge [CHK-8] |
+| **Current focus** | **Phase 5: Check-in & polish**: Focus record and stat trend lines on the Level screen [LVL-8] |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -22,7 +22,7 @@ This file is the progress tracker.
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 16 / 16 |
 | **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 17 / 17 |
-| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 14 / 29 |
+| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 15 / 29 |
 
 ---
 
@@ -225,7 +225,7 @@ The owner approved the plan on 2026-11-17 ([ADR 0012](docs/decisions/0012-requir
 - [x] Check-in screen at `/check-in` with the `StepIndicator`, every step, the route guard and the startup order. It can't be closed, Ctrl+N opens over it and its figures refresh after a save, a failed load opens the app normally, and a failed Finish reloads the offers and offers "Open the app anyway" for that session, with the check-in also asked for at midnight (UI_FLOWS §8.7, F17, ADR 0014) [CHK-2] [CHK-3] [CHK-4] [CHK-5] [CHK-6] [CHK-7]
 - [x] Level screen at `/level` with the `LevelBadge`, `LevelPath` and `StatHexagon`, the next best move and the streaks, plus its sidebar item (UI_FLOWS §8.8) [LVL-3] [LVL-4] [LVL-7]
 - [x] Sidebar level chip with its ring [LVL-5]
-- [ ] Dashboard focus strip, and the warning toast when a save takes a cap to 80% of its target or past it. Count the dashboard's blurred panels with every banner showing first: past the budget, the rows go flat in the Safe to spend card instead (UI_FLOWS §2, F18) [CHK-8]
+- [x] Dashboard focus strip, and the warning toast when a save takes a cap to 80% of its target or past it. Count the dashboard's blurred panels with every banner showing first: past the budget, the rows go flat in the Safe to spend card instead (UI_FLOWS §2, F18). It was past the budget, so the rows were built in the card [CHK-8]
 - [ ] Focus record and stat trend lines on the Level screen [LVL-8]
 - [ ] Level-up moment in the check-in's Stats and level step, skipped with `prefers-reduced-motion` [LVL-6]
 - [ ] Pay bill, Pay and Record now inside the check-in, opening the existing forms over it [CHK-9]

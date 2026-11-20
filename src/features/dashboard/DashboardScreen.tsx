@@ -21,6 +21,7 @@ import { AccountRow } from "@/components/AccountRow";
 import { CategoryChip, TransferChip } from "@/components/CategoryChip";
 import { Banner } from "@/components/Banner";
 import { EmptyState } from "@/components/EmptyState";
+import { FocusRows } from "@/components/FocusRows";
 import { ErrorState } from "@/components/ErrorState";
 import { GlassPanel } from "@/components/GlassPanel";
 import { IncomeExpenseChart } from "@/components/IncomeExpenseChart";
@@ -42,7 +43,9 @@ import { SafeToSpendCard } from "./SafeToSpendCard";
 import { useBackupNow } from "@/hooks/useBackup";
 import { useCategories } from "@/hooks/useCategories";
 import { useDashboard } from "@/hooks/useDashboard";
+import { useLoans } from "@/hooks/useLoans";
 import { usePeriodQuery } from "@/hooks/usePeriodQuery";
+import { useSettings } from "@/hooks/useSettings";
 import {
   formatDate,
   formatDayHeader,
@@ -51,8 +54,10 @@ import {
   formatSpan,
   groupByDate,
 } from "@/lib/dates";
+import { formatMoney } from "@/lib/money";
 import { rowTitle } from "@/lib/records";
 import { cn } from "@/lib/utils";
+import { cardLevel, focusNames } from "@/lib/vault";
 
 const COLUMNS = "grid grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] gap-3";
 
@@ -223,7 +228,10 @@ function DashboardBody({
           )}
         </GlassPanel>
         <div className="grid content-start gap-3">
-          <SafeToSpendCard forecast={data.safeToSpend} />
+          <SafeToSpendCard
+            forecast={data.safeToSpend}
+            focus={<DashboardFocus data={data} categories={categoryList} />}
+          />
           <GlassPanel className="overflow-hidden">
             <CardHeader title="Accounts" to="/accounts" link="Manage" />
             {/* Archived accounts are hidden here but still in the net balance (ACC-5). */}
@@ -270,6 +278,41 @@ function DashboardBody({
         />
       </div>
     </>
+  );
+}
+
+/**
+ * The active focuses for today, the month's first, flat at the top of the Safe to spend card:
+ * the dashboard is already past the blur budget, so they don't get a panel of their own (UI_FLOWS
+ * §2, DESIGN_SYSTEM §11). A loan payment's rows wait for the loans, and hide on an error loading
+ * them: the Level screen, which the rows open, shows that.
+ */
+function DashboardFocus({
+  data: { focuses, accounts, today },
+  categories,
+}: {
+  data: Dashboard;
+  categories: Category[];
+}) {
+  // Only a loan payment's sentence needs the loans, so nothing else waits for them.
+  const needsLoans = focuses.some((f) => f.kind === "loan_on_time");
+  const loans = useLoans(needsLoans).data;
+  const settings = useSettings().data;
+  if (!focuses.length || (needsLoans && !loans) || !settings) return null;
+  const names = focusNames(
+    today,
+    (amount) => formatMoney(amount, settings),
+    categories,
+    accounts,
+    loans?.loans ?? [],
+  );
+  return (
+    <Link
+      to="/level"
+      className="block border-b border-hairline px-[18px] py-3 transition-colors duration-150 outline-none hover:bg-glass-hover focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:ring-inset"
+    >
+      <FocusRows focuses={focuses} names={names} level={cardLevel(accounts)} />
+    </Link>
   );
 }
 

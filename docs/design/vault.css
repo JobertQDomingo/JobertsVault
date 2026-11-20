@@ -429,7 +429,7 @@ svg.v-trend polyline { fill: none; stroke: var(--primary); stroke-width: 1.5; st
 .lv-check li { display: flex; gap: 8px; align-items: center; }
 .lv-check .met { color: var(--success); } .lv-check .unmet { color: var(--muted-foreground); }
 
-/* FocusStrip: a slim panel, one 40 px row per active focus */
+/* FocusRows: one row per active focus, flat inside its panel */
 .v-focus { border-radius: 16px; padding: 0 16px; }
 .v-focus.flat { padding: 0; border-radius: 0; }
 .v-focus .fr { display: flex; align-items: center; gap: 10px; min-height: 40px; border-top: 1px solid var(--hairline); flex-wrap: wrap; }
