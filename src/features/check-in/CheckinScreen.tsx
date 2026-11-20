@@ -78,6 +78,8 @@ export function CheckinScreen() {
   const settings = useSettings();
   // Only for Record now: while it loads, or if it fails, the step just has no button (CHK-9).
   const paydays = (useDueOccurrences().data ?? []).filter((o) => o.isPayday);
+  // Held here, not in the flow, so a failed reload and its Retry don't forget it (UI_FLOWS §11).
+  const [paidHere, setPaidHere] = useState<number[]>([]);
   const data = checkin.data;
   const failed = [categories, accounts, loans, settings].filter(
     (q) => q.isError,
@@ -119,6 +121,9 @@ export function CheckinScreen() {
               accounts: accounts.data.accounts,
               loans: loans.data.loans,
               paydays,
+              paidHere,
+              onPay: (id) =>
+                setPaidHere((was) => (was.includes(id) ? was : [...was, id])),
             }}
           />
         ) : (
@@ -139,7 +144,11 @@ function Flow({
   refetch,
 }: {
   data: Checkin;
-  base: Pick<Ctx, "categories" | "accounts" | "loans" | "paydays"> & {
+  base: Pick<
+    Ctx,
+    "categories" | "accounts" | "loans" | "paydays" | "paidHere"
+  > & {
+    onPay: (paymentId: number) => void;
     settings: SettingsView;
   };
   refetch: () => void;
@@ -149,7 +158,6 @@ function Flow({
   const guard = useOutletContext<Partial<GuardContext>>();
   const [answers, setAnswers] = useState<Record<number, Answer>>({});
   const [pickKey, setPickKey] = useState<string | null>(null);
-  const [paidHere, setPaidHere] = useState<number[]>([]);
   const quickAdd = useQuickAdd();
 
   const steps = ORDER.filter((s) =>
@@ -193,11 +201,10 @@ function Flow({
     picked,
     pick: (o) => setPickKey(keyOf(o)),
     levelUp,
-    paidHere,
     payBill: quickAdd.payBill,
     pay: (id) => {
       // Kept only once it's paid, so a cancelled form changes nothing.
-      setPaidHere((was) => (was.includes(id) ? was : [...was, id]));
+      base.onPay(id);
       quickAdd.markPaid(id);
     },
     recordPayslip: (o) =>

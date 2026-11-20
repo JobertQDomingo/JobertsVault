@@ -463,7 +463,11 @@ export function cardStep(ctx: Ctx): Step {
             </Muted>
             {/* Secondary, since Next is the step's main button (CHK-9). */}
             {card.amountOwed > 0 && (
-              <Button size="sm" onClick={() => ctx.payBill(a.id)}>
+              <Button
+                size="sm"
+                aria-label={`Pay bill for ${a.name}`}
+                onClick={() => ctx.payBill(a.id)}
+              >
                 Pay bill
               </Button>
             )}
@@ -486,11 +490,15 @@ export function loansStep(ctx: Ctx): Step {
     .filter((d) => d.days < 0)
     .reduce((n, d) => n + 1 + d.moreOverdue, 0);
   const paidLine = `${plural(paid.length, "loan payment", "loan payments")} paid, ${money(ctx, paidTotal)}.`;
-  // Paid from this check-in: after today, so not in the period's `paid`, but kept in place as paid.
+  // Paid from this check-in after the period, so not in its `paid`, but kept in place as paid.
+  // One dated back into the period is already in `paid`.
   const paidNow = ctx.paidHere
     .map((id) => payment(ctx, id))
     .filter(
-      (x) => x?.p?.paidOn && !loansDue.some((d) => d.paymentId === x.p!.id),
+      (x) =>
+        x?.p?.paidOn &&
+        x.p.paidOn > ctx.data.period.end &&
+        !loansDue.some((d) => d.paymentId === x.p!.id),
     )
     .map((x) => ({ name: x!.loan.name, ...x!.p! }));
   const say = overdue
@@ -522,27 +530,45 @@ export function loansStep(ctx: Ctx): Step {
                 {`${p.name}: ${money(ctx, p.paidAmount ?? 0)} paid ${p.paidOn === today ? "today" : weekdayDate(p.paidOn!, today)}`}
               </p>
             ))}
-            {loansDue.map((d) => (
-              <div
-                key={d.paymentId}
-                className="flex items-center justify-between gap-3"
-              >
-                <p
-                  className={cn(
-                    "flex items-center gap-1.5 tabular-nums",
-                    d.days < 0 && "font-semibold text-danger",
-                  )}
+            {loansDue.map((d) => {
+              const account = ctx.accounts.find((a) => a.id === d.accountId);
+              return (
+                <div
+                  key={d.paymentId}
+                  className="flex items-center justify-between gap-3"
                 >
-                  {d.days < 0 && (
-                    <TriangleAlert aria-hidden className="size-4 shrink-0" />
-                  )}
-                  {`${d.name}: ${money(ctx, d.amount)} ${d.days < 0 ? formatOverdue(d.dueDate, today) : formatDue(d.dueDate, today)}`}
-                </p>
-                <Button size="sm" onClick={() => ctx.pay(d.paymentId)}>
-                  Pay
-                </Button>
-              </div>
-            ))}
+                  <div className="grid gap-0.5">
+                    <p
+                      className={cn(
+                        "flex items-center gap-1.5 tabular-nums",
+                        d.days < 0 && "font-semibold text-danger",
+                      )}
+                    >
+                      {d.days < 0 && (
+                        <TriangleAlert
+                          aria-hidden
+                          className="size-4 shrink-0"
+                        />
+                      )}
+                      {`${d.name}: ${money(ctx, d.amount)} ${d.days < 0 ? formatOverdue(d.dueDate, today) : formatDue(d.dueDate, today)}`}
+                    </p>
+                    {/* What the dashboard's banner says when the account is short (LOAN-4). */}
+                    {d.moveFirst !== null && account && (
+                      <p className="text-small text-muted-foreground tabular-nums">
+                        {`${account.name} has ${money(ctx, account.balance)}. Move ${money(ctx, d.moveFirst)} there first.`}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    aria-label={`Pay ${d.name}`}
+                    onClick={() => ctx.pay(d.paymentId)}
+                  >
+                    Pay
+                  </Button>
+                </div>
+              );
+            })}
             {loansLeft && (
               <Muted>
                 {`Loans left: ${money(ctx, loansLeft.totalLeft)} · `}
