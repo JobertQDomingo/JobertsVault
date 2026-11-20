@@ -3,7 +3,7 @@
 
 use std::time::{Duration, Instant};
 
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use rusqlite::{Connection, params};
 
 use crate::domain::period::ComparisonMode;
@@ -116,9 +116,10 @@ fn seed(conn: &mut Connection) {
            ('expense', 80000, 4, (SELECT id FROM categories WHERE kind = 'expense' LIMIT 1), 'weekly', 1, '2026-11-06', 'auto', 0, 'x', 'x'),
            ('expense', 260000, 2, (SELECT id FROM categories WHERE kind = 'expense' LIMIT 1), 'monthly', 1, '2026-11-10', 'confirm', 0, 'x', 'x');
          INSERT INTO loans (name, account_id, category_id, is_new, added_on, created_at, updated_at)
-           VALUES ('Perf loan', 2, (SELECT id FROM categories WHERE name = 'Loan'), 0, '2026-11-01', 'x', 'x');",
+           VALUES ('Perf loan', 2, (SELECT id FROM categories WHERE name = 'Loan'), 0, '2025-11-01', 'x', 'x');",
     )
     .unwrap();
+    seed_last_year(&tx);
     for month in 0..12 {
         let due = NaiveDate::from_ymd_opt(2026, 11, 20)
             .unwrap()
@@ -132,6 +133,125 @@ fn seed(conn: &mut Connection) {
         .unwrap();
     }
     tx.commit().unwrap();
+}
+
+/// Payslips (gross plus 3 deductions) on the 15th and 30th, and loan payments paid on the 20th.
+const PAYSLIP_ROWS: i64 = 24 * 4;
+const PAID_LOAN_ROWS: i64 = 12;
+
+/// The year before today, for the check-in and the Vault level (ARCHITECTURE §12): 24 payslips,
+/// 12 loan payments paid on time, and the check-ins finished each week and month, each with a
+/// graded focus. The newest week and month (Oct 26 – Nov 1, October) stay due, so `get_checkin`
+/// times the merged check-in, its fullest form.
+fn seed_last_year(tx: &rusqlite::Transaction) {
+    let category = |name: &str| -> i64 {
+        tx.query_row("SELECT id FROM categories WHERE name = ?1", [name], |r| {
+            r.get(0)
+        })
+        .unwrap()
+    };
+    let salary = category("Salary");
+    let deductions = [
+        (category("SSS"), 58_000),
+        (category("PhilHealth"), 26_250),
+        (category("Withholding tax"), 95_000),
+    ];
+    let insert = |kind: &str, amount: i64, date: &str, category: i64, payslip: Option<i64>| {
+        tx.execute(
+            "INSERT INTO transactions (kind, amount, date, account_id, category_id, payee, payslip_id, created_at, updated_at)
+             VALUES (?1, ?2, ?3, 2, ?4, 'Perf employer', ?5, 'x', 'x')",
+            params![kind, amount, date, category, payslip],
+        )
+        .unwrap();
+        tx.last_insert_rowid()
+    };
+    let start = NaiveDate::from_ymd_opt(2025, 11, 1).unwrap();
+    for month in 0..12 {
+        let first = start
+            .checked_add_months(chrono::Months::new(month))
+            .unwrap();
+        // The 30th, or the month's last day (February).
+        let last = first
+            .checked_add_months(chrono::Months::new(1))
+            .unwrap()
+            .pred_opt()
+            .unwrap();
+        for day in [
+            first.with_day(15).unwrap(),
+            first.with_day(30).unwrap_or(last),
+        ] {
+            let date = day.to_string();
+            let gross = insert("income", 1_250_000, &date, salary, None);
+            tx.execute(
+                "UPDATE transactions SET payslip_id = id WHERE id = ?1",
+                [gross],
+            )
+            .unwrap();
+            for (category, amount) in deductions {
+                insert("expense", amount, &date, category, Some(gross));
+            }
+        }
+        let due = first.with_day(20).unwrap().to_string();
+        let paid = insert("expense", 100_000, &due, category("Loan"), None);
+        tx.execute(
+            "INSERT INTO loan_payments (loan_id, due_date, amount, transaction_id, created_at, updated_at)
+             VALUES ((SELECT id FROM loans), ?1, 100000, ?2, 'x', 'x')",
+            params![due, paid],
+        )
+        .unwrap();
+    }
+    // Check-ins: a snapshot each, a focus for the next period, graded kept or missed.
+    let checkin = |kind: &str, start: NaiveDate, end: NaiveDate, next_end: NaiveDate, i: i64| {
+        let focus = (kind == "week").then_some("spending_cap");
+        tx.execute(
+            "INSERT INTO checkins (kind, period_start, period_end, completed_on, level,
+                 stat_cashflow, stat_bills, stat_card, stat_debt, stat_savings, stat_habit, debt_free_on,
+                 focus_kind, focus_target, focus_start, focus_end, focus_result, focus_actual, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 90, ?7, 60, ?8, 80, '2027-10-20',
+                 ?9, ?10, ?11, ?12, ?13, ?14, 'x', 'x')",
+            params![
+                kind,
+                start.to_string(),
+                end.to_string(),
+                end.succ_opt().unwrap().to_string(),
+                2 + i % 4,
+                40 + i % 50,
+                50 + i % 40,
+                20 + i % 30,
+                focus,
+                focus.map(|_| 500_000),
+                focus.map(|_| end.succ_opt().unwrap().to_string()),
+                focus.map(|_| next_end.to_string()),
+                focus.map(|_| if i % 3 == 0 { "missed" } else { "kept" }),
+                focus.map(|_| 400_000 + (i % 3) * 60_000),
+            ],
+        )
+        .unwrap();
+    };
+    let monday = NaiveDate::from_ymd_opt(2025, 11, 3).unwrap();
+    for week in 0..51 {
+        let start = monday + chrono::Days::new(7 * week);
+        let end = start + chrono::Days::new(6);
+        checkin("week", start, end, end + chrono::Days::new(7), week as i64);
+    }
+    for month in 0..11 {
+        let first = start
+            .checked_add_months(chrono::Months::new(month))
+            .unwrap();
+        let end = first
+            .checked_add_months(chrono::Months::new(1))
+            .unwrap()
+            .pred_opt()
+            .unwrap();
+        checkin("month", first, end, end, month as i64);
+    }
+    // The last week's focus (Oct 26 – Nov 1) is graded by the check-in that's due.
+    tx.execute(
+        "UPDATE checkins SET focus_result = NULL, focus_actual = NULL
+         WHERE kind = 'week' AND period_start = '2026-10-19'",
+        [],
+    )
+    .unwrap();
 }
 
 /// The slowest of three runs, so a lucky cache doesn't hide a slow query.
@@ -179,7 +299,7 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(count, ROWS);
+    assert_eq!(count, ROWS + PAYSLIP_ROWS + PAID_LOAN_ROWS);
 
     let all = || PeriodQuery::Custom {
         start: NaiveDate::from_ymd_opt(2022, 1, 1).unwrap(),
@@ -294,6 +414,11 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
     time("check-in", || {
         crate::services::checkin::get(&mut conn, today()).unwrap()
     });
+    // The merged check-in (October and Oct 26 – Nov 1), with a year of history behind it.
+    let due = crate::services::checkin::get(&mut conn, today())
+        .unwrap()
+        .expect("a check-in is due");
+    assert_eq!(due.kinds.len(), 2, "merged: {:?}", due.kinds);
     // TXN-6: one letter matches all 300 payees; "store 12" narrows to 11.
     for (label, prefix) in [("payees: \"s\"", "s"), ("payees: \"store 12\"", "store 12")] {
         time(label, || {
@@ -378,5 +503,9 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
     let count: i64 = conn
         .query_row("SELECT COUNT(*) FROM transactions", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(count, ROWS, "three restores in a row");
+    assert_eq!(
+        count,
+        ROWS + PAYSLIP_ROWS + PAID_LOAN_ROWS,
+        "three restores in a row"
+    );
 }
