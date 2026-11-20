@@ -357,7 +357,7 @@ test("from 3 check-ins on, each stat ends with a trend line; a flat one sits in 
   show({
     history: [
       snapshot("2026-10-26", [40, 100, 70, 30, null, 80]),
-      snapshot("2026-11-02", [62, 100, 58, 35, 18, 82]),
+      snapshot("2026-11-02", [62, 100, 58, null, 18, 82]),
       snapshot("2026-11-09", [66, 100, 58, 37, 20, 85]),
     ],
   });
@@ -374,6 +374,8 @@ test("from 3 check-ins on, each stat ends with a trend line; a flat one sits in 
   expect(lines[0]?.split(" ")[2]).toBe("63,1");
   // Savings didn't apply at the first check-in, so its line starts at the second.
   expect(lines[4]?.split(" ")).toHaveLength(2);
+  // Debt didn't apply at the middle one: its two lone points aren't joined across the gap.
+  expect(lines[3]).toBeNull();
   // The trend is extra: the score and its change still say it in text.
   expect(row("Cashflow").textContent).toBe("Cashflow72▲ Up 6");
 });

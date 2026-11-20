@@ -137,29 +137,38 @@ export function StatScores({
 /**
  * A stat's snapshots as a 64 × 20 px line with no axes or dots (UI_FLOWS §8.8), scaled to its own
  * range but never less than 20 points tall, so a flat line sits in the middle. A snapshot where the
- * stat didn't apply is left out. Hidden from screen readers: the score and its change say it.
+ * stat didn't apply breaks the line, so it never suggests a value there. Hidden from screen readers:
+ * the score and its change say it.
  */
 function Trend({ points }: { points: (number | null)[] }) {
   const known = points.filter((p) => p !== null);
   const span = Math.max(Math.max(...known) - Math.min(...known), 20);
   const bottom = (Math.max(...known) + Math.min(...known) - span) / 2;
   const step = 62 / Math.max(points.length - 1, 1);
-  // 1 px inside each edge, so the 1.5 px stroke isn't clipped.
-  const line = points.flatMap((p, i) =>
-    p === null ? [] : [`${1 + i * step},${19 - ((p - bottom) / span) * 18}`],
-  );
+  // Runs of points between the gaps; 1 px inside each edge, so the 1.5 px stroke isn't clipped.
+  const runs: string[][] = [[]];
+  points.forEach((p, i) => {
+    if (p === null) runs.push([]);
+    else
+      runs[runs.length - 1].push(
+        `${1 + i * step},${19 - ((p - bottom) / span) * 18}`,
+      );
+  });
   return (
     <svg aria-hidden data-trend width={64} height={20}>
-      {line.length >= 2 && (
-        <polyline
-          points={line.join(" ")}
-          fill="none"
-          stroke="var(--primary)"
-          strokeWidth={1.5}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-      )}
+      {runs
+        .filter((run) => run.length >= 2)
+        .map((run) => (
+          <polyline
+            key={run[0]}
+            points={run.join(" ")}
+            fill="none"
+            stroke="var(--primary)"
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        ))}
     </svg>
   );
 }
