@@ -234,7 +234,9 @@ test("editing opens the dialog as Edit transaction, whatever the id", async () =
 describe("the level chip (LVL-5)", () => {
   const { levelChange: _, ...STATUS } = CHECKIN_STATUS;
   const chip = () =>
-    screen.queryByRole("img", { name: /^Level \d+, \d+ of \d+ conditions met/ });
+    screen.queryByRole("img", {
+      name: /^Level \d+, \d+ of \d+ conditions met/,
+    });
 
   test("isn't shown while the status loads", async () => {
     renderRoute("/settings", { get_vault_status: () => new Promise(() => {}) });

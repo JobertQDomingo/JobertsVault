@@ -62,10 +62,7 @@ export function Sidebar() {
         <img src={logo} alt="" className="size-[30px]" />
         Jobert's Vault
         {status && (
-          <Link
-            to="/level"
-            className="ml-auto rounded-full"
-          >
+          <Link to="/level" className="ml-auto rounded-full">
             <LevelChip
               level={status.level}
               met={status.nextLevel.met}
