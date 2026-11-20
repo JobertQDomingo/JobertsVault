@@ -1,4 +1,5 @@
 import { CalendarRange, TriangleAlert } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { Forecast } from "@/bindings/Forecast";
 import { EmptyState } from "@/components/EmptyState";
@@ -17,10 +18,13 @@ import { formatMoney } from "@/lib/money";
 export function SafeToSpendCard({
   forecast,
   viewLink = true,
+  focus,
 }: {
   forecast: Forecast;
   /** Off on the Forecast screen itself. */
   viewLink?: boolean;
+  /** The dashboard's focus rows, flat at the top (UI_FLOWS §2, DESIGN_SYSTEM §11). */
+  focus?: ReactNode;
 }) {
   const { payslip } = useQuickAdd();
   const { data: settings } = useSettings();
@@ -36,6 +40,7 @@ export function SafeToSpendCard({
   if (safeToSpend === null || windowEnd === null)
     return (
       <GlassPanel className="overflow-hidden">
+        {focus}
         <div className="flex items-center justify-between gap-2 px-[18px] pt-4">
           <h2 className="text-h3">Safe to spend</h2>
           {viewForecast}
@@ -54,52 +59,55 @@ export function SafeToSpendCard({
 
   const days = forecast.daysLeft === 1 ? "1 day" : `${forecast.daysLeft} days`;
   return (
-    <GlassPanel className="grid gap-1 px-[18px] py-4">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-muted-foreground">
-          Safe to spend until{" "}
-          {windowEnd === today ? "today" : weekdayDate(windowEnd, today)}
-        </h2>
-        {viewForecast}
-      </div>
-      {/* What's left, not income, so never green (DESIGN_SYSTEM). */}
-      <MoneyText
-        amount={safeToSpend}
-        kind="balance"
-        size="display"
-        className="text-foreground"
-      />
-      <p className="text-small text-muted-foreground tabular-nums">
-        {`${money(forecast.perDay ?? 0)} a day · ${days} left`}
-      </p>
-      {short ? (
-        <p className="flex items-center gap-1 text-small font-semibold text-danger tabular-nums">
-          <TriangleAlert aria-hidden className="size-3.5 shrink-0" />
-          {`Short by ${money(short.amount)} on ${weekdayDate(short.date, today)}`}
+    <GlassPanel className="overflow-hidden">
+      {focus}
+      <div className="grid gap-1 px-[18px] py-4">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-muted-foreground">
+            Safe to spend until{" "}
+            {windowEnd === today ? "today" : weekdayDate(windowEnd, today)}
+          </h2>
+          {viewForecast}
+        </div>
+        {/* What's left, not income, so never green (DESIGN_SYSTEM). */}
+        <MoneyText
+          amount={safeToSpend}
+          kind="balance"
+          size="display"
+          className="text-foreground"
+        />
+        <p className="text-small text-muted-foreground tabular-nums">
+          {`${money(forecast.perDay ?? 0)} a day · ${days} left`}
         </p>
-      ) : (
-        forecast.heldFor &&
-        forecast.heldBack !== null && (
-          <p className="text-small text-muted-foreground tabular-nums">
-            {`${money(forecast.heldBack)} held back for ${formatSpan(forecast.heldFor.start, forecast.heldFor.end, today)}`}
+        {short ? (
+          <p className="flex items-center gap-1 text-small font-semibold text-danger tabular-nums">
+            <TriangleAlert aria-hidden className="size-3.5 shrink-0" />
+            {`Short by ${money(short.amount)} on ${weekdayDate(short.date, today)}`}
           </p>
-        )
-      )}
-      {earlyPayday && (
-        <p className="flex items-center gap-2 text-small">
-          {`Payday ${weekdayDate(earlyPayday.date, today)}. Paid early?`}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-primary"
-            onClick={() =>
-              payslip({ ruleId: earlyPayday.ruleId, date: earlyPayday.date })
-            }
-          >
-            Record now
-          </Button>
-        </p>
-      )}
+        ) : (
+          forecast.heldFor &&
+          forecast.heldBack !== null && (
+            <p className="text-small text-muted-foreground tabular-nums">
+              {`${money(forecast.heldBack)} held back for ${formatSpan(forecast.heldFor.start, forecast.heldFor.end, today)}`}
+            </p>
+          )
+        )}
+        {earlyPayday && (
+          <p className="flex items-center gap-2 text-small">
+            {`Payday ${weekdayDate(earlyPayday.date, today)}. Paid early?`}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-primary"
+              onClick={() =>
+                payslip({ ruleId: earlyPayday.ruleId, date: earlyPayday.date })
+              }
+            >
+              Record now
+            </Button>
+          </p>
+        )}
+      </div>
     </GlassPanel>
   );
 }

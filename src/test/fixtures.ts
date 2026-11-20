@@ -1,3 +1,4 @@
+import type { ActiveFocus } from "@/bindings/ActiveFocus";
 // Sample data matching UI_FLOWS' examples, for screen tests.
 import type { Account } from "@/bindings/Account";
 import type { Breakdown } from "@/bindings/Breakdown";
@@ -757,3 +758,20 @@ export const MONTHLY_CHECKIN: Checkin = {
     { accountId: 4, balance: -64000, amountOwed: 64000 },
   ],
 };
+
+/** An active focus (CHK-8): a week's, Nov 16–22, unless `over` says otherwise. */
+export const activeFocus = (
+  over: Partial<ActiveFocus> & Pick<ActiveFocus, "kind">,
+): ActiveFocus => ({
+  actual: null,
+  paidOn: null,
+  percent: null,
+  state: null,
+  categoryId: null,
+  accountId: null,
+  loanPaymentId: null,
+  target: null,
+  start: "2026-11-16",
+  end: "2026-11-22",
+  ...over,
+});

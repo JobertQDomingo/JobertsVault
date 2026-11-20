@@ -1,5 +1,4 @@
 import { Check, Circle } from "lucide-react";
-import type { ActiveFocus } from "@/bindings/ActiveFocus";
 import { ErrorState } from "@/components/ErrorState";
 import { FocusRows } from "@/components/FocusRows";
 import { GlassPanel } from "@/components/GlassPanel";
@@ -16,7 +15,8 @@ import { formatMoney } from "@/lib/money";
 import {
   CONDITIONS,
   conditionGap,
-  type FocusNames,
+  cardLevel,
+  focusNames,
   levelTitle,
   nextMoveText,
   weakest,
@@ -65,34 +65,17 @@ export function LevelScreen() {
 
   const s = status.data;
   const list = accounts.data.accounts;
-  const account = (id: number | null) =>
-    list.find((a) => a.id === id)?.name ?? "Your card";
   const money = (amount: number) => formatMoney(amount, settings.data);
-  const names: FocusNames = {
+  const names = focusNames(
+    s.today,
     money,
-    category: (id) =>
-      categories.data.categories.find((c) => c.id === id)?.name ?? "A category",
-    account,
-    cards: list.filter((a) => a.kind === "credit_card" && !a.archived).length,
-    payment: (id) => {
-      for (const loan of loans.data.loans) {
-        const p = loan.payments.find((p) => p.id === id);
-        if (p) return { loan: loan.name, dueDate: p.dueDate };
-      }
-    },
-    today: s.today,
-  };
-  // A card-level focus names its level when its target is one of the card's three.
-  const cardLevel = (f: ActiveFocus) => {
-    const a = list.find((a) => a.id === f.accountId);
-    if (!a || f.target === null) return null;
-    if (f.target === a.spendSoft) return "soft";
-    if (f.target === a.spendMid) return "mid";
-    return f.target === a.spendHard ? "hard" : null;
-  };
+    categories.data.categories,
+    list,
+    loans.data.loans,
+  );
   const move = nextMoveText(s.nextMove, {
     money,
-    account,
+    account: names.account,
     loan: (id) => loans.data.loans.find((l) => l.id === id)?.name ?? "A loan",
   });
   // The lowest stat that applies, the first on a tie (DATA_MODEL §5.20); none when all are 100.
@@ -160,7 +143,11 @@ export function LevelScreen() {
         <GlassPanel className="grid gap-4 p-5">
           <h3 className="text-h3">Focus</h3>
           {s.focuses.length ? (
-            <FocusRows focuses={s.focuses} names={names} level={cardLevel} />
+            <FocusRows
+              focuses={s.focuses}
+              names={names}
+              level={cardLevel(list)}
+            />
           ) : (
             <p className="text-muted-foreground">
               No focus right now. You'll pick one at your next check-in.

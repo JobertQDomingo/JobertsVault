@@ -583,13 +583,9 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
     </div>
     <p class="cap" style="margin-top:8px">Ten 20 px nodes, 64 px apart, numbered below in <code>small</code> text. Reached: solid <code>--primary</code> with a 12 px <code>check</code>. Current: the same, with a 3 px ring at 25%, like a focused field, and its number in <code>--foreground</code>, weight 600. Not reached: <code>--wash</code> with a 12 px <code>lock</code> in <code>--muted-foreground</code>. The 2 px line is <code>--primary</code> up to the current node and <code>--wash</code> after it. Each node takes keyboard focus, and its tooltip has the level's name and conditions.</p>
 
-    <h3 class="sub"><code>FocusStrip</code></h3>
+    <h3 class="sub"><code>FocusRows</code></h3>
     <div class="pair" style="grid-template-columns:minmax(0,1fr)">
       <div class="aurora theme-light"><p class="preview-label"><span>Light</span></p>
-        <div class="v-card v-focus">
-          <div class="fr"><i data-lucide="target"></i><span class="txt num">This month's focus: Stay under your ₱4,000.00 mid level <span class="muted">· ₱2,310.00 this cycle</span></span></div>
-          <div class="fr"><i data-lucide="target"></i><span class="txt num">This week's focus: Keep Dining Out under ₱1,500.00 <span class="muted">· ₱640.00 so far</span></span><div class="v-progress"><i style="width:42.7%"></i></div><span class="pc">42%</span></div>
-        </div>
         <div class="v-card" style="padding:4px 20px">
           <div class="v-focus flat">
             <div class="fr"><i data-lucide="target"></i><span class="txt">This week's focus: Pay E-wallet loan by Fri, Nov 20 <span class="muted">· paid Nov 18</span></span></div>
@@ -599,7 +595,7 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
         </div>
       </div>
     </div>
-    <p class="cap" style="margin-top:8px">On the dashboard: a slim Level 1 panel (16 px radius, 16 px side padding) with one 40 px row per active focus, the month's first: a 16 px <code>target</code> in <code>--primary</code>, the sentence, the progress so far in <code>--muted-foreground</code>, and for a cap a 160 px <code>ProgressBar</code> with its %. A card level, a loan payment or logging has no bar. On the Level screen and in the check-in the same rows are flat inside their panel (second panel), and a cap's bar sits under its sentence, across the row.</p>
+    <p class="cap" style="margin-top:8px">One row per active focus, the month's first, flat inside its panel and divided by <code>--hairline</code>: a 16 px <code>target</code> in <code>--primary</code>, the sentence, the progress so far in <code>--muted-foreground</code>, and for a cap a <code>ProgressBar</code> with its % under its sentence, across the row. A card level, a loan payment or logging has no bar. On the dashboard the rows sit at the top of the Safe to spend card, since a strip of its own would go past the blur budget (§11); the Level screen and the check-in show the same rows.</p>
 
     <h3 class="sub">Focus offer card</h3>
     <div class="pair">

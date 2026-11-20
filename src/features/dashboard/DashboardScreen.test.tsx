@@ -5,6 +5,7 @@ import type { LoanDue } from "@/bindings/LoanDue";
 import type { PeriodQuery } from "@/bindings/PeriodQuery";
 import {
   ACCOUNT_LIST,
+  activeFocus,
   CATEGORIES,
   DASHBOARD,
   DEFAULTS,
@@ -587,4 +588,56 @@ test("a day whose rows don't fit hides its header too (DSH-8)", async () => {
       .getByText("Today", { selector: "h3" })
       .classList.contains("invisible"),
   ).toBe(false);
+});
+
+test("the week's and the month's focus sit flat at the top of Safe to spend, the month's first, and open /level (CHK-8)", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    list_loans: LOANS,
+    get_dashboard: {
+      ...DASHBOARD,
+      focuses: [
+        activeFocus({
+          kind: "category_cap",
+          categoryId: 2,
+          target: 150000,
+          actual: 124000,
+          percent: 82,
+          state: "near",
+        }),
+        activeFocus({
+          kind: "logging",
+          target: 20,
+          actual: 9,
+          start: "2026-11-01",
+          end: "2026-11-30",
+        }),
+      ],
+    },
+  });
+  const lines = (await screen.findAllByText(/'s focus: /)).map(
+    (l) => l.textContent,
+  );
+  expect(lines).toEqual([
+    "This month's focus: Log on at least 20 days this month · 9 days so far",
+    "This week's focus: Keep Dining Out under ₱1,500.00 · ₱1,240.00 so far",
+  ]);
+  const card = panel("Safe to spend");
+  // Flat in the card's own panel: no blurred panel of its own (DESIGN_SYSTEM §11).
+  expect(card.getAllByText(/'s focus: /)).toHaveLength(2);
+  expect(card.getByRole("progressbar").getAttribute("aria-valuenow")).toBe(
+    "82",
+  );
+  expect(
+    screen
+      .getByText(/^This week's focus/)
+      .closest("a")!
+      .getAttribute("href"),
+  ).toBe("/level");
+});
+
+test("with no active focus there are no focus rows (CHK-8)", async () => {
+  renderRoute("/", { ...ANSWERS, list_loans: LOANS });
+  await screen.findByText("Safe to spend");
+  expect(screen.queryByText(/'s focus: /)).toBeNull();
 });
