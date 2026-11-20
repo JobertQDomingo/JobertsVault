@@ -92,8 +92,9 @@ test("New account creates a credit card with its limit and days", async () => {
   fireEvent.click(await screen.findByRole("button", { name: "New account" }));
   type(dialog().getByRole("textbox", { name: "Name" }), "Visa");
   pick("Type", "Credit card");
+  // A new card has no transactions, so there's no "Owed today" under it (UI_FLOWS §5.2).
   expect(
-    dialog().getByRole("textbox", { name: "Amount owed now" }),
+    dialog().getByRole("textbox", { name: "Amount owed now", description: "" }),
   ).toBeTruthy();
   type(dialog().getByRole("textbox", { name: "Credit limit" }), "10000");
   // CC-10: a new card starts at 3,000.00, 4,000.00 and 5,000.00.

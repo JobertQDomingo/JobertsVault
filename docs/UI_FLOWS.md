@@ -209,7 +209,7 @@ The dialog is raised glass (Level 2). The app behind it dims and blurs slightly.
 |---|---|
 | Name | Required, must be unique |
 | Type | Cash / Bank / E-wallet / Credit card. **Can't be changed after the account is created**, because that would change how its balance works. |
-| Opening balance | 0 or more. For a credit card the field holds the opening amount owed (DATA_MODEL §5.1): the new account form labels it **"Amount owed now"**, and the edit form labels it **"Opening amount owed"**, with the help text "Owed today: ₱640.00" (the card's `amountOwed`, CC-6) under it. Changing it moves what's owed today by the same amount. |
+| Opening balance | 0 or more. For a credit card the field holds the opening amount owed (DATA_MODEL §5.1): the new account form labels it **"Amount owed now"**, and the edit form labels it **"Opening amount owed"**, with the help text "Owed today: ₱640.00" (the card's `amountOwed`, CC-6) under it, as it was when the form opened. Changing the field moves the card's balance by the same amount. A card in credit owes ₱0.00. |
 | *(Credit card only)* Credit limit, Statement closing day, Payment due day | Days are 1–31, with the help text "If a month is shorter, the last day is used." |
 | *(Credit card only, Phase 4)* Spending levels: Soft, Mid, Hard | Three amounts on one row, ₱3,000.00, ₱4,000.00 and ₱5,000.00 to start with. Help text: "Warnings for each statement cycle's spending. They never block a purchase." (CC-10) |
 
