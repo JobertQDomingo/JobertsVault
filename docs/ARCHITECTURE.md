@@ -84,7 +84,7 @@ jobertsvault/
 │  └─ design/                      # visual previews of the design system and UI flows
 ├─ assets/brand/                   # logo.svg, one-color marks, app-icon-1024.png
 ├─ .cargo/config.toml              # tells ts-rs to write to src/bindings/ (§4.6)
-├─ .claude/skills/release/SKILL.md # the /release command (§11.1)
+├─ .claude/skills/                 # release/ (the /release command, §11.1); cycle/ and task/ (how a release cycle is planned and each task is built, with the dev-app driver in task/tools/)
 ├─ .github/workflows/              # ci.yml (the checks in §9), release.yml (§11.1)
 ├─ package.json  package-lock.json  components.json  eslint.config.js  .prettierignore
 ├─ vite.config.ts  tsconfig.json  tsconfig.node.json
