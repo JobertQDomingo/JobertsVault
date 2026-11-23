@@ -406,6 +406,7 @@ svg.v-trend polyline { fill: none; stroke: var(--primary); stroke-width: 1.5; st
 .lv-chip > svg { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke-width: 2; }
 .lv-chip .track { stroke: var(--hairline); }
 .lv-chip .arc { stroke: var(--primary); stroke-linecap: round; }
+.lv-chip.on { border-radius: 50%; background: color-mix(in srgb, var(--primary) 14%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 22%, transparent); }
 /* The level-up moment (§10): grows from 80% to 110% and settles over 600 ms while a soft glow fades */
 @keyframes lv-up { 0% { transform: scale(0.8); } 55% { transform: scale(1.1); } 100% { transform: scale(1); } }
 @keyframes lv-glow { from { opacity: 1; } to { opacity: 0; } }
