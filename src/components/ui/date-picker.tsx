@@ -109,6 +109,18 @@ export function DatePicker({
           align="end"
           sideOffset={4}
           className="glass-raised z-50 rounded-toolbar p-3"
+          // The selected day (or today) first, not "Previous month", so ↑ ↓ ← → move days at once.
+          // DayPicker's autoFocus loses to Radix here (A11Y-10).
+          onOpenAutoFocus={(e) => {
+            const day = (
+              e.currentTarget as HTMLElement
+            ).querySelector<HTMLElement>(
+              "[role=gridcell] button[tabindex='0']",
+            );
+            if (!day) return;
+            e.preventDefault();
+            day.focus();
+          }}
         >
           <DayPicker
             mode="single"

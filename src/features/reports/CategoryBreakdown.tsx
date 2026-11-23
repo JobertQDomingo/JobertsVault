@@ -109,6 +109,8 @@ export function CategoryBreakdown({
               endAngle={-270}
               paddingAngle={parts.length > 1 ? 1.5 : 0}
               stroke="none"
+              // The Pie is a Tab stop of its own by default, even with no keyboard layer (A11Y-06).
+              rootTabIndex={-1}
               isAnimationActive={false}
             >
               {parts.map((p) => (

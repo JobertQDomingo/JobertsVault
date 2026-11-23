@@ -30,11 +30,14 @@ export function FocusRows({
   focuses,
   names,
   level,
+  inLink = false,
 }: {
   focuses: ActiveFocus[];
   names: FocusNames;
   /** A card-level focus's level name ("mid"), when its target is one of the card's levels. */
   level: (f: ActiveFocus) => string | null;
+  /** Inside a link (the dashboard's strip), whose name is the sentences alone. */
+  inLink?: boolean;
 }) {
   const sorted = [...focuses].sort(
     (a, b) => +(focusUnit(b) === "month") - +(focusUnit(a) === "month"),
@@ -62,12 +65,15 @@ export function FocusRows({
               </span>
             </p>
             {f.percent !== null && (
-              <ProgressBar
-                percent={f.percent}
-                state={f.state}
-                aria-label={`${text}: ${f.percent}%`}
-                className="pl-6"
-              />
+              // In a link the bar's value and % would be read as part of its name (A11Y-10).
+              <div aria-hidden={inLink || undefined}>
+                <ProgressBar
+                  percent={f.percent}
+                  state={f.state}
+                  aria-label={`${text}: ${f.percent}%`}
+                  className="pl-6"
+                />
+              </div>
             )}
           </li>
         );

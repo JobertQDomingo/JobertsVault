@@ -80,6 +80,15 @@ test("an account's details page highlights Accounts, not the dashboard", () => {
   expect(link("Dashboard").getAttribute("aria-current")).toBeNull();
 });
 
+test("Skip to content comes first and moves focus past the sidebar to the screen (A11Y-09)", () => {
+  renderAt("/transactions");
+  const skip = screen.getByRole("link", { name: "Skip to content" });
+  const first = document.querySelector<HTMLElement>("a[href], button");
+  expect(first).toBe(skip);
+  fireEvent.click(skip);
+  expect(document.activeElement).toBe(screen.getByRole("main"));
+});
+
 test("the top bar title follows the route", async () => {
   renderAt("/transactions");
   expect(title()).toBe("Transactions");

@@ -99,12 +99,28 @@ export function AppShell() {
   });
   return (
     <div className="grid h-full grid-cols-[228px_minmax(0,1fr)] gap-3 p-3">
+      {/* First in the Tab order, shown only when focused: past the sidebar's 13 stops (A11Y-09).
+          Fixed, so it never takes a cell of the grid. */}
+      <a
+        href="#main"
+        onClick={(e) => {
+          e.preventDefault();
+          document.querySelector<HTMLElement>("main")?.focus();
+        }}
+        className="glass-raised sr-only rounded-chip font-semibold text-primary focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-3 focus:py-2"
+      >
+        Skip to content
+      </a>
       <Sidebar />
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
         <TopBar />
         {/* Spans the 12 px around it, so the panels' shadows aren't cut off at its edges. A
             column, so a screen's list panel can take the height left and scroll inside itself. */}
-        <main className="-m-3 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+        <main
+          id="main"
+          tabIndex={-1}
+          className="-m-3 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 outline-none"
+        >
           <Outlet />
         </main>
       </div>

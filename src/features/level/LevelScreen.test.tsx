@@ -54,6 +54,10 @@ test("the level, its path, the next level's checklist and the move (LVL-3, LVL-4
   expect(
     screen.getByRole("heading", { level: 1, name: "Vault level" }),
   ).toBeTruthy();
+  // The panels' titles come next, with no level skipped (A11Y-10).
+  expect(
+    screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
+  ).toEqual(["Next: Level 5 · Steady", "Stats", "Focus"]);
 
   // Each node says its state in words, so color is never the only cue.
   const path = screen.getByRole("list", { name: "Level path" });
@@ -113,6 +117,8 @@ test("each score is written with its change against the last check-in, and in a 
   expect(within(table).getAllByRole("row")[5].textContent).toBe("Savings2220");
   // Today's shape and last check-in's outline behind it.
   expect(document.querySelectorAll(".recharts-radar")).toHaveLength(2);
+  // The hexagon is hidden from screen readers, so it's no Tab stop either (A11Y-05).
+  expect(document.querySelector(".recharts-wrapper [tabindex='0']")).toBeNull();
   expect(
     screen.getByText(
       "Weakest: Savings. Your money covers less than 3 months of spending.",

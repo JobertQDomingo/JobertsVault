@@ -311,7 +311,12 @@ function DashboardFocus({
       to="/level"
       className="block border-b border-hairline px-[18px] py-3 transition-colors duration-150 outline-none hover:bg-glass-hover focus-visible:ring-3 focus-visible:ring-ring/40 focus-visible:ring-inset"
     >
-      <FocusRows focuses={focuses} names={names} level={cardLevel(accounts)} />
+      <FocusRows
+        focuses={focuses}
+        names={names}
+        level={cardLevel(accounts)}
+        inLink
+      />
     </Link>
   );
 }

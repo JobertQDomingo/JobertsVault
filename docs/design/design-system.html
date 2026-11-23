@@ -174,7 +174,7 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
   <!-- 3. Color -->
   <section class="s" id="color">
     <h2><span class="sec-no">§3</span> Color</h2>
-    <p class="sec-intro">Each token is shown in light mode (left) and dark mode (right), on glass over the aurora. The ratios are <b>worst-case contrast</b>: text on a 62% panel sitting over the strongest aurora color. WCAG AA needs 4.5 : 1 for text, and every text color passes. The lowest is 4.95 : 1, for expense red in light mode.</p>
+    <p class="sec-intro">Each token is shown in light mode (left) and dark mode (right), on glass over the aurora. The ratios are <b>worst-case contrast</b>: text on a 62% panel sitting over the strongest aurora color. WCAG AA needs 4.5 : 1 for text, and every text color passes on every surface it's used on (DESIGN_SYSTEM §3.6). On a panel the lowest is 5.3 : 1, for warning amber in light mode.</p>
 
     <h3 class="sub">3.1 Glass surfaces</h3>
     <div class="grid g4" id="sw-surface"></div>
@@ -203,7 +203,7 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
 
     <h3 class="sub">3.5 Implementation (Tailwind 4)</h3>
     <pre class="code">/* src/styles/globals.css */
-:root { --glass: rgb(255 255 255 / .62); --edge: rgb(255 255 255 / .8); --income: #03684A; /* … */ }
+:root { --glass: rgb(255 255 255 / .62); --edge: rgb(255 255 255 / .8); --income: #035E43; /* … */ }
 .dark { --glass: rgb(20 22 38 / .62);    --edge: rgb(255 255 255 / .14); --income: #6EE7B7; /* … */ }
 
 @utility glass        { background: var(--glass);        border: 1px solid var(--edge); backdrop-filter: blur(22px) saturate(170%); box-shadow: var(--shadow-panel); }
@@ -743,23 +743,23 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
     ["--overlay", "Dims the app behind a dialog", "rgba(11,16,32,0.28)", "rgba(0,0,0,0.5)", "overlay"]
   ], "sw-surface");
   swatches([
-    ["--foreground", "Main text", "#0B1020", "#F5F7FF", "text", "14.0", "11.3"],
-    ["--muted-foreground", "Secondary text, labels", "#3D4560", "#C3C9DE", "text", "7.0", "7.3"],
-    ["--primary", "Buttons, active nav, links", "#3730A3", "#A5B4FC", "text", "7.3", "6.0"],
+    ["--foreground", "Main text", "#0B1020", "#F5F7FF", "text", "14.0", "10.7"],
+    ["--muted-foreground", "Secondary text, labels", "#3D4560", "#C3C9DE", "text", "7.0", "7.0"],
+    ["--primary", "Buttons, active nav, links", "#3730A3", "#A5B4FC", "text", "7.35", "5.8"],
     ["--primary-hover", "Primary button hover", "#312E81", "#C7D2FE", "fill"],
     ["--primary-foreground", "Text on primary", "#FFFFFF", "#0B1020", "onprimary", "9.9", "9.5"],
     ["--ring", "Focus ring", "#3730A3", "#A5B4FC", "ring"]
   ], "sw-text");
   swatches([
-    ["--income", "Income, good increases", "#03684A", "#6EE7B7", "text", "5.0", "7.9"],
-    ["--expense", "Expenses, bad increases", "#B4183A", "#FDA4AF", "text", "4.95", "6.4"],
-    ["--transfer", "Transfers (neutral)", "#3D4560", "#C3C9DE", "text", "7.0", "7.3"],
-    ["--warning", "Budget ≥ 80%, due date, stale backup", "#8A4500", "#FCD34D", "text", "5.3", "8.4"],
-    ["--danger", "Budget ≥ 100%, delete, errors", "#B4183A", "#FDA4AF", "text", "4.95", "6.4"],
-    ["--danger-foreground", "Text on a danger button", "#FFFFFF", "#0B1020", "ondanger", "6.7", "10.0"],
-    ["--danger-banner", "The red mixed into a danger banner (text contrast shown)", "#B4183A", "#DC2626", "banner", "11.2", "9.4"],
+    ["--income", "Income, good increases", "#035E43", "#6EE7B7", "text", "5.8", "7.5"],
+    ["--expense", "Expenses, bad increases", "#A21634", "#FDA4AF", "text", "5.75", "6.1"],
+    ["--transfer", "Transfers (neutral)", "#3D4560", "#C3C9DE", "text", "7.0", "7.0"],
+    ["--warning", "Budget ≥ 80%, due date, stale backup", "#8A4500", "#FCD34D", "text", "5.3", "8.0"],
+    ["--danger", "Budget ≥ 100%, delete, errors", "#A21634", "#FDA4AF", "text", "5.75", "6.1"],
+    ["--danger-foreground", "Text on a danger button", "#FFFFFF", "#0B1020", "ondanger", "7.8", "10.0"],
+    ["--danger-banner", "The red mixed into a danger banner (text contrast shown)", "#A21634", "#DC2626", "banner", "11.2", "8.4"],
     ["--danger-banner-mix", "How much of it a danger banner mixes in", "14%", "30%", "bannermix"],
-    ["--success", "Goal achieved, \"Saved\" toasts", "#03684A", "#6EE7B7", "text", "5.0", "7.9"]
+    ["--success", "Goal achieved, \"Saved\" toasts", "#035E43", "#6EE7B7", "text", "5.8", "7.5"]
   ], "sw-meaning");
 
   var cats = [["Blue", "#1D4ED8", "#93C5FD"], ["Orange", "#C2410C", "#FDBA74"], ["Teal", "#0F766E", "#5EEAD4"], ["Pink", "#BE185D", "#F9A8D4"],

@@ -90,6 +90,9 @@ test("the breakdown ranks the expense categories with their amounts and shares",
     "Snacks3.4%−₱100.00",
   ]);
   expect(screen.getByText("Total expenses")).toBeTruthy();
+  // The donut is no Tab stop: the list says everything it does (A11Y-06).
+  expect(document.querySelector(".recharts-pie")).toBeTruthy();
+  expect(document.querySelector(".recharts-pie[tabindex='0']")).toBeNull();
   expect(invoke).toHaveBeenCalledWith("get_category_breakdown", {
     query: { kind: "month", anchor: null },
     kind: "expense",

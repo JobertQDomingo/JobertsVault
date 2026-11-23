@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Approved v1.2 |
 | **Style** | **Glassmorphism 2.0**: frosted glass panels floating over a soft colored light (the "aurora") |
-| **Last updated** | 2026-11-21 |
+| **Last updated** | 2026-11-23 |
 | **Related docs** | [PRD.md](PRD.md), [UI_FLOWS.md](UI_FLOWS.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 | **Built with** | Tailwind CSS 4 + shadcn/ui (Radix), lucide-react icons, Sora font (bundled) |
 
@@ -80,7 +80,7 @@ Settings → Appearance also has a **Reduce transparency** switch (SET-8, Phase 
 
 All colors are **CSS variables** in `src/styles/globals.css`. Components use the token names, never raw values. The names follow shadcn/ui's conventions, plus the glass and app-specific tokens below.
 
-**Contrast is measured at the worst spot:** text on a 62% panel over the strongest aurora color. WCAG AA requires 4.5:1 for text. **Every text color passes**, and the lowest is light-mode `--expense` / `--danger` at **4.95:1**. Category colors are used as icons, which need 3:1, and their worst case is 3.7:1 (light) and 6.4:1 (dark). Values were checked on 2026-10-26. Re-check any token you change.
+**Contrast is measured at the worst spot:** text on a 62% panel over the strongest aurora color, the lowest ratio over every 4 × 4-pixel block of the window. WCAG AA requires 4.5:1 for text. **Every text color passes on every surface it's used on** (§3.6), and the lowest is dark-mode `--muted-foreground` on a `--wash` row inside a `--wash` card at **4.71:1**. Category colors are used as icons, which need 3:1, and their worst case is 3.7:1 (light) and 6.4:1 (dark). The token figures were re-measured on 2026-11-23 (the T24 accessibility pass), when light `--income`, `--success`, `--expense` and `--danger` were made one step darker so they pass on a `--wash` card and the net cashflow card too. Re-check any token you change.
 
 ### 3.1 Glass surfaces
 
@@ -104,9 +104,9 @@ All colors are **CSS variables** in `src/styles/globals.css`. Components use the
 
 | Token | Purpose | Light | Dark | Worst-case contrast (L / D) |
 |---|---|---|---|---|
-| `--foreground` | Main text | `#0B1020` | `#F5F7FF` | 14.0 / 11.3 |
-| `--muted-foreground` | Secondary text, labels | `#3D4560` | `#C3C9DE` | 7.0 / 7.3 |
-| `--primary` | Accent: main buttons, active nav, links | `#3730A3` (deep indigo) | `#A5B4FC` (periwinkle) | 7.3 / 6.0 |
+| `--foreground` | Main text | `#0B1020` | `#F5F7FF` | 14.0 / 10.7 |
+| `--muted-foreground` | Secondary text, labels | `#3D4560` | `#C3C9DE` | 7.0 / 7.0 |
+| `--primary` | Accent: main buttons, active nav, links | `#3730A3` (deep indigo) | `#A5B4FC` (periwinkle) | 7.35 / 5.8 |
 | `--primary-hover` | Primary hover | `#312E81` | `#C7D2FE` | — |
 | `--primary-foreground` | Text on primary | `#FFFFFF` | `#0B1020` | 9.9 / 9.5 |
 | `--ring` | Focus ring | `#3730A3` | `#A5B4FC` | — |
@@ -115,15 +115,15 @@ All colors are **CSS variables** in `src/styles/globals.css`. Components use the
 
 | Token | Purpose | Light | Dark | Worst-case contrast (L / D) |
 |---|---|---|---|---|
-| `--income` | Income, increases that are good | `#03684A` | `#6EE7B7` | 5.0 / 7.9 |
-| `--expense` | Expenses, increases that are bad | `#B4183A` | `#FDA4AF` | 4.95 / 6.4 |
-| `--transfer` | Transfers (neutral) | `#3D4560` | `#C3C9DE` | 7.0 / 7.3 |
-| `--warning` | Budget ≥ 80%, due-date banners (card and loan), stale-backup notice | `#8A4500` | `#FCD34D` | 5.3 / 8.4 |
-| `--danger` | Budget ≥ 100%, an overdue loan payment, a pay window that runs short, delete, errors (same red as `--expense`) | `#B4183A` | `#FDA4AF` | 4.95 / 6.4 |
-| `--danger-foreground` | Text on a danger button | `#FFFFFF` | `#0B1020` | 6.7 / 10.0 |
-| `--danger-banner` | The red mixed into a `danger` banner (§9.1). Dark mode uses a deeper red than `--danger`, because the light pink at 14% read as plain glass over the aurora | `#B4183A` (`--danger`) | `#DC2626` | 11.2 / 9.4 (text), 16.5 / 8.2 (Pay button), 3.9 / 5.3 (icon) |
+| `--income` | Income, increases that are good | `#035E43` | `#6EE7B7` | 5.8 / 7.5 |
+| `--expense` | Expenses, increases that are bad | `#A21634` | `#FDA4AF` | 5.75 / 6.1 |
+| `--transfer` | Transfers (neutral) | `#3D4560` | `#C3C9DE` | 7.0 / 7.0 |
+| `--warning` | Budget ≥ 80%, due-date banners (card and loan), stale-backup notice | `#8A4500` | `#FCD34D` | 5.3 / 8.0 |
+| `--danger` | Budget ≥ 100%, an overdue loan payment, a pay window that runs short, delete, errors (same red as `--expense`) | `#A21634` | `#FDA4AF` | 5.75 / 6.1 |
+| `--danger-foreground` | Text on a danger button | `#FFFFFF` | `#0B1020` | 7.8 / 10.0 |
+| `--danger-banner` | The red mixed into a `danger` banner (§9.1). Dark mode uses a deeper red than `--danger`, because the light pink at 14% read as plain glass over the aurora | `#A21634` (`--danger`) | `#DC2626` | 11.2 / 8.4 (text), 16.4 / 7.55 (Pay button), 4.6 / 4.8 (icon) |
 | `--danger-banner-mix` | How much of `--danger-banner` a `danger` banner mixes in | `14%` | `30%` | — |
-| `--success` | Goal achieved, loan paid off, "You're debt-free", "Saved" toasts | `#03684A` | `#6EE7B7` | 5.0 / 7.9 |
+| `--success` | Goal achieved, loan paid off, "You're debt-free", "Saved" toasts | `#035E43` | `#6EE7B7` | 5.8 / 7.5 |
 
 - **Tints:** each meaning color has a tint for chips and banners. It's the color mixed into transparent at **16%** in light mode and **20%** in dark (`--tint`).
 - **Banners** are panel glass with the meaning color mixed in at 14%, and a border with it mixed in at 35%. A `danger` banner mixes `--danger-banner` into its glass at `--danger-banner-mix` instead, and into its border at 35%, so in dark mode it reads as red and as more urgent than the amber `warning` banner beside it. Its contrast figures are `--foreground` text, the `secondary` Pay button's text and the `--danger` icon on the banner, at the worst spot and with transparency off.
@@ -162,7 +162,7 @@ Categories store a palette key, not a hex code (DATA_MODEL §3.2), so they switc
 @import "@fontsource/sora/600.css";
 @import "@fontsource/sora/700.css";
 
-:root { --glass: rgb(255 255 255 / .62); --edge: rgb(255 255 255 / .8); --income: #03684A; /* … every token, light values */ }
+:root { --glass: rgb(255 255 255 / .62); --edge: rgb(255 255 255 / .8); --income: #035E43; /* … every token, light values */ }
 .dark { --glass: rgb(20 22 38 / .62);    --edge: rgb(255 255 255 / .14); --income: #6EE7B7; /* … dark values */ }
 
 @utility glass        { background: var(--glass);        border: 1px solid var(--edge); backdrop-filter: blur(22px) saturate(170%); box-shadow: var(--shadow-panel); }
@@ -187,6 +187,24 @@ Categories store a palette key, not a hex code (DATA_MODEL §3.2), so they switc
 - The aurora is one component, `<AuroraBackground>`, rendered once behind the app shell.
 - **Dark mode** is the `.dark` class on `<html>`. `lib/theme.ts` sets it from the `prefers-color-scheme` media query, and changes it while the app is open. **From Phase 1**, that follows the Windows setting.
 - **The theme switch** (SET-5, Phase 5) is in Settings → Appearance: System, Light or Dark, stored as `theme`. Rust gives the window that theme (`set_theme`), and WebView2 reports it as `prefers-color-scheme`, so the CSS and `lib/theme.ts` are unchanged and the title bar matches. System hands the window back to Windows, so it follows a change made while the app is open. Rust applies it at startup before the page loads, after every save and after a restore, so the first paint already has the right theme (measured 2026-11-17: `main.tsx` ran before the first paint in every launch). Nothing in the frontend stores or works out the theme, and there's no `next-themes`.
+
+### 3.6 Contrast on the other surfaces
+
+The tables above are text on a panel. Text also sits on these surfaces, measured the same way (the worst spot, light / dark). With transparency off every surface is solid, and every figure is higher. Measured on 2026-11-23.
+
+| Surface | Where | `--foreground` | `--muted-foreground` | `--primary` | `--income` | `--expense` | `--warning` |
+|---|---|---|---|---|---|---|---|
+| Raised (86%) | Dialogs, menus, toasts | 16.9 / 14.6 | 8.5 / 9.45 | 8.9 / 7.8 | 7.0 / 10.2 | 7.0 / 8.2 | 6.4 / 10.8 |
+| A `--wash` card in a panel | The check-in's figures and offer cards, flat `StatCard`s, the Forecast's movements | 12.6 / 8.8 | 6.3 / 5.7 | 6.6 / 4.75 | 5.2 / 6.2 | 5.2 / 5.0 | 4.8 / 6.6 |
+| A `--wash` row in a `--wash` card | Rows inside those cards | 11.5 / 7.3 | 5.8 / 4.71 | — | — | — | — |
+| A field (`--field`) in a panel / a dialog | Inputs, `secondary` buttons | 17.4 / 9.0, 18.4 / 12.3 | 8.7 / 5.85, 9.2 / 7.95 | — | — | — | — |
+| The net cashflow card (12% `--primary`) | The dashboard | 11.6 / 8.6 | 5.8 / 5.6 | — | 4.8 / 6.0 | 4.75 / 4.9 | — |
+| A `warning` banner | Due-date and stale-backup banners | 11.5 / 8.0 (button text 16.6 / 6.8) | 5.8 / 5.2 | — | — | — | 4.4 / 5.9 (icon, 3:1) |
+| An `info` banner | Recurring dates due | 11.2 / 8.2 | 5.6 / 5.3 | — | — | — | — |
+
+- `--primary` as text on a banner would be 4.3 in dark mode. It isn't used: banner buttons are `secondary`.
+- Field edges (`--field-edge`) are 1.4:1 against their surface, under WCAG's 3:1 for a control's edge. Fields are named by their labels, so they stay as they are (the owner, 2026-11-23). The offer card's empty circle, the one place the edge is the only cue, uses `--muted-foreground` (§9.2).
+- Disabled controls are exempt from these figures (WCAG 1.4.3).
 
 ---
 
@@ -357,9 +375,9 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **Date picker** | Its popover is Level 2 | Weeks start on the `week_start` setting (Monday by default). In the input, ↑ and ↓ move one day. From Phase 3 future days can be picked too (TXN-8). Only the period switcher's Custom range picker disables days after today. The selected day is solid `--primary`. |
 | **Segmented control** | Flat | A `--wash` track with 12 px radius. The selected segment is solid `--primary` with `--primary-foreground` text. The check-in's Balance check starts with neither segment selected (CHK-4). |
 | **Toolbar** | Level 1 | A small glass bar (16 px radius, 6 px padding) for controls that sit on the canvas: the period bar, the filter bar, report controls. Inside a card it becomes a flat `--wash`. |
-| **Dialog** | Level 2 | 24 px radius, max width 480 px (forms), 400 px (confirmations) or 640 px (a list whose rows have actions, such as the recurring dates due, which scrolls inside it past 60% of the window's height, and the Keyboard shortcuts table that `?` opens, UI_FLOWS §10). The backdrop is `--overlay` plus a 6 px blur of the app behind. Esc closes it, and focus stays inside. |
+| **Dialog** | Level 2 | 24 px radius, max width 480 px (forms), 400 px (confirmations) or 640 px (a list whose rows have actions, such as the recurring dates due, which scrolls inside it past 60% of the window's height, and the Keyboard shortcuts table that `?` opens, UI_FLOWS §10). The backdrop is `--overlay` plus a 6 px blur of the app behind. Esc closes it, and focus stays inside. When it closes, focus goes back to what opened it, or to the ⋯ button for a dialog opened from a menu item, while that's still there and not behind another open dialog. |
 | **Confirm dialog** | Level 2 | A title, one sentence, `secondary` Cancel, and a `primary` or `destructive` button that names the action. |
-| **Toast** | Level 2 | Bottom-right, 16 px radius, several shown one above the other. Closes after 4 s. One with an action, such as **Open folder**, stays 10 s, and its action is a ghost `sm` button in `--primary` text. Errors stay until closed. A failed check-in Finish has the action **Open the app anyway** on its error toast (ADR 0014). From Phase 4, a warning (a card spending level reached, CC-11) has the `triangle-alert` icon in `--warning` and stays 8 s. From Phase 5, a focus reaching 80% of its target or going past it (CHK-8) is the same warning toast. |
+| **Toast** | Level 2 | Bottom-right, 16 px radius, several shown one above the other. Closes after 4 s. One with an action, such as **Open folder**, stays until it's closed with its ✕, so it never closes while the keyboard is on its action. The action is a ghost `sm` button in `--primary` text, under the sentence, so the sentence keeps the toast's width. Errors stay until closed, and screen readers read them out at once (`role="alert"`). A failed check-in Finish has the action **Open the app anyway** on its error toast (ADR 0014), and that toast sits bottom centre, between Back and Finish, so it never covers Finish. There's no Alt+T to jump to the toasts: they're reached by Tab. From Phase 4, a warning (a card spending level reached, CC-11) has the `triangle-alert` icon in `--warning` and stays 8 s. From Phase 5, a focus reaching 80% of its target or going past it (CHK-8) is the same warning toast. |
 | **Banner** | Level 1, tinted | Panel glass mixed with the meaning color at 14%, and a border with it at 35% (§3.3). Has an icon, the message and an optional action. Variants: `warning`, `danger`, `info`. Inside another panel, the tint is flat (§2.3). `components/Banner.tsx` has `warning` (`.glass-warning`, the backup warning and the card due date) and `info` (`.glass-info`, tinted with `--primary` as in the mockups, the recurring dates due). From Phase 4 it also has `danger` (`.glass-danger`, an overdue loan payment, tinted with `--danger-banner` at `--danger-banner-mix`, §3.3), and uses `warning` for a loan payment due. A banner can have a second line in `small` text (`detail`), such as "Move ₱800.00 there first." |
 | **Tabs** | Flat | Inside Settings. A 2 px `--primary` underline marks the active tab. |
 | **Skeleton** | Flat | `--wash` blocks with no shimmer, shown only if loading takes more than **150 ms**. |
@@ -389,7 +407,7 @@ Built on shadcn/ui and restyled with the glass tokens. App-specific components l
 | **`LevelBadge`** (Phase 5) | A 40 px pointy-top hexagon with 3 px rounded corners, solid `--primary` with the level number in `--primary-foreground`, `h2` size and weight. Level 0 is a `--wash` hexagon with the number in `--muted-foreground`. Beside it, 12 px away, "Level 4 · In the black" in `h2` ("Level 0" alone at level 0). The **level chip** in the sidebar, at the right of the app name, is its 26 px version, with the number in `small` text, weight 600, inside a 34 px ring 2 px wide: the ring's track is `--hairline`, and its `--primary` arc, from the top and clockwise, is the share of the next level's conditions that are met. It shows the number alone, with no "Lv" (the owner, 2026-11-19: "Lv 4" doesn't fit beside the app name). Its label for screen readers says both: "Level 4, 1 of 2 conditions met for level 5". |
 | **`LevelPath`** (Phase 5) | Ten 20 px nodes in a row, 64 px apart from center to center, joined by a 2 px line, numbered below in `small` text. Reached: solid `--primary` with a 12 px `check` in `--primary-foreground`. Current: the same, with a 3 px ring at 25%, like a focused field, and its number in `--foreground`, weight 600. Not reached: `--wash` with a 12 px `lock` in `--muted-foreground`, and the track's `--hairline` edge. The line is `--primary` up to the current node and `--wash` after it. Each node's tooltip has the level's name and conditions, and the nodes can be reached with the keyboard. |
 | **`FocusRows`** (Phase 5) | One row per active focus, the month's first, flat inside its panel and divided by `--hairline`: a 16 px `target` icon in `--primary`, the sentence, the progress so far in `--muted-foreground`, and for a cap a `ProgressBar` with the budget thresholds under its sentence, across the row, with its % after it. A card level, a loan payment or logging has no bar. On the dashboard the rows sit at the top of the Safe to spend card, which links them to `/level`; the Level screen and the check-in show the same rows. It was planned as `FocusStrip`, a slim Level 1 panel of its own, but the dashboard is already past the blur budget (§11, UI_FLOWS §11 item 88). |
-| **Focus offer card** (Phase 5) | A flat `--wash` card in the check-in's last step, 12 px radius, the cards one under the other 12 px apart: the sentence in `body` weight 600 and what it's based on in `small` text. Each has a 20 px circle in its top-right corner, 12 px in, empty with a `--field-edge` border. Selected: a 2 px `--primary` border (2 px transparent otherwise, so nothing moves), and the circle filled `--primary` with a 12 px `check` in `--primary-foreground`, like a selected radio, never by tint alone. The cards form one radio group, and the focused card has the usual focus ring. |
+| **Focus offer card** (Phase 5) | A flat `--wash` card in the check-in's last step, 12 px radius, the cards one under the other 12 px apart: the sentence in `body` weight 600 and what it's based on in `small` text. Each has a 20 px circle in its top-right corner, 12 px in, empty with a `--muted-foreground` border (7:1, where `--field-edge` would be 1.4:1: the circle is what says a card isn't picked). Selected: a 2 px `--primary` border (2 px transparent otherwise, so nothing moves), and the circle filled `--primary` with a 12 px `check` in `--primary-foreground`, like a selected radio, never by tint alone. The cards form one radio group, and the focused card has the usual focus ring. |
 
 ---
 
@@ -458,3 +476,4 @@ Glass costs graphics power, so these rules keep the app smooth:
 | 2026-11-20 | Building the Level screen: a `LevelPath` node's tooltip is raised glass (Level 2) like a menu, and opens on focus as well as hover; each node's label names its state, so it never rests on color or the check and lock icons alone. An unchanged stat score shows `—` (§9.2, UI_FLOWS §11 items 84, 85) |
 | 2026-11-20 | The dashboard's focus rows are flat at the top of the Safe to spend card, not a `FocusStrip` panel: with every banner showing once the dashboard has 16 blurred panels (12 with none), already past §11's "about 12" (a strip would make it 17), so the fallback UI_FLOWS §2 named was built. The component is `FocusRows` (§9.2, UI_FLOWS §11 item 88) |
 | 2026-11-21 | The Keyboard shortcuts dialog (`?`, UI_FLOWS §10) is the 640 px dialog: a three-column table (Shortcut, Action, Where) with each key in a `--wash` `<kbd>` chip, `←` for ArrowLeft and `Esc` for Escape, and the check-in sentence under it in `small` muted text (§9.1) |
+| 2026-11-23 | The accessibility pass (T24, decided with the owner): a dialog gives focus back to what opened it; a toast with an action stays until closed, with the action under the sentence; errors are alerts; Sonner's Alt+T is off; a failed Finish's toast sits bottom centre; the offer card's empty circle has a `--muted-foreground` border; light `--income`/`--success` and `--expense`/`--danger` are one step darker, so every text color passes at the worst spot on every surface (§3, §9.1, §9.2) |

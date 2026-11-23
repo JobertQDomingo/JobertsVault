@@ -20,8 +20,8 @@
   /* Text, accent, meaning */
   --foreground: #0B1020; --muted-foreground: #3D4560;
   --primary: #3730A3; --primary-hover: #312E81; --primary-foreground: #FFFFFF; --ring: #3730A3;
-  --income: #03684A; --expense: #B4183A; --transfer: #3D4560;
-  --warning: #8A4500; --danger: #B4183A; --danger-foreground: #FFFFFF; --danger-banner: var(--danger); --danger-banner-mix: 14%; --success: #03684A;
+  --income: #035E43; --expense: #A21634; --transfer: #3D4560;
+  --warning: #8A4500; --danger: #A21634; --danger-foreground: #FFFFFF; --danger-banner: var(--danger); --danger-banner-mix: 14%; --success: #035E43;
   --cat-1: #1D4ED8; --cat-2: #C2410C; --cat-3: #0F766E; --cat-4: #BE185D; --cat-5: #6D28D9; --cat-6: #B45309;
   --cat-7: #0E7490; --cat-8: #BE123C; --cat-9: #4D7C0F; --cat-10: #A21CAF; --cat-11: #57534E; --cat-12: #047857;
   --tint: 16%;

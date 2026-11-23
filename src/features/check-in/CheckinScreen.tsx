@@ -226,17 +226,14 @@ function Flow({
     );
   });
   const last = step === "focus";
-  const ready =
-    step === "balance"
-      ? answered
-      : last
-        ? !!picked && !complete.isPending
-        : true;
+  const ready = step === "balance" ? answered : last ? !!picked : true;
 
   const go = (s: Name) => setParams({ step: s }, { replace: true });
   const back = () => at > 0 && go(steps[at - 1]);
   const next = () => {
-    if (!ready) return;
+    // A second press while saving does nothing. Finish isn't disabled for it, since a focused
+    // button that's disabled loses focus (A11Y-02).
+    if (!ready || complete.isPending) return;
     if (!last) return go(steps[at + 1]);
     notify.dismiss(failure.current);
     complete.mutate(picked!, {
@@ -302,7 +299,14 @@ function Flow({
       </div>
       <div className="flex justify-between">
         {at > 0 ? <Button onClick={back}>Back</Button> : <span />}
-        <Button variant="primary" onClick={next} disabled={!ready}>
+        <Button
+          variant="primary"
+          onClick={next}
+          disabled={!ready}
+          // Busy while saving, but still focusable (A11Y-02).
+          aria-disabled={complete.isPending || undefined}
+          className="aria-disabled:opacity-50"
+        >
           {last ? (
             "Finish"
           ) : (
