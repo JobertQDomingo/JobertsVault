@@ -246,6 +246,18 @@ The first four were found while testing Phase 4 on the owner's data and left for
 
 ---
 
+## Backlog
+
+Found but not planned yet. `/cycle` reads this list first, and an item moves into a phase when the owner picks it.
+
+- [ ] A due check-in has no way out if one of its queries fails (only Retry), if the screen crashes while drawing (no route `errorElement`), or if Rust panics. A possible fix is a route error page plus "Open the app anyway" on the check-in's error state
+- [ ] A toast with `role="alert"` inside Sonner's polite region may be read twice by a screen reader. Never tried with one
+- [ ] An error toast with no action, from a form opened over the check-in, still sits bottom right
+- [ ] The `docs/design/` previews' pixel details don't match the app everywhere, e.g. a 13 px stat label and 20 px banner icons where the app uses body size and 16 px
+- [ ] Wording: an on-time payment made inside the check-in, "spent so far", and "this cycle" on a card focus
+
+---
+
 ## Not planned
 
 The PRD §3 non-goals stay out of scope unless the PRD is changed first: bank sync, statement import, receipts, multiple users, cloud sync, multiple currencies, investments, tax, other platforms, and split transactions. The same goes for the check-in's non-goals: points for using the app, reminders while the app is closed, editable stat formulas, and reopening a past check-in. The polished onboarding (ONB-2) was dropped on 2026-11-17.

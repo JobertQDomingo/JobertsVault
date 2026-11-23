@@ -5,7 +5,14 @@ import tseslint from "typescript-eslint";
 
 export default defineConfig(
   {
-    ignores: ["dist/", "src-tauri/", "src/bindings/", "docs/", ".superpowers/"],
+    ignores: [
+      "dist/",
+      "src-tauri/",
+      "src/bindings/",
+      "docs/",
+      ".superpowers/",
+      ".claude/",
+    ],
   },
   js.configs.recommended,
   tseslint.configs.recommended,
