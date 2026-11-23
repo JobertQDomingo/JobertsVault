@@ -19,7 +19,7 @@ def rd(path):
     return io.open(path, encoding="utf-8", newline="").read()
 
 
-files = ["ROADMAP.md", "CLAUDE.md", "README.md", "RELEASING.md"]
+files = ["ROADMAP.md", "CLAUDE.md", "README.md", "RELEASING.md", "WORKFLOW.md"]
 files += glob.glob("docs/*.md") + glob.glob("docs/decisions/*.md")
 txt = {f.replace(os.sep, "/"): rd(f) for f in files if os.path.exists(f)}
 prd = txt["docs/PRD.md"]
