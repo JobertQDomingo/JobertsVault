@@ -152,23 +152,28 @@ function DashboardBody({
   const vs = formatSpan(c.compareStart, c.compareEnd, data.today);
   return (
     <>
-      {data.loansDue.map((due) => (
-        <LoanDueBanner
-          key={due.loanId}
-          due={due}
-          account={accounts.get(due.accountId)}
-          today={data.today}
-        />
-      ))}
-      {data.backupDue && <BackupWarning />}
-      {data.cardsDue.map((due) => (
-        <CardDueBanner
-          key={due.accountId}
-          due={due}
-          name={accounts.get(due.accountId)?.name}
-        />
-      ))}
-      <RecurringDue count={data.recurringDue} today={data.today} />
+      {/* The banners share one blurred panel, as flat tinted rows, so five of them blur once
+          (PERF-01, DESIGN_SYSTEM §11). Hidden with none: Review's dialog is portaled, so it can
+          stay open here after its banner goes. */}
+      <GlassPanel className="grid gap-1.5 p-1.5 empty:hidden">
+        {data.loansDue.map((due) => (
+          <LoanDueBanner
+            key={due.loanId}
+            due={due}
+            account={accounts.get(due.accountId)}
+            today={data.today}
+          />
+        ))}
+        {data.backupDue && <BackupWarning />}
+        {data.cardsDue.map((due) => (
+          <CardDueBanner
+            key={due.accountId}
+            due={due}
+            name={accounts.get(due.accountId)?.name}
+          />
+        ))}
+        <RecurringDue count={data.recurringDue} today={data.today} />
+      </GlassPanel>
       <div className="grid grid-cols-3 gap-3">
         <StatCard
           label="Income"

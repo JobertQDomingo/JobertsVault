@@ -107,7 +107,7 @@ export function AppShell() {
           e.preventDefault();
           document.querySelector<HTMLElement>("main")?.focus();
         }}
-        className="glass-raised sr-only rounded-chip font-semibold text-primary focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-3 focus:py-2"
+        className="glass-raised sr-only rounded-chip font-semibold text-primary not-focus:backdrop-filter-none focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-3 focus:py-2"
       >
         Skip to content
       </a>

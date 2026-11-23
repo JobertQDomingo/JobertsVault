@@ -309,6 +309,9 @@ svg.lucide { width: 16px; height: 16px; flex: none; }
 .v-banner > svg.lucide { color: var(--c); }
 .v-banner .msg { flex: 1 1 200px; min-width: 0; }
 .v-banner.warning { --c: var(--warning); } .v-banner.danger { --c: var(--danger); --bg: var(--danger-banner); --mix: var(--danger-banner-mix); }
+/* The dashboard's banners share one panel as flat rows that keep their tint (PERF-01, DESIGN_SYSTEM §9.1) */
+.v-banners { display: grid; gap: 6px; padding: 6px; }
+.v-banners .v-banner { background: color-mix(in srgb, var(--bg) var(--mix), transparent); }
 /* After .v-banner, so Windows' setting beats its translucent background */
 @media (prefers-reduced-transparency: reduce) { .v-banner { background: color-mix(in srgb, var(--bg) var(--mix), var(--glass-solid)); } } .v-banner.info { --c: var(--primary); }
 

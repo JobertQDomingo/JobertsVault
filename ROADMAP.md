@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-23 |
-| **Current focus** | **Phase 5: Check-in & polish**: Performance pass |
+| **Current focus** | **Phase 5: Check-in & polish**: Installer polish |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -22,7 +22,7 @@ This file is the progress tracker.
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 16 / 16 |
 | **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 17 / 17 |
-| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 25 / 29 |
+| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 26 / 29 |
 
 ---
 
@@ -239,7 +239,7 @@ The first four were found while testing Phase 4 on the owner's data and left for
 - [x] HMO preset deduction category, added by a new migration to a database that doesn't have one yet, like Phase 4's categories. Migration `0006_hmo_category.sql` leaves one the user made as it is, and the payslip form lists HMO with the other deductions [PAY-3]
 - [x] `?` opens the keyboard shortcut help dialog, and every shortcut is reviewed, the check-in's included. `?` works on the check-in too. The review found one wrong key: Alt+← on Pick a focus also moved the pick
 - [x] Accessibility pass: focus order, screen reader labels, contrast re-check of any changed tokens. It covers the check-in, the hexagon's hidden table, the level path and the level chip
-- [ ] Performance pass on the glass UI with a full year of data, with `get_checkin` and `get_vault_status` added to the 50,000-transaction check ([ARCHITECTURE §12](docs/ARCHITECTURE.md))
+- [x] Performance pass on the glass UI with a full year of data, with `get_checkin` and `get_vault_status` added to the 50,000-transaction check ([ARCHITECTURE §12](docs/ARCHITECTURE.md))
 - [ ] Installer polish: icon, product name, version info
 - [ ] Review all docs against the shipped app, and update any that drifted
 - [ ] Release `v1.0.0` with `/release`, then finish a real weekly and monthly check-in in the installed app
