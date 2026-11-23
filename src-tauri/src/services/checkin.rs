@@ -1363,6 +1363,13 @@ mod tests {
         assert_eq!(c.start.last_focus.unwrap().result, FocusResult::Kept);
         // The Start step says it was kept, so the streak under the level counts it too (§5.20).
         assert_eq!(c.status.status.focus_streak, 1);
-        assert_eq!(c.status.status.focus_record.len(), 1);
+        let record: Vec<_> = c
+            .status
+            .status
+            .focus_record
+            .iter()
+            .map(|f| f.result)
+            .collect();
+        assert_eq!(record, [FocusResult::Kept]);
     }
 }
