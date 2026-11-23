@@ -1,3 +1,4 @@
+import type { VaultStatus } from "@/bindings/VaultStatus";
 import { levelTitle } from "@/lib/vault";
 import { cn } from "@/lib/utils";
 
@@ -5,16 +6,17 @@ import { cn } from "@/lib/utils";
 const HEX =
   "M14.72 1.50Q17.32 0 19.92 1.50L32.04 8.50Q34.64 10 34.64 13.00L34.64 27.00Q34.64 30 32.04 31.50L19.92 38.50Q17.32 40 14.72 38.50L2.60 31.50Q0.00 30 0.00 27.00L0.00 13.00Q0.00 10 2.60 8.50Z";
 
-/** The hexagon with the level's number: 40 px, or the chip's 26 px when `small`. */
+/** The hexagon with the level's number: 40 px, or the chip's 26 px when `small`. `null` is "—". */
 function LevelHex({
   level,
   small,
   levelUp,
 }: {
-  level: number;
+  level: number | null;
   small?: boolean;
   levelUp?: boolean;
 }) {
+  const muted = !level;
   return (
     <span
       aria-hidden
@@ -22,19 +24,19 @@ function LevelHex({
         "relative grid shrink-0 place-items-center tabular-nums",
         levelUp && "animate-level-up",
         small ? "h-[26px] w-[22.52px] text-small" : "h-10 w-[34.64px] text-h2",
-        level === 0 ? "text-muted-foreground" : "text-primary-foreground",
+        muted ? "text-muted-foreground" : "text-primary-foreground",
       )}
     >
       <svg
         viewBox="0 0 34.64 40"
         className={cn(
           "absolute inset-0 size-full",
-          level === 0 ? "fill-wash" : "fill-primary",
+          muted ? "fill-wash" : "fill-primary",
         )}
       >
         <path d={HEX} />
       </svg>
-      <b className="relative font-semibold">{level}</b>
+      <b className="relative font-semibold">{level ?? "—"}</b>
     </span>
   );
 }
@@ -60,23 +62,19 @@ const RING = 2 * Math.PI * 16;
 
 /**
  * The sidebar's level chip (LVL-5): the 26 px hexagon inside a 34 px ring whose arc, from the top
- * and clockwise, is the share of the next level's conditions met.
+ * and clockwise, is the share of the next level's conditions met. With no status (loading or
+ * failed) it's the level 0 hexagon with "—" and an empty ring.
  */
-export function LevelChip({
-  level,
-  met,
-  total,
-  next,
-}: {
-  level: number;
-  met: number;
-  total: number;
-  next: number;
-}) {
+export function LevelChip({ status }: { status?: VaultStatus }) {
+  const { met = 0, total = 0, level: next = 0 } = status?.nextLevel ?? {};
   return (
     <span
       role="img"
-      aria-label={`Level ${level}, ${met} of ${total} conditions met for level ${next}`}
+      aria-label={
+        status
+          ? `Level ${status.level}, ${met} of ${total} conditions met for level ${next}`
+          : "Vault level"
+      }
       className="relative grid size-[34px] shrink-0 place-items-center"
     >
       <svg
@@ -97,7 +95,7 @@ export function LevelChip({
           />
         )}
       </svg>
-      <LevelHex level={level} small />
+      <LevelHex level={status?.level ?? null} small />
     </span>
   );
 }

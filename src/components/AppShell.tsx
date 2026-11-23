@@ -99,7 +99,7 @@ export function AppShell() {
   });
   return (
     <div className="grid h-full grid-cols-[228px_minmax(0,1fr)] gap-3 p-3">
-      {/* First in the Tab order, shown only when focused: past the sidebar's 13 stops (A11Y-09).
+      {/* First in the Tab order, shown only when focused: past the sidebar's 11 stops and + Add (A11Y-09).
           Fixed, so it never takes a cell of the grid. */}
       <a
         href="#main"

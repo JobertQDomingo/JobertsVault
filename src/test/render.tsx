@@ -59,7 +59,7 @@ export function renderRoute(
         get_settings: SETTINGS,
         // No check-in is due unless the test says so (CHK-2).
         get_checkin: null,
-        // The sidebar's level chip asks on every screen; null hides it.
+        // The sidebar's level chip asks on every screen; null shows its placeholder.
         get_vault_status: null,
         // The loan form's running total asks as it opens: a stand-in for the backend's sum.
         total_loan_payments: ({ rows }: { rows: LoanRowAmount[] }) => {

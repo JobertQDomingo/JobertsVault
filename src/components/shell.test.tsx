@@ -55,15 +55,16 @@ test("the sidebar lists the screens built so far and marks the current one", () 
     "Goals",
     "Debt-free",
     "Forecast",
-    "Level",
     "Settings",
   ]);
+  // The level chip beside the app name is the only way to /level (UI_FLOWS item 101).
+  expect(within(nav).queryByRole("link", { name: /level/i })).toBeNull();
   expect(link("Dashboard").getAttribute("aria-current")).toBe("page");
   expect(link("Accounts").getAttribute("aria-current")).toBeNull();
   expect(screen.getByText("Jobert's Vault")).toBeTruthy();
 });
 
-test.each(["Recurring", "Budgets", "Goals", "Debt-free", "Forecast", "Level"])(
+test.each(["Recurring", "Budgets", "Goals", "Debt-free", "Forecast"])(
   "the %s screen is marked current and has no shortcut (UI_FLOWS §10, §11 item 19)",
   (name) => {
     renderAt(`/${name.toLowerCase()}`);
@@ -288,11 +289,53 @@ describe("the level chip (LVL-5)", () => {
       name: /^Level \d+, \d+ of \d+ conditions met/,
     });
 
-  test("isn't shown while the status loads", async () => {
-    renderRoute("/settings", { get_vault_status: () => new Promise(() => {}) });
-    await screen.findByRole("navigation");
-    await new Promise((r) => setTimeout(r, 50));
-    expect(chip()).toBeNull();
+  // The Level screen must stay reachable whatever the status does (UI_FLOWS §1, item 101).
+  test.each([
+    ["loads", () => new Promise(() => {})],
+    [
+      "fails",
+      () => {
+        throw new Error("boom");
+      },
+    ],
+  ])(
+    "is a level 0 placeholder link to /level while the status %s",
+    async (_, answer) => {
+      const { router } = renderRoute("/settings", {
+        get_vault_status: answer,
+      });
+      await screen.findByRole("navigation");
+      await new Promise((r) => setTimeout(r, 50));
+      expect(chip()).toBeNull();
+      const placeholder = screen.getByRole("link", { name: "Vault level" });
+      expect(placeholder.getAttribute("title")).toBe("Vault level");
+      expect(placeholder.textContent).toBe("—");
+      // An empty ring: the track only, no arc.
+      expect(placeholder.querySelectorAll("circle")).toHaveLength(1);
+      fireEvent.click(placeholder);
+      await waitFor(() =>
+        expect(router.state.location.pathname).toBe("/level"),
+      );
+    },
+  );
+
+  test("is marked the current page on /level and nowhere else", async () => {
+    renderRoute("/level", {
+      get_vault_status: STATUS,
+      list_categories: [],
+      list_accounts: [],
+    });
+    const link = await screen.findByRole("link", { name: /^Level 4,/ });
+    expect(link.getAttribute("aria-current")).toBe("page");
+    expect(link.getAttribute("title")).toBe("Vault level");
+    fireEvent.click(screen.getByRole("link", { name: "Dashboard" }));
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("link", { name: /^Level 4,/ })
+          .getAttribute("aria-current"),
+      ).toBeNull(),
+    );
   });
 
   test("names the level and the ring, opens /level, and follows a save", async () => {
