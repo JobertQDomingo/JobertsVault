@@ -388,6 +388,7 @@ test("while Finish saves it keeps focus and a second press does nothing (A11Y-02
   fireEvent.click(finish);
   // Not disabled: a focused button that's disabled drops focus to <body>.
   expect(finish.hasAttribute("disabled")).toBe(false);
+  expect(finish.getAttribute("aria-disabled")).toBe("true");
   expect(document.activeElement).toBe(finish);
   expect(complete).toHaveBeenCalledOnce();
   release();

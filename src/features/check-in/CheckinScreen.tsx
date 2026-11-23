@@ -299,7 +299,14 @@ function Flow({
       </div>
       <div className="flex justify-between">
         {at > 0 ? <Button onClick={back}>Back</Button> : <span />}
-        <Button variant="primary" onClick={next} disabled={!ready}>
+        <Button
+          variant="primary"
+          onClick={next}
+          disabled={!ready}
+          // Busy while saving, but still focusable (A11Y-02).
+          aria-disabled={complete.isPending || undefined}
+          className="aria-disabled:opacity-50"
+        >
           {last ? (
             "Finish"
           ) : (

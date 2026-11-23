@@ -636,7 +636,7 @@ While a check-in is due, `Ctrl+N` and `?` still work, each opening its dialog ov
 
 `?` opens this table in the **Keyboard shortcuts** dialog, with the two sentences above under it, without their references. The dialog and the key handlers read one list in the code (`src/lib/shortcuts.ts`), so they can't drift apart. While you're typing in a field, `?` types a question mark and opens nothing.
 
-**Skip to content:** the first Tab on any screen of the app shell shows a **Skip to content** link at the top left. Enter on it moves the focus past the sidebar's 13 stops to the screen, so the next Tab is the screen's first control. It's hidden until it has the focus, and the check-in has none, having no sidebar. When a dialog closes, the focus goes back to the button that opened it.
+**Skip to content:** the first Tab on any screen of the app shell shows a **Skip to content** link at the top left. Enter on it moves the focus past the sidebar's 13 stops to the screen, so the next Tab is the screen's first control. It's hidden until it has the focus, and the check-in has none, having no sidebar. When a dialog closes, the focus goes back to the button that opened it, if it's still there (a deleted row's Edit isn't) and not behind another open dialog.
 
 ---
 

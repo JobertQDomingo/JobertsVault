@@ -227,3 +227,98 @@ test("a toast with an action stays until it's closed, so it can't close under th
     vi.useRealTimers();
   }
 });
+
+function Removing() {
+  const [open, setOpen] = useState(false);
+  const [row, setRow] = useState(true);
+  return (
+    <>
+      <Button>Row 3</Button>
+      {row && <Button onClick={() => setOpen(true)}>Row 80</Button>}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent title="Edit transaction">
+          <Button
+            onClick={() => {
+              setRow(false);
+              setOpen(false);
+            }}
+          >
+            Delete
+          </Button>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+test("when its opener is gone, closing a dialog sends focus nowhere older (A11Y-01)", async () => {
+  render(<Removing />);
+  screen.getByRole("button", { name: "Row 3" }).focus();
+  const opener = screen.getByRole("button", { name: "Row 80" });
+  opener.focus();
+  fireEvent.click(opener);
+  const del = await screen.findByRole("button", { name: "Delete" });
+  await waitFor(() => expect(document.activeElement).toBe(del));
+  fireEvent.click(del);
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await new Promise((r) => setTimeout(r, 10));
+  expect(document.activeElement).not.toBe(
+    screen.getByRole("button", { name: "Row 3" }),
+  );
+});
+
+function Nested() {
+  const [outer, setOuter] = useState(false);
+  const [inner, setInner] = useState(false);
+  const [row, setRow] = useState(true);
+  return (
+    <>
+      <Button onClick={() => setOuter(true)}>Review</Button>
+      <Dialog open={outer} onOpenChange={setOuter}>
+        <DialogContent title="Due">
+          {/* Row 1, which the save removes: Radix's first focus lands on its Post. */}
+          {row && (
+            <>
+              <Button>Post</Button>
+              <Button onClick={() => setInner(true)}>Edit & post</Button>
+            </>
+          )}
+          <Button>Skip</Button>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={inner} onOpenChange={setInner}>
+        <DialogContent title="Edit & post">
+          <Button
+            onClick={() => {
+              setRow(false);
+              setInner(false);
+            }}
+          >
+            Save
+          </Button>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+test("closing a dialog over another never sends focus behind the one still open (A11Y-01)", async () => {
+  render(<Nested />);
+  const review = screen.getByRole("button", { name: "Review" });
+  review.focus();
+  fireEvent.click(review);
+  const post = await screen.findByRole("button", { name: "Edit & post" });
+  post.focus();
+  fireEvent.click(post);
+  const save = await screen.findByRole("button", { name: "Save" });
+  await waitFor(() => expect(document.activeElement).toBe(save));
+  // The outer dialog's trap may pull focus straight back, so watch whether it ever got there.
+  const reached = vi.fn();
+  review.addEventListener("focus", reached);
+  fireEvent.click(save);
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Edit & post" })).toBeNull(),
+  );
+  await new Promise((r) => setTimeout(r, 10));
+  expect(reached).not.toHaveBeenCalled();
+});
