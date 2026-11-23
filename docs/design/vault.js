@@ -60,7 +60,7 @@
   }
   function badge(el) {
     var n = el.getAttribute("data-level"), sm = el.classList.contains("sm"), w = sm ? 22.52 : 34.64, h = sm ? 26 : 40;
-    el.classList.toggle("zero", n === "0");
+    el.classList.toggle("zero", n === "0" || n === "—");
     el.innerHTML = '<svg viewBox="0 0 ' + w + " " + h + '" aria-hidden="true"><path d="' + hexPath(w, h, 3) + '"/></svg><b>' + n + "</b>";
   }
 
@@ -82,7 +82,8 @@
       var hex = document.createElement("span");
       hex.className = "lv-hex sm"; hex.setAttribute("data-level", n); badge(hex);
       el.innerHTML = ""; el.appendChild(svg); el.appendChild(hex);
-      el.setAttribute("aria-label", "Level " + n + ", " + met + " of " + total + " conditions met for level " + (+n + 1));
+      // The placeholder while the status loads or fails (UI_FLOWS §1)
+      el.setAttribute("aria-label", n === "—" ? "Vault level" : "Level " + n + ", " + met + " of " + total + " conditions met for level " + (+n + 1));
     });
     // LevelPath: ten nodes, reached ones with a check, the current one ringed, later ones locked
     document.querySelectorAll(".lv-path[data-level]").forEach(function (el) {
