@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-23 |
-| **Current focus** | **Phase 5: Check-in & polish**: Installer polish |
+| **Current focus** | **Phase 5: Check-in & polish**: Level chip takes over the sidebar's Level item |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -240,7 +240,7 @@ The first four were found while testing Phase 4 on the owner's data and left for
 - [x] `?` opens the keyboard shortcut help dialog, and every shortcut is reviewed, the check-in's included. `?` works on the check-in too. The review found one wrong key: Alt+← on Pick a focus also moved the pick
 - [x] Accessibility pass: focus order, screen reader labels, contrast re-check of any changed tokens. It covers the check-in, the hexagon's hidden table, the level path and the level chip
 - [x] Performance pass on the glass UI with a full year of data, with `get_checkin` and `get_vault_status` added to the 50,000-transaction check ([ARCHITECTURE §12](docs/ARCHITECTURE.md))
-- [ ] Installer polish: icon, product name, version info
+- [ ] Level chip takes over the sidebar's Level item, which is removed: the chip always shows (a placeholder while the status loads or fails), is tinted on `/level` like the current screen, and has a "Vault level" tooltip (UI_FLOWS §1, item 101). This replaces installer polish, dropped by the owner on 2026-11-23: the installer already has its icon, product name, publisher and version, and the owner is its only user [LVL-5]
 - [ ] Review all docs against the shipped app, and update any that drifted
 - [ ] Release `v1.0.0` with `/release`, then finish a real weekly and monthly check-in in the installed app
 

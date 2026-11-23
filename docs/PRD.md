@@ -311,7 +311,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | LVL-2 | **Levels:** a fixed ladder of 10 levels, each a set of real conditions, such as nothing overdue, or savings that cover a month of spending. The level is the highest one whose conditions, and those of every level below it, are true today. It can go down, and the app says why. Nothing in the app raises a stat or a level except the money data and finishing check-ins on time. | P5 |
 | LVL-3 | A **Level** screen shows the ten levels as a path, with the next level's conditions as a checklist, and the six stats as a hexagon chart with last check-in's shape behind it. Every score is also written as a number with its change since the last check-in. | P5 |
 | LVL-4 | **Next best move:** one sentence naming the single action that would help most: paying what's overdue first, otherwise the first unmet condition of the next level, with the gap as an amount where there is one. | P5 |
-| LVL-5 | The sidebar shows the level (its number in a small hexagon) with a ring for how many of the next level's conditions are met, on every screen. Clicking it opens the Level screen. | P5 |
+| LVL-5 | The sidebar shows the level (its number in a small hexagon) with a ring for how many of the next level's conditions are met, on every screen. Clicking it opens the Level screen, and it's the only way there: there's no Level sidebar item. | P5 |
 | LVL-6 | **Level-up moment:** when a check-in finds the level higher than at the last check-in, the level badge plays one short animation, skipped when Windows has animations turned off. A lower level gets a plain sentence with the reason and no animation. | P5 |
 | LVL-7 | **Streaks:** the number of weekly check-ins in a row finished within 2 days of coming due, and the number of focuses kept in a row. | P5 |
 | LVL-8 | The Level screen shows the last 8 graded focuses as kept or missed, and a small trend line for each stat once there are 3 or more check-ins. | P5 |
@@ -381,7 +381,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | **2: Reports & backups** | Charts over time, category breakdown, period comparison, % change, payee suggestions, regular backups, restore, CSV export |
 | **3: Planning** | Recurring transactions, budgets, savings goals, card due-date reminder, future-dated transactions |
 | **4: Loans & forecast** | Loans with payment reminders and the Debt-free screen, payday rules and payslips with deductions, Safe to spend and the Forecast screen, smart goal target dates, and credit card spending levels |
-| **5: Check-in & polish** | The weekly and monthly check-in with a focus, the Vault level (stats, levels and the Level screen), the theme switch, the Reduce transparency switch, more keyboard shortcuts, Windows installer polish |
+| **5: Check-in & polish** | The weekly and monthly check-in with a focus, the Vault level (stats, levels and the Level screen), the theme switch, the Reduce transparency switch, more keyboard shortcuts |
 
 ## 12. How we'll measure success
 
@@ -495,6 +495,7 @@ None at the moment. All earlier questions have been answered and are recorded in
 | 2026-11-20 | The Add and Edit loan forms total their payment rows as they're typed (LOAN-1), with what's still to pay beside it once a row counts as paid, since a lender app shows what's left. The backend adds them up; it's a check, never a rule (UI_FLOWS §11 item 95) |
 | 2026-11-21 | HMO joins the PAY-3 deduction categories, added by migration 0006 to a database without one, as Phase 4 added its own; one the user already made is kept as it is (DATA_MODEL §7, UI_FLOWS §11 item 97) |
 | 2026-11-21 | `?` opens the keyboard shortcuts on every screen past the first-launch setup form, the check-in included, over it like quick-add (the owner, 2026-11-19). The shortcut review added no `Ctrl+` number for the screens built since Phase 2 (UI_FLOWS §10, §11 item 98) |
+| 2026-11-23 | The level chip (LVL-5) replaces the sidebar's Level item, which opened the same screen, and Windows installer polish is dropped from Phase 5: the installer already has its icon, product name, publisher and version, and the owner is its only user (the owner, UI_FLOWS item 101) |
 
 ---
 

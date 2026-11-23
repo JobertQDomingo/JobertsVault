@@ -101,7 +101,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
   <!-- 1–2. Shell + Dashboard -->
   <section class="s" id="dashboard">
     <h2><span class="sec-no">§1–2</span> App shell and dashboard <span class="phase p1">Phase 1</span></h2>
-    <p class="sec-intro">The window is a fixed 1440 × 900. Everything floats as glass over the aurora with 12 px gaps: the sidebar, the top bar, the period bar and the cards. The sidebar lists the screens, with Settings at the bottom, and the current screen gets a soft indigo tint. The top bar always has <b>+ Add</b> (<span class="kbd">Ctrl</span> <span class="kbd">N</span>). Turn on <b>Show Phase 2–5 additions</b> in the bar above to see what later phases add, outlined with dashes, such as the Phase 5 focus rows at the top of Safe to spend, the Level item and the level chip beside the app name. Screens from later phases stay hidden in the sidebar until they're built.</p>
+    <p class="sec-intro">The window is a fixed 1440 × 900. Everything floats as glass over the aurora with 12 px gaps: the sidebar, the top bar, the period bar and the cards. The sidebar lists the screens, with Settings at the bottom, and the current screen gets a soft indigo tint. The top bar always has <b>+ Add</b> (<span class="kbd">Ctrl</span> <span class="kbd">N</span>). Turn on <b>Show Phase 2–5 additions</b> in the bar above to see what later phases add, outlined with dashes, such as the Phase 5 focus rows at the top of Safe to spend and the level chip beside the app name. Screens from later phases stay hidden in the sidebar until they're built.</p>
     <div class="frame-fit" data-fit>
       <div class="preview shot">
         <div class="v-shell">
@@ -947,7 +947,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
       <li><b>Safe to spend (Phase 4):</b> a card at the top of the dashboard's right column, always for today, and the lowest point over the next 12 months, never only "until the next payday".</li>
       <li><b>New loans (Phase 4):</b> saving one shows what it does to the debt-free date and Safe to spend first. The button to go ahead is destructive.</li>
       <li><b>Check-in (Phase 5):</b> a full-window route, not a dialog, with one panel whose Back and Next never move. It can't be closed, and only + Add and the <span class="kbd">?</span> shortcut list open over it.</li>
-      <li><b>Level chip (Phase 5):</b> the level's number in a small hexagon inside a ring, not "Lv 4", which doesn't fit beside the app name.</li>
+      <li><b>Level chip (Phase 5):</b> the level's number in a small hexagon inside a ring, not "Lv 4", which doesn't fit beside the app name. It's the only way to the Level screen, so there's no Level item, and it takes the current-screen tint there.</li>
     </ul>
   </section>
 </div>
@@ -958,14 +958,14 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
   var nav = [
     ["dashboard", "Dashboard", "layout-dashboard", ""], ["transactions", "Transactions", "list", ""], ["accounts", "Accounts", "landmark", ""],
     ["reports", "Reports", "chart-pie", "P2"], ["recurring", "Recurring", "repeat", "P3"], ["budgets", "Budgets", "target", "P3"], ["goals", "Goals", "flag", "P3"],
-    ["debt-free", "Debt-free", "hand-coins", "P4"], ["forecast", "Forecast", "calendar-range", "P4"], ["level", "Level", "hexagon", "P5"]
+    ["debt-free", "Debt-free", "hand-coins", "P4"], ["forecast", "Forecast", "calendar-range", "P4"]
   ];
   // A Phase 5 screen (data-all) shows every item, since the screen itself is from the last phase
   document.querySelectorAll(".v-side[data-active]").forEach(function (side) {
     var active = side.getAttribute("data-active"), later = side.hasAttribute("data-all") ? "" : " later";
     var lv = side.getAttribute("data-level") || "7,1,2";
     lv = lv.split(",");
-    var html = '<div class="v-brand"><img src="../../assets/brand/logo.svg" width="30" height="30" alt="">Jobert\'s Vault<span class="lv-chip' + later + '" role="link" data-level="' + lv[0] + '" data-met="' + lv[1] + '" data-total="' + lv[2] + '"></span></div>';
+    var html = '<div class="v-brand"><img src="../../assets/brand/logo.svg" width="30" height="30" alt="">Jobert\'s Vault<span class="lv-chip' + later + (active === "level" ? " on" : "") + '" role="link" title="Vault level" data-level="' + lv[0] + '" data-met="' + lv[1] + '" data-total="' + lv[2] + '"></span></div>';
     nav.forEach(function (n) {
       html += '<div class="v-nav' + (n[0] === active ? " on" : "") + (n[3] ? later : "") + '"><i data-lucide="' + n[2] + '" class="s20"></i>' + n[1] + (n[3] && later ? '<span class="phase">' + n[3] + '</span>' : "") + '</div>';
     });
