@@ -437,6 +437,38 @@ test("a loan payment due soon has a warning banner with Pay, before every other 
   );
 });
 
+test("the banners share one blurred panel as flat rows, so every banner blurs once (PERF-01)", async () => {
+  renderRoute("/", {
+    ...ANSWERS,
+    get_dashboard: {
+      ...DASHBOARD,
+      backupDue: true,
+      cardsDue: [cardDue(3)],
+      loansDue: [loanDue()],
+      recurringDue: 2,
+    },
+    list_loans: LOANS,
+  });
+  await screen.findByText(/E-wallet loan:/);
+  const all = banners();
+  expect(all).toHaveLength(4);
+  const panel = all[0].parentElement!;
+  expect(panel.classList.contains("glass")).toBe(true);
+  for (const b of all) {
+    expect(b.parentElement).toBe(panel);
+    // A .glass inside a .glass is flat (globals.css, DESIGN_SYSTEM §2.3).
+    expect(b.classList.contains("glass")).toBe(true);
+  }
+});
+
+test("with no banner, their panel is empty and hidden (PERF-01)", async () => {
+  renderRoute("/", ANSWERS);
+  await screen.findByText("Safe to spend");
+  expect(screen.queryAllByRole("status")).toHaveLength(0);
+  const empty = document.querySelector('[class~="empty:hidden"]');
+  expect(empty?.childElementCount).toBe(0);
+});
+
 test("the loan banner says due today and due tomorrow (LOAN-4)", async () => {
   renderRoute("/", {
     ...ANSWERS,
