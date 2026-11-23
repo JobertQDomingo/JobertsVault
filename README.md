@@ -12,7 +12,7 @@ A private desktop app for Windows that tracks personal cashflow (income and expe
 | **2: Reports & backups** | Income-vs-expense charts, category breakdown, period comparison, payee suggestions, automatic daily backups, restore, CSV export |
 | **3: Planning** | Recurring transactions, budgets, savings goals, credit card due-date reminders, future-dated transactions |
 | **4: Loans & forecast** | Loans with payment reminders and a Debt-free screen, Before you borrow, payslips with their deductions, Safe to spend that looks 12 months ahead with a Forecast screen, goal target dates that follow the forecast, and credit card spending levels |
-| **5: Check-in & polish** | A required weekly and monthly check-in that ends with one focus to do better, the Vault level (six stats and ten levels worked out from your real data), Theme and Reduce transparency switches, more keyboard shortcuts |
+| **5: Check-in & polish** | A required weekly and monthly check-in that ends with one focus to do better, the Vault level (six stats and ten levels worked out from your real data), Theme and Reduce transparency switches, a `?` list of every keyboard shortcut, and an accessibility pass |
 
 See [PRD.md](docs/PRD.md) for the full requirements.
 

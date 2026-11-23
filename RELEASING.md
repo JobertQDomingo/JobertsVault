@@ -24,7 +24,7 @@ git switch -c feat/short-name        # or fix/…, docs/…, chore/…, ci/…
 # work and commit, as many commits as you like
 git push -u origin feat/short-name
 gh pr create --web
-gh pr checks --watch                 # CI: the check job, about 5 minutes
+gh pr checks --watch                 # CI: the check job, about 2–3 minutes
 ```
 
 When CI is green, click **Squash and merge**, which also deletes the branch on GitHub. Then run:
@@ -67,6 +67,7 @@ The repo includes a Claude Code skill, [`.claude/skills/release/SKILL.md`](.clau
    | `/release` | It suggests patch or minor from the commits, and you confirm |
    | `/release patch` | The next patch, e.g. 0.1.0 → 0.1.1 |
    | `/release minor` | The next minor, e.g. 0.1.1 → 0.2.0 |
+   | `/release major` | The next major, e.g. 0.4.0 → 1.0.0. It's never suggested, so type it when you mean it |
    | `/release 0.1.0` | Exactly that version |
 
    Typing `/` shows the list of commands. `release` is among them as *(project)*.

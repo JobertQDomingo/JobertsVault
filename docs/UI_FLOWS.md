@@ -540,7 +540,7 @@ A full-window screen with **no sidebar**, shown while a check-in is due (CHK-2).
 
 - **Top bar:** the logo, the title and the period ("Weekly check-in · Nov 9–15", "Monthly check-in · October 2026"), and **+ Add**. There's no close button, and Esc does nothing here. A merged check-in is titled as the monthly one.
 - **The panel** is one Level 1 glass panel, 880 px wide and centered, with the `StepIndicator` (DESIGN_SYSTEM §9.2) at the top, the step's sentence in `h1` size, its figures in flat `--wash` cards with 12 px corners inside the panel, and **Back** (hidden on the first step, `secondary`) and **Next** (`primary`, with its `Enter` hint like + Add's) at the bottom. The panel runs from 12 px under the top bar to 12 px above the window's bottom edge, with 24 px padding and 20 px between its parts, so Back and Next stay in the same place on every step, and figures that don't fit scroll inside it. The last step's button is **Finish**. Enter presses Next, and the step is kept in the URL by name (`?step=card`), so Back and a reload stay put, and a step that appears after a save (Goals, when a goal moves) doesn't move the user.
-- **The steps**, in order (CHK-3). A weekly check-in has 6 to 8 (with a month start day above 1, the first one finished in January can be weekly and still have Your year), and a monthly one 8 or 9:
+- **The steps**, in order (CHK-3). A weekly check-in has 6 to 8 (with a month start day above 1, the first one finished in January can be weekly and still have Your year), and a monthly one 7 to 9 (7 when there's no active goal, item 93):
 
 | Step | When | What it shows |
 |---|---|---|
@@ -609,7 +609,7 @@ A full-window screen with **no sidebar**, shown while a check-in is due (CHK-2).
 | **Error loading data** | An inline message with a **Retry** button. Details are in the error log (ARCHITECTURE §4.4). |
 | **App can't start** | A full-window error screen showing the database path and the error, plus **Open data folder** and **Check for updates** (ARCHITECTURE §6, UPD-6) |
 | **Updating** | A centered glass panel with the logo and "Updating Jobert's Vault to 0.2.0…". The rest of the app isn't shown yet. |
-| **Check-in due** (Phase 5) | The check-in fills the window, with no sidebar, until it's finished (§8.7). Only + Add and the forms it offers open over it. |
+| **Check-in due** (Phase 5) | The check-in fills the window, with no sidebar, until it's finished (§8.7). Only + Add, the forms it offers and the `?` shortcut list open over it. |
 | **Transparency off** (Windows setting) | The same screens with solid panels and no blur. The aurora and layout stay (DESIGN_SYSTEM §2.4). |
 
 ---
@@ -628,7 +628,7 @@ A full-window screen with **no sidebar**, shown while a check-in is due (CHK-2).
 | `Enter` / `Shift+Enter` | Save / save and add another | Quick-add |
 | `↑` / `↓` | Previous / next day | Date input |
 | `Esc` | Close a dialog or popover | Everywhere |
-| `Enter` / `Alt+←` | Next step (Finish on the last) / previous step | Check-in (Phase 5) |
+| `Enter` / `Alt+←` | Next step (Finish on the last) / previous step | Check-in |
 | `↑` / `↓` | Move between the offered focuses | Check-in, Pick a focus |
 | `?` | Show these shortcuts | Everywhere, the check-in included |
 

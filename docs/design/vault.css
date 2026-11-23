@@ -319,6 +319,9 @@ svg.lucide { width: 16px; height: 16px; flex: none; }
 .v-toast > svg.lucide:first-child { color: var(--success); }
 .v-toast.error > svg.lucide:first-child { color: var(--danger); }
 .v-toast .msg { flex: 1; min-width: 0; }
+/* With an action: the action under the sentence, ✕ at the top right (DESIGN_SYSTEM §9.1) */
+.v-toast.action { display: grid; grid-template-columns: auto 1fr auto; row-gap: 4px; }
+.v-toast.action .act { grid-column: 2; justify-self: start; margin-left: -10px; color: var(--primary); }
 
 .v-dialog { border-radius: 24px; width: 480px; max-width: 100%; }
 .v-dialog.confirm { width: 400px; }
@@ -452,7 +455,7 @@ svg.v-trend polyline { fill: none; stroke: var(--primary); stroke-width: 1.5; st
 /* Focus offer card: one radio group, selected by a border and a check, never by tint alone */
 .v-offer { position: relative; display: grid; gap: 2px; background: var(--wash); border: 2px solid transparent; border-radius: 12px; padding: 12px 48px 12px 16px; cursor: pointer; }
 .v-offer b { font-weight: 600; }
-.v-offer .tick { position: absolute; top: 12px; right: 12px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--field-edge); display: grid; place-items: center; }
+.v-offer .tick { position: absolute; top: 12px; right: 12px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--muted-foreground); display: grid; place-items: center; }
 .v-offer .tick svg.lucide { width: 12px; height: 12px; visibility: hidden; }
 .v-offer.on { border-color: var(--primary); }
 .v-offer.on .tick { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }

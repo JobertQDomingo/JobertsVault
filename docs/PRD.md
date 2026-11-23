@@ -4,7 +4,7 @@
 |---|---|
 | **App name** | Jobert's Vault |
 | **Status** | Approved v1.3 |
-| **Last updated** | 2026-11-21 |
+| **Last updated** | 2026-11-23 |
 | **Platform** | Windows desktop app built with Tauri 2: React + TypeScript frontend, Rust backend, SQLite database |
 
 ---
@@ -381,7 +381,7 @@ This section is in Phase 2 (see §11), except BAK-5, which is in the MVP because
 | **2: Reports & backups** | Charts over time, category breakdown, period comparison, % change, payee suggestions, regular backups, restore, CSV export |
 | **3: Planning** | Recurring transactions, budgets, savings goals, card due-date reminder, future-dated transactions |
 | **4: Loans & forecast** | Loans with payment reminders and the Debt-free screen, payday rules and payslips with deductions, Safe to spend and the Forecast screen, smart goal target dates, and credit card spending levels |
-| **5: Check-in & polish** | The weekly and monthly check-in with a focus, the Vault level (stats, levels and the Level screen), the theme switch, the Reduce transparency switch, more keyboard shortcuts |
+| **5: Check-in & polish** | The weekly and monthly check-in with a focus, the Vault level (stats, levels and the Level screen), the theme switch, the Reduce transparency switch, the `?` list of keyboard shortcuts, and accessibility and performance passes |
 
 ## 12. How we'll measure success
 
