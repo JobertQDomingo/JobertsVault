@@ -8,7 +8,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const shots = join(here, "../../../../.superpowers/shots"); // git-ignored; never inside the tracked skill folder
 mkdirSync(shots, { recursive: true });
 
-// T25: CDP_PORT=9333 CDP_MATCH=tauri.localhost drives the separate perf build instead.
+// CDP_PORT=9333 CDP_MATCH=tauri.localhost drives the separate perf build instead.
 const targets = await (await fetch(`http://127.0.0.1:${process.env.CDP_PORT ?? 9222}/json`)).json();
 const page = targets.find((t) => t.type === "page" && t.url.includes(process.env.CDP_MATCH ?? "localhost:1420"));
 if (!page) throw new Error("no app page: " + JSON.stringify(targets.map((t) => t.url)));
@@ -52,7 +52,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function answerStub({ requestId, request }) {
   if (request.method !== "POST") return send("Fetch.continueRequest", { requestId });
-  // fn may return { __error: value } to make the command fail with that error (T11).
+  // fn may return { __error: value } to make the command fail with that error.
   const out = await stub.fn(request);
   const failed = out !== null && typeof out === "object" && "__error" in out;
   const body = failed ? out.__error : out;

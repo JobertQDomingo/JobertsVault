@@ -1,8 +1,15 @@
 // Cold start + screen loads + scroll smoothness on the release build with identifier
 // com.jobertsvault.perf (its own data folder). Usage: node perfrun.mjs [runs]
+// Build it first:  npm run tauri build -- --no-bundle --config '{"identifier":"com.jobertsvault.perf"}'
+// A plain `npm run tauri build` writes the same exe with the real identifier, so this refuses to run it.
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const EXE = "C:/Projects/JobertsVault/src-tauri/target/release/jobertsvault.exe";
+if (!readFileSync(EXE).includes("com.jobertsvault.perf")) {
+  console.error(`Refusing: ${EXE} isn't the perf build, and would open the real database. See this file's header for the build.`);
+  process.exit(1);
+}
 const PORT = 9333;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

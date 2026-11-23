@@ -1,5 +1,5 @@
 # Seeds 50,000 transactions into the PERF build's database only (com.jobertsvault.perf).
-# Usage: python -I seedperf.py [auto_update true|false]
+# Usage: python -I .claude/skills/task/tools/passes/seedperf.py [auto_update true|false]
 import datetime, os, sqlite3, sys
 
 db = os.path.join(os.environ["APPDATA"], "com.jobertsvault.perf", "jobertsvault.db")

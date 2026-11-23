@@ -37,6 +37,8 @@ section = road[start:].split("\n## ", 1)[0]
 cur_ids = set(re.findall(r"(?m)^\| ([A-Z]+-\d+a?) \|.*\| P%d \|" % current, prd))
 for missing in sorted(cur_ids - set(re.findall(r"\[([A-Z]+-\d+a?)\]", section))):
     problems.append("PRD %s is P%d but no Phase %d task names it" % (missing, current, current))
+if not re.search(r"(?m)^\| \*\*%d · " % current, road):
+    problems.append("Phase %d has no row in ROADMAP's Overview table" % current)
 
 # 2. Each phase's progress in the Overview matches its boxes.
 sections = re.split(r"(?m)^## Phase (\d+)", road)

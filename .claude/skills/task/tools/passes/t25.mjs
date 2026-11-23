@@ -1,3 +1,5 @@
+// Build it first (never a plain `npm run tauri build`, which opens the real data):
+//   npm run tauri build -- --no-bundle --config '{"identifier":"com.jobertsvault.perf"}'
 // T25: on the separate perf build (com.jobertsvault.perf, 50,000 transactions and a year of
 // Phase 3-5 data): each screen's load, its blurred surfaces, and frame times while its main list
 // scrolls, in both themes. The dashboard also runs with every banner showing (its answer
@@ -28,7 +30,7 @@ export default async (app) => {
       ...real,
       backupDue: true,
       recurringDue: 3,
-      cardsDue: [{ accountId: 4, amountOwed: 840029, days: 2 }],
+      cardsDue: [{ accountId: 4, amountOwed: 840000, days: 2 }],
       loansDue: [
         { loanId: 9001, name: "t25 Bank loan", accountId: 2, paymentId: 9001, amount: 105000, dueDate: "2026-11-15", days: -6, moreOverdue: 0, moveFirst: null },
         { loanId: 9002, name: "t25 E-wallet loan", accountId: 3, paymentId: 9002, amount: 100000, dueDate: "2026-11-24", days: 3, moreOverdue: 0, moveFirst: 80000 },

@@ -5,7 +5,7 @@ is the 2x2-pixel block inside the run's boxes with the lowest WCAG ratio against
 (alpha and opacity composited over that block). Large text (24 px, or 18.66 px at weight 700)
 needs 3:1, other text 4.5:1. Disabled controls are exempt (WCAG 1.4.3) and listed apart.
 
-    python .claude/skills/task/tools/passes/t24text.py <folder> [--all]
+    python -I .claude/skills/task/tools/passes/t24text.py <folder> [--all]
 """
 
 import json

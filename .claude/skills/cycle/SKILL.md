@@ -11,17 +11,20 @@ A cycle is one release. The owner brings the changes. This session works out exa
 
 **This session builds no app code.** It produces a docs PR and a git-ignored prompt file.
 
-**The owner's permission (2026-11-23):** for this cycle's PRs, you may commit, push, open the PR, review, fix and squash-merge on green CI. That includes this docs PR. It never covers a version bump or `/release`.
+**The owner's permission (2026-11-23):** for this cycle's PRs, you may commit, push, open the PR, review, fix and squash-merge on green CI. That includes this docs PR. It ends when the cycle's close-phase PR merges, and it never covers a version bump or `/release`.
 
 ## 1. Start
 
 1. Run `git status --porcelain`: it must print nothing. Then `git switch main`, `git pull --ff-only`.
-2. N = the highest `## Phase <n>` in ROADMAP.md, plus 1. Check the previous cycle is closed:
+2. **Resume if an earlier `/cycle` session stopped part-way:**
+   - **An open docs PR:** `gh pr list --state open --search "head:docs/phase"` lists one. Switch to its branch and carry on from §4 step 5. The grill's answers are in its PRD §14 rows.
+   - **A merged docs PR without prompts:** the highest phase in ROADMAP has no ticked box and no `.superpowers/phase<N>/` folder. Carry on from §5 with that N.
+3. Otherwise, N = the highest `## Phase <n>` in ROADMAP.md, plus 1. Check the previous cycle is closed:
    - Every box in Phase N−1 is ticked.
    - No `.superpowers/phase*/` folder is left.
 
    If either fails, stop and tell the owner what's still open.
-3. Run `python -I .claude/skills/task/tools/checkdocs.py`. It must print 0. If it doesn't, fix that first in its own `docs/` PR.
+4. Run `python -I .claude/skills/task/tools/checkdocs.py`. It must print 0. If it doesn't, fix that first in its own `docs/` PR.
 
 ## 2. Read before asking
 
@@ -49,7 +52,7 @@ Branch: `docs/phase<N>-<short-name>`. PR title: `docs: plan Phase <N>, <name>`.
 
 1. **PRD:**
    - a new row per requirement, with a new ID in its area's series (`TXN-9`, …) and phase `P<N>`
-   - a §11 release-plan row for Phase N
+   - `**P<N>**` added to §7's priority list, and a §11 release-plan row for Phase N
    - §14 decision log rows, dated today, for each answer from the grill
 2. **Every connected doc**, using the stale-docs table in `.claude/skills/task/SKILL.md` §5:
    - DATA_MODEL first for any schema change, including the new migration's SQL word for word
@@ -62,10 +65,12 @@ Branch: `docs/phase<N>-<short-name>`. PR title: `docs: plan Phase <N>, <name>`.
    - Each task is one PR, worth a reviewer's gate, and doable in one session.
    - List them top to bottom, so later tasks build on earlier ones.
    - Each task names its IDs (`[TXN-9]`).
-   - End with three standard tasks:
-     - review every doc against the shipped app (`docs/`)
-     - get ready for the release, which the owner types
-     - close the phase: tick the release box, update Current focus and README's status line, and delete the cycle folder
+   - End with two standard boxes:
+     - review every doc against the shipped app, and update any that drifted
+     - the release box: `Release vX.Y.Z with /release`, then use it in the installed app
+   - The release box gets two prompts:
+     - **get ready for the release:** checks only, no PR unless something needs fixing, and it ticks nothing. The owner types `/release`.
+     - **close the phase:** ticks the release box, updates Current focus and README's status line, and deletes the cycle folder.
 5. **Review:**
    - `checkdocs` prints 0.
    - Do the stale-docs check (task skill §5).
@@ -91,7 +96,7 @@ Tasks that need you: <ids, and what each asks>.
 - **Branch:** `feat/<name>` · **PR title:** `feat: <reader-facing line> (IDs)`
 ```
 
-- One block per ROADMAP task, numbered T01 upward in ROADMAP order.
+- One block per ROADMAP box, numbered T01 upward in ROADMAP order. The release box gets two: get ready, then close the phase.
 - A prompt carries only what's particular to its task. The loop, the permission and the review rules are in `/task`, so don't repeat them.
 - A task that tests on a copy of the owner's real data must say exactly how, and must never touch the live database.
 
