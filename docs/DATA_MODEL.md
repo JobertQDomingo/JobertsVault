@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Approved v1.3 |
-| **Last updated** | 2026-11-21 |
+| **Last updated** | 2026-11-23 |
 | **Database** | SQLite (bundled with the app through `rusqlite`) |
 | **Related docs** | [PRD.md](PRD.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 
@@ -62,7 +62,7 @@ settings  (a key/value table)
 | `loan_payments` | 4 | One row per scheduled payment of a loan |
 | `checkins` | 5 | One row per finished check-in of a week, month or year: its stat snapshot and its focus |
 
-Phase 4 also adds two columns: `transactions.payslip_id` (§4.7) and `recurring_rules.is_payday` (§4.8). Phase 5 adds two to `goals`: `moved_on` and `moved_from` (§4.4).
+Phase 4 also added two columns: `transactions.payslip_id` (§4.7) and `recurring_rules.is_payday` (§4.8). Phase 5 added two to `goals`: `moved_on` and `moved_from` (§4.4).
 
 ---
 
@@ -1155,7 +1155,7 @@ The database's CHECK constraints are a last line of defence. The Rust service la
 | Credit card fields are present if and only if the account is a credit card | the card fields |
 | `currency_decimals` can't change once any amount is stored: a transaction, a recurring rule, a budget, a goal, a loan, a check-in focus with an amount, or an account's non-zero opening balance or credit limit (§1) | settings |
 | A budget's category is an expense category, and a goal's account isn't a credit card | category / account |
-| A goal's name is 1–50 characters and unique, ignoring case; its target amount is > 0 and ≤ the maximum; its target date, if any, is a real date (past dates are allowed until Phase 4's check below); a new goal can't use an archived account, but an edit may keep the one it has | name / targetAmount / targetDate / accountId |
+| A goal's name is 1–50 characters and unique, ignoring case; its target amount is > 0 and ≤ the maximum; its target date is a real date (the next row says when one is needed and how soon it may be); a new goal can't use an archived account, but an edit may keep the one it has | name / targetAmount / targetDate / accountId |
 | Phase 4 (GOL-6): a goal has a target date, on add and on every edit; adding one, or changing its date, needs a payday rule; and the date isn't before the earliest realistic date (§5.17), checked on add and when an edit changes the date | targetDate |
 | Phase 4 (CC-10): a card's spending levels are each > 0 and ≤ the maximum, with soft < mid < hard; every other kind of account has none. A card sent without a level keeps the one it has, and a new card gets the default (§2) | spendSoft / spendMid / spendHard |
 | A new budget can't use an archived category, but an edit may keep the one it has. A category, or all spending, has at most one budget per period. | categoryId / period |

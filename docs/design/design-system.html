@@ -88,7 +88,7 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
     <h1>Design system</h1>
     <p class="lede">The visual version of DESIGN_SYSTEM.md, now in the Glassmorphism 2.0 style. The app's surfaces are frosted glass floating over a soft colored light we call the aurora. Every color, size and component here uses the app's real tokens. Use the switches to see light or dark mode, or what the app looks like with Windows transparency turned off.</p>
     <div class="meta">
-      <span class="pill style"><i data-lucide="circle-check" class="s14"></i> Approved v1.0</span>
+      <span class="pill style"><i data-lucide="circle-check" class="s14"></i> Approved v1.3</span>
       <span class="pill style"><i data-lucide="sparkles" class="s14"></i> Glassmorphism 2.0</span>
       <span class="pill">Sora · lucide icons</span>
       <span class="pill">Peso ₱</span>
@@ -187,8 +187,6 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
     <p class="cap" style="margin-top:12px"><code>--danger</code> uses the same red as <code>--expense</code>. Each meaning color also has a tint for chips and banners: 16% in light mode, 20% in dark.</p>
     <div class="preview" style="margin-top:12px">
       <div class="v-toolbar">
-        <span class="chip" style="--c:var(--income)"><i data-lucide="arrow-down-left"></i></span>
-        <span class="chip" style="--c:var(--expense)"><i data-lucide="arrow-up-right"></i></span>
         <span class="chip xfer"><i data-lucide="arrow-left-right"></i></span>
         <span class="chip" style="--c:var(--warning)"><i data-lucide="triangle-alert"></i></span>
         <span class="chip" style="--c:var(--danger)"><i data-lucide="octagon-alert"></i></span>
@@ -290,13 +288,22 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
     <h2><span class="sec-no">§6</span> Icons</h2>
     <p class="sec-intro">lucide icons with a 1.75 stroke: 16 px inline and in buttons, 20 px in the sidebar, 24 px in empty states. Category icons sit in a 32 px chip with 10 px corners: a tint of the category color, a bright inner edge, and the icon in full color.</p>
     <div class="grid g4">
-      <div class="icon-tile"><span class="ico inc"><i data-lucide="arrow-down-left" class="s20"></i></span><b>Income</b><code class="cap">arrow-down-left</code></div>
-      <div class="icon-tile"><span class="ico exp"><i data-lucide="arrow-up-right" class="s20"></i></span><b>Expense</b><code class="cap">arrow-up-right</code></div>
       <div class="icon-tile"><span class="ico xfer"><i data-lucide="arrow-left-right" class="s20"></i></span><b>Transfer</b><code class="cap">arrow-left-right</code></div>
       <div class="icon-tile"><span class="ico"><i data-lucide="wallet" class="s20"></i></span><b>Cash account</b><code class="cap">wallet</code></div>
       <div class="icon-tile"><span class="ico"><i data-lucide="landmark" class="s20"></i></span><b>Bank account</b><code class="cap">landmark</code></div>
       <div class="icon-tile"><span class="ico"><i data-lucide="smartphone" class="s20"></i></span><b>E-wallet</b><code class="cap">smartphone</code></div>
       <div class="icon-tile"><span class="ico"><i data-lucide="credit-card" class="s20"></i></span><b>Credit card</b><code class="cap">credit-card</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="hand-coins" class="s20"></i></span><b>Debt-free (sidebar)</b><code class="cap">hand-coins</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="calendar-range" class="s20"></i></span><b>Forecast (sidebar)</b><code class="cap">calendar-range</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="calendar-clock" class="s20" style="color:var(--warning)"></i></span><b>A loan payment due</b><code class="cap">calendar-clock</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="octagon-alert" class="s20" style="color:var(--danger)"></i></span><b>Overdue (banner)</b><code class="cap">octagon-alert</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="triangle-alert" class="s20" style="color:var(--danger)"></i></span><b>Overdue or short (in a row)</b><code class="cap">triangle-alert</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="banknote" class="s20"></i></span><b>Pay bill</b><code class="cap">banknote</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="target" class="s20" style="color:var(--primary)"></i></span><b>A focus</b><code class="cap">target</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="check" class="s20" style="color:var(--success)"></i></span><b>Reached, kept or met</b><code class="cap">check</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="x" class="s20" style="color:var(--danger)"></i></span><b>A focus missed</b><code class="cap">x</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="circle" class="s20"></i></span><b>A condition not met</b><code class="cap">circle</code></div>
+      <div class="icon-tile"><span class="ico"><i data-lucide="lock" class="s20"></i></span><b>A level not reached</b><code class="cap">lock</code></div>
       <div class="icon-tile"><img src="../../assets/brand/logo.svg" width="36" height="36" alt=""><b>App logo</b><span class="cap">C · Line Door</span></div>
     </div>
 
@@ -445,9 +452,9 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
     <h3 class="sub">Stat cards</h3>
     <div class="preview">
       <div class="grid g3">
-        <div class="v-card v-stat lift"><span class="lab"><i data-lucide="arrow-down-left" class="s14 inc"></i>Income</span><span class="display inc">+₱4,200.00</span><span class="chg"><span class="pct good">▲ 3.1%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
-        <div class="v-card v-stat lift"><span class="lab"><i data-lucide="arrow-up-right" class="s14 exp"></i>Expense</span><span class="display exp">−₱2,950.40</span><span class="chg"><span class="pct good">▼ 8.0%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
-        <div class="v-card v-stat net lift"><span class="lab"><i data-lucide="scale" class="s14 muted"></i>Net cashflow</span><span class="display inc">+₱1,249.60</span><span class="chg"><span class="pct good">▲ 44.2%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
+        <div class="v-card v-stat lift"><span class="lab">Income</span><span class="display inc">+₱4,200.00</span><span class="chg"><span class="pct good">▲ 3.1%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
+        <div class="v-card v-stat lift"><span class="lab">Expense</span><span class="display exp">−₱2,950.40</span><span class="chg"><span class="pct good">▼ 8.0%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
+        <div class="v-card v-stat net lift"><span class="lab">Net cashflow</span><span class="display inc">+₱1,249.60</span><span class="chg"><span class="pct good">▲ 44.2%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
       </div>
       <p class="cap" style="margin-top:12px">Clickable cards lift 2 px on hover. Net cashflow is the one card tinted with the accent.</p>
     </div>
@@ -609,12 +616,11 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
         </div>
       </div>
     </div>
-    <p class="cap" style="margin-top:8px">A flat <code>--wash</code> card with 12 px corners, one under the other 12 px apart: the sentence in <code>body</code> weight 600 and what it's based on in <code>small</code> text. Each has a 20 px circle in its top-right corner, empty with a <code>--field-edge</code> border. Selected: a 2 px <code>--primary</code> border, and the circle filled <code>--primary</code> with a 12 px <code>check</code>, like a selected radio, never by tint alone. The cards form one radio group: ↑ ↓ move between them, and the focused card has the usual focus ring (the second card here).</p>
+    <p class="cap" style="margin-top:8px">A flat <code>--wash</code> card with 12 px corners, one under the other 12 px apart: the sentence in <code>body</code> weight 600 and what it's based on in <code>small</code> text. Each has a 20 px circle in its top-right corner, empty with a <code>--muted-foreground</code> border. Selected: a 2 px <code>--primary</code> border, and the circle filled <code>--primary</code> with a 12 px <code>check</code>, like a selected radio, never by tint alone. The cards form one radio group: ↑ ↓ move between them, and the focused card has the usual focus ring (the second card here).</p>
 
     <h3 class="sub">Banners and toasts</h3>
     <div class="preview stack">
-      <div class="v-banner warning"><i data-lucide="calendar-clock" class="s20"></i><div class="msg">Credit card payment due in 3 days: ₱640.00 owed</div><button class="v-btn secondary sm" type="button">Pay bill</button></div>
-      <div class="v-banner danger"><i data-lucide="octagon-alert" class="s20"></i><div class="msg">Shopping is ₱30.00 over its October budget.</div></div>
+      <div class="v-banner warning"><i data-lucide="credit-card" class="s20"></i><div class="msg">Credit card payment due in 3 days: ₱640.00 owed</div><button class="v-btn secondary sm" type="button">Pay bill</button></div>
       <div class="v-banner info"><i data-lucide="repeat" class="s20"></i><div class="msg">2 recurring transactions are due.</div><button class="v-btn secondary sm" type="button">Review</button></div>
       <div class="v-banner warning"><i data-lucide="calendar-clock" class="s20"></i><div class="msg">E-wallet loan: ₱1,000.00 due Wed, Oct 28<div class="cap">E-wallet has ₱150.00. Move ₱850.00 there first.</div></div><button class="v-btn secondary sm" type="button">Pay</button><span class="phase">P4</span></div>
       <div class="v-banner danger"><i data-lucide="octagon-alert" class="s20"></i><div class="msg">E-wallet loan: ₱1,000.00 overdue since Mon, Oct 26, and 1 more overdue</div><button class="v-btn secondary sm" type="button">Pay</button><span class="phase">P4</span></div>
@@ -622,8 +628,9 @@ pre.code { margin: 0; background: var(--surface); border: 1px solid var(--border
         <div class="v-toast"><i data-lucide="circle-check"></i><span class="msg">Saved</span></div>
         <div class="v-toast"><i data-lucide="triangle-alert" style="color:var(--warning)"></i><span class="msg">Credit card: ₱3,240.00 this cycle, past your ₱3,000.00 soft level.</span></div>
         <div class="v-toast error"><i data-lucide="circle-alert"></i><span class="msg">Couldn't save. The database is busy, try again.</span><button class="v-btn ghost icon" type="button" aria-label="Close"><i data-lucide="x"></i></button></div>
+        <div class="v-toast action"><i data-lucide="circle-check"></i><span class="msg">Backup saved as jobertsvault-2026-10-26_0930.db</span><button class="v-btn ghost icon" type="button" aria-label="Close"><i data-lucide="x"></i></button><button class="v-btn ghost sm act" type="button">Open folder</button></div>
       </div>
-      <span class="cap">Banners are panel glass tinted with their meaning color. Toasts are raised glass, appear bottom-right and close after 4 s. A warning (a card spending level reached) stays 8 s. Error toasts stay until closed.</span>
+      <span class="cap">Banners are panel glass tinted with their meaning color. Toasts are raised glass, appear bottom-right and close after 4 s. A warning (a card spending level reached) stays 8 s. Error toasts, and a toast with an action, stay until closed: the action sits under the sentence, so the sentence keeps the toast's width, and ✕ is at the top right. A failed check-in Finish's error toast sits bottom centre, so it never covers Finish.</span>
     </div>
 
     <h3 class="sub">Dialog</h3>

@@ -73,7 +73,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
     <h1>Screens and flows</h1>
     <p class="lede">The visual version of UI_FLOWS.md, in the Glassmorphism 2.0 style: every Phase 1 screen as a desktop mockup, the key flows, outlines of the Phase 2–4 screens, and the Phase 5 check-in and Level screens. The sidebar, top bar, period bar and cards are frosted glass panels floating over the aurora. Dialogs, menus and toasts use the stronger raised glass. The sample data is made up but adds up: the October totals, balances, chart bars and budgets all match each other.</p>
     <div class="meta">
-      <span class="pill style"><i data-lucide="circle-check" class="s14"></i> Approved v1.0</span>
+      <span class="pill style"><i data-lucide="circle-check" class="s14"></i> Approved v1.3</span>
       <span class="pill style"><i data-lucide="sparkles" class="s14"></i> Glassmorphism 2.0</span>
       <span class="pill">Today in the mockups: Mon, Oct 26, 2026</span>
       <span class="pill">Window: fixed 1440 × 900</span>
@@ -121,9 +121,9 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
                 <div class="v-banner info later later-tag"><i data-lucide="repeat" class="s20"></i><div class="msg">2 recurring transactions are due.</div><button class="v-btn secondary sm" type="button">Review</button><span class="phase">P3</span></div>
               </div>
               <div class="cols c3">
-                <div class="v-card v-stat"><span class="lab"><i data-lucide="arrow-down-left" class="s14 inc"></i>Income</span><span class="display inc">+₱4,200.00</span><span class="chg later"><span class="pct good">▲ 3.1%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
-                <div class="v-card v-stat"><span class="lab"><i data-lucide="arrow-up-right" class="s14 exp"></i>Expense</span><span class="display exp">−₱2,950.40</span><span class="chg later"><span class="pct good">▼ 8.0%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
-                <div class="v-card v-stat net"><span class="lab"><i data-lucide="scale" class="s14 muted"></i>Net cashflow</span><span class="display inc">+₱1,249.60</span><span class="chg later"><span class="pct good">▲ 44.2%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
+                <div class="v-card v-stat"><span class="lab">Income</span><span class="display inc">+₱4,200.00</span><span class="chg later"><span class="pct good">▲ 3.1%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
+                <div class="v-card v-stat"><span class="lab">Expense</span><span class="display exp">−₱2,950.40</span><span class="chg later"><span class="pct good">▼ 8.0%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
+                <div class="v-card v-stat net"><span class="lab">Net cashflow</span><span class="display inc">+₱1,249.60</span><span class="chg later"><span class="pct good">▲ 44.2%</span><span class="muted">vs Sep 1–26</span><span class="phase">P2</span></span></div>
               </div>
               <div class="v-card later later-tag" style="padding:14px 16px 10px">
                 <div class="row" style="justify-content:space-between;margin-bottom:6px"><b>Income vs expense</b><span class="row" style="gap:10px"><span class="legend"><span><i class="sq" style="background:var(--income)"></i>Income</span><span><i class="sq" style="background:var(--expense)"></i>Expense</span></span><span class="phase">P2</span></span></div>
@@ -741,7 +741,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
                 <h3 class="chip-name"><span class="ico"><i data-lucide="credit-card"></i></span>Credit card</h3>
                 <div class="row" style="gap:8px;align-items:baseline"><span class="display">₱612.59</span><span class="muted">this cycle</span></div>
                 <span class="muted num">Soft ₱3,000.00 · Mid ₱4,000.00 · Hard ₱5,000.00</span>
-                <div class="row" style="justify-content:space-between"><span class="muted num">₱840.29 owed · 8% of your limit · due Thu, Nov 5</span><button class="v-btn secondary sm" type="button"><i data-lucide="banknote"></i>Pay bill</button></div>
+                <div class="row" style="justify-content:space-between"><span class="muted num">₱840.29 owed · 8% of your limit · due Thu, Nov 5</span><button class="v-btn secondary sm" type="button">Pay bill</button></div>
               </div>
             </div>
             <div class="ci-foot"><button class="v-btn secondary" type="button">Back</button><button class="v-btn primary" type="button">Next<span class="kbd-in">Enter</span></button></div>
@@ -916,19 +916,19 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
       <table class="t">
         <thead><tr><th>Shortcut</th><th>Action</th><th>Where</th></tr></thead>
         <tbody>
-          <tr><td class="nowrap"><span class="kbd">Ctrl</span> <span class="kbd">N</span></td><td>Add transaction</td><td>Everywhere</td></tr>
+          <tr><td class="nowrap"><span class="kbd">Ctrl</span> <span class="kbd">N</span></td><td>Add transaction (quick-add)</td><td>Everywhere</td></tr>
           <tr><td class="nowrap"><span class="kbd">Ctrl</span> <span class="kbd">F</span></td><td>Focus the search box</td><td>Transactions</td></tr>
           <tr><td class="nowrap"><span class="kbd">Ctrl</span> <span class="kbd">1</span>–<span class="kbd">4</span></td><td>Dashboard, Transactions, Accounts, Reports</td><td>Everywhere</td></tr>
           <tr><td class="nowrap"><span class="kbd">Ctrl</span> <span class="kbd">,</span></td><td>Settings</td><td>Everywhere</td></tr>
           <tr><td class="nowrap"><span class="kbd">Alt</span> <span class="kbd">←</span> / <span class="kbd">→</span></td><td>Previous / next period</td><td>Screens with a period switcher</td></tr>
           <tr><td class="nowrap"><span class="kbd">Alt</span> <span class="kbd">Home</span></td><td>Go to today</td><td>Screens with a period switcher</td></tr>
-          <tr><td class="nowrap"><span class="kbd">Alt</span> <span class="kbd">E</span> / <span class="kbd">I</span> / <span class="kbd">T</span></td><td>Expense / Income / Transfer</td><td>Quick-add</td></tr>
-          <tr><td class="nowrap"><span class="kbd">Enter</span> · <span class="kbd">Shift</span> <span class="kbd">Enter</span></td><td>Save · Save &amp; add another</td><td>Quick-add</td></tr>
+          <tr><td class="nowrap"><span class="kbd">Alt</span> <span class="kbd">E</span> / <span class="kbd">I</span> / <span class="kbd">T</span></td><td>Switch type to Expense / Income / Transfer</td><td>Quick-add</td></tr>
+          <tr><td class="nowrap"><span class="kbd">Enter</span> · <span class="kbd">Shift</span> <span class="kbd">Enter</span></td><td>Save / save and add another</td><td>Quick-add</td></tr>
           <tr><td class="nowrap"><span class="kbd">↑</span> / <span class="kbd">↓</span></td><td>Previous / next day</td><td>Date input</td></tr>
-          <tr><td class="nowrap"><span class="kbd">Esc</span></td><td>Close the dialog or popover</td><td>Everywhere</td></tr>
-          <tr><td class="nowrap"><span class="kbd">Enter</span> · <span class="kbd">Alt</span> <span class="kbd">←</span></td><td>Next step (Finish on the last) · previous step <span class="phase">P5</span></td><td>Check-in</td></tr>
+          <tr><td class="nowrap"><span class="kbd">Esc</span></td><td>Close a dialog or popover</td><td>Everywhere</td></tr>
+          <tr><td class="nowrap"><span class="kbd">Enter</span> · <span class="kbd">Alt</span> <span class="kbd">←</span></td><td>Next step (Finish on the last) / previous step <span class="phase">P5</span></td><td>Check-in</td></tr>
           <tr><td class="nowrap"><span class="kbd">↑</span> / <span class="kbd">↓</span></td><td>Move between the offered focuses <span class="phase">P5</span></td><td>Check-in, Pick a focus</td></tr>
-          <tr><td class="nowrap"><span class="kbd">?</span></td><td>Show this list <span class="phase">P5</span></td><td>Everywhere, the check-in included</td></tr>
+          <tr><td class="nowrap"><span class="kbd">?</span></td><td>Show these shortcuts <span class="phase">P5</span></td><td>Everywhere, the check-in included</td></tr>
         </tbody>
       </table>
     </div>
@@ -938,7 +938,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
   <section class="s" id="questions">
     <h2><span class="sec-no">§11</span> Decided</h2>
     <ul class="plain">
-      <li><b>First launch:</b> a plain setup form in Phase 1 (ONB-1), polished in Phase 5 (ONB-2).</li>
+      <li><b>First launch:</b> a plain setup form (ONB-1). The polished version with a tour (ONB-2) was dropped.</li>
       <li><b>Duplicate:</b> the copy uses today's date (TXN-2).</li>
       <li><b>Pay bill:</b> suggests the full amount owed, editable (CC-9).</li>
       <li><b>Window:</b> fixed 1440 × 900, not resizable or maximizable. It fits both monitors (1920 × 1080 and 2560 × 1080) at 100% scaling and falls back to 1280 × 800, with the same layout zoomed to 88.9%, if the screen is too small.</li>
@@ -946,7 +946,7 @@ svg.chart .grid-l { stroke: var(--hairline); stroke-width: 1; }
       <li><b>Loan banners (Phase 4):</b> one per loan, for its next unpaid payment, saying how many others are overdue.</li>
       <li><b>Safe to spend (Phase 4):</b> a card at the top of the dashboard's right column, always for today, and the lowest point over the next 12 months, never only "until the next payday".</li>
       <li><b>New loans (Phase 4):</b> saving one shows what it does to the debt-free date and Safe to spend first. The button to go ahead is destructive.</li>
-      <li><b>Check-in (Phase 5):</b> a full-window route, not a dialog, with one panel whose Back and Next never move. It can't be closed, and only + Add and the <span class="kbd">?</span> shortcut list open over it.</li>
+      <li><b>Check-in (Phase 5):</b> a full-window route, not a dialog, with one panel whose Back and Next never move. It can't be closed, and only + Add, the pay forms it offers and the <span class="kbd">?</span> shortcut list open over it.</li>
       <li><b>Level chip (Phase 5):</b> the level's number in a small hexagon inside a ring, not "Lv 4", which doesn't fit beside the app name. It's the only way to the Level screen, so there's no Level item, and it takes the current-screen tint there.</li>
     </ul>
   </section>

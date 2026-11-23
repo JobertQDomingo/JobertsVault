@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted, amended by [0014](0014-check-in-escape-on-failed-finish.md) |
 | **Date** | 2026-11-17 |
 | **Related** | PRD §7.17 (CHK-1 to CHK-9), DATA_MODEL §4.9 and §5.19, UI_FLOWS §8.7 and F17, ARCHITECTURE §5.4, DESIGN_SYSTEM §2.3 |
 
