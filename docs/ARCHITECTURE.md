@@ -78,7 +78,7 @@ Exact versions are pinned in `Cargo.lock` and `package-lock.json`, and upgraded 
 
 ```
 jobertsvault/
-├─ README.md  CLAUDE.md  ROADMAP.md  RELEASING.md
+├─ README.md  CLAUDE.md  ROADMAP.md  RELEASING.md  WORKFLOW.md
 ├─ docs/                           # PRD, DATA_MODEL, ARCHITECTURE, DESIGN_SYSTEM, UI_FLOWS
 │  ├─ decisions/                   # decision records 0001–0014 (see docs/decisions/README.md)
 │  └─ design/                      # visual previews of the design system and UI flows
