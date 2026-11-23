@@ -331,9 +331,9 @@ describe("the level chip (LVL-5)", () => {
     fireEvent.click(screen.getByRole("link", { name: "Dashboard" }));
     await waitFor(() =>
       expect(
-        screen.getByRole("link", { name: /^Level 4,/ }).getAttribute(
-          "aria-current",
-        ),
+        screen
+          .getByRole("link", { name: /^Level 4,/ })
+          .getAttribute("aria-current"),
       ).toBeNull(),
     );
   });
