@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-11-23 |
-| **Current focus** | **Phase 5: Check-in & polish**: Release `v1.0.0`, then finish a real weekly and monthly check-in |
+| **Current focus** | **Phase 5 done**: `v1.0.0` is out (2026-11-23), and the first real weekly check-in is finished. Still to come: the first real monthly check-in, due on or after Mon, Dec 1 |
 | **Related docs** | [PRD.md](docs/PRD.md) (requirements and IDs), [ARCHITECTURE.md](docs/ARCHITECTURE.md), [CLAUDE.md](CLAUDE.md) (definition of done) |
 
 This file is the progress tracker.
@@ -22,7 +22,7 @@ This file is the progress tracker.
 | **2 · Reports & backups** | Understand spending, never lose data | `v0.2.0` | All P2 requirements done, a backup restored successfully | 14 / 14 |
 | **3 · Planning** | Recurring transactions, budgets, goals | `v0.3.0` | All P3 requirements done | 16 / 16 |
 | **4 · Loans & forecast** | Never miss a loan payment, and know what's safe to spend | `v0.4.0` | All P4 requirements done, and the real loans and paydays are set up in the installed app | 17 / 17 |
-| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 28 / 29 |
+| **5 · Check-in & polish** | Review every week and month, level up for real, and be ready for daily use for years | `v1.0.0` | All P5 requirements done, and a real weekly and monthly check-in finished in the installed app | 29 / 29 |
 
 ---
 
@@ -242,7 +242,7 @@ The first four were found while testing Phase 4 on the owner's data and left for
 - [x] Performance pass on the glass UI with a full year of data, with `get_checkin` and `get_vault_status` added to the 50,000-transaction check ([ARCHITECTURE §12](docs/ARCHITECTURE.md))
 - [x] Level chip takes over the sidebar's Level item, which is removed: the chip always shows (a placeholder while the status loads or fails), is tinted on `/level` like the current screen, and has a "Vault level" tooltip (UI_FLOWS §1, item 101). It replaces installer polish, which the owner dropped on 2026-11-23 (PRD decision log) [LVL-5]
 - [x] Review all docs against the shipped app, and update any that drifted
-- [ ] Release `v1.0.0` with `/release`, then finish a real weekly and monthly check-in in the installed app
+- [x] Release `v1.0.0` with `/release`, then finish a real weekly and monthly check-in in the installed app. Released on 2026-11-23, and the installed app updated itself with its data intact. The weekly check-in for Nov 16–22 is finished. The owner closed the phase before the first monthly one, which can't come due before Dec 1 (2026-11-23)
 
 ---
 
