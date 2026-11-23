@@ -140,8 +140,8 @@ const PAYSLIP_ROWS: i64 = 24 * 4;
 const PAID_LOAN_ROWS: i64 = 12;
 
 /// The year before today, for the check-in and the Vault level (ARCHITECTURE §12): 24 payslips,
-/// 12 loan payments paid on time, and the check-ins finished each week and month, each with a
-/// graded focus. The newest week and month (Oct 26 – Nov 1, October) stay due, so `get_checkin`
+/// 12 loan payments paid on time, and the check-ins finished each week and month, each weekly one
+/// with a spending cap for the next week, graded but for the newest. The newest week and month (Oct 26 – Nov 1, October) stay due, so `get_checkin`
 /// times the merged check-in, its fullest form.
 fn seed_last_year(tx: &rusqlite::Transaction) {
     let category = |name: &str| -> i64 {
@@ -157,10 +157,12 @@ fn seed_last_year(tx: &rusqlite::Transaction) {
         (category("Withholding tax"), 95_000),
     ];
     let insert = |kind: &str, amount: i64, date: &str, category: i64, payslip: Option<i64>| {
+        // Only the gross has the employer as payee: deductions and loan payments have none.
+        let payee = (kind == "income").then_some("Perf employer");
         tx.execute(
             "INSERT INTO transactions (kind, amount, date, account_id, category_id, payee, payslip_id, created_at, updated_at)
-             VALUES (?1, ?2, ?3, 2, ?4, 'Perf employer', ?5, 'x', 'x')",
-            params![kind, amount, date, category, payslip],
+             VALUES (?1, ?2, ?3, 2, ?4, ?5, ?6, 'x', 'x')",
+            params![kind, amount, date, category, payee, payslip],
         )
         .unwrap();
         tx.last_insert_rowid()
@@ -222,7 +224,8 @@ fn seed_last_year(tx: &rusqlite::Transaction) {
                 focus.map(|_| 500_000),
                 focus.map(|_| end.succ_opt().unwrap().to_string()),
                 focus.map(|_| next_end.to_string()),
-                focus.map(|_| if i % 3 == 0 { "missed" } else { "kept" }),
+                // Kept at or under the 500,000 target, missed over it (DATA_MODEL §5.22).
+                focus.map(|_| if i % 3 == 2 { "missed" } else { "kept" }),
                 focus.map(|_| 400_000 + (i % 3) * 60_000),
             ],
         )
@@ -318,7 +321,7 @@ fn perf_50k_dashboard_list_and_reports_under_300_ms() {
         .unwrap()
     };
     let (account, category) = (busiest("account_id"), busiest("category_id"));
-    let last_page = ((ROWS - 1) / i64::from(transactions::PAGE_SIZE)) as u32;
+    let last_page = ((count - 1) / i64::from(transactions::PAGE_SIZE)) as u32;
     for (label, query) in [
         ("dashboard: month", month()),
         ("dashboard: year", PeriodQuery::Year { anchor: None }),

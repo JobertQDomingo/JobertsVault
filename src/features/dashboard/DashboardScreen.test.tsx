@@ -453,11 +453,11 @@ test("the banners share one blurred panel as flat rows, so every banner blurs on
   const all = banners();
   expect(all).toHaveLength(4);
   const panel = all[0].parentElement!;
-  expect(panel.className).toContain("glass");
+  expect(panel.classList.contains("glass")).toBe(true);
   for (const b of all) {
     expect(b.parentElement).toBe(panel);
     // A .glass inside a .glass is flat (globals.css, DESIGN_SYSTEM §2.3).
-    expect(b.className).toContain("glass");
+    expect(b.classList.contains("glass")).toBe(true);
   }
 });
 
