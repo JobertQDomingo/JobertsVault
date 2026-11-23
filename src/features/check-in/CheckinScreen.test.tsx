@@ -374,6 +374,25 @@ test("Finish waits for a pick, saves it and opens the dashboard (CHK-7, F17)", a
   expect(await screen.findByText("Check-in done")).toBeTruthy();
 });
 
+test("while Finish saves it keeps focus and a second press does nothing (A11Y-02)", async () => {
+  let release = () => {};
+  const complete = vi.fn(
+    () => new Promise((resolve) => (release = () => resolve([]))),
+  );
+  open(CHECKIN, { complete_checkin: complete });
+  await pickFocus();
+  const finish = button("Finish");
+  finish.focus();
+  fireEvent.click(finish);
+  await waitFor(() => expect(complete).toHaveBeenCalledOnce());
+  fireEvent.click(finish);
+  // Not disabled: a focused button that's disabled drops focus to <body>.
+  expect(finish.hasAttribute("disabled")).toBe(false);
+  expect(document.activeElement).toBe(finish);
+  expect(complete).toHaveBeenCalledOnce();
+  release();
+});
+
 test("↑ and ↓ move the pick between the offers", async () => {
   open(CHECKIN);
   await goTo("Pick a focus");

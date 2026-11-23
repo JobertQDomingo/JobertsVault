@@ -15,12 +15,28 @@ const WIDTHS = {
   list: "max-w-[640px]",
 };
 
+/**
+ * Every element in the page that has had focus, the latest last, each once. The app opens its
+ * dialogs from state, with no Radix Trigger to return to, so Radix would drop focus to <body> on
+ * close (A11Y-01). A field's `autoFocus` moves focus in before Radix's open event, so the opener is
+ * read on close instead: the latest of these outside the closing dialog. A menu item counts as its
+ * menu's ⋯ button, since the menu is gone by then.
+ */
+let focused: HTMLElement[] = [];
+document.addEventListener("focusin", (e) => {
+  const el = e.target as HTMLElement;
+  const trigger = el.closest("[role=menu]")?.getAttribute("aria-labelledby");
+  const now = (trigger && document.getElementById(trigger)) || el;
+  focused = [...focused.filter((f) => f !== now && f.isConnected), now];
+});
+
 export function DialogContent({
   title,
   description,
   size = "form",
   className,
   children,
+  onCloseAutoFocus,
   ...props
 }: Omit<ComponentProps<typeof DialogPrimitive.Content>, "title"> & {
   title: ReactNode;
@@ -38,6 +54,16 @@ export function DialogContent({
           WIDTHS[size],
           className,
         )}
+        onCloseAutoFocus={(e) => {
+          onCloseAutoFocus?.(e);
+          const dialog = e.currentTarget as Node;
+          const el = [...focused]
+            .reverse()
+            .find((f) => f.isConnected && !dialog.contains(f));
+          if (e.defaultPrevented || !el) return;
+          e.preventDefault();
+          el.focus();
+        }}
         {...props}
       >
         <DialogPrimitive.Title className="px-[22px] pt-[18px] pr-14 pb-2 text-h2">

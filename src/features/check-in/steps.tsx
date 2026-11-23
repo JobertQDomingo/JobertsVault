@@ -844,7 +844,8 @@ export function focusStep(ctx: Ctx): Step {
                   "absolute top-3 right-3 grid size-5 place-items-center rounded-full border",
                   on
                     ? "border-primary bg-primary text-primary-foreground"
-                    : "border-field-edge",
+                    : // Not --field-edge (1.4:1): the circle is what says it isn't picked (A11Y-07).
+                      "border-muted-foreground",
                 )}
               >
                 {on && <Check className="size-3" />}

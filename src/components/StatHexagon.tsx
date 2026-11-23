@@ -35,7 +35,14 @@ export function StatHexagon({
     <>
       {data.length >= 3 && (
         <div aria-hidden className="size-[280px] shrink-0">
-          <RadarChart width={280} height={280} data={data} outerRadius={96}>
+          {/* No keyboard layer: it was a Tab stop with no name inside aria-hidden (A11Y-05). */}
+          <RadarChart
+            width={280}
+            height={280}
+            data={data}
+            outerRadius={96}
+            accessibilityLayer={false}
+          >
             <PolarGrid stroke="var(--wash)" />
             <PolarRadiusAxis
               domain={[0, 100]}

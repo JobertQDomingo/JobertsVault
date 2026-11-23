@@ -226,17 +226,14 @@ function Flow({
     );
   });
   const last = step === "focus";
-  const ready =
-    step === "balance"
-      ? answered
-      : last
-        ? !!picked && !complete.isPending
-        : true;
+  const ready = step === "balance" ? answered : last ? !!picked : true;
 
   const go = (s: Name) => setParams({ step: s }, { replace: true });
   const back = () => at > 0 && go(steps[at - 1]);
   const next = () => {
-    if (!ready) return;
+    // A second press while saving does nothing. Finish isn't disabled for it, since a focused
+    // button that's disabled loses focus (A11Y-02).
+    if (!ready || complete.isPending) return;
     if (!last) return go(steps[at + 1]);
     notify.dismiss(failure.current);
     complete.mutate(picked!, {

@@ -633,15 +633,17 @@ test("the week's and the month's focus sit flat at the top of Safe to spend, the
   const card = panel("Safe to spend");
   // Flat in the card's own panel: no blurred panel of its own (DESIGN_SYSTEM §11).
   expect(card.getAllByText(/'s focus: /)).toHaveLength(2);
-  expect(card.getByRole("progressbar").getAttribute("aria-valuenow")).toBe(
-    "82",
-  );
   expect(
-    screen
-      .getByText(/^This week's focus/)
-      .closest("a")!
-      .getAttribute("href"),
-  ).toBe("/level");
+    card
+      .getByRole("progressbar", { hidden: true })
+      .getAttribute("aria-valuenow"),
+  ).toBe("82");
+  // The link is named by its sentences: the bar's "82" and "82%" aren't read into it (A11Y-10).
+  const link = screen.getByRole("link", {
+    name: /^This month's focus: .*so far$/,
+  });
+  expect(link.getAttribute("href")).toBe("/level");
+  expect(link).toBe(screen.getByText(/^This week's focus/).closest("a"));
 });
 
 test("with no active focus there are no focus rows (CHK-8)", async () => {

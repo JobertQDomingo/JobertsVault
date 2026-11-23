@@ -153,7 +153,7 @@ export function LevelScreen() {
         <LevelPath level={s.level} />
         {s.level < 10 && (
           <div className="grid gap-2">
-            <h3 className="text-h3">{`Next: ${levelTitle(s.nextLevel.level)}`}</h3>
+            <h2 className="text-h3">{`Next: ${levelTitle(s.nextLevel.level)}`}</h2>
             <ul className="grid gap-1">
               {s.nextLevel.conditions.map((c) => {
                 const gap = conditionGap(c, names);
@@ -190,7 +190,7 @@ export function LevelScreen() {
       </GlassPanel>
       <div className="grid grid-cols-2 items-start gap-3">
         <GlassPanel className="grid gap-3 p-5">
-          <h3 className="text-h3">Stats</h3>
+          <h2 className="text-h3">Stats</h2>
           {/* gap-3 leaves room for the trend column: 280 + 12 + 248 fills the 540 px inside. */}
           <div className="grid grid-cols-[280px_minmax(0,1fr)] items-center gap-3">
             <StatHexagon stats={s.stats} previous={s.previous?.stats} />
@@ -205,7 +205,7 @@ export function LevelScreen() {
           {lowest?.reason && <p>{weakest(lowest.reason)}</p>}
         </GlassPanel>
         <GlassPanel className="grid gap-4 p-5">
-          <h3 className="text-h3">Focus</h3>
+          <h2 className="text-h3">Focus</h2>
           {s.focuses.length ? (
             <FocusRows focuses={s.focuses} names={names} level={level} />
           ) : (
