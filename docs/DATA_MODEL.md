@@ -1128,7 +1128,7 @@ focus streak    = counting back from the focus that ended latest, the number of 
 ```
 
 - **The latest week doesn't break the streak while it can still be on time:** until `period_end + 3` has passed, a week with no row yet is passed over rather than counted as missed.
-- The check-in being finished counts as finished today, in its own Stats and level step and in its snapshot (§5.20).
+- The check-in being finished counts as finished today, in its own Stats and level step and in its snapshot (§5.20). So its own focus streak, and the focus record behind it, already count the focuses it grades: the one the Start step shows as kept is in the streak under it (§9 item 149).
 - Neither streak feeds a stat or a level, beyond the on-time check-ins that Habit already counts (§5.20).
 
 **History (LVL-8).** The trend lines use the 12 latest check-ins, one point per `completed_on` (a merged check-in's rows hold the same snapshot). The focus record is the 8 latest graded focuses, `void` ones left out.
@@ -1518,3 +1518,7 @@ Answered on 2026-11-20, testing on a copy of the owner's data (T18):
 Answered on 2026-11-20 (Phase 5, the goal's two monthly figures):
 
 148. **The monthly room is named as the most there is, and `monthly_needed` as what the date needs** (GOL-3, GOL-6). The dialog's "set aside about ₱X a month" and the too-soon message's "saving about ₱X a month" read as what the goal needs, so for one goal and one date the card's different "Save ₱Y/month" looked like it disagreed. Y is never more than X on the day the date is set, and is more only once the goal is Behind. The too-soon message now says "Even setting aside the most you could, about ₱X a month, the earliest you can reach this is …", the dialog's line says "The most you could set aside …", and the card adds "on time". Only the wording changed: both figures are worked out as before (§5.7, §5.17, items 84, 85, 98; UI_FLOWS §11 item 96).
+
+Answered on 2026-11-23, reviewing the docs for `v1.0.0`:
+
+149. **The check-in's own focus streak counts the focus it grades** (the owner's choice, 2026-11-23). The Stats and level step counted only grades already stored, so the Start step could say "You kept it" while "N focuses kept in a row" under the level left that focus out until Finish stored it. §5.20 already said the check-in counts as finished "for both streaks", so the code was changed to match (§5.23).

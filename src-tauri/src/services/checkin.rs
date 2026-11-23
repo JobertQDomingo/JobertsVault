@@ -270,9 +270,7 @@ pub fn complete(
     }
     let stamp = stamp(now);
     for (id, _, ended, result) in &d.ended {
-        let actual = (*result != FocusResult::Void)
-            .then(|| vault::actual(ended))
-            .flatten();
+        let actual = stored_actual(ended, *result);
         repo::checkins::set_grade(&tx, *id, result_text(*result), actual, &stamp)?;
     }
     let level = levels::levels(&d.facts.level, &d.facts.inputs).level;
@@ -518,10 +516,18 @@ fn view(conn: &Connection, d: Due, today: NaiveDate) -> Result<Checkin, AppError
     let Due {
         due,
         shown,
-        facts,
+        mut facts,
         ended,
         offers,
     } = d;
+    // The check-in being finished counts as finished today (DATA_MODEL §5.20): its status counts
+    // the grades Finish will store, so the focus streak includes the focus the Start step shows.
+    for (id, _, measured, result) in &ended {
+        if let Some(row) = facts.rows.iter_mut().find(|r| r.id == *id) {
+            row.focus_result = Some(result_text(*result).into());
+            row.focus_actual = stored_actual(measured, *result);
+        }
+    }
     let settings = &facts.settings;
     let query = |p: Period| match p.kind() {
         PeriodKind::Week => PeriodQuery::Week {
@@ -547,9 +553,7 @@ fn view(conn: &Connection, d: Due, today: NaiveDate) -> Result<Checkin, AppError
             .map(|(_, focus, measured, result)| GradedFocus {
                 focus: *focus,
                 result: *result,
-                actual: (*result != FocusResult::Void)
-                    .then(|| vault::actual(measured))
-                    .flatten(),
+                actual: stored_actual(measured, *result),
             });
     let in_shown = |date: NaiveDate| shown.start() <= date && date <= shown.end();
     let payments: Vec<_> = facts
@@ -821,6 +825,13 @@ fn kind_text(kind: CheckinKind) -> &'static str {
         CheckinKind::Month => "month",
         CheckinKind::Year => "year",
     }
+}
+
+/// What `focus_actual` stores for a graded focus: none when it's void or a `loan_on_time`.
+fn stored_actual(measured: &Ended, result: FocusResult) -> Option<i64> {
+    (result != FocusResult::Void)
+        .then(|| vault::actual(measured))
+        .flatten()
 }
 
 fn result_text(result: FocusResult) -> &'static str {
@@ -1336,5 +1347,22 @@ mod tests {
             .query_row("SELECT stat_habit FROM checkins", [], |r| r.get(0))
             .unwrap();
         assert_eq!(habit, Some(9));
+    }
+
+    #[test]
+    fn finishing_counts_the_focus_it_grades_in_its_own_focus_streak() {
+        let mut conn = db();
+        spend(&mut conn, 500, "2026-11-10");
+        let first = d(2026, 11, 16);
+        let focus = logging(&get(&mut conn, first).unwrap().unwrap());
+        complete(&mut conn, focus, at(first)).unwrap();
+        for day in 17..=21 {
+            spend(&mut conn, 100, &format!("2026-11-{day}"));
+        }
+        let c = get(&mut conn, d(2026, 11, 23)).unwrap().unwrap();
+        assert_eq!(c.start.last_focus.unwrap().result, FocusResult::Kept);
+        // The Start step says it was kept, so the streak under the level counts it too (§5.20).
+        assert_eq!(c.status.status.focus_streak, 1);
+        assert_eq!(c.status.status.focus_record.len(), 1);
     }
 }
