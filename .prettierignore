@@ -4,3 +4,4 @@ docs/
 src-tauri/
 src/bindings/
 .impeccable/
+.claude/
